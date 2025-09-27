@@ -1,0 +1,59 @@
+name: "✨ Feature Request / Suggestion"
+description: "Suggest a new feature or an improvement for the application."
+title: "[FEAT] "
+labels: ["enhancement", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!IMPORTANT]
+        > Thanks for taking the time to suggest a new feature or improvement!
+        >
+        > Please provide as much detail as possible.
+
+  - type: textarea
+    id: problem-related
+    attributes:
+      label: "Is your feature request related to a problem?"
+      description: "A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]"
+      placeholder: "Describe the problem or limitation you've encountered."
+    validations:
+      required: false
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Describe the solution you'd like"
+      description: "A clear and concise description of what you want to happen."
+      placeholder: "Tell us what you'd like to see implemented."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Describe alternatives you've considered"
+      description: "A clear and concise description of any alternative solutions or features you've considered."
+      placeholder: "Have you thought of other ways to solve this?"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "Additional Context"
+      description: "Add any other context or screenshots about the feature request here."
+      placeholder: "You can add mockups, links, or any other relevant information."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: "Code of Conduct"
+      description: "By submitting this issue, you agree to follow our Code of Conduct."
+      options:
+        - label: "I agree to follow this project's Code of Conduct"
+          required: true

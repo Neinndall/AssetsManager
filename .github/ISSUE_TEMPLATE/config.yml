@@ -15,3 +15,6 @@ issue_forms:
     path: bug_report.yml
     # The form's label in the GitHub UI
     description: "Report a bug or unexpected behavior in the application."
+  - name: "✨ Feature Request / Suggestion"
+    path: suggestion.yml
+    description: "Suggest a new feature or an improvement for the application."
