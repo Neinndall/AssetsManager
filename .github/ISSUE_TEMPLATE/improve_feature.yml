@@ -5,6 +5,12 @@ labels: ["enhancement"]
 assignees: []
 
 body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!NOTE]
+        > Thanks for taking the time to write to improve an existing feature! Please be as detailed as possible.
+        
   - type: textarea
     id: tedious-feature
     attributes:
