@@ -1,6 +1,6 @@
 name: "✨ Request a Feature"
 description: "Suggest an idea for a new feature or enhancement."
-title: "[FEAT] "
+title: "[SUGGEST] "
 labels: ["enhancement", "triage"]
 assignees: []
 
