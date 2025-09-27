@@ -1,17 +1,9 @@
 blank_issues_enabled: false
-contact_links:
-  - name: Ask a question
-    url: https://github.com/Neinndall/PBE_AssetsDownloader/discussions/new?category=q-a
-    about: Ask a question about the project or its usage.
-  - name: Request a feature
-    url: https://github.com/Neinndall/PBE_AssetsDownloader/discussions/new?category=ideas
-    about: Suggest an idea for a new feature or enhancement.
-
 # List of issue forms to display
 issue_forms:
   - name: "🐛 Bug Report"
-    # The file path to the form's YAML or Markdown file
-    # The path is relative to the .github/ISSUE_TEMPLATE/ directory
     path: bug_report.yml
-    # The form's label in the GitHub UI
     description: "Report a bug or unexpected behavior in the application."
+  - name: "✨ Requests a Suggestion"
+    path: suggestion.yml
+    description: "Suggest an idea for a new feature or enhancement."
