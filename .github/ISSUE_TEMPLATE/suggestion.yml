@@ -1,50 +1,39 @@
-name: "✨ Request a Feature"
-description: "Suggest an idea for a new feature or enhancement."
-title: "[SUGGEST] "
-labels: ["enhancement", "triage"]
+name: "✨ Requests a Suggestion"
+description: "Got an idea for a new feature or an improvement? We'd love to hear it!"
+title: "[SUGGESTION] "
+labels: ["suggestion"]
 assignees: []
 
 body:
   - type: markdown
     attributes:
       value: |
-        > [!IMPORTANT]
-        > Thanks for taking the time to suggest a new feature or improvement!
-        >
-        > Please provide as much detail as possible.
+        > [!NOTE]
+        > Thanks for taking the time to suggest an idea! Please be as detailed as possible.
 
   - type: textarea
-    id: problem-related
+    id: what-to-add
     attributes:
-      label: "Is your feature request related to a problem?"
-      description: "A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]"
-      placeholder: "Describe the problem or limitation you've encountered."
-    validations:
-      required: false
-
-  - type: textarea
-    id: solution
-    attributes:
-      label: "Describe the solution you'd like"
-      description: "A clear and concise description of what you want to happen."
-      placeholder: "Tell us what you'd like to see implemented."
+      label: "What would you like to be added?"
+      description: "A clear and concise description of the new feature or enhancement you are proposing."
+      placeholder: "e.g., 'Add a button to export data as a CSV file.'"
     validations:
       required: true
 
   - type: textarea
-    id: alternatives
+    id: why-needed
     attributes:
-      label: "Describe alternatives you've considered"
-      description: "A clear and concise description of any alternative solutions or features you've considered."
-      placeholder: "Have you thought of other ways to solve this?"
+      label: "Why is this needed?"
+      description: "Explain the problem or limitation this feature would solve. Why would this be a valuable addition to the application?"
+      placeholder: "e.g., 'Currently, there is no easy way to share data with other team members who don't use this app. Exporting to CSV would solve this.'"
     validations:
-      required: false
+      required: true
 
   - type: textarea
-    id: additional-context
+    id: other-context
     attributes:
-      label: "Additional Context"
-      description: "Add any other context or screenshots about the feature request here."
-      placeholder: "You can add mockups, links, or any other relevant information."
+      label: "Anything else you want to share?"
+      description: "Add any other context, mockups, screenshots, or links about the feature request here."
+      placeholder: "You can drag and drop images, paste links, or provide any other relevant information."
     validations:
       required: false

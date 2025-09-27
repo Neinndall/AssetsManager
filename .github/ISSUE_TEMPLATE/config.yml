@@ -4,6 +4,9 @@ issue_forms:
   - name: "🐛 Bug Report"
     path: bug_report.yml
     description: "Report a bug or unexpected behavior in the application."
+  - name: "✨ Improve an Existing Feature"
+    path: improve_feature.yml
+    description: "Suggest an improvement for a feature that is already implemented."
   - name: "✨ Requests a Suggestion"
     path: suggestion.yml
-    description: "Suggest an idea for a new feature or enhancement."
+    description: "Got an idea for a new feature or an improvement? We'd love to hear it!"
