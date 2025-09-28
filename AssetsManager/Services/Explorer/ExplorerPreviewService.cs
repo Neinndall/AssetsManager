@@ -243,55 +243,74 @@ namespace AssetsManager.Services.Explorer
             try
             {
                 string textContent;
+                IHighlightingDefinition syntaxHighlighting = null;
 
-                if (IsBinExtension(extension))
+                switch (extension)
                 {
-                    using var stream = new MemoryStream(data);
-                    var binTree = new BinTree(stream);
-                    var binDict = BinUtils.ConvertBinTreeToDictionary(binTree, _hashResolverService);
-                    textContent = await JsonDiffHelper.FormatJsonAsync(binDict);
-                }
-                else
-                {
-                    textContent = Encoding.UTF8.GetString(data);
-                    if (extension == ".js")
-                    {
-                        textContent = await _jsBeautifierService.BeautifyAsync(textContent);
-                    }
-                    else if (extension == ".json")
-                    {
-                        textContent = await JsonDiffHelper.FormatJsonAsync(textContent);
-                    }
-                }
-
-                if (extension == ".json" || IsBinExtension(extension) || IsJavaScriptExtension(extension))
-                {
-                    if (_jsonHighlightingDefinition == null)
-                    {
-                        var assembly = Assembly.GetExecutingAssembly();
-                        var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
-                        using (var stream = assembly.GetManifestResourceStream(resourceName))
+                    case ".bin":
+                        using (var stream = new MemoryStream(data))
                         {
-                            if (stream != null)
+                            var binTree = new BinTree(stream);
+                            var binDict = BinUtils.ConvertBinTreeToDictionary(binTree, _hashResolverService);
+                            textContent = await JsonDiffHelper.FormatJsonAsync(binDict);
+                        }
+                        if (_jsonHighlightingDefinition == null)
+                        {
+                            var assembly = Assembly.GetExecutingAssembly();
+                            var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
+                            using (var stream = assembly.GetManifestResourceStream(resourceName))
+                            using (var reader = new XmlTextReader(stream))
                             {
-                                using (var reader = new XmlTextReader(stream))
-                                {
-                                    _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
-                                }
+                                _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
                             }
                         }
-                    }
-                    _textEditorPreview.SyntaxHighlighting = _jsonHighlightingDefinition;
-                }
-                else if (extension == ".xml")
-                {
-                    _textEditorPreview.SyntaxHighlighting = null;
-                }
-                else
-                {
-                    _textEditorPreview.SyntaxHighlighting = null;
+                        syntaxHighlighting = _jsonHighlightingDefinition;
+                        break;
+
+                    case ".js":
+                        textContent = Encoding.UTF8.GetString(data);
+                        textContent = await _jsBeautifierService.BeautifyAsync(textContent);
+                        if (_jsonHighlightingDefinition == null)
+                        {
+                            var assembly = Assembly.GetExecutingAssembly();
+                            var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
+                            using (var stream = assembly.GetManifestResourceStream(resourceName))
+                            using (var reader = new XmlTextReader(stream))
+                            {
+                                _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
+                            }
+                        }
+                        syntaxHighlighting = _jsonHighlightingDefinition;
+                        break;
+
+                    case ".json":
+                        textContent = Encoding.UTF8.GetString(data);
+                        textContent = await JsonDiffHelper.FormatJsonAsync(textContent);
+                        if (_jsonHighlightingDefinition == null)
+                        {
+                            var assembly = Assembly.GetExecutingAssembly();
+                            var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
+                            using (var stream = assembly.GetManifestResourceStream(resourceName))
+                            using (var reader = new XmlTextReader(stream))
+                            {
+                                _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
+                            }
+                        }
+                        syntaxHighlighting = _jsonHighlightingDefinition;
+                        break;
+
+                    case ".xml":
+                        textContent = Encoding.UTF8.GetString(data);
+                        syntaxHighlighting = null;
+                        break;
+
+                    default: // for .txt, .log, .yml, etc.
+                        textContent = Encoding.UTF8.GetString(data);
+                        syntaxHighlighting = null;
+                        break;
                 }
 
+                _textEditorPreview.SyntaxHighlighting = syntaxHighlighting;
                 _textEditorPreview.Text = textContent;
                 _textEditorPreview.Focus();
             }
