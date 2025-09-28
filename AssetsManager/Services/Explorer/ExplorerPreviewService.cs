@@ -27,6 +27,7 @@ using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using System.Xml;
+
 using AssetsManager.Services.Comparator;
 
 namespace AssetsManager.Services.Explorer
@@ -241,7 +242,7 @@ namespace AssetsManager.Services.Explorer
             await SetPreviewer(Previewer.AvalonEdit);
             try
             {
-                string textContent = string.Empty;
+                string textContent;
 
                 if (IsBinExtension(extension))
                 {
@@ -257,7 +258,7 @@ namespace AssetsManager.Services.Explorer
                     {
                         textContent = await _jsBeautifierService.BeautifyAsync(textContent);
                     }
-                    else
+                    else if (extension == ".json")
                     {
                         textContent = await JsonDiffHelper.FormatJsonAsync(textContent);
                     }
@@ -281,6 +282,10 @@ namespace AssetsManager.Services.Explorer
                         }
                     }
                     _textEditorPreview.SyntaxHighlighting = _jsonHighlightingDefinition;
+                }
+                else if (extension == ".xml")
+                {
+                    _textEditorPreview.SyntaxHighlighting = null;
                 }
                 else
                 {
