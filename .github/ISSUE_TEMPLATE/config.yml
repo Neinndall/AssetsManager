@@ -7,6 +7,6 @@ issue_forms:
   - name: "✨ Improve an Existing Feature"
     path: improve_feature.yml
     description: "Suggest an improvement for a feature that is already implemented."
-  - name: "✨ Requests a Suggestion"
+  - name: "💡 Requests a Suggestion"
     path: suggestion.yml
     description: "Got an idea for a new feature or an improvement? We'd love to hear it!"

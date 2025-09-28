@@ -1,7 +1,7 @@
 name: "✨ Improve an Existing Feature"
 description: "Suggest an improvement for a feature that is already implemented."
 title: "[IMPROVE] "
-labels: ["enhancement"]
+labels: ["improvements"]
 assignees: []
 
 body:
@@ -19,6 +19,7 @@ body:
       placeholder: "e.g., 'The process for exporting images requires too many clicks...'"
     validations:
       required: true
+      
   - type: textarea
     id: proposed-improvement
     attributes:
