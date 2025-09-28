@@ -1,9 +1,9 @@
 name: "✨ Improve an Existing Feature"
 description: "Suggest an improvement for a feature that is already implemented."
 title: "[IMPROVE] "
-labels: ["improvements"]
-assignees: []
-
+labels: 
+  - "improvements"
+  - "status/triage"
 body:
   - type: markdown
     attributes:
