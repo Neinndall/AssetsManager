@@ -346,6 +346,7 @@ namespace AssetsManager.Services.Explorer
                     _webView2Preview.Visibility = Visibility.Visible;
                     break;
                 case Previewer.AvalonEdit:
+                    _textEditorPreview.Text = string.Empty;
                     _textEditorPreview.Visibility = Visibility.Visible;
                     break;
                 case Previewer.Placeholder:
