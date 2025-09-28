@@ -1,9 +1,9 @@
 name: "💡 Requests a Suggestion"
 description: "Got an idea for a new feature or an improvement? We'd love to hear it!"
 title: "[SUGGESTION] "
-labels: ["suggestion"]
-assignees: []
-
+labels:
+  - "suggestion"
+  - "status/triage"
 body:
   - type: markdown
     attributes:
