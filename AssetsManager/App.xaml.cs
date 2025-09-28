@@ -123,7 +123,6 @@ namespace AssetsManager
             services.AddTransient<GeneralSettingsView>();
             services.AddTransient<AdvancedSettingsView>();
             services.AddTransient<HashPathsSettingsView>();
-            services.AddTransient<LogsSettingsView>();
             services.AddTransient<AboutView>();
             services.AddTransient<BugReportsView>();
             services.AddTransient<ChangelogsView>();

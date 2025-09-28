@@ -156,34 +156,7 @@ namespace AssetsManager.Services.Downloads
             }
         }
 
-        public async Task<string> DownloadAssetIfNeeded(string assetUrl, string assetName)
-        {
-            await _directoriesCreator.CreatePreviewAssetsAsync();
-            string previewAssetsPath = _directoriesCreator.PreviewAssetsPath;
-            string localFilePath = Path.Combine(previewAssetsPath, assetName);
 
-            if (File.Exists(localFilePath))
-            {
-                _logService.LogDebug($"Asset already exists locally: {localFilePath}");
-                return localFilePath;
-            }
-
-            try
-            {
-                var response = await _httpClient.GetAsync(assetUrl);
-                response.EnsureSuccessStatusCode();
-                await using (var fileStream = new FileStream(localFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                {
-                    await response.Content.CopyToAsync(fileStream);
-                }
-                return localFilePath;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, $"Error downloading asset '{assetName}' from {assetUrl}");
-                return null;
-            }
-        }
 
         public async Task DownloadAssetToCustomPathAsync(string url, string fullDestinationPath)
         {

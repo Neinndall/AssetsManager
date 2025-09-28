@@ -58,12 +58,6 @@
                                Tag="⚡"
                                GroupName="Navigation" 
                                Style="{StaticResource NavButtonStyle}"/>
-                    
-                    <RadioButton x:Name="NavLogs" 
-                               Content="Logs" 
-                               Tag="📋"
-                               GroupName="Navigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
                 </StackPanel>
             </StackPanel>
         </Border>
