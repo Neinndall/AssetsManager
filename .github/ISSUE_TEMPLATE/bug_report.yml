@@ -1,9 +1,9 @@
 name: "🐛 Bug Report"
 description: "Report a bug or unexpected behavior in the application."
 title: "[BUG] "
-labels: ["bug", "triage"]
-assignees: []
-
+labels: 
+  - "bug"
+  - "triage"
 body:
   - type: markdown
     attributes:
