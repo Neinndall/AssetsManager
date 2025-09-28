@@ -19,6 +19,7 @@ body:
       placeholder: "e.g., 'The process for exporting images requires too many clicks...'"
     validations:
       required: true
+      
   - type: textarea
     id: proposed-improvement
     attributes:
