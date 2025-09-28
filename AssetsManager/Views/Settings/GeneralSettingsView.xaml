@@ -166,7 +166,7 @@
                         <CheckBox x:Name="checkBoxCreateBackUp" 
                                   Content="Create hashes backups" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Back up hash files before updates to prevent data loss."
+                        <TextBlock Text="Back up hash files before updates to prevent data loss"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
                                      Margin="27,0,0,8" 
