@@ -94,10 +94,14 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private void CloseTabButton_Click(object sender, RoutedEventArgs e)
+        private async void CloseTabButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement element && element.DataContext is PinnedFileModel vm)
             {
+                if (ViewModel.SelectedFile == vm)
+                {
+                    await ExplorerPreviewService.ResetPreviewAsync();
+                }
                 ViewModel.UnpinFile(vm);
             }
         }
