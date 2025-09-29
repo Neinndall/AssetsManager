@@ -85,21 +85,6 @@ namespace AssetsManager.Utils
             CreateDirectoryInternal(SubAssetsDownloadedPath, false);
         }
 
-        public void GenerateNewWadSubPaths()
-        {
-            string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
-            SubAssetsDownloadedPath = Path.Combine("AssetsDownloaded", date);
-            WadNewAssetsPath = Path.Combine(SubAssetsDownloadedPath, "NEW");
-            WadModifiedAssetsPath = Path.Combine(SubAssetsDownloadedPath, "MODIFIED");
-            WadRenamedAssetsPath = Path.Combine(SubAssetsDownloadedPath, "RENAMED");
-            WadRemovedAssetsPath = Path.Combine(SubAssetsDownloadedPath, "REMOVED");
-            
-            CreateDirectoryInternal(WadNewAssetsPath, false);
-            CreateDirectoryInternal(WadModifiedAssetsPath, false);
-            CreateDirectoryInternal(WadRenamedAssetsPath, false);
-            CreateDirectoryInternal(WadRemovedAssetsPath, false);
-        }
-
         public void GenerateNewBackUpOldHashesPath()
         {
             string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");

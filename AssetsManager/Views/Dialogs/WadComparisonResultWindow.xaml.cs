@@ -18,6 +18,7 @@ using System.Windows.Media.Imaging;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Explorer;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -51,11 +52,13 @@ namespace AssetsManager.Views.Dialogs
         private readonly WadPackagingService _wadPackagingService;
         private readonly DiffViewService _diffViewService;
         private readonly HashResolverService _hashResolverService;
+        private readonly WadExtractionService _wadExtractionService;
+        private readonly AppSettings _appSettings;
         private readonly string _oldPbePath;
         private readonly string _newPbePath;
         private readonly string _sourceJsonPath; // Path to the loaded wadcomparison.json
 
-        public WadComparisonResultWindow(List<ChunkDiff> diffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, string oldPbePath, string newPbePath)
+        public WadComparisonResultWindow(List<ChunkDiff> diffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, WadExtractionService wadExtractionService, AppSettings appSettings, string oldPbePath, string newPbePath)
         {
             InitializeComponent();
             _serviceProvider = serviceProvider;
@@ -67,6 +70,8 @@ namespace AssetsManager.Views.Dialogs
             _wadPackagingService = wadPackagingService;
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
+            _wadExtractionService = wadExtractionService;
+            _appSettings = appSettings;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = null; // Not loaded from a file
@@ -86,7 +91,7 @@ namespace AssetsManager.Views.Dialogs
             PopulateResults(_serializableDiffs);
         }
 
-        public WadComparisonResultWindow(List<SerializableChunkDiff> serializableDiffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
+        public WadComparisonResultWindow(List<SerializableChunkDiff> serializableDiffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, WadExtractionService wadExtractionService, AppSettings appSettings, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
         {
             InitializeComponent();
             _serviceProvider = serviceProvider;
@@ -98,6 +103,8 @@ namespace AssetsManager.Views.Dialogs
             _wadPackagingService = wadPackagingService;
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
+            _wadExtractionService = wadExtractionService;
+            _appSettings = appSettings;
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
@@ -243,42 +250,84 @@ namespace AssetsManager.Views.Dialogs
                 }
             }
 
-            if (ResultsTree.DownloadMenuItem is MenuItem downloadMenuItem)
+            if (ResultsTree.ExtractMenuItem is MenuItem extractMenuItem)
             {
-                downloadMenuItem.IsEnabled = GetDownloadableDiffsFromSelection().Any();
+                extractMenuItem.IsEnabled = GetExtractableDiffsFromSelection().Any();
             }
         }
 
-        private async void DownloadMenuItem_Click(object sender, RoutedEventArgs e)
+        private async void ExtractMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            List<SerializableChunkDiff> diffsToDownload = GetDownloadableDiffsFromSelection();
-            if (!diffsToDownload.Any())
+            List<SerializableChunkDiff> diffsToExtract = GetExtractableDiffsFromSelection();
+            if (!diffsToExtract.Any())
             {
-                _customMessageBoxService.ShowInfo("Info", "No downloadable files (New or Modified) in the current selection.", this);
+                _customMessageBoxService.ShowInfo("Info", "No extractable files (New, Modified, or Renamed) in the current selection.", this);
                 return;
             }
 
-            _logService.Log($"Starting download of {diffsToDownload.Count} assets from WAD comparison...");
-            try
+            string rootDestinationPath = null;
+            if (!string.IsNullOrEmpty(_appSettings.DefaultExtractedSelectDirectory) && Directory.Exists(_appSettings.DefaultExtractedSelectDirectory))
             {
-                int successCount = await _assetDownloaderService.DownloadWadAssetsAsync(diffsToDownload);
-                if (successCount == diffsToDownload.Count)
+                rootDestinationPath = _appSettings.DefaultExtractedSelectDirectory;
+            }
+            else
+            {
+                var dialog = new Microsoft.WindowsAPICodePack.Dialogs.CommonOpenFileDialog
                 {
-                    _customMessageBoxService.ShowSuccess("Success", $"Successfully downloaded {successCount} asset(s).");
+                    IsFolderPicker = true,
+                    Title = "Select Destination Folder for Extraction"
+                };
+
+                if (dialog.ShowDialog() == Microsoft.WindowsAPICodePack.Dialogs.CommonFileDialogResult.Ok)
+                {
+                    rootDestinationPath = dialog.FileName;
+                }
+            }
+
+            if (rootDestinationPath != null)
+            {
+                _logService.Log("Extracting selected files...");
+                int successCount = 0;
+
+                foreach (var diff in diffsToExtract)
+                {
+                    try
+                    {
+                        string typeFolder = diff.Type.ToString();
+                        string finalDestinationPath = Path.Combine(rootDestinationPath, typeFolder);
+                        Directory.CreateDirectory(finalDestinationPath); // Create the type-specific subfolder
+
+                        string basePath = (diff.Type == ChunkDiffType.New || diff.Type == ChunkDiffType.Modified || diff.Type == ChunkDiffType.Renamed) ? _newPbePath : _oldPbePath;
+                        string sourceWadPath = Path.Combine(basePath, diff.SourceWadFile);
+
+                        var node = new FileSystemNodeModel(diff.FileName, false, diff.Path, sourceWadPath)
+                        {
+                            SourceChunkPathHash = diff.NewPathHash, // For extraction, we always want the new version
+                            ChunkDiff = diff
+                        };
+
+                        await _wadExtractionService.ExtractNodeAsync(node, finalDestinationPath);
+                        successCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, $"Failed to extract {diff.FileName}");
+                    }
+                }
+
+                if (successCount == diffsToExtract.Count)
+                {
+                    _customMessageBoxService.ShowSuccess("Success", "Successfully extracted selected assets.");
+                    _logService.LogInteractiveSuccess($"Successfully extracted to {rootDestinationPath}", rootDestinationPath);
                 }
                 else
                 {
-                    _customMessageBoxService.ShowWarning("Partial Success", $"Successfully downloaded {successCount} out of {diffsToDownload.Count} asset(s). Check logs for details.");
+                    _customMessageBoxService.ShowWarning("Partial Success", $"Successfully extracted {successCount} out of {diffsToExtract.Count} asset(s). Check logs for details.");
                 }
-            }
-            catch (Exception ex)
-            {
-                _customMessageBoxService.ShowError("Error", $"An error occurred during download: {ex.Message}", this);
-                _logService.LogError(ex, "Download failed.");
             }
         }
 
-        private List<SerializableChunkDiff> GetDownloadableDiffsFromSelection()
+        private List<SerializableChunkDiff> GetExtractableDiffsFromSelection()
         {
             var selectedItem = ResultsTree.SelectedItem;
             var downloadableDiffs = new List<SerializableChunkDiff>();

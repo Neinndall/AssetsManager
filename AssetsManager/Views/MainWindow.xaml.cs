@@ -41,6 +41,7 @@ namespace AssetsManager.Views
         private readonly DiffViewService _diffViewService;
         private readonly MonitorService _monitorService;
         private readonly VersionService _versionService; // Add this
+        private readonly WadExtractionService _wadExtractionService;
 
         private string _latestAppVersionAvailable;
         private readonly List<string> _notificationMessages = new List<string>();
@@ -64,7 +65,8 @@ namespace AssetsManager.Views
             ProgressUIManager progressUIManager,
             DiffViewService diffViewService,
             MonitorService monitorService,
-            VersionService versionService) // Add this
+            VersionService versionService, // Add this
+            WadExtractionService wadExtractionService)
         {
             InitializeComponent();
 
@@ -87,6 +89,7 @@ namespace AssetsManager.Views
             _diffViewService = diffViewService;
             _monitorService = monitorService;
             _versionService = versionService; // Add this
+            _wadExtractionService = wadExtractionService;
 
             _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, this);
 
@@ -139,7 +142,7 @@ namespace AssetsManager.Views
                         NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
                     }).ToList();
 
-                    var resultWindow = new WadComparisonResultWindow(serializableDiffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, oldLolPath, newLolPath);
+                    var resultWindow = new WadComparisonResultWindow(serializableDiffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, _wadExtractionService, _appSettings, oldLolPath, newLolPath);
                     resultWindow.Owner = this;
                     resultWindow.Show();
                 }

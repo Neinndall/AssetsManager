@@ -160,10 +160,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     LogService.Log("Extracting selected files...");
                     await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath);
-                    LogService.LogInteractiveSuccess($"Successfully extracted '{selectedNode.Name}' to '{destinationPath}'.", destinationPath);
+                    LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name} to {destinationPath}", destinationPath);
                 }
                 catch (Exception ex)
-                {                    LogService.LogError(ex, $"Failed to extract '{selectedNode.Name}'.");
+                {   
+                    LogService.LogError(ex, $"Failed to extract '{selectedNode.Name}'.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred during extraction: {ex.Message}", Window.GetWindow(this));
                 }
             }
