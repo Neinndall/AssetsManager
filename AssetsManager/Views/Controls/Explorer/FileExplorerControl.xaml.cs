@@ -42,6 +42,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public ObservableCollection<FileSystemNodeModel> RootNodes { get; set; }
         private readonly DispatcherTimer _searchTimer;
+        private string _currentRootPath;
 
         public FileExplorerControl()
         {
@@ -262,6 +263,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildInitialTree(string rootPath)
         {
+            _currentRootPath = rootPath;
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
@@ -379,12 +381,12 @@ namespace AssetsManager.Views.Controls.Explorer
                         bool keepFile = false;
                         if (lowerFile.EndsWith(".wad.client"))
                         {
-                            if (node.FullPath.StartsWith(Path.Combine(AppSettings.LolDirectory, "Game")))
+                            if (node.FullPath.StartsWith(Path.Combine(_currentRootPath, "Game")))
                                 keepFile = true;
                         }
                         else if (lowerFile.EndsWith(".wad"))
                         {
-                            if (node.FullPath.StartsWith(Path.Combine(AppSettings.LolDirectory, "Plugins")))
+                            if (node.FullPath.StartsWith(Path.Combine(_currentRootPath, "Plugins")))
                                 keepFile = true;
                         }
 
