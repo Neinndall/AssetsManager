@@ -141,6 +141,7 @@ namespace AssetsManager.Views
             {
                 Show();
                 WindowState = WindowState.Normal;
+                _notifyIcon.Visible = false;
             };
 
             var contextMenu = new ContextMenuStrip();
@@ -150,7 +151,7 @@ namespace AssetsManager.Views
 
             _notifyIcon.ContextMenuStrip = contextMenu;
 
-            _notifyIcon.Visible = true;
+
         }
 
         private void ExitApplication_Click(object sender, EventArgs e)
@@ -314,6 +315,7 @@ namespace AssetsManager.Views
             {
                 e.Cancel = true;
                 Hide();
+                _notifyIcon.Visible = true;
             }
         }
 
