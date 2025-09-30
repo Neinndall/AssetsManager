@@ -284,7 +284,7 @@ namespace AssetsManager.Services.Monitor
             return (false, null);
         }
 
-        private async Task<(bool anyNewAssetFound, bool progressChanged)> _InternalCheckLogicAsync(IEnumerable<long> idsToCheck, AssetCategory category, Action onUpdatesFound = null)
+        private async Task<(bool anyNewAssetFound, bool progressChanged)> _InternalCheckLogicAsync(IEnumerable<long> idsToCheck, AssetCategory category, Action<string> onUpdatesFound = null)
         {
             bool anyNewAssetFound = false;
             bool progressChanged = false;
@@ -302,7 +302,7 @@ namespace AssetsManager.Services.Monitor
                         progressChanged = true;
                         if (onUpdatesFound != null && !notificationSent)
                         {
-                            onUpdatesFound.Invoke();
+                            onUpdatesFound.Invoke(category.Name);
                             notificationSent = true;
                         }
                     }
@@ -370,7 +370,7 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        public async Task<bool> CheckAllAssetCategoriesAsync(bool silent, Action onUpdatesFound = null)
+        public async Task<bool> CheckAllAssetCategoriesAsync(bool silent, Action<string> onUpdatesFound = null)
         {
             if (!AssetCategories.Any()) LoadAssetCategories();
             bool anyNewAssetFound = false;
@@ -381,7 +381,7 @@ namespace AssetsManager.Services.Monitor
             return anyNewAssetFound;
         }
 
-        private async Task<bool> _CheckCategoryAsync(AssetCategory category, bool silent, Action onUpdatesFound = null)
+        private async Task<bool> _CheckCategoryAsync(AssetCategory category, bool silent, Action<string> onUpdatesFound = null)
         {
             Application.Current.Dispatcher.Invoke(() => category.Status = CategoryStatus.Checking);
             try
