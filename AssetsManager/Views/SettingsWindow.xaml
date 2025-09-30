@@ -47,15 +47,15 @@
                                IsChecked="True" 
                                Style="{StaticResource NavButtonStyle}"/>
                     
-                    <RadioButton x:Name="NavHashes" 
-                               Content="Default Paths" 
-                               Tag="📁"
-                               GroupName="Navigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
-                    
                     <RadioButton x:Name="NavAdvanced" 
                                Content="Advanced" 
                                Tag="⚡"
+                               GroupName="Navigation" 
+                               Style="{StaticResource NavButtonStyle}"/>
+                    
+                    <RadioButton x:Name="NavHashes" 
+                               Content="Default Paths" 
+                               Tag="📁"
                                GroupName="Navigation" 
                                Style="{StaticResource NavButtonStyle}"/>
                 </StackPanel>

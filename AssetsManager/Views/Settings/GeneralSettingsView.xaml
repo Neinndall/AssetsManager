@@ -204,35 +204,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Application Behavior Section -->
-                <StackPanel Margin="0,24,0,0">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                        <materialDesign:MaterialIcon Kind="Application" 
-                                                   Foreground="{StaticResource AccentBlue}"
-                                                   FontSize="20" 
-                                                   Margin="0,0,12,0" 
-                                                   VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="Application Behavior" 
-                                     FontSize="18" 
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Customize how the application opens and closes" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </StackPanel>
-                    <StackPanel Margin="10,0,0,0">
-                        <CheckBox x:Name="checkBoxMinimizeToTray" 
-                                  Content="Minimize to tray on close" 
-                                  Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="When closing the window, the application will be minimized to the system tray instead of exiting"
-                                     Foreground="{StaticResource TextMuted}" 
-                                     FontSize="12" 
-                                     Margin="27,0,0,0" 
-                                     TextWrapping="Wrap"/>
-                    </StackPanel>
-                </StackPanel>
+
             </StackPanel>
         </Border>
     </StackPanel>
