@@ -51,6 +51,7 @@ namespace AssetsManager.Views
         private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
         private readonly List<string> _notificationMessages = new List<string>();
+        private bool _isForceClosing = false;
 
         public MainWindow(
             IServiceProvider serviceProvider,
@@ -154,6 +155,7 @@ namespace AssetsManager.Views
 
         private void ExitApplication_Click(object sender, EventArgs e)
         {
+            _isForceClosing = true;
             System.Windows.Application.Current.Shutdown();
         }
 
@@ -312,7 +314,7 @@ namespace AssetsManager.Views
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
-            if (_appSettings.MinimizeToTrayOnClose)
+            if (_appSettings.MinimizeToTrayOnClose && !_isForceClosing)
             {
                 e.Cancel = true;
                 Hide();
