@@ -191,11 +191,14 @@ namespace AssetsManager.Views
                 _latestAppVersionAvailable = latestVersion;
             }
             
-            // Use the compat manager for robust notification support in WPF                           
-            ToastNotificationManagerCompat.CreateToastNotifier().Show(new ToastNotification(new ToastContentBuilder()                                                                            
-                .AddText("AssetsManager Update")                                                       
-                .AddText(message)                                                                      
-                .GetToastContent().GetXml()));                                                         
+            // Use the compat manager for robust notification support in WPF
+            if (Visibility != Visibility.Visible)
+            {
+                ToastNotificationManagerCompat.CreateToastNotifier().Show(new ToastNotification(new ToastContentBuilder()
+                    .AddText("AssetsManager")
+                    .AddText(message)
+                    .GetToastContent().GetXml()));
+            }
 
             ShowNotification(true, message);
         }
@@ -314,6 +317,7 @@ namespace AssetsManager.Views
                 e.Cancel = true;
                 Hide();
                 _notifyIcon.Visible = true;
+                _notifyIcon.ShowBalloonTip(1000, "AssetsManager", "The application has been minimized to the system tray.", ToolTipIcon.Info);
             }
         }
 
