@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <ApplicationIcon>Resources\img\logo.ico</ApplicationIcon>
     <Version>2.4.0.4</Version>
     <AssemblyVersion>2.4.0.4</AssemblyVersion>
@@ -18,6 +18,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
+    <PackageReference Include="CommunityToolkit.WinUI.Notifications" Version="7.1.2" />
     <PackageReference Include="DiffPlex" Version="1.8.0" />
     <PackageReference Include="HelixToolkit.Core.Wpf" Version="2.27.1" />
     <PackageReference Include="LeagueToolkit" Version="4.0.0-beta.53" />
@@ -47,9 +48,14 @@
     <EmbeddedResource Include="Themes\WebViewScrollbar.css" />
     <EmbeddedResource Include="Themes\WebViewDarkTheme.css" />
   </ItemGroup>
+
   <ItemGroup>
     <Resource Include="Resources\**\*.dds" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Resources\img\logo.ico" />
+  </ItemGroup>
+
   
   <Target Name="MoveWebView2Loader" AfterTargets="Build;Publish">
     <!-- Mover WebView2Loader.dll desde runtimes\win-x64\native -->

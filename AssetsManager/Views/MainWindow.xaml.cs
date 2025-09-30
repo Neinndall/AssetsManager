@@ -1,22 +1,27 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Forms;
 using System.Windows.Input;
-using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
-using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Versions;
-using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;
+using CommunityToolkit.WinUI.Notifications;
+using Microsoft.Extensions.DependencyInjection;
+using Windows.Data.Xml.Dom;
+using Windows.UI.Notifications;
 
 namespace AssetsManager.Views
 {
@@ -43,6 +48,7 @@ namespace AssetsManager.Views
         private readonly VersionService _versionService; // Add this
         private readonly WadExtractionService _wadExtractionService;
 
+        private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
         private readonly List<string> _notificationMessages = new List<string>();
 
@@ -120,6 +126,36 @@ namespace AssetsManager.Views
 
             _updateCheckService.Start();
             _ = _updateCheckService.CheckForAllUpdatesAsync();
+
+            InitializeNotifyIcon();
+            Closing += MainWindow_Closing;
+        }
+
+        private void InitializeNotifyIcon()
+        {
+            _notifyIcon = new NotifyIcon();
+            var iconUri = new Uri("pack://application:,,,/AssetsManager;component/Resources/img/logo.ico", UriKind.RelativeOrAbsolute);
+            _notifyIcon.Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(iconUri).Stream);
+            _notifyIcon.Text = "AssetsManager";
+            _notifyIcon.DoubleClick += (s, args) =>
+            {
+                Show();
+                WindowState = WindowState.Normal;
+            };
+
+            var contextMenu = new ContextMenuStrip();
+            var exitMenuItem = new ToolStripMenuItem("Exit");
+            exitMenuItem.Click += ExitApplication_Click;
+            contextMenu.Items.Add(exitMenuItem);
+
+            _notifyIcon.ContextMenuStrip = contextMenu;
+
+            _notifyIcon.Visible = true;
+        }
+
+        private void ExitApplication_Click(object sender, EventArgs e)
+        {
+            System.Windows.Application.Current.Shutdown();
         }
 
         private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
@@ -155,6 +191,13 @@ namespace AssetsManager.Views
             {
                 _latestAppVersionAvailable = latestVersion;
             }
+            
+            // Use the compat manager for robust notification support in WPF                           
+            ToastNotificationManagerCompat.CreateToastNotifier().Show(new ToastNotification(new ToastContentBuilder()                                                                            
+                .AddText("AssetsManager Update")                                                       
+                .AddText(message)                                                                      
+                .GetToastContent().GetXml()));                                                         
+
             ShowNotification(true, message);
         }
 
@@ -263,6 +306,21 @@ namespace AssetsManager.Views
             }
             _updateCheckService.Stop();
             _updateCheckService.Start();
+        }
+
+        private void MainWindow_Closing(object sender, CancelEventArgs e)
+        {
+            if (_appSettings.MinimizeToTrayOnClose)
+            {
+                e.Cancel = true;
+                Hide();
+            }
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            _notifyIcon.Dispose();
+            base.OnClosed(e);
         }
     }
 }
