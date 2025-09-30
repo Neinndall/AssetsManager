@@ -18,13 +18,13 @@ namespace AssetsManager.Views.Dialogs.Controls
             remove { RemoveHandler(ViewDifferencesClickEvent, value); }
         }
 
-        public static readonly RoutedEvent DownloadMenuItemClickEvent = EventManager.RegisterRoutedEvent(
-            nameof(DownloadMenuItemClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
+        public static readonly RoutedEvent ExtractMenuItemClickEvent = EventManager.RegisterRoutedEvent(
+            nameof(ExtractMenuItemClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
 
-        public event RoutedEventHandler DownloadMenuItemClick
+        public event RoutedEventHandler ExtractMenuItemClick
         {
-            add { AddHandler(DownloadMenuItemClickEvent, value); }
-            remove { RemoveHandler(DownloadMenuItemClickEvent, value); }
+            add { AddHandler(ExtractMenuItemClickEvent, value); }
+            remove { RemoveHandler(ExtractMenuItemClickEvent, value); }
         }
 
         public event RoutedPropertyChangedEventHandler<object> SelectedItemChanged;
@@ -40,7 +40,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         public object SelectedItem => resultsTreeView.SelectedItem;
 
         public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
-        public MenuItem DownloadMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => "Download Selected".Equals(m.Header as string));
+        public MenuItem ExtractMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => "Extract Selected".Equals(m.Header as string));
 
         public WadResultsTreeControl()
         {
@@ -63,9 +63,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             RaiseEvent(new RoutedEventArgs(ViewDifferencesClickEvent, SelectedItem));
         }
 
-        private void DownloadMenuItem_Click(object sender, RoutedEventArgs e)
+        private void ExtractMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            RaiseEvent(new RoutedEventArgs(DownloadMenuItemClickEvent, SelectedItem));
+            RaiseEvent(new RoutedEventArgs(ExtractMenuItemClickEvent, SelectedItem));
         }
 
         public void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)

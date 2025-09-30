@@ -56,7 +56,7 @@
 
     <!-- SearchBox Animations -->
     <Storyboard x:Key="ExpandSearchBox">
-        <DoubleAnimation Storyboard.TargetProperty="Width" To="150" Duration="0:0:0.3">
+        <DoubleAnimation Storyboard.TargetProperty="Width" To="150" Duration="0:0:0.4">
             <DoubleAnimation.EasingFunction>
                 <CubicEase EasingMode="EaseOut"/>
             </DoubleAnimation.EasingFunction>

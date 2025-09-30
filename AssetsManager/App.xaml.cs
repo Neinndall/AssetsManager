@@ -69,7 +69,6 @@ namespace AssetsManager
             services.AddSingleton<Status>();
             services.AddSingleton<UpdateManager>();
             services.AddSingleton<UpdateExtractor>();
-            services.AddSingleton<AssetsPreview>();
             services.AddSingleton<Resources>();
             services.AddSingleton<DirectoryCleaner>();
             services.AddSingleton<BackupManager>();
@@ -101,19 +100,16 @@ namespace AssetsManager
 
             // Main Application Logic Service
             services.AddTransient<ExtractionService>();
-            services.AddSingleton<ExportService>();
 
             // Windows, Views, and Dialogs
             services.AddTransient<MainWindow>();
             services.AddTransient<HomeWindow>();
-            services.AddTransient<ExportWindow>();
             services.AddTransient<ExplorerWindow>();
             services.AddTransient<ComparatorWindow>();
             services.AddTransient<ModelWindow>();
             services.AddTransient<MonitorWindow>();
             services.AddTransient<HelpWindow>();
             services.AddTransient<JsonDiffWindow>();
-            services.AddTransient<PreviewAssetsWindow>();
             services.AddTransient<SettingsWindow>();
             services.AddTransient<ProgressDetailsWindow>();
             services.AddTransient<UpdateProgressWindow>();
@@ -127,7 +123,6 @@ namespace AssetsManager
             services.AddTransient<GeneralSettingsView>();
             services.AddTransient<AdvancedSettingsView>();
             services.AddTransient<HashPathsSettingsView>();
-            services.AddTransient<LogsSettingsView>();
             services.AddTransient<AboutView>();
             services.AddTransient<BugReportsView>();
             services.AddTransient<ChangelogsView>();

@@ -25,6 +25,7 @@ namespace AssetsManager.Views.Settings
 
             LoadAssetTrackerIntervalSettings();
             LoadPbeIntervalSettings();
+            checkBoxMinimizeToTray.IsChecked = _settings.MinimizeToTrayOnClose;
         }
 
         public void SaveSettings()
@@ -58,6 +59,8 @@ namespace AssetsManager.Views.Settings
                     }
                 }
             }
+
+            _settings.MinimizeToTrayOnClose = checkBoxMinimizeToTray.IsChecked ?? false;
         }
 
         private int ConvertToMinutes(int value, string unit)

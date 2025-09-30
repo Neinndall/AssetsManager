@@ -72,6 +72,7 @@ namespace AssetsManager.Views.Converters
             return extension switch
             {
                 ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" => MaterialIconKind.ImageOutline,
+                ".svg" => MaterialIconKind.Svg,
                 ".dds" or ".tex" => MaterialIconKind.FileImageOutline,
                 ".json" => MaterialIconKind.CodeJson,
                 ".js" => MaterialIconKind.LanguageJavascript,

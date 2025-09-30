@@ -19,6 +19,7 @@ namespace AssetsManager.Utils
         public bool SaveDiffHistory { get; set; }
         public bool BackgroundUpdates { get; set; }
         public bool CheckPbeStatus { get; set; }
+        public bool MinimizeToTrayOnClose { get; set; }
         
         public int UpdateCheckFrequency { get; set; }
         public int AssetTrackerFrequency { get; set; }
@@ -126,6 +127,7 @@ namespace AssetsManager.Utils
                 SaveDiffHistory = false,
                 BackgroundUpdates = false,
                 CheckPbeStatus = false,
+                MinimizeToTrayOnClose = false,
                 UpdateCheckFrequency = 10,
                 AssetTrackerFrequency = 60,
                 PbeStatusFrequency = 10,
@@ -167,6 +169,7 @@ namespace AssetsManager.Utils
             SaveDiffHistory = defaultSettings.SaveDiffHistory;
             BackgroundUpdates = defaultSettings.BackgroundUpdates;
             CheckPbeStatus = defaultSettings.CheckPbeStatus;
+            MinimizeToTrayOnClose = defaultSettings.MinimizeToTrayOnClose;
             LastPbeStatusMessage = defaultSettings.LastPbeStatusMessage;
             UpdateCheckFrequency = defaultSettings.UpdateCheckFrequency;
             PbeStatusFrequency = defaultSettings.PbeStatusFrequency;

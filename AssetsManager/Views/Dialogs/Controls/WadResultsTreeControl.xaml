@@ -18,9 +18,9 @@
                     <materialDesign:MaterialIcon Kind="FileFindOutline"/>
                 </MenuItem.Icon>
             </MenuItem>
-            <MenuItem Header="Download Selected" Click="DownloadMenuItem_Click">
+            <MenuItem Header="Extract Selected" Click="ExtractMenuItem_Click">
                 <MenuItem.Icon>
-                    <materialDesign:MaterialIcon Kind="CloudDownloadOutline"/>
+                    <materialDesign:MaterialIcon Kind="ArchiveArrowDownOutline"/>
                 </MenuItem.Icon>
             </MenuItem>
         </ContextMenu>

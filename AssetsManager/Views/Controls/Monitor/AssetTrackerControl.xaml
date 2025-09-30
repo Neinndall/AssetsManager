@@ -24,7 +24,7 @@
                               FontSize="18" 
                               FontWeight="SemiBold"
                               Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Automatically discover new game assets" 
+                    <TextBlock Text="Automatically discover new assets from the CDN" 
                               FontSize="12" 
                               Foreground="{StaticResource TextMuted}"/>
                 </StackPanel>

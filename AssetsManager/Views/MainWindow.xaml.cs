@@ -1,22 +1,27 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Forms;
 using System.Windows.Input;
-using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Services.Hashes;
-using AssetsManager.Services.Explorer;
-using AssetsManager.Services.Monitor;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Monitor;
+using AssetsManager.Services.Versions;
 using AssetsManager.Utils;
 using AssetsManager.Views.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Controls.Export;
+using AssetsManager.Views.Models;
+using CommunityToolkit.WinUI.Notifications;
+using Microsoft.Extensions.DependencyInjection;
+using Windows.Data.Xml.Dom;
+using Windows.UI.Notifications;
 
 namespace AssetsManager.Views
 {
@@ -40,7 +45,10 @@ namespace AssetsManager.Views
         private readonly UpdateCheckService _updateCheckService;
         private readonly DiffViewService _diffViewService;
         private readonly MonitorService _monitorService;
+        private readonly VersionService _versionService; // Add this
+        private readonly WadExtractionService _wadExtractionService;
 
+        private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
         private readonly List<string> _notificationMessages = new List<string>();
 
@@ -62,7 +70,9 @@ namespace AssetsManager.Views
             UpdateCheckService updateCheckService,
             ProgressUIManager progressUIManager,
             DiffViewService diffViewService,
-            MonitorService monitorService)
+            MonitorService monitorService,
+            VersionService versionService, // Add this
+            WadExtractionService wadExtractionService)
         {
             InitializeComponent();
 
@@ -84,6 +94,8 @@ namespace AssetsManager.Views
             _progressUIManager = progressUIManager;
             _diffViewService = diffViewService;
             _monitorService = monitorService;
+            _versionService = versionService; // Add this
+            _wadExtractionService = wadExtractionService;
 
             _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, this);
 
@@ -96,6 +108,11 @@ namespace AssetsManager.Views
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
             _wadComparatorService.ComparisonCompleted += _progressUIManager.OnComparisonCompleted;
+            _wadComparatorService.ComparisonCompleted += OnWadComparisonCompleted;
+
+            _versionService.VersionDownloadStarted += (sender, e) => _progressUIManager.OnVersionDownloadStarted(sender, e);
+            _versionService.VersionDownloadProgressChanged += (sender, e) => _progressUIManager.OnDownloadProgressChanged(e.CurrentValue, e.TotalValue, e.CurrentFile, true, null);
+            _versionService.VersionDownloadCompleted += (sender, e) => _progressUIManager.OnDownloadCompleted();
 
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
@@ -109,6 +126,64 @@ namespace AssetsManager.Views
 
             _updateCheckService.Start();
             _ = _updateCheckService.CheckForAllUpdatesAsync();
+
+            InitializeNotifyIcon();
+            Closing += MainWindow_Closing;
+        }
+
+        private void InitializeNotifyIcon()
+        {
+            _notifyIcon = new NotifyIcon();
+            var iconUri = new Uri("pack://application:,,,/AssetsManager;component/Resources/img/logo.ico", UriKind.RelativeOrAbsolute);
+            _notifyIcon.Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(iconUri).Stream);
+            _notifyIcon.Text = "AssetsManager";
+            _notifyIcon.DoubleClick += (s, args) =>
+            {
+                Show();
+                WindowState = WindowState.Normal;
+                _notifyIcon.Visible = false;
+            };
+
+            var contextMenu = new ContextMenuStrip();
+            var exitMenuItem = new ToolStripMenuItem("Exit");
+            exitMenuItem.Click += ExitApplication_Click;
+            contextMenu.Items.Add(exitMenuItem);
+
+            _notifyIcon.ContextMenuStrip = contextMenu;
+
+
+        }
+
+        private void ExitApplication_Click(object sender, EventArgs e)
+        {
+            System.Windows.Application.Current.Shutdown();
+        }
+
+        private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (allDiffs != null)
+                {
+                    var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
+                    {
+                        Type = d.Type,
+                        OldPath = d.OldPath,
+                        NewPath = d.NewPath,
+                        SourceWadFile = d.SourceWadFile,
+                        OldPathHash = d.OldChunk.PathHash,
+                        NewPathHash = d.NewChunk.PathHash,
+                        OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
+                        NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
+                        OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
+                        NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
+                    }).ToList();
+
+                    var resultWindow = new WadComparisonResultWindow(serializableDiffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, _wadExtractionService, _appSettings, oldLolPath, newLolPath);
+                    resultWindow.Owner = this;
+                    resultWindow.Show();
+                }
+            });
         }
 
         private void OnUpdatesFound(string message, string latestVersion)
@@ -117,6 +192,13 @@ namespace AssetsManager.Views
             {
                 _latestAppVersionAvailable = latestVersion;
             }
+            
+            // Use the compat manager for robust notification support in WPF                           
+            ToastNotificationManagerCompat.CreateToastNotifier().Show(new ToastNotification(new ToastContentBuilder()                                                                            
+                .AddText("AssetsManager Update")                                                       
+                .AddText(message)                                                                      
+                .GetToastContent().GetXml()));                                                         
+
             ShowNotification(true, message);
         }
 
@@ -168,7 +250,6 @@ namespace AssetsManager.Views
             switch (viewTag)
             {
                 case "Home": LoadHomeWindow(); break;
-                case "Export": LoadExportWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Models": LoadModelWindow(); break;
@@ -186,11 +267,6 @@ namespace AssetsManager.Views
         private void LoadExplorerWindow()
         {
             MainContentArea.Content = _serviceProvider.GetRequiredService<ExplorerWindow>();
-        }
-
-        private void LoadExportWindow()
-        {
-            MainContentArea.Content = _serviceProvider.GetRequiredService<ExportWindow>();
         }
 
         private void LoadComparatorWindow()
@@ -231,6 +307,22 @@ namespace AssetsManager.Views
             }
             _updateCheckService.Stop();
             _updateCheckService.Start();
+        }
+
+        private void MainWindow_Closing(object sender, CancelEventArgs e)
+        {
+            if (_appSettings.MinimizeToTrayOnClose)
+            {
+                e.Cancel = true;
+                Hide();
+                _notifyIcon.Visible = true;
+            }
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            _notifyIcon.Dispose();
+            base.OnClosed(e);
         }
     }
 }

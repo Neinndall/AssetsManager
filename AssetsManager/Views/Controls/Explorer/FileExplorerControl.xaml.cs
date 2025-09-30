@@ -42,6 +42,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public ObservableCollection<FileSystemNodeModel> RootNodes { get; set; }
         private readonly DispatcherTimer _searchTimer;
+        private string _currentRootPath;
 
         public FileExplorerControl()
         {
@@ -159,10 +160,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     LogService.Log("Extracting selected files...");
                     await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath);
-                    LogService.LogInteractiveSuccess($"Successfully extracted '{selectedNode.Name}' to '{destinationPath}'.", destinationPath);
+                    LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name} to {destinationPath}", destinationPath);
                 }
                 catch (Exception ex)
-                {                    LogService.LogError(ex, $"Failed to extract '{selectedNode.Name}'.");
+                {   
+                    LogService.LogError(ex, $"Failed to extract '{selectedNode.Name}'.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred during extraction: {ex.Message}", Window.GetWindow(this));
                 }
             }
@@ -262,6 +264,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildInitialTree(string rootPath)
         {
+            _currentRootPath = rootPath;
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
@@ -289,9 +292,18 @@ namespace AssetsManager.Views.Controls.Explorer
                     await LoadAllChildren(pluginsNode);
                 }
 
+                // Prune empty directories after loading
+                for (int i = RootNodes.Count - 1; i >= 0; i--)
+                {
+                    if (!PruneEmptyDirectories(RootNodes[i]))
+                    {
+                        RootNodes.RemoveAt(i);
+                    }
+                }
+
                 if (RootNodes.Count == 0)
                 {
-                    CustomMessageBoxService.ShowError("Error", "Could not find 'Game' or 'Plugins' subdirectories in the selected path.", Window.GetWindow(this));
+                    CustomMessageBoxService.ShowError("Error", "Could not find any WAD files in 'Game' or 'Plugins' subdirectories.", Window.GetWindow(this));
                     NoDirectoryMessage.Visibility = Visibility.Visible;
                 }
             }
@@ -308,6 +320,26 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.Visibility = Visibility.Visible;
                 ToolbarSeparator.Visibility = Visibility.Visible;
             }
+        }
+
+        private bool PruneEmptyDirectories(FileSystemNodeModel node)
+        {
+            if (node.Type != NodeType.RealDirectory)
+            {
+                return true; // Keep files
+            }
+
+            // Recursively prune children
+            for (int i = node.Children.Count - 1; i >= 0; i--)
+            {
+                if (!PruneEmptyDirectories(node.Children[i]))
+                {
+                    node.Children.RemoveAt(i);
+                }
+            }
+
+            // If directory is now empty, it should be pruned
+            return node.Children.Any();
         }
 
         private async Task LoadAllChildren(FileSystemNodeModel node)
@@ -331,6 +363,7 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 try
                 {
+                    // Recurse into subdirectories
                     var directories = Directory.GetDirectories(node.FullPath);
                     foreach (var dir in directories.OrderBy(d => d))
                     {
@@ -339,12 +372,31 @@ namespace AssetsManager.Views.Controls.Explorer
                         await LoadAllChildren(childNode);
                     }
 
+                    // Process files
                     var files = Directory.GetFiles(node.FullPath);
                     foreach (var file in files.OrderBy(f => f))
                     {
-                        var childNode = new FileSystemNodeModel(file);
-                        node.Children.Add(childNode);
-                        await LoadAllChildren(childNode); // This will handle WAD files
+                        string lowerFile = file.ToLowerInvariant();
+
+                        // Determine if the file is a WAD file we want to keep
+                        bool keepFile = false;
+                        if (lowerFile.EndsWith(".wad.client"))
+                        {
+                            if (node.FullPath.StartsWith(Path.Combine(_currentRootPath, "Game")))
+                                keepFile = true;
+                        }
+                        else if (lowerFile.EndsWith(".wad"))
+                        {
+                            if (node.FullPath.StartsWith(Path.Combine(_currentRootPath, "Plugins")))
+                                keepFile = true;
+                        }
+
+                        if (keepFile)
+                        {
+                            var childNode = new FileSystemNodeModel(file);
+                            node.Children.Add(childNode);
+                            await LoadAllChildren(childNode); // Eager load WAD content
+                        }
                     }
                 }
                 catch (UnauthorizedAccessException)

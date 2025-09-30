@@ -16,6 +16,10 @@ namespace AssetsManager.Services.Versions
 {
     public class VersionService
     {
+        public event EventHandler<string> VersionDownloadStarted;
+        public event EventHandler<(string TaskName, int CurrentValue, int TotalValue, string CurrentFile)> VersionDownloadProgressChanged;
+        public event EventHandler<(string TaskName, bool Success, string Message)> VersionDownloadCompleted;
+
         private readonly LogService _logService;
         private readonly HttpClient _httpClient;
         private readonly DirectoriesCreator _directoriesCreator;
@@ -132,36 +136,46 @@ namespace AssetsManager.Services.Versions
             var urlsSeen = new HashSet<string>();
             string tempDir = Path.Combine(_directoriesCreator.AppDirectory, "TempVersions");
 
-            foreach (var (region, url) in configs)
+            try
             {
-                if (urlsSeen.Contains(url)) continue;
-                urlsSeen.Add(url);
+                ExtractManifestDownloader();
 
-                try
+                foreach (var (region, url) in configs)
                 {
-                    Directory.CreateDirectory(tempDir);
-                    await ExtractAndRunManifestDownloader(url, tempDir);
+                    if (urlsSeen.Contains(url)) continue;
+                    urlsSeen.Add(url);
 
-                    string exePath = Path.Combine(tempDir, TargetFilename);
-                    string version = GetExeVersion(exePath);
-
-                    if (version != null)
+                    try
                     {
-                        versions.Add((region, "windows", version, url));
+                        Directory.CreateDirectory(tempDir);
+                        await ExtractAndRunManifestDownloader(url, tempDir);
+
+                        string exePath = Path.Combine(tempDir, TargetFilename);
+                        string version = GetExeVersion(exePath);
+
+                        if (version != null)
+                        {
+                            versions.Add((region, "windows", version, url));
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Error downloading from {url}");
-                }
-                finally
-                {
-                    if (Directory.Exists(tempDir))
+                    catch (Exception ex)
                     {
-                        Directory.Delete(tempDir, true);
+                        _logService.LogError(ex, $"Error downloading from {url}");
+                    }
+                    finally
+                    {
+                        if (Directory.Exists(tempDir))
+                        {
+                            Directory.Delete(tempDir, true);
+                        }
                     }
                 }
             }
+            finally
+            {
+                CleanupManifestDownloader();
+            }
+            
             return versions;
         }
 
@@ -184,64 +198,147 @@ namespace AssetsManager.Services.Versions
         private async Task ExtractAndRunManifestDownloader(string manifestUrl, string outputDir)
         {
             string arguments = $"\"{manifestUrl}\" -f {TargetFilename} -o \"{outputDir}\" -t 4";
-            await RunManifestDownloaderAsync(arguments);
+            await RunManifestDownloaderAsync(arguments, "Downloading League Client Executable");
         }
 
-        private async Task RunManifestDownloaderAsync(string arguments)
+        private void ExtractManifestDownloader()
         {
             string resourceName = "AssetsManager.Resources.ManifestDownloader.ManifestDownloader.exe";
-            string tempExePath = Path.Combine(Path.GetTempPath(), "ManifestDownloader.exe");
+            string manifestDownloaderPath = Path.Combine(_directoriesCreator.VersionsPath, "ManifestDownloader.exe");
 
-            try
+            if (File.Exists(manifestDownloaderPath)) return;
+
+            var assembly = Assembly.GetExecutingAssembly();
+            using (Stream stream = assembly.GetManifestResourceStream(resourceName))
             {
-                var assembly = Assembly.GetExecutingAssembly();
-                using (Stream stream = assembly.GetManifestResourceStream(resourceName))
+                if (stream == null)
                 {
-                    if (stream == null)
-                    {
-                        _logService.LogError("Embedded resource 'ManifestDownloader.exe' not found.");
-                        return;
-                    }
-                    using (FileStream fs = new FileStream(tempExePath, FileMode.Create, FileAccess.Write))
-                    {
-                        await stream.CopyToAsync(fs);
-                    }
+                    _logService.LogError("Embedded resource 'ManifestDownloader.exe' not found.");
+                    throw new FileNotFoundException("Embedded resource 'ManifestDownloader.exe' not found.");
                 }
-
-                ProcessStartInfo startInfo = new ProcessStartInfo
+                using (FileStream fs = new FileStream(manifestDownloaderPath, FileMode.Create, FileAccess.Write))
                 {
-                    FileName = tempExePath,
-                    Arguments = arguments,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
-
-                using (Process process = Process.Start(startInfo))
-                {
-                    // Asynchronous reading of the output streams to prevent deadlocks
-                    var outputTask = process.StandardOutput.ReadToEndAsync();
-                    var errorTask = process.StandardError.ReadToEndAsync();
-
-                    await process.WaitForExitAsync();
-
-                    string error = await errorTask;
-
-                    if (process.ExitCode != 0)
-                    {
-                        if (!string.IsNullOrWhiteSpace(error))
-                            _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}: {error}");
-                        else
-                            _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}");
-                    }
+                    stream.CopyTo(fs);
                 }
             }
-            finally
+        }
+
+        private void CleanupManifestDownloader()
+        {
+            string manifestDownloaderPath = Path.Combine(_directoriesCreator.VersionsPath, "ManifestDownloader.exe");
+            if (File.Exists(manifestDownloaderPath))
             {
-                if (File.Exists(tempExePath))
+                try
                 {
-                    File.Delete(tempExePath);
+                    File.Delete(manifestDownloaderPath);
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "Failed to cleanup ManifestDownloader.exe");
+                }
+            }
+        }
+
+        private async Task<int> GetManifestFileCountAsync(string manifestUrl, string outputDirectory, string localesArgument)
+        {
+            string arguments = $"\"{manifestUrl}\" -o \"{outputDirectory}\" -l {localesArgument} -n -t 4 --verify-only skip-existing";
+            string manifestDownloader = Path.Combine(_directoriesCreator.VersionsPath, "ManifestDownloader.exe");
+
+            ProcessStartInfo startInfo = new ProcessStartInfo
+            {
+                FileName = manifestDownloader,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            int filesToUpdate = 0;
+            using (Process process = Process.Start(startInfo))
+            {
+                var outputReader = process.StandardOutput;
+                var errorReader = process.StandardError;
+
+                var outputTask = Task.Run(async () =>
+                {
+                    string line;
+                    Regex verifyingRegex = new Regex(@"^Verifying file (.+?)\.\.\.$");
+                    Regex incorrectRegex = new Regex(@"^File (.+?) is incorrect\.$");
+                    Regex fixingUpRegex = new Regex(@"^Fixing up file (.+?)\.\.\.$");
+
+                    while ((line = await outputReader.ReadLineAsync()) != null)
+                    {
+                        if (verifyingRegex.IsMatch(line))
+                        {
+                            filesToUpdate++;
+                        }
+                    }
+                });
+
+                var errorTask = errorReader.ReadToEndAsync();
+                await Task.WhenAll(process.WaitForExitAsync(), outputTask);
+            }
+            return filesToUpdate;
+        }
+
+        private async Task RunManifestDownloaderAsync(string arguments, string taskName, int totalFiles = 0, bool silent = false)
+        {
+            string manifestDownloader = Path.Combine(_directoriesCreator.VersionsPath, "ManifestDownloader.exe");
+
+            ProcessStartInfo startInfo = new ProcessStartInfo
+            {
+                FileName = manifestDownloader,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using (Process process = Process.Start(startInfo))
+            {
+                if (silent)
+                {
+                    await process.WaitForExitAsync();
+                    return;
+                }
+
+                var outputReader = process.StandardOutput;
+                var errorReader = process.StandardError;
+
+                var outputTask = Task.Run(async () =>
+                {
+                    string line;
+                    int fileCounter = 0;
+                    Regex verifyingRegex = new Regex(@"^Verifying file (.+?)\.\.\.$");
+                    Regex incorrectRegex = new Regex(@"^File (.+?) is incorrect\.$");
+                    Regex fixingUpRegex = new Regex(@"^Fixing up file (.+?)\.\.\.$");
+
+                    while ((line = await outputReader.ReadLineAsync()) != null)
+                    {
+                        Match verifyingMatch = verifyingRegex.Match(line);
+                        if (verifyingMatch.Success)
+                        {
+                            string fileName = verifyingMatch.Groups[1].Value;
+                            fileCounter++;
+                            VersionDownloadProgressChanged?.Invoke(this, (taskName, fileCounter, totalFiles, fileName));
+                        }
+                    }
+                });
+
+                var errorTask = errorReader.ReadToEndAsync();
+
+                await Task.WhenAll(process.WaitForExitAsync(), outputTask);
+
+                string error = await errorTask;
+
+                if (process.ExitCode != 0)
+                {
+                    if (!string.IsNullOrWhiteSpace(error))
+                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}: {error}");
+                    else
+                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}");
                 }
             }
         }
@@ -266,35 +363,83 @@ namespace AssetsManager.Services.Versions
 
         public async Task DownloadPluginsAsync(string manifestUrl, string lolDirectory, List<string> locales)
         {
-            if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolDirectory) || locales == null || !locales.Any())
+            const string taskName = "Downloading Plugins";
+            bool success = false;
+            try
             {
-                _logService.LogWarning("DownloadPluginsAsync called with invalid parameters.");
-                return;
+                _logService.Log("Starting verifying/updating the league client...");
+                ExtractManifestDownloader();
+
+                if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolDirectory) || locales == null || !locales.Any())
+                {
+                    _logService.LogWarning("DownloadPluginsAsync called with invalid parameters.");
+                    VersionDownloadCompleted?.Invoke(this, (taskName, false, "Invalid parameters."));
+                    return;
+                }
+
+                VersionDownloadStarted?.Invoke(this, taskName);
+                VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files ..."));
+
+                string localesArgument = string.Join(" ", locales);
+                int totalFiles = await GetManifestFileCountAsync(manifestUrl, lolDirectory, localesArgument);
+
+                string arguments = $"\"{manifestUrl}\" -o \"{lolDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
+
+                await RunManifestDownloaderAsync(arguments, taskName, totalFiles);
+                _logService.LogSuccess("Plugin download process finished.");
+                success = true;
             }
-
-            string localesArgument = string.Join(" ", locales);
-            string arguments = $"\"{manifestUrl}\" -o \"{lolDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
-
-            _logService.Log("Starting updating the plugins...");
-            await RunManifestDownloaderAsync(arguments);
-            _logService.LogSuccess("Plugin download process finished.");
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "An error occurred during plugin download.");
+                success = false;
+            }
+            finally
+            {
+                CleanupManifestDownloader();
+                VersionDownloadCompleted?.Invoke(this, (taskName, success, success ? "Plugin download finished." : "Plugin download failed."));
+            }
         }
 
         public async Task DownloadGameClientAsync(string manifestUrl, string lolDirectory, List<string> locales)
         {
-            if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolDirectory) || locales == null || !locales.Any())
+            const string taskName = "Downloading Game Client";
+            bool success = false;
+            try
             {
-                _logService.LogWarning("DownloadGameClientAsync called with invalid parameters.");
-                return;
+                _logService.Log("Starting verifying/updating the game client...");
+                ExtractManifestDownloader();
+
+                if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolDirectory) || locales == null || !locales.Any())
+                {
+                    _logService.LogWarning("DownloadGameClientAsync called with invalid parameters.");
+                    VersionDownloadCompleted?.Invoke(this, (taskName, false, "Invalid parameters."));
+                    return;
+                }
+
+                VersionDownloadStarted?.Invoke(this, taskName);
+                VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files ..."));
+
+                string gameDirectory = Path.Combine(lolDirectory, "Game");
+                string localesArgument = string.Join(" ", locales);
+                int totalFiles = await GetManifestFileCountAsync(manifestUrl, gameDirectory, localesArgument);
+
+                string arguments = $"\"{manifestUrl}\" -o \"{gameDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
+
+                await RunManifestDownloaderAsync(arguments, taskName, totalFiles);
+                _logService.LogSuccess("Game client download process finished.");
+                success = true;
             }
-
-            string gameDirectory = Path.Combine(lolDirectory, "Game");
-            string localesArgument = string.Join(" ", locales);
-            string arguments = $"\"{manifestUrl}\" -o \"{gameDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
-
-            _logService.Log("Starting updating the game client...");
-            await RunManifestDownloaderAsync(arguments);
-            _logService.LogSuccess("Game client download process finished.");
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "An error occurred during game client download.");
+                success = false;
+            }
+            finally
+            {
+                CleanupManifestDownloader();
+                VersionDownloadCompleted?.Invoke(this, (taskName, success, success ? "Game client download finished." : "Game client download failed."));
+            }
         }
 
         public async Task<List<VersionFileInfo>> GetVersionFilesAsync()

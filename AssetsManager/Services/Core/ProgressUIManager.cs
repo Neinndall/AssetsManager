@@ -152,6 +152,59 @@ namespace AssetsManager.Services.Core
             });
         }
 
+        public void OnVersionDownloadStarted(object sender, string taskName)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                _progressSummaryButton.Visibility = Visibility.Visible;
+                _progressSummaryButton.ToolTip = "Click to see download details";
+
+                if (_spinningIconAnimationStoryboard == null)
+                {
+                    var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
+                    _spinningIconAnimationStoryboard = originalStoryboard?.Clone();
+                    if (_spinningIconAnimationStoryboard != null) Storyboard.SetTarget(_spinningIconAnimationStoryboard, _progressIcon);
+                }
+                _spinningIconAnimationStoryboard?.Begin();
+
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, taskName);
+                _progressDetailsWindow.Owner = _owner;
+                _progressDetailsWindow.OperationVerb = "Downloading";
+                _progressDetailsWindow.HeaderIconKind = "Download";
+                _progressDetailsWindow.HeaderText = taskName;
+                _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.UpdateProgress(0, 1, "Initializing...", true, null); // Use 0 of 1 for indeterminate progress
+            });
+        }
+
+        public void OnVersionDownloadProgressChanged(object sender, (string TaskName, int Progress, string Details) data)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                _progressDetailsWindow?.UpdateProgress(0, 1, data.Details, true, null); // Indeterminate progress, update current file
+            });
+        }
+
+        public void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                _progressSummaryButton.Visibility = Visibility.Collapsed;
+                _spinningIconAnimationStoryboard?.Stop();
+                _spinningIconAnimationStoryboard = null;
+                _progressDetailsWindow?.Close();
+
+                if (data.Success)
+                {
+                    _customMessageBoxService.ShowSuccess("Success", data.Message, _owner);
+                }
+                else
+                {
+                    _customMessageBoxService.ShowError("Error", data.Message, _owner);
+                }
+            });
+        }
+
         private void ProgressSummaryButton_Click(object sender, RoutedEventArgs e)
         {
             if (_progressDetailsWindow != null)

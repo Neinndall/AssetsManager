@@ -57,51 +57,6 @@ namespace AssetsManager.Views.Controls.Comparator
         public WadComparisonControl()
         {
             InitializeComponent();
-            Loaded += WadComparisonControl_Loaded;
-            Unloaded += WadComparisonControl_Unloaded;
-        }
-
-        private void WadComparisonControl_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (WadComparatorService != null)
-            {
-                WadComparatorService.ComparisonCompleted += WadComparatorService_ComparisonCompleted;
-            }
-        }
-
-        private void WadComparisonControl_Unloaded(object sender, RoutedEventArgs e)
-        {
-            if (WadComparatorService != null)
-            {
-                WadComparatorService.ComparisonCompleted -= WadComparatorService_ComparisonCompleted;
-            }
-        }
-
-        private void WadComparatorService_ComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                if (allDiffs != null)
-                {
-                    var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
-                    {
-                        Type = d.Type,
-                        OldPath = d.OldPath,
-                        NewPath = d.NewPath,
-                        SourceWadFile = d.SourceWadFile,
-                        OldPathHash = d.OldChunk.PathHash,
-                        NewPathHash = d.NewChunk.PathHash,
-                        OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
-                        NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
-                        OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
-                        NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
-                    }).ToList();
-
-                    var resultWindow = new WadComparisonResultWindow(serializableDiffs, ServiceProvider, CustomMessageBoxService, DirectoriesCreator, AssetDownloaderService, LogService, WadDifferenceService, WadPackagingService, DiffViewService, HashResolverService, oldLolPath, newLolPath);
-                    resultWindow.Owner = Window.GetWindow(this);
-                    resultWindow.Show();
-                }
-            });
         }
 
         private async void createLolBackupButton_Click(object sender, RoutedEventArgs e)

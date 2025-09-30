@@ -32,7 +32,7 @@
                               FontSize="18" 
                               FontWeight="SemiBold"
                               Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Monitor remote JSON files for updates" 
+                    <TextBlock Text="Monitor files from CDTB for updates" 
                               FontSize="12" 
                               Foreground="{StaticResource TextMuted}"/>
                 </StackPanel>
@@ -41,7 +41,7 @@
 
         <!-- Toolbar -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
-            <Button Content="+ Add URL" Style="{StaticResource ModernButton}" Width="120" Click="AddUrl_Click"/>
+            <Button Content="+ Add URLs" Style="{StaticResource ModernButton}" Width="100" Click="AddUrl_Click"/>
             <!-- Search Box -->
                 <Grid Width="250" Margin="10,0,0,0">
                     <Border Background="{StaticResource DarkBackground}"

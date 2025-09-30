@@ -25,6 +25,7 @@ namespace AssetsManager.Views.Converters
             { ".jpg", MaterialIconKind.ImageOutline },
             { ".jpeg", MaterialIconKind.ImageOutline },
             { ".bmp", MaterialIconKind.ImageOutline },
+            { ".svg", MaterialIconKind.Svg },
             { ".dds", MaterialIconKind.FileImageOutline },
             { ".tex", MaterialIconKind.FileImageOutline },
             { ".webm", MaterialIconKind.MoviePlayOutline },

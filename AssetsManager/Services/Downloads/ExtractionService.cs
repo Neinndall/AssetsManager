@@ -46,7 +46,6 @@ namespace AssetsManager.Services.Downloads
                 _directoryCleaner.CleanEmptyDirectories();
                 await _backupManager.HandleBackUpAsync(_appSettings.CreateBackUpOldHashes);
                 await _hashCopier.HandleCopyAsync(_appSettings.AutoCopyHashes);
-                
                 // No pondremos ningun log aqui
             }
             catch (Exception ex)

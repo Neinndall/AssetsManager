@@ -10,6 +10,7 @@ using ICSharpCode.AvalonEdit.Rendering;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using System.Xml;
+
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;

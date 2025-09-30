@@ -164,9 +164,9 @@
                                      TextWrapping="Wrap"/>
 
                         <CheckBox x:Name="checkBoxCreateBackUp" 
-                                  Content="Create backups before replacing" 
+                                  Content="Create hashes backups" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Backup existing files to prevent data loss during updates"
+                        <TextBlock Text="Back up hash files before updates to prevent data loss"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
                                      Margin="27,0,0,8" 
@@ -203,6 +203,8 @@
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
+
+
             </StackPanel>
         </Border>
     </StackPanel>

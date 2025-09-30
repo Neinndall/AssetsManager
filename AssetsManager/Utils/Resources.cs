@@ -14,23 +14,20 @@ namespace AssetsManager.Utils
     {
         private readonly HttpClient _httpClient;
         private readonly AssetDownloader _assetDownloader;
-        private readonly DirectoriesCreator _directoryCreator;
+        private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
 
-        public Resources(HttpClient httpClient, DirectoriesCreator directoryCreator, LogService logService, AssetDownloader assetDownloader)
+        public Resources(HttpClient httpClient, DirectoriesCreator directoriesCreator, LogService logService, AssetDownloader assetDownloader)
         {
             _httpClient = httpClient;
-            _directoryCreator = directoryCreator;
+            _directoriesCreator = directoriesCreator;
             _logService = logService;
             _assetDownloader = assetDownloader;
         }
 
         public async Task GetResourcesFiles()
         {
-            // Aseguramos la creacion del directorio necesario
-            await _directoryCreator.CreateDirResourcesAsync();
-            
-            var resourcesPath = _directoryCreator.ResourcesPath;
+            var resourcesPath = _directoriesCreator.ResourcesPath;
             var differencesGameFilePath = Path.Combine(resourcesPath, "differences_game.txt");
             var differencesLcuFilePath = Path.Combine(resourcesPath, "differences_lcu.txt");
 
@@ -50,7 +47,9 @@ namespace AssetsManager.Utils
                     .Select(asset => (asset, "https://raw.communitydragon.org/pbe/"));
                 var allDifferences = gameDifferences.Concat(lcuDifferences).ToList();
 
-                var downloadDirectory = _directoryCreator.SubAssetsDownloadedPath;
+                // Aseguramos la creacion de la carpeta de AssetsDownloaded
+                _directoriesCreator.GenerateNewSubAssetsDownloadedPath();
+                var downloadDirectory = _directoriesCreator.SubAssetsDownloadedPath;
 
                 var notFoundAssets = new List<string>();
 

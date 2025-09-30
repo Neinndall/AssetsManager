@@ -33,7 +33,9 @@ namespace AssetsManager.Utils
         {
             try
             {
-                await _directoriesCreator.CreateBackUpOldHashesAsync();
+                // Llamamos para la creacion de la carpeta de BackUp si es necesario
+                _directoriesCreator.GenerateNewBackUpOldHashesPath();
+                
                 string backupDirectory = _directoriesCreator.BackUpOldHashesPath;                
                 var filesToCopy = new[] { "hashes.game.txt", "hashes.lcu.txt" };
 
@@ -44,7 +46,7 @@ namespace AssetsManager.Utils
 
                     if (File.Exists(sourceFilePath))
                     {
-                        File.Copy(sourceFilePath, destinationFilePath, true);
+                        await Task.Run(() => File.Copy(sourceFilePath, destinationFilePath, true));
                     }
                 }
                 return backupDirectory;

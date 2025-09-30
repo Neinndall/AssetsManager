@@ -84,7 +84,9 @@ namespace AssetsManager.Services.Hashes
 
         public async Task FilterAndSaveDifferencesAsync(List<string> differencesGame, List<string> differencesLcu, string oldHashesPath)
         {
-            await _directoriesCreator.CreateDirResourcesAsync();
+             // Llamamos para la creacion de la carpeta de Resources
+            _directoriesCreator.GenerateNewResourcesPath();
+                            
             string oldGameHashesPath = Path.Combine(oldHashesPath, "hashes.game.txt");
             var oldHashes = await TryReadAllLinesAsync(oldGameHashesPath);
 

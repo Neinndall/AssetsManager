@@ -25,6 +25,7 @@ namespace AssetsManager.Views.Settings
             checkBoxSaveDiffHistory.IsChecked = _appSettings.SaveDiffHistory;
             checkBoxBackgroundUpdates.IsChecked = _appSettings.BackgroundUpdates;
             comboBoxUpdateFrequency.SelectedItem = _appSettings.UpdateCheckFrequency;
+
         }
 
         public void SaveSettings()
@@ -39,6 +40,7 @@ namespace AssetsManager.Views.Settings
             _appSettings.SaveDiffHistory = checkBoxSaveDiffHistory.IsChecked ?? false;
             _appSettings.BackgroundUpdates = checkBoxBackgroundUpdates.IsChecked ?? false;
             _appSettings.UpdateCheckFrequency = (int)(comboBoxUpdateFrequency.SelectedItem ?? 10);
+
         }
     }
 }

@@ -156,35 +156,6 @@ namespace AssetsManager.Services.Downloads
             }
         }
 
-        public async Task<string> DownloadAssetIfNeeded(string assetUrl, string assetName)
-        {
-            await _directoriesCreator.CreatePreviewAssetsAsync();
-            string previewAssetsPath = _directoriesCreator.PreviewAssetsPath;
-            string localFilePath = Path.Combine(previewAssetsPath, assetName);
-
-            if (File.Exists(localFilePath))
-            {
-                _logService.LogDebug($"Asset already exists locally: {localFilePath}");
-                return localFilePath;
-            }
-
-            try
-            {
-                var response = await _httpClient.GetAsync(assetUrl);
-                response.EnsureSuccessStatusCode();
-                await using (var fileStream = new FileStream(localFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                {
-                    await response.Content.CopyToAsync(fileStream);
-                }
-                return localFilePath;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, $"Error downloading asset '{assetName}' from {assetUrl}");
-                return null;
-            }
-        }
-
         public async Task DownloadAssetToCustomPathAsync(string url, string fullDestinationPath)
         {
             try
@@ -206,62 +177,6 @@ namespace AssetsManager.Services.Downloads
             }
         }
 
-        public async Task<int> DownloadWadAssetsAsync(IEnumerable<SerializableChunkDiff> diffs)
-        {
-            await _directoriesCreator.CreateDirSubAssetsDownloadedAsync();
-            string gameBaseUrl = "https://raw.communitydragon.org/pbe/game/";
-            string pluginBaseUrl = "https://raw.communitydragon.org/pbe/";
-            int successCount = 0;
 
-            foreach (var diff in diffs)
-            {
-                string baseUrl = diff.SourceWadFile.Contains("plugins", StringComparison.OrdinalIgnoreCase) ? pluginBaseUrl : gameBaseUrl;
-                string sourceUrl = baseUrl + diff.Path.Replace("\\", "/");
-
-                string finalUrl = AssetUrlRules.Adjust(sourceUrl);
-
-                if (string.IsNullOrEmpty(finalUrl))
-                {
-                    Log.Information($"Skipping download for {diff.FileName} as it's filtered by asset rules."); // Log only to the .log file
-                    continue;
-                }
-
-                string baseSavePath;
-                switch (diff.Type)
-                {
-                    case ChunkDiffType.New:
-                        baseSavePath = _directoriesCreator.WadNewAssetsPath;
-                        break;
-                    case ChunkDiffType.Modified:
-                        baseSavePath = _directoriesCreator.WadModifiedAssetsPath;
-                        break;
-                    case ChunkDiffType.Renamed:
-                        baseSavePath = _directoriesCreator.WadRenamedAssetsPath;
-                        break;
-                    default:
-                        // Skip downloading for other types like 'Removed'
-                        continue;
-                }
-
-                // Refactored to use the centralized DirectoriesCreator for path construction.
-                // This correctly handles "game/" vs "plugins/" based on the URL and keeps the logic consistent.
-                string destinationDirectory = _directoriesCreator.CreateAssetDirectoryPath(finalUrl, baseSavePath);
-                string finalFileName = Path.GetFileName(finalUrl);
-                string destinationPath = Path.Combine(destinationDirectory, finalFileName);
-
-                Log.Information($"Downloaded: {finalFileName}"); // Log only to the .log file
-                try
-                {
-                    await DownloadAssetToCustomPathAsync(finalUrl, destinationPath);
-                    successCount++;
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Failed to download {diff.FileName}");
-                    // Continue to next file
-                }
-            }
-            return successCount;
-        }
     }
 }

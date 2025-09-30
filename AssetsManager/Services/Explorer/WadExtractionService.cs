@@ -34,9 +34,6 @@ namespace AssetsManager.Services.Explorer
                 case NodeType.VirtualFile:
                     await ExtractVirtualFileAsync(node, destinationPath);
                     break;
-                case NodeType.RealFile:
-                    ExtractRealFile(node, destinationPath);
-                    break;
                 case NodeType.VirtualDirectory:
                 case NodeType.WadFile:
                     await ExtractVirtualDirectoryAsync(node, destinationPath);
@@ -49,7 +46,7 @@ namespace AssetsManager.Services.Explorer
 
         private async Task ExtractVirtualDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath)
         {
-            string newDirPath = Path.Combine(destinationPath, dirNode.Name);
+            string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
             Directory.CreateDirectory(newDirPath);
 
             // If children are not loaded (i.e., it's the dummy node), load them.
@@ -72,44 +69,13 @@ namespace AssetsManager.Services.Explorer
 
         private async Task ExtractRealDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath)
         {
-            string newDirPath = Path.Combine(destinationPath, dirNode.Name);
+            string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
             Directory.CreateDirectory(newDirPath);
 
-            var subDirectories = Directory.GetDirectories(dirNode.FullPath);
-            foreach (var dirPath in subDirectories)
+            // The tree is already fully loaded in memory, so we can just iterate through the children.
+            foreach (var childNode in dirNode.Children)
             {
-                var childNode = new FileSystemNodeModel(dirPath);
                 await ExtractNodeAsync(childNode, newDirPath);
-            }
-
-            var files = Directory.GetFiles(dirNode.FullPath);
-            foreach (var filePath in files)
-            {
-                var childNode = new FileSystemNodeModel(filePath);
-                await ExtractNodeAsync(childNode, newDirPath);
-            }
-        }
-
-        private void ExtractRealFile(FileSystemNodeModel fileNode, string destinationPath)
-        {
-            try
-            {
-                if (Path.GetExtension(fileNode.Name).Equals(".tex", StringComparison.OrdinalIgnoreCase))
-                {
-                    string pngFileName = Path.ChangeExtension(fileNode.Name, ".png");
-                    string destFilePath = Path.Combine(destinationPath, pngFileName);
-                        
-                    byte[] fileData = File.ReadAllBytes(fileNode.FullPath);
-                    ConvertTexToPng(fileData, destFilePath);
-                }
-                else
-                {                    string destFilePath = Path.Combine(destinationPath, fileNode.Name);
-                    File.Copy(fileNode.FullPath, destFilePath, true);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, $"Failed to extract real file: {fileNode.FullPath}");
             }
         }
 
@@ -139,17 +105,8 @@ namespace AssetsManager.Services.Explorer
                         decompressedData = decompressedDataOwner.Span.ToArray();
                     }
 
-                    if (Path.GetExtension(fileNode.Name).Equals(".tex", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string pngFileName = Path.ChangeExtension(fileNode.Name, ".png");
-                        string destFilePath = Path.Combine(destinationPath, pngFileName);
-                        ConvertTexToPng(decompressedData, destFilePath);
-                    }
-                    else
-                    {
-                        string destFilePath = Path.Combine(destinationPath, fileNode.Name);
-                        File.WriteAllBytes(destFilePath, decompressedData);
-                    }
+                    string destFilePath = Path.Combine(destinationPath, SanitizeName(fileNode.Name));
+                    File.WriteAllBytes(destFilePath, decompressedData);
                 }
                 catch (Exception ex)
                 {
@@ -158,38 +115,17 @@ namespace AssetsManager.Services.Explorer
             });
         }
 
-        private void ConvertTexToPng(byte[] texData, string destinationPngPath)
+        private string SanitizeName(string name)
         {
-            using var stream = new MemoryStream(texData);
-            var texture = Texture.Load(stream);
-            if (texture.Mips.Length > 0)
+            const int MaxLength = 240; // A bit less than 255 to be safe.
+            if (name.Length > MaxLength)
             {
-                var mainMip = texture.Mips[0];
-                var width = mainMip.Width;
-                var height = mainMip.Height;
-                if (mainMip.Span.TryGetSpan(out Span<ColorRgba32> pixelSpan))
-                {
-                    var pixelBytes = MemoryMarshal.AsBytes(pixelSpan).ToArray();
-                    // Swap R and B channels
-                    for (int i = 0; i < pixelBytes.Length; i += 4)
-                    {
-                        var r = pixelBytes[i];
-                        var b = pixelBytes[i + 2];
-                        pixelBytes[i] = b;
-                        pixelBytes[i + 2] = r;
-                    }
-                    var bmp = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixelBytes, width * 4);
-                    bmp.Freeze();
-                    
-                    var encoder = new PngBitmapEncoder();
-                    encoder.Frames.Add(BitmapFrame.Create(bmp));
-
-                    using (var fileStream = new FileStream(destinationPngPath, FileMode.Create))
-                    {
-                        encoder.Save(fileStream);
-                    }
-                }
+                var extension = Path.GetExtension(name);
+                var newLength = MaxLength - extension.Length;
+                var sanitizedName = name.Substring(0, newLength) + extension;
+                return sanitizedName;
             }
+            return name;
         }
     }
 }

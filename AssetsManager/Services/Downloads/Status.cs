@@ -47,12 +47,47 @@ namespace AssetsManager.Services.Downloads
             {
                 if (!silent) _logService.Log("Server updated or local files out of date. Starting hash synchronization...");
                 await _requests.SyncHashesIfEnabledAsync(syncHashesWithCDTB);
+
+                UpdateConfigWithLocalFileSizes();
+
                 if (!silent) _logService.LogSuccess("Synchronization completed.");
                 return true;
             }
 
             if (!silent) _logService.Log("No server updates found. Local hashes are up-to-date.");
             return false;
+        }
+
+        private void UpdateConfigWithLocalFileSizes()
+        {
+            var newHashesPath = _directoriesCreator.HashesNewPath;
+            if (!Directory.Exists(newHashesPath))
+            {
+                _logService.LogWarning($"Cannot update hash config: 'hashes/new' directory not found at '{newHashesPath}'.");
+                return;
+            }
+
+            var newSizes = new Dictionary<string, long>();
+            var allKnownFiles = new[] {
+                GAME_HASHES_FILENAME, LCU_HASHES_FILENAME, HASHES_BINENTRIES,
+                HASHES_BINFIELDS, HASHES_BINHASHES, HASHES_BINTYPES
+            };
+
+            foreach (var filename in allKnownFiles)
+            {
+                var filePath = Path.Combine(newHashesPath, filename);
+                if (File.Exists(filePath))
+                {
+                    newSizes[filename] = new FileInfo(filePath).Length;
+                }
+                else
+                {
+                    newSizes[filename] = 0;
+                }
+            }
+
+            _appSettings.HashesSizes = newSizes;
+            AppSettings.SaveSettings(_appSettings);
         }
 
         private bool AreLocalFilesOutOfSync()

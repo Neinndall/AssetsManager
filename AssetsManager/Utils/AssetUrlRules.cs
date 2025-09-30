@@ -9,7 +9,7 @@ namespace AssetsManager.Utils
         private static readonly HashSet<string> _excludedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
             ".luabin", ".luabin64", ".preload", ".scb",
-            ".sco", ".skl", ".mapgeo", ".stringtable",
+            ".sco", ".skn", ".skl", ".mapgeo", ".stringtable",
             ".anm", ".dat", ".bnk", ".wpk",
             ".cfg", ".cfgbin", ".subchunktoc"
         };
