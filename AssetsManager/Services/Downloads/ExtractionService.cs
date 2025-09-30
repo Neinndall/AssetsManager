@@ -16,7 +16,6 @@ namespace AssetsManager.Services.Downloads
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly AppSettings _appSettings;
-        private readonly CustomMessageBoxService _customMessageBoxService;
 
         public ExtractionService(
             HashesManager hashesManager,
@@ -26,8 +25,7 @@ namespace AssetsManager.Services.Downloads
             HashCopier hashCopier,
             LogService logService,
             DirectoriesCreator directoriesCreator,
-            AppSettings appSettings,
-            CustomMessageBoxService customMessageBoxService)
+            AppSettings appSettings)
         {
             _hashesManager = hashesManager;
             _resources = resources;
@@ -37,7 +35,6 @@ namespace AssetsManager.Services.Downloads
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _appSettings = appSettings;
-            _customMessageBoxService = customMessageBoxService;
         }
 
         public async Task ExecuteAsync(string oldHashesPath, string newHashesPath)
