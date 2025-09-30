@@ -4,7 +4,7 @@
 
 ## ✅ APP Reliability
 
-*   **Latest Version v2.4.0.3:** **[VirusTotal details and scans](https://www.virustotal.com/gui/file/400cda794d2ff9f1480bf3ca1bad08d5abdf6c868cf043aebe755d68ca658be4/details)** 
+*   **Latest Version v2.4.0.4:** **[VirusTotal details and scans](https://www.virustotal.com/gui/file/decf2e289b6af193f54556adfdc3fd738cfe869a07498ea6dc35abc013623607/details)** 
      *   *GITHUB* --> You cant get the sha-256 [here](https://github.com/Neinndall/AssetsManager/releases)
      *   *VIRUSTOTAL* --> You cant get the sha-256 in `details` from the link of VirusTotal in details
 
@@ -14,13 +14,12 @@ AssetsManager is a tool for League of Legends enthusiasts who need to analyze, m
 
 ## ✨ Key Features
 
-*   **Advanced WAD File Comparison:** Compare `.wad` archives between two PBE directories to identify new, modified, deleted, or renamed assets. Includes a side-by-side visual diff for image changes (`ImageDiffWindow`).
-*   **Portable Comparison Packages:** Save comparison results asynchronously as a lightweight, self-contained package. This includes only the changed file chunks, allowing for easy sharing and review without the original PBE directories.
-*   **Powerful PBE File Explorer:** Browse game files with a familiar file-tree interface, featuring a highly advanced real-time search to instantly filter results or navigate directly to any file or folder. The integrated previewer supports a wide range of formats, including textures (`.tex`, `.dds`), images (`.png`, `.svg`), text, audio, video, and provides a readable visualization for binary `.bin` files.
+*   **Obtain automatically the new assets from each update:** Efficiently compares local and server hashes to download only new or modified assets from CommunityDragon.
+*   **WAD Comparison and Backups:** Compare `.wad` archives between two PBE directories to identify new, modified, deleted, or renamed assets. Includes a side-by-side visual diff for image changes (`ImageDiffWindow`). Save comparison results asynchronously as a lightweight, self-contained package. This includes only the changed file chunks, allowing for easy sharing and review without the original PBE directories.
+*   **WAD Explorer** Browse game files with a familiar file-tree interface, featuring a highly advanced real-time search to instantly filter results or navigate directly to any file or folder. The integrated previewer supports a wide range of formats, including textures (`.tex`, `.dds`), images (`.png`, `.svg`), text, audio, video, and provides a readable visualization for binary `.bin` files.
 *   **3D Model Viewer:** A fully integrated tool to load and inspect 3D models (`.skn`), skeletons (`.skl`), and play animations (`.anm`) directly within the application.
-*   **Automated Asset Downloading:** Efficiently compares local and server hashes to download only new or modified assets from Community Dragon.
-*   **Flexible Asset Filtering:** Customize downloads by excluding file extensions and applying complex URL-based rules.
-*   **Modern & Responsive Architecture:** Built with an event-driven, asynchronous-first approach to ensure a smooth, non-blocking user experience. It leverages Dependency Injection (DI) for a clean and maintainable codebase.
+
+And much more!!
 
 ## 🦾 Advanced Functionality
 
