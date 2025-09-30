@@ -117,7 +117,7 @@ namespace AssetsManager.Services.Core
             {
                 await _monitorService.CheckAllAssetCategoriesAsync(true, () =>
                 {
-                    UpdatesFound?.Invoke("New assets have been found!", null);
+                    UpdatesFound?.Invoke("New category assets have been found!", null);
                 });
             }
             finally

@@ -150,8 +150,6 @@ namespace AssetsManager.Views
             contextMenu.Items.Add(exitMenuItem);
 
             _notifyIcon.ContextMenuStrip = contextMenu;
-
-
         }
 
         private void ExitApplication_Click(object sender, EventArgs e)
