@@ -17,10 +17,10 @@ namespace AssetsManager.Views.Dialogs
         private int _totalFiles;
         private readonly DispatcherTimer _timer;
 
-        public string OperationVerb { get; set; } = "Downloading";
-        public string WindowTitle { get; set; } // No default value here
-        public string HeaderIconKind { get; set; } = "Download";
-        public string HeaderText { get; set; } = "Download Details";
+        public string OperationVerb { get; set; }
+        public string WindowTitle { get; set; }
+        public string HeaderIconKind { get; set; }
+        public string HeaderText { get; set; }
 
         public ProgressDetailsWindow(LogService logService, string windowTitle) // Add windowTitle parameter
         {
