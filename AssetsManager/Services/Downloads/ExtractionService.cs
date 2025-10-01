@@ -41,7 +41,13 @@ namespace AssetsManager.Services.Downloads
         {
             try
             {
-                await _hashesManager.CompareHashesAsync(oldHashesPath, newHashesPath);
+                int diffCount = await _hashesManager.CompareHashesAsync(oldHashesPath, newHashesPath);
+
+                if (diffCount == 0)
+                {
+                    return;
+                }
+
                 await _resources.GetResourcesFiles();
                 _directoryCleaner.CleanEmptyDirectories();
                 await _backupManager.HandleBackUpAsync(_appSettings.CreateBackUpOldHashes);

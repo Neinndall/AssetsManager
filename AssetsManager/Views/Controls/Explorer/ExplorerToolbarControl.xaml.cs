@@ -8,6 +8,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public event TextChangedEventHandler SearchTextChanged;
         public event RoutedEventHandler CollapseToContainerClicked;
         public event RoutedEventHandler LoadComparisonClicked;
+        public event RoutedEventHandler SwitchModeClicked;
 
         public string SearchText => SearchTextBox.Text;
 
@@ -29,6 +30,11 @@ namespace AssetsManager.Views.Controls.Explorer
         private void LoadComparisonButton_Click(object sender, RoutedEventArgs e)
         {
             LoadComparisonClicked?.Invoke(this, e);
+        }
+
+        private void SwitchModeButton_Click(object sender, RoutedEventArgs e)
+        {
+            SwitchModeClicked?.Invoke(this, e);
         }
     }
 }

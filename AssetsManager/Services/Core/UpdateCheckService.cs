@@ -2,6 +2,7 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Downloads;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
 using AssetsManager.Services.Monitor;
@@ -115,10 +116,27 @@ namespace AssetsManager.Services.Core
             _isCheckingAssets = true;
             try
             {
-                await _monitorService.CheckAllAssetCategoriesAsync(true, () =>
+                var updatedCategoryNames = new List<string>();
+                await _monitorService.CheckAllAssetCategoriesAsync(true, (categoryName) =>
                 {
-                    UpdatesFound?.Invoke("New assets have been found!", null);
+                    if (!updatedCategoryNames.Contains(categoryName))
+                    {
+                        updatedCategoryNames.Add(categoryName);
+                    }
                 });
+
+                if (updatedCategoryNames.Any())
+                {
+                    if (updatedCategoryNames.Count == 1)
+                    {
+                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category!", null);
+                    }
+                    else
+                    {
+                        string categories = string.Join(", ", updatedCategoryNames);
+                        UpdatesFound?.Invoke($"New assets found in categories: {categories}!", null);
+                    }
+                }
             }
             finally
             {

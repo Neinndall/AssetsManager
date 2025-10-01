@@ -43,6 +43,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public ObservableCollection<FileSystemNodeModel> RootNodes { get; set; }
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
+        private bool _isWadMode = true;
 
         public FileExplorerControl()
         {
@@ -61,15 +62,56 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.SearchTextChanged += Toolbar_SearchTextChanged;
             Toolbar.CollapseToContainerClicked += Toolbar_CollapseToContainerClicked;
             Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;
+            Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
 
             if (!string.IsNullOrEmpty(AppSettings.LolDirectory) && Directory.Exists(AppSettings.LolDirectory))
             {
-                await BuildInitialTree(AppSettings.LolDirectory);
+                await BuildWadTreeAsync(AppSettings.LolDirectory);
             }
             else
             {
                 FileTreeView.Visibility = Visibility.Collapsed;
                 NoDirectoryMessage.Visibility = Visibility.Visible;
+            }
+        }
+
+        private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
+        {
+            _isWadMode = !_isWadMode;
+            await ReloadTreeAsync();
+        }
+
+        public async Task ReloadTreeAsync()
+        {
+            if (_isWadMode)
+            {
+                if (!string.IsNullOrEmpty(AppSettings.LolDirectory) && Directory.Exists(AppSettings.LolDirectory))
+                {
+                    await BuildWadTreeAsync(AppSettings.LolDirectory);
+                }
+                else
+                {
+                    FileTreeView.Visibility = Visibility.Collapsed;
+                    PlaceholderTitle.Text = "Select a LoL Directory";
+                    PlaceholderDescription.Text = "Choose the root folder where you installed League of Legends to browse its WAD files.";
+                    SelectLolDirButton.Visibility = Visibility.Visible;
+                    NoDirectoryMessage.Visibility = Visibility.Visible;
+                }
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath))
+                {
+                    await BuildDirectoryTreeAsync(DirectoriesCreator.AssetsDownloadedPath);
+                }
+                else
+                {
+                    FileTreeView.Visibility = Visibility.Collapsed;
+                    PlaceholderTitle.Text = "Assets Directory Not Found";
+                    PlaceholderDescription.Text = "The application could not find the directory for downloaded assets.";
+                    SelectLolDirButton.Visibility = Visibility.Collapsed;
+                    NoDirectoryMessage.Visibility = Visibility.Visible;
+                }
             }
         }
 
@@ -250,10 +292,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                string lolDirectory = dialog.FileName;
-                if (Directory.Exists(lolDirectory))
+                string selectedDirectory = dialog.FileName;
+                if (Directory.Exists(selectedDirectory))
                 {
-                    await BuildInitialTree(lolDirectory);
+                    AppSettings.LolDirectory = selectedDirectory;
+                    await ReloadTreeAsync();
                 }
                 else
                 {
@@ -262,7 +305,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async Task BuildInitialTree(string rootPath)
+        private async Task BuildWadTreeAsync(string rootPath)
         {
             _currentRootPath = rootPath;
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
@@ -310,6 +353,37 @@ namespace AssetsManager.Views.Controls.Explorer
             catch (Exception ex)
             {
                 LogService.LogError(ex, "Failed to build initial tree.");
+                CustomMessageBoxService.ShowError("Error", "Could not load the directory. Please check the logs.", Window.GetWindow(this));
+                NoDirectoryMessage.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                LoadingIndicator.Visibility = Visibility.Collapsed;
+                FileTreeView.Visibility = Visibility.Visible;
+                Toolbar.Visibility = Visibility.Visible;
+                ToolbarSeparator.Visibility = Visibility.Visible;
+            }
+        }
+
+        private async Task BuildDirectoryTreeAsync(string rootPath)
+        {
+            _currentRootPath = rootPath;
+            NoDirectoryMessage.Visibility = Visibility.Collapsed;
+            FileTreeView.Visibility = Visibility.Collapsed;
+            LoadingIndicator.Visibility = Visibility.Visible;
+
+            try
+            {
+                RootNodes.Clear();
+                var nodes = await WadNodeLoaderService.LoadDirectoryAsync(rootPath);
+                foreach (var node in nodes)
+                {
+                    RootNodes.Add(node);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Failed to build directory tree.");
                 CustomMessageBoxService.ShowError("Error", "Could not load the directory. Please check the logs.", Window.GetWindow(this));
                 NoDirectoryMessage.Visibility = Visibility.Visible;
             }

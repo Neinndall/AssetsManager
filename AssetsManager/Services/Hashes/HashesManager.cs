@@ -22,7 +22,7 @@ namespace AssetsManager.Services.Hashes
             _logService = logService;
         }
 
-        public async Task CompareHashesAsync(string oldHashesPath, string newHashesPath)
+        public async Task<int> CompareHashesAsync(string oldHashesPath, string newHashesPath)
         {
             _logService.Log("Comparing and filtering hashes, please wait...");
 
@@ -61,7 +61,7 @@ namespace AssetsManager.Services.Hashes
                 }
             });
 
-            await FilterAndSaveDifferencesAsync(differencesGame.ToList(), differencesLcu.ToList(), oldHashesPath);
+            return await FilterAndSaveDifferencesAsync(differencesGame.ToList(), differencesLcu.ToList(), oldHashesPath);
         }
 
         private async Task<string[]> TryReadAllLinesAsync(string path)
@@ -82,11 +82,8 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        public async Task FilterAndSaveDifferencesAsync(List<string> differencesGame, List<string> differencesLcu, string oldHashesPath)
+        public async Task<int> FilterAndSaveDifferencesAsync(List<string> differencesGame, List<string> differencesLcu, string oldHashesPath)
         {
-             // Llamamos para la creacion de la carpeta de Resources
-            _directoriesCreator.GenerateNewResourcesPath();
-                            
             string oldGameHashesPath = Path.Combine(oldHashesPath, "hashes.game.txt");
             var oldHashes = await TryReadAllLinesAsync(oldGameHashesPath);
 
@@ -150,6 +147,18 @@ namespace AssetsManager.Services.Hashes
                 }
             });
 
+            int gameDiffCount = filteredDifferencesGame.Count;
+            int lcuDiffCount = filteredDifferencesLcu.Count;
+
+            // If no differences are found after filtering, exit early to prevent creating empty resource files and directories.
+            if (gameDiffCount == 0 && lcuDiffCount == 0)
+            {
+                _logService.Log("No hash differences found after filtering.");
+                return 0;
+            }
+
+            _directoriesCreator.GenerateNewResourcesPath();
+
             try
             {
                 await File.WriteAllLinesAsync(Path.Combine(_directoriesCreator.ResourcesPath, "differences_game.txt"), filteredDifferencesGame);
@@ -170,6 +179,8 @@ namespace AssetsManager.Services.Hashes
 
             var resourcePath = _directoriesCreator.ResourcesPath;
             _logService.LogInteractiveInfo($"Filtered differences saved to {resourcePath}", resourcePath);
+
+            return gameDiffCount + lcuDiffCount;
         }
     }
 }

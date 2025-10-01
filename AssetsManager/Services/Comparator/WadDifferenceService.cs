@@ -121,6 +121,7 @@ namespace AssetsManager.Services.Comparator
             var textExtensions = new[] { ".txt", ".lua", ".xml", ".yaml", ".yml", ".ini", ".log" };
             var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tex", ".dds" };
             var binExtensions = new[] { ".bin" };
+            var cssExtensions = new[] { ".css" };
 
             object GetBinDataObject(byte[] data)
             {
@@ -162,6 +163,12 @@ namespace AssetsManager.Services.Comparator
                 string oldText = GetTextContent(oldData);
                 string newText = GetTextContent(newData);
                 return ("json", oldText, newText);
+            }
+            if (cssExtensions.Contains(extension))
+            {
+                string oldText = GetTextContent(oldData);
+                string newText = GetTextContent(newData);
+                return ("css", oldText, newText);
             }
             if (textExtensions.Contains(extension))
             {

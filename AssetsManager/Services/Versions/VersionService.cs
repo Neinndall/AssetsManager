@@ -363,7 +363,7 @@ namespace AssetsManager.Services.Versions
 
         public async Task DownloadPluginsAsync(string manifestUrl, string lolDirectory, List<string> locales)
         {
-            const string taskName = "Downloading Plugins";
+            const string taskName = "Updating League Client";
             bool success = false;
             try
             {
@@ -403,7 +403,7 @@ namespace AssetsManager.Services.Versions
 
         public async Task DownloadGameClientAsync(string manifestUrl, string lolDirectory, List<string> locales)
         {
-            const string taskName = "Downloading Game Client";
+            const string taskName = "Updating Game Client";
             bool success = false;
             try
             {

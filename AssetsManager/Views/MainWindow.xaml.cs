@@ -129,6 +129,22 @@ namespace AssetsManager.Views
 
             InitializeNotifyIcon();
             Closing += MainWindow_Closing;
+            StateChanged += MainWindow_StateChanged;
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            SingleInstance.RegisterWindow(this, () =>
+            {
+                Show();
+                if (WindowState == WindowState.Minimized)
+                {
+                    WindowState = WindowState.Normal;
+                }
+                Activate();
+                _notifyIcon.Visible = false;
+            });
         }
 
         private void InitializeNotifyIcon()
@@ -150,8 +166,6 @@ namespace AssetsManager.Views
             contextMenu.Items.Add(exitMenuItem);
 
             _notifyIcon.ContextMenuStrip = contextMenu;
-
-
         }
 
         private void ExitApplication_Click(object sender, EventArgs e)
@@ -193,11 +207,14 @@ namespace AssetsManager.Views
                 _latestAppVersionAvailable = latestVersion;
             }
             
-            // Use the compat manager for robust notification support in WPF                           
-            ToastNotificationManagerCompat.CreateToastNotifier().Show(new ToastNotification(new ToastContentBuilder()                                                                            
-                .AddText("AssetsManager Update")                                                       
-                .AddText(message)                                                                      
-                .GetToastContent().GetXml()));                                                         
+            // Use the compat manager for robust notification support in WPF
+            if (Visibility != Visibility.Visible)
+            {
+                ToastNotificationManagerCompat.CreateToastNotifier().Show(new ToastNotification(new ToastContentBuilder()
+                    .AddText("AssetsManager")
+                    .AddText(message)
+                    .GetToastContent().GetXml()));
+            }
 
             ShowNotification(true, message);
         }
@@ -309,20 +326,19 @@ namespace AssetsManager.Views
             _updateCheckService.Start();
         }
 
-        private void MainWindow_Closing(object sender, CancelEventArgs e)
+        private void MainWindow_StateChanged(object sender, EventArgs e)
         {
-            if (_appSettings.MinimizeToTrayOnClose)
+            if (WindowState == WindowState.Minimized && _appSettings.MinimizeToTrayOnClose)
             {
-                e.Cancel = true;
                 Hide();
                 _notifyIcon.Visible = true;
+                _notifyIcon.ShowBalloonTip(1000, "AssetsManager", "The application has been minimized to the system tray.", ToolTipIcon.Info);
             }
         }
 
-        protected override void OnClosed(EventArgs e)
+        private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
-            _notifyIcon.Dispose();
-            base.OnClosed(e);
+            _notifyIcon?.Dispose();
         }
     }
 }

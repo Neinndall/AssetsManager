@@ -77,6 +77,7 @@ namespace AssetsManager
             services.AddSingleton<ProgressUIManager>();
             services.AddTransient<ExplorerPreviewService>();
             services.AddSingleton<WadSearchBoxService>();
+            services.AddTransient<CSSParserService>();
             services.AddSingleton<JsBeautifierService>();
             services.AddSingleton<DiffViewService>();
             services.AddSingleton<MonitorService>();
@@ -131,6 +132,12 @@ namespace AssetsManager
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            if (!SingleInstance.EnsureSingleInstance())
+            {
+                Shutdown();
+                return;
+            }
+
             base.OnStartup(e);
 
             var logService = ServiceProvider.GetRequiredService<LogService>();

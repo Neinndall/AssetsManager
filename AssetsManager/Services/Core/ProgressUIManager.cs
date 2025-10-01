@@ -79,10 +79,11 @@ namespace AssetsManager.Services.Core
                 }
                 _spinningIconAnimationStoryboard?.Begin();
 
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Download Details");
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Downloader");
                 _progressDetailsWindow.Owner = _owner;
+                _progressDetailsWindow.OperationVerb = "Downloading";
                 _progressDetailsWindow.HeaderIconKind = "Download";
-                _progressDetailsWindow.HeaderText = "Download Details";
+                _progressDetailsWindow.HeaderText = "Downloading Assets";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
             });
@@ -123,11 +124,11 @@ namespace AssetsManager.Services.Core
                 }
                 _spinningIconAnimationStoryboard?.Begin();
 
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Comparison Details");
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Comparator");
                 _progressDetailsWindow.Owner = _owner;
                 _progressDetailsWindow.OperationVerb = "Comparing";
                 _progressDetailsWindow.HeaderIconKind = "Compare";
-                _progressDetailsWindow.HeaderText = "Comparison Details";
+                _progressDetailsWindow.HeaderText = "Comparing WADs";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, totalFiles, "Comparison starting...", true, null);
             });
@@ -167,7 +168,7 @@ namespace AssetsManager.Services.Core
                 }
                 _spinningIconAnimationStoryboard?.Begin();
 
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, taskName);
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Downloader");
                 _progressDetailsWindow.Owner = _owner;
                 _progressDetailsWindow.OperationVerb = "Downloading";
                 _progressDetailsWindow.HeaderIconKind = "Download";
