@@ -134,13 +134,15 @@
                                             HorizontalAlignment="Center"
                                             Foreground="{StaticResource TextMuted}"
                                             Opacity="0.8"/>
-                <TextBlock Text="Select a LoL Directory"
+                <TextBlock x:Name="PlaceholderTitle"
+                           Text="Select a LoL Directory"
                            FontSize="18"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource TextMuted}"
                            HorizontalAlignment="Center"
                            Margin="0,16,0,0"/>
-                <TextBlock Text="Choose the root folder where you installed League of Legends to browse its WAD files."
+                <TextBlock x:Name="PlaceholderDescription"
+                           Text="Choose the root folder where you installed League of Legends to browse its WAD files."
                            TextWrapping="Wrap"
                            FontSize="14"
                            Foreground="{StaticResource TextMuted}"

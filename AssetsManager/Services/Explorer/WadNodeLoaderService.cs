@@ -178,5 +178,33 @@ namespace AssetsManager.Services.Explorer
             currentNode.Children.Add(fileNode);
             return fileNode;
         }
+
+        public async Task<List<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath)
+        {
+            return await Task.Run(() =>
+            {
+                var rootNode = new FileSystemNodeModel(rootPath);
+                rootNode.Children.Clear(); // Clear dummy node
+                AddNodeToRealTree(rootNode, rootPath);
+                return rootNode.Children.ToList();
+            });
+        }
+
+        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path)
+        {
+            foreach (var directory in Directory.GetDirectories(path).OrderBy(d => d))
+            {
+                var dirNode = new FileSystemNodeModel(directory);
+                dirNode.Children.Clear(); // Clear dummy node
+                parentNode.Children.Add(dirNode);
+                AddNodeToRealTree(dirNode, directory);
+            }
+
+            foreach (var file in Directory.GetFiles(path).OrderBy(f => f))
+            {
+                var fileNode = new FileSystemNodeModel(file);
+                parentNode.Children.Add(fileNode);
+            }
+        }
     }
 }

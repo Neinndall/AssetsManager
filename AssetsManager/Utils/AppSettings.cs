@@ -20,7 +20,7 @@ namespace AssetsManager.Utils
         public bool BackgroundUpdates { get; set; }
         public bool CheckPbeStatus { get; set; }
         public bool MinimizeToTrayOnClose { get; set; }
-        
+
         public int UpdateCheckFrequency { get; set; }
         public int AssetTrackerFrequency { get; set; }
         public int PbeStatusFrequency { get; set; }

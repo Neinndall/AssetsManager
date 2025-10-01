@@ -16,6 +16,7 @@ namespace AssetsManager.Utils
         public string JsonCacheNewPath { get; private set; }
         public string JsonCacheOldPath { get; private set; }
         public string JsonCacheHistoryPath { get; private set; }
+        public string AssetsDownloadedPath { get; private set; }
         public string SubAssetsDownloadedPath { get; private set; }
         public string BackUpOldHashesPath { get; private set; }
         public string WadComparisonSavePath { get; private set; }
@@ -52,6 +53,8 @@ namespace AssetsManager.Utils
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
 
+            AssetsDownloadedPath = "AssetsDownloaded";
+            
             JsonCacheNewPath = Path.Combine(appFolderPath, "json_cache", "new");
             JsonCacheOldPath = Path.Combine(appFolderPath, "json_cache", "old");
             JsonCacheHistoryPath = Path.Combine(appFolderPath, "json_cache", "history");
@@ -81,7 +84,7 @@ namespace AssetsManager.Utils
         public void GenerateNewSubAssetsDownloadedPath()
         {
             string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
-            SubAssetsDownloadedPath = Path.Combine("AssetsDownloaded", date);
+            SubAssetsDownloadedPath = Path.Combine(AssetsDownloadedPath, date);
             CreateDirectoryInternal(SubAssetsDownloadedPath, false);
         }
 
