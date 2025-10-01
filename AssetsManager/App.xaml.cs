@@ -132,7 +132,7 @@ namespace AssetsManager
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            if (!SingleInstanceHelper.EnsureSingleInstance())
+            if (!SingleInstance.EnsureSingleInstance())
             {
                 Shutdown();
                 return;

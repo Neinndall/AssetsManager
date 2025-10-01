@@ -135,7 +135,7 @@ namespace AssetsManager.Views
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            SingleInstanceHelper.RegisterWindow(this, () =>
+            SingleInstance.RegisterWindow(this, () =>
             {
                 Show();
                 if (WindowState == WindowState.Minimized)

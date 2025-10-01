@@ -7,7 +7,7 @@ using System.Windows.Interop;
 
 namespace AssetsManager.Utils
 {
-    public static class SingleInstanceHelper
+    public static class SingleInstance
     {
         private static Mutex _mutex;
         public static readonly uint WM_SHOW_APP = RegisterWindowMessage("AssetsManager_ShowApp");
