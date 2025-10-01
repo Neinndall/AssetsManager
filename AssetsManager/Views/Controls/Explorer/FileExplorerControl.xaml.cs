@@ -9,10 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-
 using Microsoft.WindowsAPICodePack.Dialogs;
-using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Comparator;  
 using AssetsManager.Services.Hashes;      
 using AssetsManager.Services.Core;        
 using AssetsManager.Services.Explorer;    

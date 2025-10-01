@@ -4,12 +4,13 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using AssetsManager.Services.Comparator;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Services.Comparator;
 using AssetsManager.Views.Models;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Services.Formatting;
 
 namespace AssetsManager.Services.Core
 {

@@ -21,6 +21,7 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Formatting;
 
 using System.Reflection;
 using ICSharpCode.AvalonEdit;

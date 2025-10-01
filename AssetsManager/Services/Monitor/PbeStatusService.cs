@@ -6,9 +6,10 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
+using AssetsManager.Services.Core;
 using Newtonsoft.Json.Linq;
 
-namespace AssetsManager.Services.Core
+namespace AssetsManager.Services.Monitor
 {
     public class PbeStatusService
     {

@@ -21,12 +21,12 @@ namespace AssetsManager.Views
             WadSearchBoxService wadSearchBoxService,
             DirectoriesCreator directoriesCreator,
             ExplorerPreviewService explorerPreviewService,
-            JsBeautifierService jsBeautifierService,
             DiffViewService diffViewService,
             AppSettings appSettings
         )
         {
             InitializeComponent();
+            
             FileExplorer.LogService = logService;
             FileExplorer.CustomMessageBoxService = customMessageBoxService;
             FileExplorer.HashResolverService = hashResolverService;
