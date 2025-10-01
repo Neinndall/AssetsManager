@@ -54,14 +54,16 @@ namespace AssetsManager.Services.Explorer
         private readonly HashResolverService _hashResolverService;
         private readonly JsBeautifierService _jsBeautifierService;
         private readonly WadDifferenceService _wadDifferenceService;
+        private readonly CSSParserService _cssParserService;
 
-        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, HashResolverService hashResolverService, JsBeautifierService jsBeautifierService, WadDifferenceService wadDifferenceService)
+        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, HashResolverService hashResolverService, JsBeautifierService jsBeautifierService, WadDifferenceService wadDifferenceService, CSSParserService cssParserService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _hashResolverService = hashResolverService;
             _jsBeautifierService = jsBeautifierService;
             _wadDifferenceService = wadDifferenceService;
+            _cssParserService = cssParserService;
         }
 
         public void Initialize(Image imagePreview, WebView2 webView2Preview, TextEditor textEditor, Panel placeholder, Panel selectFileMessage, Panel unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
@@ -286,6 +288,22 @@ namespace AssetsManager.Services.Explorer
                     case ".json":
                         textContent = Encoding.UTF8.GetString(data);
                         textContent = await JsonDiffHelper.FormatJsonAsync(textContent);
+                        if (_jsonHighlightingDefinition == null)
+                        {
+                            var assembly = Assembly.GetExecutingAssembly();
+                            var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
+                            using (var stream = assembly.GetManifestResourceStream(resourceName))
+                            using (var reader = new XmlTextReader(stream))
+                            {
+                                _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
+                            }
+                        }
+                        syntaxHighlighting = _jsonHighlightingDefinition;
+                        break;
+
+                    case ".css":
+                        textContent = Encoding.UTF8.GetString(data);
+                        textContent = _cssParserService.ConvertToJson(textContent);
                         if (_jsonHighlightingDefinition == null)
                         {
                             var assembly = Assembly.GetExecutingAssembly();
@@ -569,7 +587,7 @@ namespace AssetsManager.Services.Explorer
         private bool IsImageExtension(string extension) => extension == ".png" || extension == ".jpg" || extension == ".jpeg";
         private bool IsVectorImageExtension(string extension) => extension == ".svg";
         private bool IsTextureExtension(string extension) => extension == ".tex" || extension == ".dds";
-        private bool IsTextExtension(string extension) => extension == ".json" || extension == ".xml" || extension == ".yml" || extension == ".yaml" || extension == ".ini" || extension == ".log" || extension == ".txt";
+        private bool IsTextExtension(string extension) => extension == ".css" || extension == ".json" || extension == ".xml" || extension == ".yml" || extension == ".yaml" || extension == ".ini" || extension == ".log" || extension == ".txt";
         private bool IsJavaScriptExtension(string extension) => extension == ".js";
         private bool IsMediaExtension(string extension) => extension == ".ogg" || extension == ".webm";
         private bool IsBinExtension(string extension) => extension == ".bin";

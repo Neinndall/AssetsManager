@@ -77,6 +77,7 @@ namespace AssetsManager
             services.AddSingleton<ProgressUIManager>();
             services.AddTransient<ExplorerPreviewService>();
             services.AddSingleton<WadSearchBoxService>();
+            services.AddTransient<CSSParserService>();
             services.AddSingleton<JsBeautifierService>();
             services.AddSingleton<DiffViewService>();
             services.AddSingleton<MonitorService>();
