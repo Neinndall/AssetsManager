@@ -51,7 +51,6 @@ namespace AssetsManager.Views
         private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
         private readonly List<string> _notificationMessages = new List<string>();
-        private bool _isForceClosing = false;
 
         public MainWindow(
             IServiceProvider serviceProvider,
@@ -130,6 +129,22 @@ namespace AssetsManager.Views
 
             InitializeNotifyIcon();
             Closing += MainWindow_Closing;
+            StateChanged += MainWindow_StateChanged;
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            SingleInstanceHelper.RegisterWindow(this, () =>
+            {
+                Show();
+                if (WindowState == WindowState.Minimized)
+                {
+                    WindowState = WindowState.Normal;
+                }
+                Activate();
+                _notifyIcon.Visible = false;
+            });
         }
 
         private void InitializeNotifyIcon()
@@ -155,7 +170,6 @@ namespace AssetsManager.Views
 
         private void ExitApplication_Click(object sender, EventArgs e)
         {
-            _isForceClosing = true;
             System.Windows.Application.Current.Shutdown();
         }
 
@@ -312,21 +326,19 @@ namespace AssetsManager.Views
             _updateCheckService.Start();
         }
 
-        private void MainWindow_Closing(object sender, CancelEventArgs e)
+        private void MainWindow_StateChanged(object sender, EventArgs e)
         {
-            if (_appSettings.MinimizeToTrayOnClose && !_isForceClosing)
+            if (WindowState == WindowState.Minimized && _appSettings.MinimizeToTrayOnClose)
             {
-                e.Cancel = true;
                 Hide();
                 _notifyIcon.Visible = true;
                 _notifyIcon.ShowBalloonTip(1000, "AssetsManager", "The application has been minimized to the system tray.", ToolTipIcon.Info);
             }
         }
 
-        protected override void OnClosed(EventArgs e)
+        private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
-            _notifyIcon.Dispose();
-            base.OnClosed(e);
+            _notifyIcon?.Dispose();
         }
     }
 }

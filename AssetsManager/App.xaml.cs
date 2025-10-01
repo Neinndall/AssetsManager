@@ -131,6 +131,12 @@ namespace AssetsManager
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            if (!SingleInstanceHelper.EnsureSingleInstance())
+            {
+                Shutdown();
+                return;
+            }
+
             base.OnStartup(e);
 
             var logService = ServiceProvider.GetRequiredService<LogService>();
