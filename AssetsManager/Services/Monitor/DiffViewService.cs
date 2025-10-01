@@ -21,17 +21,19 @@ namespace AssetsManager.Services.Monitor
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly LogService _logService;
         private readonly JsBeautifierService _jsBeautifierService;
+        private readonly CSSParserService _cssParserService;
 
         private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".tga", ".jpg", ".jpeg", ".bmp", ".gif", ".ico", ".tif", ".tiff", ".webp", ".tex" };
-        private static readonly string[] SupportedTextExtensions = { ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log", ".glsl", ".vert", ".frag", ".tes", ".bak", ".py", ".lua", ".scd", ".skl", ".wgeo", ".sco", ".ann", ".map" };
+        private static readonly string[] SupportedTextExtensions = { ".css", ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log", ".glsl", ".vert", ".frag", ".tes", ".bak", ".py", ".lua", ".scd", ".skl", ".wgeo", ".sco", ".ann", ".map" };
 
-        public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, JsBeautifierService jsBeautifierService)
+        public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService)
         {
             _serviceProvider = serviceProvider;
             _wadDifferenceService = wadDifferenceService;
             _customMessageBoxService = customMessageBoxService;
             _logService = logService;
             _jsBeautifierService = jsBeautifierService;
+            _cssParserService = cssParserService;
         }
 
         public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, System.Windows.Window owner)
@@ -169,6 +171,10 @@ namespace AssetsManager.Services.Monitor
                 case "json":
                     if (oldData != null) oldText = await JsonDiffHelper.FormatJsonAsync(oldData);
                     if (newData != null) newText = await JsonDiffHelper.FormatJsonAsync(newData);
+                    break;
+                case "css":
+                    if (oldData != null) oldText = _cssParserService.ConvertToJson((string)oldData);
+                    if (newData != null) newText = _cssParserService.ConvertToJson((string)newData);
                     break;
                 case "text":
                     oldText = (string)oldData ?? string.Empty;
