@@ -254,7 +254,7 @@ namespace AssetsManager.Services.Explorer
                         {
                             var binTree = new BinTree(stream);
                             var binDict = BinUtils.ConvertBinTreeToDictionary(binTree, _hashResolverService);
-                            textContent = await JsonDiffHelper.FormatJsonAsync(binDict);
+                            textContent = await JsonFormatter.FormatJsonAsync(binDict);
                         }
                         if (_jsonHighlightingDefinition == null)
                         {
@@ -287,7 +287,7 @@ namespace AssetsManager.Services.Explorer
 
                     case ".json":
                         textContent = Encoding.UTF8.GetString(data);
-                        textContent = await JsonDiffHelper.FormatJsonAsync(textContent);
+                        textContent = await JsonFormatter.FormatJsonAsync(textContent);
                         if (_jsonHighlightingDefinition == null)
                         {
                             var assembly = Assembly.GetExecutingAssembly();

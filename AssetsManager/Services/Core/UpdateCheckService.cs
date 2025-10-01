@@ -1,11 +1,11 @@
-using AssetsManager.Utils;
-using AssetsManager.Services.Downloads;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
+using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
+using AssetsManager.Services.Downloads;
 
 namespace AssetsManager.Services.Core
 {

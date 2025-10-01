@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
@@ -10,6 +12,9 @@ namespace AssetsManager.Services.Downloads
 {
     public class Status
     {
+        // URL Server where obtain the info for the hashes
+        private const string STATUS_URL = "https://raw.communitydragon.org/data/hashes/lol/";
+
         // Game Hashes
         private const string GAME_HASHES_FILENAME = "hashes.game.txt";
         private const string LCU_HASHES_FILENAME = "hashes.lcu.txt";
@@ -23,20 +28,20 @@ namespace AssetsManager.Services.Downloads
         private readonly LogService _logService;
         private readonly Requests _requests;
         private readonly AppSettings _appSettings;
-        private readonly JsonDataService _jsonDataService;
+        private readonly HttpClient _httpClient;
         private readonly DirectoriesCreator _directoriesCreator;
 
         public Status(
             LogService logService,
             Requests requests,
             AppSettings appSettings,
-            JsonDataService jsonDataService,
+            HttpClient httpClient,
             DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
             _requests = requests;
             _appSettings = appSettings;
-            _jsonDataService = jsonDataService;
+            _httpClient = httpClient;
             _directoriesCreator = directoriesCreator;
         }
 
@@ -137,7 +142,7 @@ namespace AssetsManager.Services.Downloads
             try
             {
                 if (!silent) _logService.Log("Getting update sizes from server...");
-                var serverSizes = await _jsonDataService.GetRemoteHashesSizesAsync();
+                var serverSizes = await GetRemoteHashesSizesAsync();
 
                 if (serverSizes == null || serverSizes.Count == 0)
                 {
@@ -200,6 +205,67 @@ namespace AssetsManager.Services.Downloads
             }
 
             return false;
+        }
+
+        public async Task<Dictionary<string, long>> GetRemoteHashesSizesAsync()
+        {
+            var result = new Dictionary<string, long>();
+
+            if (_httpClient == null)
+            { 
+                _logService.LogError("HttpClient is null. Cannot fetch remote sizes.");
+                return result;
+            }
+
+            if (string.IsNullOrEmpty(STATUS_URL))
+            {
+                _logService.LogError("statusUrl is null or empty. Cannot fetch remote sizes.");
+                return result;
+            }
+
+            string html;
+            try
+            {
+                html = await _httpClient.GetStringAsync(STATUS_URL);
+            }
+            catch (HttpRequestException httpEx)
+            {
+                _logService.LogError(httpEx, $"HTTP request failed for '{STATUS_URL}'.");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"An unexpected exception occurred fetching URL '{STATUS_URL}'.");
+                return result;
+            }
+
+            if (string.IsNullOrEmpty(html))
+            {
+                _logService.LogError("Received empty response from statusUrl.");
+                return result;
+            }
+
+            var regex = new Regex(@"href=\""(?<filename>hashes\..*?\.txt)\"".*?\s+(?<size>\d+)\s*$", RegexOptions.Multiline);
+
+            foreach (Match match in regex.Matches(html))
+            {
+                string filename = match.Groups["filename"].Value;
+                string sizeStr = match.Groups["size"].Value;
+
+                if (long.TryParse(sizeStr, out long size))
+                {
+                    result[filename] = size;
+                }
+                else
+                {
+                    _logService.LogError($"Invalid size format '{sizeStr}' for file '{filename}'.");
+                }
+            }
+            if (result.Count == 0)
+            {
+                _logService.LogWarning("No hash files hashes.game or hashes.lcu found in the remote directory listing.");
+            }
+            return result;
         }
     }
 }

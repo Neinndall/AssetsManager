@@ -1,17 +1,14 @@
-using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Views.Dialogs;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
 using System.Windows;
+using Material.Icons.WPF;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;
 using AssetsManager.Utils;
-using Material.Icons.WPF;
-using Microsoft.Extensions.DependencyInjection;
-
 
 namespace AssetsManager.Services.Core
 {

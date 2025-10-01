@@ -151,8 +151,8 @@ namespace AssetsManager.Services.Core
             switch (dataType)
             {
                 case "bin":
-                    if (oldData != null) oldText = await JsonDiffHelper.FormatJsonAsync(oldData);
-                    if (newData != null) newText = await JsonDiffHelper.FormatJsonAsync(newData);
+                    if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
+                    if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
                     break;
                 case "js":
                     try
@@ -168,8 +168,8 @@ namespace AssetsManager.Services.Core
                     }
                     break;
                 case "json":
-                    if (oldData != null) oldText = await JsonDiffHelper.FormatJsonAsync(oldData);
-                    if (newData != null) newText = await JsonDiffHelper.FormatJsonAsync(newData);
+                    if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
+                    if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
                     break;
                 case "css":
                     if (oldData != null) oldText = _cssParserService.ConvertToJson((string)oldData);
