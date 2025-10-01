@@ -10,9 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views.Models;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Helpers;
-using AssetsManager.Services.Core;
 
-namespace AssetsManager.Services.Monitor
+namespace AssetsManager.Services.Core
 {
     public class DiffViewService
     {
@@ -23,8 +22,8 @@ namespace AssetsManager.Services.Monitor
         private readonly JsBeautifierService _jsBeautifierService;
         private readonly CSSParserService _cssParserService;
 
-        private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".tga", ".jpg", ".jpeg", ".bmp", ".gif", ".ico", ".tif", ".tiff", ".webp", ".tex" };
-        private static readonly string[] SupportedTextExtensions = { ".css", ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log", ".glsl", ".vert", ".frag", ".tes", ".bak", ".py", ".lua", ".scd", ".skl", ".wgeo", ".sco", ".ann", ".map" };
+        private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".tga", ".jpg", ".jpeg", ".bmp", ".gif", ".ico", ".webp", ".tex" };
+        private static readonly string[] SupportedTextExtensions = { ".css", ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log" };
 
         public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService)
         {

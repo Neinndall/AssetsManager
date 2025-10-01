@@ -11,7 +11,7 @@ using AssetsManager.Views.Models;
 using AssetsManager.Utils;
 using Material.Icons.WPF;
 using Microsoft.Extensions.DependencyInjection;
-using AssetsManager.Services.Monitor;
+
 
 namespace AssetsManager.Services.Core
 {

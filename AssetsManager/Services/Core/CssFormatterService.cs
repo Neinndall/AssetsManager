@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace AssetsManager
+namespace AssetsManager.Services.Core
 {
     // Modelos de datos
     public class CSSBlock

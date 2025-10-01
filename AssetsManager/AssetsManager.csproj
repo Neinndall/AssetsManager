@@ -51,12 +51,9 @@
 
   <ItemGroup>
     <Resource Include="Resources\**\*.dds" />
-  </ItemGroup>
-  <ItemGroup>
     <Resource Include="Resources\img\logo.ico" />
   </ItemGroup>
 
-  
   <Target Name="MoveWebView2Loader" AfterTargets="Build;Publish">
     <!-- Mover WebView2Loader.dll desde runtimes\win-x64\native -->
     <ItemGroup>

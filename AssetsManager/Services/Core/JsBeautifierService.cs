@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using NUglify;
 using NUglify.JavaScript;
 
-namespace AssetsManager.Services.Monitor
+namespace AssetsManager.Services.Core
 {
     public sealed class JsBeautifierService : IDisposable
     {
