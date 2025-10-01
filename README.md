@@ -3,10 +3,9 @@
 </div>
 
 ## ✅ APP Reliability
+You can review and check the sha-256 in github and virustotal for checking if both numbers matches.
 
-*   **Latest Version v2.4.0.4:** **[VirusTotal details and scans](https://www.virustotal.com/gui/file/decf2e289b6af193f54556adfdc3fd738cfe869a07498ea6dc35abc013623607/details)** 
-     *   *GITHUB* --> You cant get the sha-256 [here](https://github.com/Neinndall/AssetsManager/releases)
-     *   *VIRUSTOTAL* --> You cant get the sha-256 in `details` from the link of VirusTotal in details
+*   **Latest Version v2.4.0.4:** **[VirusTotal details and scans](https://www.virustotal.com/gui/file/aedd7ddc8135ec3d0f10a42158213b068c5f0fe254ac79cedeb8bb8f708b5c3c/details)** 
 
 ## 🛠️ AssetsManager
 
