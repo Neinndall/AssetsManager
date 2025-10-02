@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -171,7 +172,15 @@ namespace AssetsManager.Views.Controls.Explorer
             _currentRootPath = rootPath;
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
-            LoadingIndicator.Visibility = Visibility.Visible;
+
+            var cts = new CancellationTokenSource();
+            var indicatorTask = Task.Delay(100, cts.Token).ContinueWith(t =>
+            {
+                if (!t.IsCanceled)
+                {
+                    Dispatcher.Invoke(() => LoadingIndicator.Visibility = Visibility.Visible);
+                }
+            }, TaskScheduler.Default);
 
             try
             {
@@ -190,6 +199,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             finally
             {
+                cts.Cancel();
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
