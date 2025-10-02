@@ -1,4 +1,5 @@
 using System;
+using System.Xml;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
@@ -16,19 +17,16 @@ using System.Windows;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using System.Text.Json;
+using System.Reflection;
+using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Highlighting;
+using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using AssetsManager.Views.Models;
 using AssetsManager.Utils;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
-
-using System.Reflection;
-using ICSharpCode.AvalonEdit;
-using ICSharpCode.AvalonEdit.Highlighting;
-using ICSharpCode.AvalonEdit.Highlighting.Xshd;
-using System.Xml;
-
 using AssetsManager.Services.Comparator;
 
 namespace AssetsManager.Services.Explorer
@@ -257,65 +255,25 @@ namespace AssetsManager.Services.Explorer
                             var binDict = BinUtils.ConvertBinTreeToDictionary(binTree, _hashResolverService);
                             textContent = await JsonFormatter.FormatJsonAsync(binDict);
                         }
-                        if (_jsonHighlightingDefinition == null)
-                        {
-                            var assembly = Assembly.GetExecutingAssembly();
-                            var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
-                            using (var stream = assembly.GetManifestResourceStream(resourceName))
-                            using (var reader = new XmlTextReader(stream))
-                            {
-                                _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
-                            }
-                        }
-                        syntaxHighlighting = _jsonHighlightingDefinition;
+                        syntaxHighlighting = GetJsonHighlighting();
                         break;
 
                     case ".js":
                         textContent = Encoding.UTF8.GetString(data);
                         textContent = await _jsBeautifierService.BeautifyAsync(textContent);
-                        if (_jsonHighlightingDefinition == null)
-                        {
-                            var assembly = Assembly.GetExecutingAssembly();
-                            var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
-                            using (var stream = assembly.GetManifestResourceStream(resourceName))
-                            using (var reader = new XmlTextReader(stream))
-                            {
-                                _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
-                            }
-                        }
-                        syntaxHighlighting = _jsonHighlightingDefinition;
+                        syntaxHighlighting = GetJsonHighlighting();
                         break;
 
                     case ".json":
                         textContent = Encoding.UTF8.GetString(data);
                         textContent = await JsonFormatter.FormatJsonAsync(textContent);
-                        if (_jsonHighlightingDefinition == null)
-                        {
-                            var assembly = Assembly.GetExecutingAssembly();
-                            var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
-                            using (var stream = assembly.GetManifestResourceStream(resourceName))
-                            using (var reader = new XmlTextReader(stream))
-                            {
-                                _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
-                            }
-                        }
-                        syntaxHighlighting = _jsonHighlightingDefinition;
+                        syntaxHighlighting = GetJsonHighlighting();
                         break;
 
                     case ".css":
                         textContent = Encoding.UTF8.GetString(data);
                         textContent = _cssParserService.ConvertToJson(textContent);
-                        if (_jsonHighlightingDefinition == null)
-                        {
-                            var assembly = Assembly.GetExecutingAssembly();
-                            var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
-                            using (var stream = assembly.GetManifestResourceStream(resourceName))
-                            using (var reader = new XmlTextReader(stream))
-                            {
-                                _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
-                            }
-                        }
-                        syntaxHighlighting = _jsonHighlightingDefinition;
+                        syntaxHighlighting = GetJsonHighlighting();
                         break;
 
                     case ".xml":
@@ -338,6 +296,21 @@ namespace AssetsManager.Services.Explorer
                 _logService.LogError(ex, $"Failed to show text preview for extension {extension}");
                 _textEditorPreview.Text = $"Error showing {extension} file.";
             }
+        }
+
+        private IHighlightingDefinition GetJsonHighlighting()
+        {
+            if (_jsonHighlightingDefinition == null)
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                var resourceName = "AssetsManager.Resources.JsonSyntaxHighlighting.xshd";
+                using (var stream = assembly.GetManifestResourceStream(resourceName))
+                using (var reader = new XmlTextReader(stream))
+                {
+                    _jsonHighlightingDefinition = HighlightingLoader.Load(reader, HighlightingManager.Instance);
+                }
+            }
+            return _jsonHighlightingDefinition;
         }
 
         // Versión limpia de SetPreviewer
