@@ -5,7 +5,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using Material3D = System.Windows.Media.Media3D.Material;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Helpers
 {
     public static class SceneElements
     {
