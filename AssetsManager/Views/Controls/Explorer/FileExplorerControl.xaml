@@ -15,7 +15,7 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
         <ContextMenu x:Key="ExplorerContextMenu" Opened="ContextMenu_Opened">
-            <MenuItem Header="Extract Selected" Click="ExtractSelected_Click">
+            <MenuItem Header="Extract Selected" x:Name="ExtractMenuItem" Click="ExtractSelected_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="FileDownload"/>
                 </MenuItem.Icon>

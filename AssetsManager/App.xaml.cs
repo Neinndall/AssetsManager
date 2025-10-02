@@ -19,6 +19,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Models;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Versions;
 
@@ -76,6 +77,8 @@ namespace AssetsManager
             services.AddSingleton<UpdateCheckService>();
             services.AddSingleton<ProgressUIManager>();
             services.AddTransient<ExplorerPreviewService>();
+            services.AddTransient<TreeBuilderService>();
+            services.AddTransient<TreeUIManager>();
             services.AddSingleton<WadSearchBoxService>();
             services.AddTransient<CSSParserService>();
             services.AddSingleton<JsBeautifierService>();
