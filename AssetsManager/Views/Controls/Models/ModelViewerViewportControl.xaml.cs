@@ -1,8 +1,5 @@
+using System.Linq;
 using HelixToolkit.Wpf;
-using AssetsManager.Services;
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Models;
-using AssetsManager.Views.Models;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
@@ -10,7 +7,10 @@ using System.Diagnostics;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using System.Collections.Generic;
-using System.Linq;
+using AssetsManager.Services;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Models;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Views.Controls.Models
 {
