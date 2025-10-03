@@ -12,6 +12,7 @@ using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
+using AssetsManager.Services.Updater;
 using AssetsManager.Services.Versions;
 using AssetsManager.Utils;
 using AssetsManager.Views.Controls;
@@ -45,7 +46,7 @@ namespace AssetsManager.Views
         private readonly UpdateCheckService _updateCheckService;
         private readonly DiffViewService _diffViewService;
         private readonly MonitorService _monitorService;
-        private readonly VersionService _versionService; // Add this
+        private readonly VersionService _versionService;
         private readonly WadExtractionService _wadExtractionService;
 
         private NotifyIcon _notifyIcon;
@@ -94,7 +95,7 @@ namespace AssetsManager.Views
             _progressUIManager = progressUIManager;
             _diffViewService = diffViewService;
             _monitorService = monitorService;
-            _versionService = versionService; // Add this
+            _versionService = versionService;
             _wadExtractionService = wadExtractionService;
 
             _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, this);

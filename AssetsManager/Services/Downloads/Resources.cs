@@ -4,11 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Services.Downloads
 {
     public class Resources
     {

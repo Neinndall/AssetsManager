@@ -9,9 +9,10 @@ using Newtonsoft.Json;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Services.Updater
 {
     public class UpdateManager
     {

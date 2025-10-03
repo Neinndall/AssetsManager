@@ -6,6 +6,7 @@ using System.Windows;
 using Serilog.Events;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views;
+using AssetsManager.Services.Updater;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;

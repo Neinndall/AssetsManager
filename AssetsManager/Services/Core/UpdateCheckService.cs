@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
+using AssetsManager.Services.Updater;
 using AssetsManager.Services.Downloads;
 
 namespace AssetsManager.Services.Core
@@ -24,7 +25,7 @@ namespace AssetsManager.Services.Core
         private bool _isCheckingAssets = false;
 
         public event Action<string, string> UpdatesFound;
-
+        
         public UpdateCheckService(AppSettings appSettings, Status status, JsonDataService jsonDataService, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService)
         {
             _appSettings = appSettings;
