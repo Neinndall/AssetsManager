@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Media3D;
 
-namespace AssetsManager.Views.Camera
+namespace AssetsManager.Views.Helpers
 {
     public class CustomCameraController
     {

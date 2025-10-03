@@ -15,9 +15,9 @@ using AssetsManager.Views.Models;
 namespace AssetsManager.Views.Controls.Models
 {
     /// <summary>
-    /// Interaction logic for ModelViewerViewportControl.xaml
+    /// Interaction logic for ModelViewportControl.xaml
     /// </summary>
-    public partial class ModelViewerViewportControl : UserControl
+    public partial class ModelViewportControl : UserControl
     {
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
@@ -32,7 +32,7 @@ namespace AssetsManager.Views.Controls.Models
         private SceneModel _sceneModel;
         public bool IsAnimationPaused { get; private set; }
 
-        public ModelViewerViewportControl()
+        public ModelViewportControl()
         {
             InitializeComponent();
             

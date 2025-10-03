@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Media3D;
 using Microsoft.WindowsAPICodePack.Dialogs;
-using AssetsManager.Views.Camera;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Models;
 using AssetsManager.Views.Helpers;

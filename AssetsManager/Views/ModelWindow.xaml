@@ -92,7 +92,7 @@
                     <ColumnDefinition Width="280"/>
                 </Grid.ColumnDefinitions>
 
-                <models:ModelViewerViewportControl Grid.Column="0" x:Name="ViewportControl"/>
+                <models:ModelViewportControl Grid.Column="0" x:Name="ViewportControl"/>
 
                 <GridSplitter Grid.Column="1"
                               HorizontalAlignment="Center"
@@ -101,7 +101,7 @@
                               Background="Transparent"
                               ResizeBehavior="PreviousAndNext"
                               ResizeDirection="Columns"/>
-                <models:ModelViewerPanelControl Grid.Column="2" x:Name="PanelControl"/>
+                <models:ModelPanelControl Grid.Column="2" x:Name="PanelControl"/>
             </Grid>
         </Grid>
     </Grid>

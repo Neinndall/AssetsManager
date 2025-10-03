@@ -14,9 +14,9 @@ using AssetsManager.Services.Core;
 namespace AssetsManager.Views.Controls.Models
 {
     /// <summary>
-    /// Interaction logic for ModelViewerPanelControl.xaml
+    /// Interaction logic for ModelPanelControl.xaml
     /// </summary>
-    public partial class ModelViewerPanelControl : UserControl
+    public partial class ModelPanelControl : UserControl
     {
         public ModelLoadingService ModelLoadingService { get; set; }
         public LogService LogService { get; set; }
@@ -43,7 +43,7 @@ namespace AssetsManager.Views.Controls.Models
         private RigResource _skeleton;
         private SceneModel _sceneModel;
 
-        public ModelViewerPanelControl()
+        public ModelPanelControl()
         {
             InitializeComponent();
             AnimationsListBoxControl.ItemsSource = _animationNames;
