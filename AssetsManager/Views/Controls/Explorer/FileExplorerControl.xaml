@@ -107,7 +107,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </TextBlock.Style>
-                                <Run Text="{Binding PreMatch, Mode=OneWay}" /><Run Text="{Binding Match, Mode=OneWay}" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" /><Run Text="{Binding PostMatch, Mode=OneWay}" />
+                                <Run Text="{Binding PreMatch, Mode=OneWay}" /><Run Text="{Binding Match, Mode=OneWay}" Foreground="White" FontWeight="Bold" /><Run Text="{Binding PostMatch, Mode=OneWay}" />
                             </TextBlock>
                         </Grid>
                     </HierarchicalDataTemplate>
