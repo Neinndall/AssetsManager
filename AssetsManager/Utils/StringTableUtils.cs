@@ -104,8 +104,7 @@ namespace AssetsManager.Utils
                 
                 foreach (var (offset, hash) in entryInfos)
                 {
-                    // Adjust offset to be relative to the start of the data block
-                    long relativeOffset = offset - dataOffset;
+                    long relativeOffset = (long)offset;
 
                     if (relativeOffset < 0 || relativeOffset >= data.Length)
                     {
