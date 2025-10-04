@@ -61,12 +61,19 @@ namespace AssetsManager.Services.Downloads
             await DownloadHashesAsync("hashes.bintypes.txt", downloadDirectory);
         }
 
+        public async Task DownloadRstHashesFilesAsync(string downloadDirectory)
+        {
+            await DownloadHashesAsync("hashes.rst.xxh3.txt", downloadDirectory);
+            await DownloadHashesAsync("hashes.rst.xxh64.txt", downloadDirectory);
+        }
+
         public async Task SyncHashesIfEnabledAsync(bool syncHashesWithCDTB)
         {
             if (syncHashesWithCDTB)
             {
                 await DownloadGameHashesFilesAsync(_directoriesCreator.HashesNewPath);
                 await DownloadBinHashesFilesAsync(_directoriesCreator.HashesNewPath);
+                await DownloadRstHashesFilesAsync(_directoriesCreator.HashesNewPath);
             }
         }
 

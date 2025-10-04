@@ -25,6 +25,10 @@ namespace AssetsManager.Services.Downloads
         private const string HASHES_BINHASHES = "hashes.binhashes.txt";
         private const string HASHES_BINTYPES = "hashes.bintypes.txt";
 
+        // Rst Hashes
+        private const string HASHES_RST_XXH3 = "hashes.rst.xxh3.txt";
+        private const string HASHES_RST_XXH64 = "hashes.rst.xxh64.txt";
+
         private readonly LogService _logService;
         private readonly Requests _requests;
         private readonly AppSettings _appSettings;
@@ -75,7 +79,8 @@ namespace AssetsManager.Services.Downloads
             var newSizes = new Dictionary<string, long>();
             var allKnownFiles = new[] {
                 GAME_HASHES_FILENAME, LCU_HASHES_FILENAME, HASHES_BINENTRIES,
-                HASHES_BINFIELDS, HASHES_BINHASHES, HASHES_BINTYPES
+                HASHES_BINFIELDS, HASHES_BINHASHES, HASHES_BINTYPES,
+                HASHES_RST_XXH3, HASHES_RST_XXH64
             };
 
             foreach (var filename in allKnownFiles)
@@ -173,6 +178,8 @@ namespace AssetsManager.Services.Downloads
                 CheckAndUpdate(HASHES_BINFIELDS);
                 CheckAndUpdate(HASHES_BINHASHES);
                 CheckAndUpdate(HASHES_BINTYPES);
+                CheckAndUpdate(HASHES_RST_XXH3);
+                CheckAndUpdate(HASHES_RST_XXH64);
 
                 if (updated)
                 {
