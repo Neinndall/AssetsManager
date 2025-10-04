@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Downloads
@@ -29,6 +29,12 @@ namespace AssetsManager.Services.Downloads
         private const string HASHES_RST_XXH3 = "hashes.rst.xxh3.txt";
         private const string HASHES_RST_XXH64 = "hashes.rst.xxh64.txt";
 
+        private static readonly string[] AllKnownHashFiles = {
+            GAME_HASHES_FILENAME, LCU_HASHES_FILENAME, HASHES_BINENTRIES,
+            HASHES_BINFIELDS, HASHES_BINHASHES, HASHES_BINTYPES,
+            HASHES_RST_XXH3, HASHES_RST_XXH64
+        };
+
         private readonly LogService _logService;
         private readonly Requests _requests;
         private readonly AppSettings _appSettings;
@@ -51,11 +57,15 @@ namespace AssetsManager.Services.Downloads
 
         public async Task<bool> SyncHashesIfNeeds(bool syncHashesWithCDTB, bool silent = false, Action onUpdateFound = null)
         {
-            bool isUpdated = await IsUpdatedAsync(silent, onUpdateFound);
-            if (isUpdated)
+            var outdatedFiles = await GetOutdatedHashFilesAsync(silent, onUpdateFound);
+            if (outdatedFiles.Any())
             {
                 if (!silent) _logService.Log("Server updated or local files out of date. Starting hash synchronization...");
-                await _requests.SyncHashesIfEnabledAsync(syncHashesWithCDTB);
+
+                if (syncHashesWithCDTB)
+                {
+                    await _requests.DownloadSpecificHashesAsync(outdatedFiles);
+                }
 
                 UpdateConfigWithLocalFileSizes();
 
@@ -77,13 +87,7 @@ namespace AssetsManager.Services.Downloads
             }
 
             var newSizes = new Dictionary<string, long>();
-            var allKnownFiles = new[] {
-                GAME_HASHES_FILENAME, LCU_HASHES_FILENAME, HASHES_BINENTRIES,
-                HASHES_BINFIELDS, HASHES_BINHASHES, HASHES_BINTYPES,
-                HASHES_RST_XXH3, HASHES_RST_XXH64
-            };
-
-            foreach (var filename in allKnownFiles)
+            foreach (var filename in AllKnownHashFiles)
             {
                 var filePath = Path.Combine(newHashesPath, filename);
                 if (File.Exists(filePath))
@@ -100,20 +104,21 @@ namespace AssetsManager.Services.Downloads
             AppSettings.SaveSettings(_appSettings);
         }
 
-        private bool AreLocalFilesOutOfSync()
+        private List<string> GetLocallyOutOfSyncFiles()
         {
+            var outdatedFiles = new List<string>();
             var configSizes = _appSettings.HashesSizes;
             var newHashesPath = _directoriesCreator.HashesNewPath;
 
             if (configSizes == null || configSizes.Count == 0)
             {
-                return false; // Nothing in config to check against.
+                return outdatedFiles; // Nothing in config to check against.
             }
 
             if (string.IsNullOrEmpty(newHashesPath) || !Directory.Exists(newHashesPath))
             {
                 _logService.LogWarning($"Skipping local file sync check: Hashes/new directory path is invalid or not found ('{newHashesPath}').");
-                return false; // Path is not valid, cannot check.
+                return outdatedFiles; // Path is not valid, cannot check.
             }
 
             foreach (var entry in configSizes)
@@ -122,26 +127,35 @@ namespace AssetsManager.Services.Downloads
                 long configSize = entry.Value;
                 string filePath = Path.Combine(newHashesPath, filename);
 
+                bool isOutOfSync = false;
                 if (!File.Exists(filePath))
                 {
-                    if (configSize > 0) return true;
+                    if (configSize > 0) isOutOfSync = true;
                 }
                 else
                 {
                     long diskSize = new FileInfo(filePath).Length;
-                    if (configSize != diskSize) return true;
+                    if (configSize != diskSize) isOutOfSync = true;
+                }
+
+                if (isOutOfSync)
+                {
+                    outdatedFiles.Add(filename);
                 }
             }
 
-            return false; 
+            return outdatedFiles;
         }
 
-        public async Task<bool> IsUpdatedAsync(bool silent = false, Action onUpdateFound = null)
+        public async Task<List<string>> GetOutdatedHashFilesAsync(bool silent = false, Action onUpdateFound = null)
         {
-            if (AreLocalFilesOutOfSync())
+            var localOutOfSync = GetLocallyOutOfSyncFiles();
+            if (localOutOfSync.Any())
             {
                 onUpdateFound?.Invoke();
-                return true;
+                // If files are out of sync locally, we might need to sync everything
+                // depending on the strategy, but for now, let's just return the list.
+                return localOutOfSync;
             }
 
             try
@@ -152,18 +166,18 @@ namespace AssetsManager.Services.Downloads
                 if (serverSizes == null || serverSizes.Count == 0)
                 {
                     _logService.LogWarning("Could not retrieve remote hash sizes or received an empty list. Skipping update check.");
-                    return false;
+                    return new List<string>();
                 }
 
                 var localSizes = _appSettings.HashesSizes ?? new Dictionary<string, long>();
-                bool updated = false;
+                var filesToUpdate = new List<string>();
                 bool notificationSent = false;
 
-                void CheckAndUpdate(string filename)
+                foreach (var filename in AllKnownHashFiles)
                 {
                     if (UpdateHashSizeIfDifferent(serverSizes, localSizes, filename))
                     {
-                        updated = true;
+                        filesToUpdate.Add(filename);
                         if (!notificationSent)
                         {
                             onUpdateFound?.Invoke();
@@ -172,28 +186,18 @@ namespace AssetsManager.Services.Downloads
                     }
                 }
 
-                CheckAndUpdate(GAME_HASHES_FILENAME);
-                CheckAndUpdate(LCU_HASHES_FILENAME);
-                CheckAndUpdate(HASHES_BINENTRIES);
-                CheckAndUpdate(HASHES_BINFIELDS);
-                CheckAndUpdate(HASHES_BINHASHES);
-                CheckAndUpdate(HASHES_BINTYPES);
-                CheckAndUpdate(HASHES_RST_XXH3);
-                CheckAndUpdate(HASHES_RST_XXH64);
-
-                if (updated)
+                if (filesToUpdate.Any())
                 {
                     _appSettings.HashesSizes = localSizes;
                     AppSettings.SaveSettings(_appSettings);
-                    return true;
                 }
 
-                return false;
+                return filesToUpdate;
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Error checking for updates.");
-                return false;
+                return new List<string>();
             }
         }
 
@@ -219,7 +223,7 @@ namespace AssetsManager.Services.Downloads
             var result = new Dictionary<string, long>();
 
             if (_httpClient == null)
-            { 
+            {
                 _logService.LogError("HttpClient is null. Cannot fetch remote sizes.");
                 return result;
             }
