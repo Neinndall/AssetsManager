@@ -50,7 +50,8 @@ namespace AssetsManager.Views.Helpers
                 var currentMousePosition = e.GetPosition(_viewport);
                 var delta = new System.Windows.Point(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
 
-                var delta3D = new Vector3D(-delta.X, delta.Y, 0);
+                double sensitivity = 0.5;
+                var delta3D = new Vector3D(-delta.X * sensitivity, delta.Y * sensitivity, 0);
                 Rotate(delta3D);
 
                 _lastMousePosition = currentMousePosition;
