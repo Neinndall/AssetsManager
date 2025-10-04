@@ -11,7 +11,6 @@
              d:DesignHeight="450" d:DesignWidth="400">
     <UserControl.Resources>
         <converters:PathToIconConverter x:Key="PathToIconConverter"/>
-        <converters:WadComparisonIconConverter x:Key="WadComparisonIconConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
         <ContextMenu x:Key="ExplorerContextMenu" Opened="ContextMenu_Opened">
@@ -63,7 +62,7 @@
                                                         Height="18" 
                                                         VerticalAlignment="Center" 
                                                         Margin="0,0,5,0"
-                                                        Kind="{Binding Converter={StaticResource WadComparisonIconConverter}}"/>
+                                                        Kind="{Binding Converter={StaticResource PathToIconConverter}}"/>
                             
                             <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14">
                                 <TextBlock.Style>

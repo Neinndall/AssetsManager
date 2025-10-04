@@ -1,11 +1,11 @@
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models;
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Services.Explorer.Tree
 {
