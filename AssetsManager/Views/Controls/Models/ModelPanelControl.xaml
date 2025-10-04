@@ -25,23 +25,35 @@
                              Background="{StaticResource SidebarBackground}"
                              BorderThickness="1"
                              BorderBrush="{StaticResource BorderColor}"
-                             ItemContainerStyle="{StaticResource ListBoxItemStyle}">
+                             ItemContainerStyle="{StaticResource ListBoxItemStyle}"
+                             Padding="0,0,0,0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Vertical" Margin="10,0,0,0">
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center" Margin="2,0,0,0" Foreground="{StaticResource TextPrimary}"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                        <TextBlock Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center"/>
-                                        <ComboBox Style="{StaticResource ModernComboBox}"
-                                                  ItemsSource="{Binding AvailableTextureNames}"
-                                                  SelectedItem="{Binding SelectedTextureName}"
-                                                  Width="165"
-                                                  Margin="5,0,0,0"/>
-                                    </StackPanel>
-                                </StackPanel>
+                                <Border Margin="0,0,0,4" Padding="0,6,0,6">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                        </StackPanel>
+
+                                        <Grid Grid.Row="1" Margin="0,4,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center" Margin="10,0,2,0"/>
+                                            <ComboBox Grid.Column="1" Style="{StaticResource ModernComboBox}"
+                                                      ItemsSource="{Binding AvailableTextureNames}"
+                                                      SelectedItem="{Binding SelectedTextureName}"
+                                                      Margin="0,0,10,0"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -123,6 +135,20 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </TabItem>
+                <TabItem Header="Settings">
+                    <StackPanel Margin="5" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <materialDesign:MaterialIcon Kind="Construction"
+                                                     Height="48"
+                                                     Width="48"
+                                                     Foreground="{StaticResource TextMuted}"
+                                                     Opacity="0.5"
+                                                     Margin="0,0,0,10"/>
+                        <TextBlock Text="Under Construction"
+                                   FontSize="18"
+                                   Foreground="{StaticResource TextMuted}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </TabItem>
             </TabControl>
             
             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
@@ -135,6 +161,12 @@
                         Content="Load Animations"
                         Style="{StaticResource SecondaryButton}"
                         Click="LoadAnimationButton_Click"
+                        Margin="10,0,0,0"/>
+
+                <Button x:Name="ScreenshotButton" 
+                        Content="Screenshot"
+                        Style="{StaticResource SecondaryButton}"
+                        Click="ScreenshotButton_Click"
                         Margin="10,0,0,0"/>
             </StackPanel>
         </Grid>

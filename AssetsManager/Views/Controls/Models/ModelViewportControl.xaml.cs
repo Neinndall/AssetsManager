@@ -1,7 +1,10 @@
+using System;
 using System.Linq;
 using HelixToolkit.Wpf;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.IO;
 using System.Windows.Media.Media3D;
 using System.Diagnostics;
 using LeagueToolkit.Core.Animation;
@@ -100,6 +103,36 @@ namespace AssetsManager.Views.Controls.Models
             camera.LookDirection = lookDirection;
             camera.UpDirection = upDirection;
             camera.FieldOfView = 45;
+        }
+
+        public void TakeScreenshot(string filePath)
+        {
+            var renderBitmap = new RenderTargetBitmap((int)Viewport3D.ActualWidth, (int)Viewport3D.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            renderBitmap.Render(Viewport3D);
+
+            // Always use PngBitmapEncoder
+            BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
+            bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
+
+            // Ensure the file path has a .png extension
+            string finalFilePath = filePath;
+            if (Path.GetExtension(finalFilePath).ToLower() != ".png")
+            {
+                finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
+            }
+
+            try
+            {
+                using (var stream = File.Create(finalFilePath))
+                {
+                    bitmapEncoder.Save(stream);
+                }
+                LogService.LogInteractiveSuccess($"Screenshot saved to {finalFilePath}", finalFilePath);
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
+            }
         }
     }
 }
