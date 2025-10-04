@@ -2,12 +2,43 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Utils
 {
     public static class StringTableUtils
     {
-        public static (Dictionary<ulong, string> Entries, int HashBits, int Version) Parse(Stream stream, int gameVersion = 1502)
+        public static Dictionary<string, string> ParseAndResolve(Stream stream, HashResolverService hashResolverService, int gameVersion = 1502)
+        {
+            var (rstEntries, hashBits, fileVersion) = Parse(stream, gameVersion);
+
+            var referenceHashes = (gameVersion >= 1415)
+                ? hashResolverService.RstXxh3Hashes
+                : hashResolverService.RstXxh64Hashes;
+
+            var truncatedLut = new Dictionary<ulong, string>();
+            ulong hashMask = (1UL << hashBits) - 1;
+            foreach (var pair in referenceHashes)
+            {
+                truncatedLut[pair.Key & hashMask] = pair.Value;
+            }
+
+            var finalDict = new Dictionary<string, string>();
+            foreach (var entry in rstEntries)
+            {
+                if (truncatedLut.TryGetValue(entry.Key, out var resolvedKey))
+                {
+                    finalDict[resolvedKey] = entry.Value;
+                }
+                else
+                {
+                    finalDict[$"{{{entry.Key:x10}}}"] = entry.Value;
+                }
+            }
+            return finalDict;
+        }
+
+        private static (Dictionary<ulong, string> Entries, int HashBits, int Version) Parse(Stream stream, int gameVersion = 1502)
         {
             var entries = new Dictionary<ulong, string>();
             int hashBits;

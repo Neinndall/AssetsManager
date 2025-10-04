@@ -280,35 +280,7 @@ namespace AssetsManager.Services.Explorer
                     case ".stringtable":
                         using (var stream = new MemoryStream(data))
                         {
-                            // Assume a recent game version for hash selection logic, matching Python script behavior
-                            const int gameVersion = 1502;
-                            var (rstEntries, hashBits, fileVersion) = StringTableUtils.Parse(stream, gameVersion);
-
-                            // Conditionally select the correct hash dictionary based on game version
-                            var referenceHashes = (gameVersion >= 1415)
-                                ? _hashResolverService.RstXxh3Hashes
-                                : _hashResolverService.RstXxh64Hashes;
-
-                            // Create a temporary lookup table with truncated hashes
-                            var truncatedLut = new Dictionary<ulong, string>();
-                            ulong hashMask = (1UL << hashBits) - 1;
-                            foreach (var pair in referenceHashes)
-                            {
-                                truncatedLut[pair.Key & hashMask] = pair.Value;
-                            }
-
-                            var resolvedEntries = new Dictionary<string, string>();
-                            foreach (var entry in rstEntries)
-                            {
-                                if (truncatedLut.TryGetValue(entry.Key, out var resolvedKey))
-                                {
-                                    resolvedEntries[resolvedKey] = entry.Value;
-                                }
-                                else
-                                {
-                                    resolvedEntries[$"{{{entry.Key:x10}}}"] = entry.Value;
-                                }
-                            }
+                            var resolvedEntries = StringTableUtils.ParseAndResolve(stream, _hashResolverService);
                             textContent = await JsonFormatter.FormatJsonAsync(resolvedEntries);
                         }
                         syntaxHighlighting = GetJsonHighlighting();
