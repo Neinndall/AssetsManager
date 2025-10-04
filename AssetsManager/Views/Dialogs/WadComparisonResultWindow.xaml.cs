@@ -192,7 +192,7 @@ namespace AssetsManager.Views.Dialogs
                 var json = JsonSerializer.Serialize(comparisonResult, options);
                 await File.WriteAllTextAsync(jsonFilePath, json);
 
-                _logService.LogInteractiveInfo($"Saved comparison WAD files in {comparisonFullPath}", comparisonFullPath);
+                // _logService.LogInteractiveInfo($"Saved comparison WAD files in {comparisonFullPath}", comparisonFullPath);
                 _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);
             }
             catch (Exception ex)
@@ -261,7 +261,7 @@ namespace AssetsManager.Views.Dialogs
             List<SerializableChunkDiff> diffsToExtract = GetExtractableDiffsFromSelection();
             if (!diffsToExtract.Any())
             {
-                _customMessageBoxService.ShowInfo("Info", "No extractable files (New, Modified, or Renamed) in the current selection.", this);
+                _customMessageBoxService.ShowInfo("Info", "No extractable files (New, Modified, Renamed, or Removed) in the current selection.", this);
                 return;
             }
 
@@ -286,6 +286,12 @@ namespace AssetsManager.Views.Dialogs
 
             if (rootDestinationPath != null)
             {
+                if (ResultsTree.SelectedItem is WadGroupViewModel selectedWad)
+                {
+                    rootDestinationPath = Path.Combine(rootDestinationPath, selectedWad.WadName);
+                    Directory.CreateDirectory(rootDestinationPath);
+                }
+
                 _logService.Log("Extracting selected files...");
                 int successCount = 0;
 
@@ -295,15 +301,16 @@ namespace AssetsManager.Views.Dialogs
                     {
                         string typeFolder = diff.Type.ToString();
                         string finalDestinationPath = Path.Combine(rootDestinationPath, typeFolder);
-                        Directory.CreateDirectory(finalDestinationPath); // Create the type-specific subfolder
+                        Directory.CreateDirectory(finalDestinationPath);
 
-                        string basePath = (diff.Type == ChunkDiffType.New || diff.Type == ChunkDiffType.Modified || diff.Type == ChunkDiffType.Renamed) ? _newPbePath : _oldPbePath;
+                        string basePath = (diff.Type == ChunkDiffType.Removed) ? _oldPbePath : _newPbePath;
                         string sourceWadPath = Path.Combine(basePath, diff.SourceWadFile);
 
                         var node = new FileSystemNodeModel(diff.FileName, false, diff.Path, sourceWadPath)
                         {
-                            SourceChunkPathHash = diff.NewPathHash, // For extraction, we always want the new version
-                            ChunkDiff = diff
+                            SourceChunkPathHash = (diff.Type == ChunkDiffType.Removed) ? diff.OldPathHash : diff.NewPathHash,
+                            ChunkDiff = diff,
+                            Status = (DiffStatus)diff.Type
                         };
 
                         await _wadExtractionService.ExtractNodeAsync(node, finalDestinationPath);
@@ -332,18 +339,18 @@ namespace AssetsManager.Views.Dialogs
             var selectedItem = ResultsTree.SelectedItem;
             var downloadableDiffs = new List<SerializableChunkDiff>();
 
-            if (selectedItem is SerializableChunkDiff singleDiff && (singleDiff.Type == ChunkDiffType.New || singleDiff.Type == ChunkDiffType.Modified || singleDiff.Type == ChunkDiffType.Renamed))
+            if (selectedItem is SerializableChunkDiff singleDiff && (singleDiff.Type == ChunkDiffType.New || singleDiff.Type == ChunkDiffType.Modified || singleDiff.Type == ChunkDiffType.Renamed || singleDiff.Type == ChunkDiffType.Removed))
             {
                 downloadableDiffs.Add(singleDiff);
             }
-            else if (selectedItem is DiffTypeGroupViewModel typeGroup && (typeGroup.Type == ChunkDiffType.New || typeGroup.Type == ChunkDiffType.Modified || typeGroup.Type == ChunkDiffType.Renamed))
+            else if (selectedItem is DiffTypeGroupViewModel typeGroup && (typeGroup.Type == ChunkDiffType.New || typeGroup.Type == ChunkDiffType.Modified || typeGroup.Type == ChunkDiffType.Renamed || typeGroup.Type == ChunkDiffType.Removed))
             {
                 downloadableDiffs.AddRange(typeGroup.Diffs);
             }
             else if (selectedItem is WadGroupViewModel wadGroup)
             {
                 downloadableDiffs.AddRange(wadGroup.Types
-                    .Where(t => t.Type == ChunkDiffType.New || t.Type == ChunkDiffType.Modified || t.Type == ChunkDiffType.Renamed)
+                    .Where(t => t.Type == ChunkDiffType.New || t.Type == ChunkDiffType.Modified || t.Type == ChunkDiffType.Renamed || t.Type == ChunkDiffType.Removed)
                     .SelectMany(t => t.Diffs));
             }
 
