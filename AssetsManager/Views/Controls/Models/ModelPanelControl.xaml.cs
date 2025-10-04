@@ -24,7 +24,7 @@ namespace AssetsManager.Views.Controls.Models
         
         public event EventHandler<IAnimationAsset> AnimationReadyForDisplay;
         public event Action<SceneModel> ModelRemovedFromViewport;
-        public event EventHandler AnimationStopRequested;
+        public event EventHandler<IAnimationAsset> AnimationStopRequested;
         public event EventHandler AnimationClearRequested;
 
         public event Action<SceneModel> ModelReadyForViewport;
@@ -182,7 +182,10 @@ namespace AssetsManager.Views.Controls.Models
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
-            AnimationStopRequested?.Invoke(this, EventArgs.Empty);
+            if (sender is Button button && button.Tag is string animationName && _animations.TryGetValue(animationName, out var animationAsset))
+            {
+                AnimationStopRequested?.Invoke(this, animationAsset);
+            }
         }
     }
 }

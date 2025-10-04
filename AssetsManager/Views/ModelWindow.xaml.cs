@@ -32,7 +32,7 @@ namespace AssetsManager.Views
             
             PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.Viewport.Children.Remove(model.RootVisual);
             PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
-            PanelControl.AnimationStopRequested += (s, e) => ViewportControl.TogglePauseResume();
+            PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
             PanelControl.AnimationClearRequested += (s, e) => ViewportControl.StopAnimation();
 
             // Model loading events

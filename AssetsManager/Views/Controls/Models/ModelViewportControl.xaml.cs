@@ -59,9 +59,9 @@ namespace AssetsManager.Views.Controls.Models
             IsAnimationPaused = false;
         }
 
-        public void TogglePauseResume()
+        public void TogglePauseResume(IAnimationAsset animationToToggle)
         {
-            if (_currentAnimation == null) return;
+            if (_currentAnimation != animationToToggle) return;
 
             IsAnimationPaused = !IsAnimationPaused;
             if (IsAnimationPaused)
