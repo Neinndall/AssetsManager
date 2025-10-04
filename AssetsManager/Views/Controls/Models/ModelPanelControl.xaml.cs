@@ -48,7 +48,6 @@ namespace AssetsManager.Views.Controls.Models
             InitializeComponent();
             AnimationsListBoxControl.ItemsSource = _animationNames;
             ModelsListBoxControl.ItemsSource = _loadedModels;
-            AnimationsListBox.SelectionChanged += AnimationsListBox_SelectionChanged;
         }
 
         private void DeleteModelButton_Click(object sender, RoutedEventArgs e)
@@ -65,6 +64,8 @@ namespace AssetsManager.Views.Controls.Models
                     _animations.Clear();
                     _animationNames.Clear();
                     MeshesListBox.ItemsSource = null;
+                    AnimationStopRequested?.Invoke(this, EventArgs.Empty);
+                    CameraResetRequested?.Invoke();
                     EmptyStateVisibilityChanged?.Invoke(Visibility.Visible);
                     MainContentVisibilityChanged?.Invoke(Visibility.Collapsed);
                 }
@@ -171,16 +172,9 @@ namespace AssetsManager.Views.Controls.Models
         }
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is string animationName)
+            if (sender is Button button && button.Tag is string animationName && _animations.TryGetValue(animationName, out var animationAsset))
             {
                 AnimationsListBox.SelectedItem = animationName;
-            }
-        }
-
-        private void AnimationsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (AnimationsListBox.SelectedItem is string selectedAnimationName && _animations.TryGetValue(selectedAnimationName, out var animationAsset))
-            {
                 AnimationReadyForDisplay?.Invoke(this, animationAsset);
             }
         }
