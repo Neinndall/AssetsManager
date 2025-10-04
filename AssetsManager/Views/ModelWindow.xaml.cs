@@ -52,8 +52,6 @@ namespace AssetsManager.Views
         {
             ViewportControl.StopAnimation();
             ViewportControl.ResetCamera();
-            EmptyStatePanel.Visibility = Visibility.Visible;
-            MainContentGrid.Visibility = Visibility.Collapsed;
         }
 
         private void SetupScene()
