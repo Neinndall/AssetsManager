@@ -14,6 +14,8 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Models;
 using AssetsManager.Views.Models;
+using Microsoft.WindowsAPICodePack.Dialogs;
+using System.Windows;
 
 namespace AssetsManager.Views.Controls.Models
 {
@@ -95,7 +97,7 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (Viewport.Camera is not PerspectiveCamera camera) return;
 
-            var position = new Point3D(-14.158, 352.651, 553.062);
+            var position = new Point3D(0, 250, 300);
             var lookDirection = new Vector3D(-2.059, -235.936, -598.980);
             var upDirection = new Vector3D(0.008, 0.930, -0.367);
 
@@ -132,6 +134,26 @@ namespace AssetsManager.Views.Controls.Models
             catch (Exception ex)
             {
                 LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
+            }
+        }
+
+        private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            ResetCamera();
+        }
+
+        private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
+        {
+            var saveFileDialog = new CommonSaveFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
+                Title = "Save Screenshot File",
+                DefaultExtension = ".png"
+            };
+
+            if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                TakeScreenshot(saveFileDialog.FileName);
             }
         }
     }

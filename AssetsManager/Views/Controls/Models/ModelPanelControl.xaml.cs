@@ -33,8 +33,6 @@ namespace AssetsManager.Views.Controls.Models
         public event Action<Visibility> EmptyStateVisibilityChanged;
         public event Action<Visibility> MainContentVisibilityChanged;
 
-        public event Action<string> ScreenshotRequested;
-
         public ListBox MeshesListBoxControl => MeshesListBox;
         public ListBox AnimationsListBoxControl => AnimationsListBox;
         public ListBox ModelsListBoxControl => ModelsListBox;
@@ -190,21 +188,6 @@ namespace AssetsManager.Views.Controls.Models
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
             AnimationStopRequested?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
-        {
-            var saveFileDialog = new CommonSaveFileDialog
-            {
-                Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
-                Title = "Save Screenshot As...",
-                DefaultExtension = ".png"
-            };
-
-            if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                ScreenshotRequested?.Invoke(saveFileDialog.FileName);
-            }
         }
     }
 }

@@ -25,8 +25,7 @@
                              Background="{StaticResource SidebarBackground}"
                              BorderThickness="1"
                              BorderBrush="{StaticResource BorderColor}"
-                             ItemContainerStyle="{StaticResource ListBoxItemStyle}"
-                             Padding="0,0,0,0">
+                             ItemContainerStyle="{StaticResource ListBoxItemStyle}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Margin="0,0,0,4" Padding="0,6,0,6">
@@ -46,7 +45,7 @@
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center" Margin="10,0,2,0"/>
+                                            <TextBlock Grid.Column="0" Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center" Margin="10,0,8,0"/>
                                             <ComboBox Grid.Column="1" Style="{StaticResource ModernComboBox}"
                                                       ItemsSource="{Binding AvailableTextureNames}"
                                                       SelectedItem="{Binding SelectedTextureName}"
@@ -161,12 +160,6 @@
                         Content="Load Animations"
                         Style="{StaticResource SecondaryButton}"
                         Click="LoadAnimationButton_Click"
-                        Margin="10,0,0,0"/>
-
-                <Button x:Name="ScreenshotButton" 
-                        Content="Screenshot"
-                        Style="{StaticResource SecondaryButton}"
-                        Click="ScreenshotButton_Click"
                         Margin="10,0,0,0"/>
             </StackPanel>
         </Grid>

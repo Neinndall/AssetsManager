@@ -12,21 +12,42 @@
             BorderThickness="1"
             Padding="10"
             Margin="5,5,0,5">
-        <helix:HelixViewport3D x:Name="Viewport3D" 
-                               Background="Transparent"
-                               ShowFrameRate="True"
-                               ShowCameraInfo="False"
-                               ShowViewCube="False"
-                               IsRotationEnabled="False"
-                               PanGesture="RightClick">
-            <helix:HelixViewport3D.Camera>
-                <PerspectiveCamera Position="0,0,10" LookDirection="0,0,-10" UpDirection="0,1,0"/>
-            </helix:HelixViewport3D.Camera>
-            <ModelVisual3D>
-                <ModelVisual3D.Content>
-                    <AmbientLight Color="White"/>
-                </ModelVisual3D.Content>
-            </ModelVisual3D>
-        </helix:HelixViewport3D>
+        <Grid>
+            <helix:HelixViewport3D x:Name="Viewport3D" 
+                                   Background="Transparent"
+                                   ShowFrameRate="True"
+                                   ShowCameraInfo="False"
+                                   ShowViewCube="False"
+                                   IsRotationEnabled="False"
+                                   PanGesture="RightClick">
+                <helix:HelixViewport3D.Camera>
+                    <PerspectiveCamera Position="0,0,10" LookDirection="0,0,-10" UpDirection="0,1,0"/>
+                </helix:HelixViewport3D.Camera>
+                <ModelVisual3D>
+                    <ModelVisual3D.Content>
+                        <AmbientLight Color="White"/>
+                    </ModelVisual3D.Content>
+                </ModelVisual3D>
+            </helix:HelixViewport3D>
+
+            <StackPanel HorizontalAlignment="Right" 
+                        VerticalAlignment="Bottom" 
+                        Orientation="Horizontal"
+                        Margin="0,0,15,15">
+                <Button Style="{StaticResource IconButton}"
+                        xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+                        ToolTip="Take Screenshot"
+                        Click="ScreenshotButton_Click"
+                        Margin="0,0,5,0">
+                    <materialDesign:MaterialIcon Kind="Camera" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
+                </Button>
+                <Button Style="{StaticResource IconButton}"
+                        xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+                        ToolTip="Reset Camera"
+                        Click="ResetCameraButton_Click">
+                    <materialDesign:MaterialIcon Kind="Refresh" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
+                </Button>
+            </StackPanel>
+        </Grid>
     </Border>
 </UserControl>

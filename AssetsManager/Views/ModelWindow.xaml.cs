@@ -41,10 +41,6 @@ namespace AssetsManager.Views
             PanelControl.CameraResetRequested += () => ViewportControl.ResetCamera();
             PanelControl.EmptyStateVisibilityChanged += (visibility) => EmptyStatePanel.Visibility = visibility;
             PanelControl.MainContentVisibilityChanged += (visibility) => MainContentGrid.Visibility = visibility;
-
-            // Settings Events
-            PanelControl.ScreenshotRequested += (filePath) => ViewportControl.TakeScreenshot(filePath);
-
         }
 
         private void PanelControl_AnimationStopRequested(object sender, System.EventArgs e)
