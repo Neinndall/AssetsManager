@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -29,21 +30,31 @@ namespace AssetsManager.Views
             PanelControl.ModelLoadingService = _modelLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = _customMessageBoxService;
-            
-            PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.Viewport.Children.Remove(model.RootVisual);
-            PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
-            PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
-            PanelControl.AnimationClearRequested += (s, e) => ViewportControl.StopAnimation();
 
-            // Model loading events
+            // Scene events
+            PanelControl.SceneClearRequested += OnSceneClearRequested;
             PanelControl.SceneSetupRequested += SetupScene;
-            PanelControl.ModelReadyForViewport += (model) => ViewportControl.SetModel(model);
-            PanelControl.SkeletonReadyForViewport += (skeleton) => ViewportControl.SetSkeleton(skeleton);
             PanelControl.CameraResetRequested += () => ViewportControl.ResetCamera();
             PanelControl.EmptyStateVisibilityChanged += (visibility) => EmptyStatePanel.Visibility = visibility;
             PanelControl.MainContentVisibilityChanged += (visibility) => MainContentGrid.Visibility = visibility;
+
+            // Model events
+            PanelControl.ModelReadyForViewport += (model) => ViewportControl.SetModel(model);
+            PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.Viewport.Children.Remove(model.RootVisual);
+            PanelControl.SkeletonReadyForViewport += (skeleton) => ViewportControl.SetSkeleton(skeleton);
+
+            // Animation events
+            PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
+            PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
         }
 
+        private void OnSceneClearRequested(object sender, EventArgs e)
+        {
+            ViewportControl.StopAnimation();
+            ViewportControl.ResetCamera();
+            EmptyStatePanel.Visibility = Visibility.Visible;
+            MainContentGrid.Visibility = Visibility.Collapsed;
+        }
 
         private void SetupScene()
         {

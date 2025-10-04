@@ -25,7 +25,7 @@ namespace AssetsManager.Views.Controls.Models
         public event EventHandler<IAnimationAsset> AnimationReadyForDisplay;
         public event Action<SceneModel> ModelRemovedFromViewport;
         public event EventHandler<IAnimationAsset> AnimationStopRequested;
-        public event EventHandler AnimationClearRequested;
+        public event EventHandler SceneClearRequested;
 
         public event Action<SceneModel> ModelReadyForViewport;
         public event Action<RigResource> SkeletonReadyForViewport;
@@ -65,10 +65,7 @@ namespace AssetsManager.Views.Controls.Models
                     _animations.Clear();
                     _animationNames.Clear();
                     MeshesListBox.ItemsSource = null;
-                    AnimationClearRequested?.Invoke(this, EventArgs.Empty);
-                    CameraResetRequested?.Invoke();
-                    EmptyStateVisibilityChanged?.Invoke(Visibility.Visible);
-                    MainContentVisibilityChanged?.Invoke(Visibility.Collapsed);
+                    SceneClearRequested?.Invoke(this, EventArgs.Empty);
                 }
             }
         }
