@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Xml;
 using System.IO;
 using System.Linq;
@@ -273,6 +274,36 @@ namespace AssetsManager.Services.Explorer
                     case ".css":
                         textContent = Encoding.UTF8.GetString(data);
                         textContent = _cssParserService.ConvertToJson(textContent);
+                        syntaxHighlighting = GetJsonHighlighting();
+                        break;
+
+                    case ".stringtable":
+                        using (var stream = new MemoryStream(data))
+                        {
+                            var (rstEntries, hashBits) = StringTableUtils.Parse(stream);
+                            
+                            // Create a temporary lookup table with truncated hashes
+                            var truncatedLut = new Dictionary<ulong, string>();
+                            ulong hashMask = (1UL << hashBits) - 1;
+                            foreach(var pair in _hashResolverService.FullRstHashes)
+                            {
+                                truncatedLut[pair.Key & hashMask] = pair.Value;
+                            }
+
+                            var resolvedEntries = new Dictionary<string, string>();
+                            foreach (var entry in rstEntries)
+                            {
+                                if (truncatedLut.TryGetValue(entry.Key, out var resolvedKey))
+                                {
+                                    resolvedEntries[resolvedKey] = entry.Value;
+                                }
+                                else
+                                {
+                                    resolvedEntries[$"{{{entry.Key:x10}}}"] = entry.Value;
+                                }
+                            }
+                            textContent = await JsonFormatter.FormatJsonAsync(resolvedEntries);
+                        }
                         syntaxHighlighting = GetJsonHighlighting();
                         break;
 
@@ -561,7 +592,7 @@ namespace AssetsManager.Services.Explorer
         private bool IsImageExtension(string extension) => extension == ".png" || extension == ".jpg" || extension == ".jpeg";
         private bool IsVectorImageExtension(string extension) => extension == ".svg";
         private bool IsTextureExtension(string extension) => extension == ".tex" || extension == ".dds";
-        private bool IsTextExtension(string extension) => extension == ".css" || extension == ".json" || extension == ".xml" || extension == ".yml" || extension == ".yaml" || extension == ".ini" || extension == ".log" || extension == ".txt";
+        private bool IsTextExtension(string extension) => extension == ".css" || extension == ".json" || extension == ".xml" || extension == ".yml" || extension == ".yaml" || extension == ".ini" || extension == ".log" || extension == ".txt" || extension == ".stringtable";
         private bool IsJavaScriptExtension(string extension) => extension == ".js";
         private bool IsMediaExtension(string extension) => extension == ".ogg" || extension == ".webm";
         private bool IsBinExtension(string extension) => extension == ".bin";

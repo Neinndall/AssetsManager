@@ -93,5 +93,20 @@ namespace AssetsManager.Services.Hashes
             if (_binHashesMap.TryGetValue(hash, out path)) return path;
             return hash.ToString("x8");
         }
+
+        private readonly Dictionary<ulong, string> _fullRstHashesMap = new Dictionary<ulong, string>();
+        public IReadOnlyDictionary<ulong, string> FullRstHashes => _fullRstHashesMap;
+
+        public async Task LoadRstHashesAsync()
+        {
+            _fullRstHashesMap.Clear();
+
+            var rstHashesDir = _directoriesCreator.HashesNewPath;
+            var rstXxh3HashesFile = Path.Combine(rstHashesDir, "hashes.rst.xxh3.txt");
+            var rstXxh64HashesFile = Path.Combine(rstHashesDir, "hashes.rst.xxh64.txt");
+
+            await LoadHashesFromFile(rstXxh3HashesFile, _fullRstHashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
+            await LoadHashesFromFile(rstXxh64HashesFile, _fullRstHashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
+        }
     }
 }

@@ -28,6 +28,7 @@ namespace AssetsManager.Services.Explorer.Tree
 
             await _hashResolverService.LoadHashesAsync();
             await _hashResolverService.LoadBinHashesAsync();
+            await _hashResolverService.LoadRstHashesAsync();
 
             string gamePath = Path.Combine(rootPath, "Game");
             if (Directory.Exists(gamePath))
