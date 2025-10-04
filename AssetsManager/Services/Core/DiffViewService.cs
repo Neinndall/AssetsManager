@@ -24,7 +24,7 @@ namespace AssetsManager.Services.Core
         private readonly CSSParserService _cssParserService;
 
         private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".tga", ".jpg", ".jpeg", ".bmp", ".gif", ".ico", ".webp", ".tex" };
-        private static readonly string[] SupportedTextExtensions = { ".css", ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log" };
+        private static readonly string[] SupportedTextExtensions = { ".bin", ".css", ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log", ".stringtable" };
 
         public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService)
         {
@@ -172,6 +172,10 @@ namespace AssetsManager.Services.Core
                     if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
                     if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
                     break;
+                case "stringtable":
+                    if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
+                    if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
+                    break;
                 case "css":
                     if (oldData != null) oldText = _cssParserService.ConvertToJson((string)oldData);
                     if (newData != null) newText = _cssParserService.ConvertToJson((string)newData);
@@ -196,7 +200,6 @@ namespace AssetsManager.Services.Core
 
             if (SupportedImageExtensions.Contains(extension)) return true;
             if (SupportedTextExtensions.Contains(extension)) return true;
-            if (extension == ".bin") return true;
 
             return false;
         }
