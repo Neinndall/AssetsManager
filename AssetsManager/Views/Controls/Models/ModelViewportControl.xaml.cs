@@ -74,6 +74,13 @@ namespace AssetsManager.Views.Controls.Models
             }
         }
 
+        public void StopAnimation()
+        {
+            _currentAnimation = null;
+            _stopwatch.Stop();
+            IsAnimationPaused = false;
+        }
+
         public void SetSkeleton(RigResource skeleton)
         {
             _skeleton = skeleton;

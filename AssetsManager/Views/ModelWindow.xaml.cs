@@ -32,7 +32,8 @@ namespace AssetsManager.Views
             
             PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.Viewport.Children.Remove(model.RootVisual);
             PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
-            PanelControl.AnimationStopRequested += PanelControl_AnimationStopRequested;
+            PanelControl.AnimationStopRequested += (s, e) => ViewportControl.TogglePauseResume();
+            PanelControl.AnimationClearRequested += (s, e) => ViewportControl.StopAnimation();
 
             // Model loading events
             PanelControl.SceneSetupRequested += SetupScene;
@@ -43,10 +44,6 @@ namespace AssetsManager.Views
             PanelControl.MainContentVisibilityChanged += (visibility) => MainContentGrid.Visibility = visibility;
         }
 
-        private void PanelControl_AnimationStopRequested(object sender, System.EventArgs e)
-        {
-            ViewportControl.TogglePauseResume();
-        }
 
         private void SetupScene()
         {
