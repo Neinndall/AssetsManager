@@ -208,6 +208,7 @@ namespace AssetsManager.Views.Dialogs
             {
                 await _hashResolverService.LoadHashesAsync();
                 await _hashResolverService.LoadBinHashesAsync();
+                await _hashResolverService.LoadRstHashesAsync();
 
                 foreach (var diff in _serializableDiffs)
                 {
