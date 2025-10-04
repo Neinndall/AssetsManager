@@ -280,12 +280,19 @@ namespace AssetsManager.Services.Explorer
                     case ".stringtable":
                         using (var stream = new MemoryStream(data))
                         {
-                            var (rstEntries, hashBits) = StringTableUtils.Parse(stream);
-                            
+                            // Assume a recent game version for hash selection logic, matching Python script behavior
+                            const int gameVersion = 1502;
+                            var (rstEntries, hashBits, fileVersion) = StringTableUtils.Parse(stream, gameVersion);
+
+                            // Conditionally select the correct hash dictionary based on game version
+                            var referenceHashes = (gameVersion >= 1415)
+                                ? _hashResolverService.RstXxh3Hashes
+                                : _hashResolverService.RstXxh64Hashes;
+
                             // Create a temporary lookup table with truncated hashes
                             var truncatedLut = new Dictionary<ulong, string>();
                             ulong hashMask = (1UL << hashBits) - 1;
-                            foreach(var pair in _hashResolverService.FullRstHashes)
+                            foreach (var pair in referenceHashes)
                             {
                                 truncatedLut[pair.Key & hashMask] = pair.Value;
                             }

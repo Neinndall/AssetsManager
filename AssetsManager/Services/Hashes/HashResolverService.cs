@@ -15,6 +15,15 @@ namespace AssetsManager.Services.Hashes
         private readonly Dictionary<uint, string> _binFieldsMap = new Dictionary<uint, string>();
         private readonly Dictionary<uint, string> _binTypesMap = new Dictionary<uint, string>();
 
+        private readonly Dictionary<ulong, string> _fullRstHashesMap = new Dictionary<ulong, string>();
+        public IReadOnlyDictionary<ulong, string> FullRstHashes => _fullRstHashesMap;
+
+        private readonly Dictionary<ulong, string> _rstXxh3HashesMap = new Dictionary<ulong, string>();
+        public IReadOnlyDictionary<ulong, string> RstXxh3Hashes => _rstXxh3HashesMap;
+
+        private readonly Dictionary<ulong, string> _rstXxh64HashesMap = new Dictionary<ulong, string>();
+        public IReadOnlyDictionary<ulong, string> RstXxh64Hashes => _rstXxh64HashesMap;
+
         private readonly DirectoriesCreator _directoriesCreator;
 
         public HashResolverService(DirectoriesCreator directoriesCreator)
@@ -94,19 +103,26 @@ namespace AssetsManager.Services.Hashes
             return hash.ToString("x8");
         }
 
-        private readonly Dictionary<ulong, string> _fullRstHashesMap = new Dictionary<ulong, string>();
-        public IReadOnlyDictionary<ulong, string> FullRstHashes => _fullRstHashesMap;
-
         public async Task LoadRstHashesAsync()
         {
-            _fullRstHashesMap.Clear();
+            await LoadRstXxh3HashesAsync();
+            await LoadRstXxh64HashesAsync();
+        }
 
+        public async Task LoadRstXxh3HashesAsync()
+        {
+            _rstXxh3HashesMap.Clear();
             var rstHashesDir = _directoriesCreator.HashesNewPath;
             var rstXxh3HashesFile = Path.Combine(rstHashesDir, "hashes.rst.xxh3.txt");
-            var rstXxh64HashesFile = Path.Combine(rstHashesDir, "hashes.rst.xxh64.txt");
+            await LoadHashesFromFile(rstXxh3HashesFile, _rstXxh3HashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
+        }
 
-            await LoadHashesFromFile(rstXxh3HashesFile, _fullRstHashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
-            await LoadHashesFromFile(rstXxh64HashesFile, _fullRstHashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
+        public async Task LoadRstXxh64HashesAsync()
+        {
+            _rstXxh64HashesMap.Clear();
+            var rstHashesDir = _directoriesCreator.HashesNewPath;
+            var rstXxh64HashesFile = Path.Combine(rstHashesDir, "hashes.rst.xxh64.txt");
+            await LoadHashesFromFile(rstXxh64HashesFile, _rstXxh64HashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
         }
     }
 }

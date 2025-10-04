@@ -7,10 +7,11 @@ namespace AssetsManager.Utils
 {
     public static class StringTableUtils
     {
-        public static (Dictionary<ulong, string> Entries, int HashBits) Parse(Stream stream, int gameVersion = 1502)
+        public static (Dictionary<ulong, string> Entries, int HashBits, int Version) Parse(Stream stream, int gameVersion = 1502)
         {
             var entries = new Dictionary<ulong, string>();
             int hashBits;
+            int version;
             using (var reader = new BinaryReader(stream, Encoding.UTF8, true))
             {
                 var magic = reader.ReadBytes(3);
@@ -19,7 +20,7 @@ namespace AssetsManager.Utils
                     throw new InvalidDataException("Invalid magic code. Expected 'RST'.");
                 }
 
-                var version = reader.ReadByte();
+                version = reader.ReadByte();
 
 
                 switch (version)
@@ -100,7 +101,7 @@ namespace AssetsManager.Utils
                     }
                 }
             }
-            return (entries, hashBits);
+            return (entries, hashBits, version);
         }
     }
 }
