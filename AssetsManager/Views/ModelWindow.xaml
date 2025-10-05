@@ -89,7 +89,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="55*" MinWidth="150"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="300" MinWidth="300" MaxWidth="300"/>
+                    <ColumnDefinition Width="320" MinWidth="320" MaxWidth="400"/>
                 </Grid.ColumnDefinitions>
 
                 <models:ModelViewportControl Grid.Column="0" x:Name="ViewportControl"/>
