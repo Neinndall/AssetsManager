@@ -9,7 +9,7 @@
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="400">
     <UserControl.Resources>
-        <converters:WadComparisonIconConverter x:Key="WadComparisonIconConverter"/>
+        <converters:PathToIconConverter x:Key="IconConverter"/>
         <converters:ChunkDiffTypeToBrushConverter x:Key="DiffTypeToBrushConverter"/>
 
         <ContextMenu x:Key="WadDiffContextMenu" Opened="ContextMenu_Opened">
@@ -31,7 +31,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialDesign:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource WadComparisonIconConverter}}" 
+                <materialDesign:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
                                              VerticalAlignment="Center" 
                                              Margin="0,0,5,0"/>
                 <TextBlock Grid.Column="1" Text="{Binding FileName}" VerticalAlignment="Center"/>
@@ -44,7 +44,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialDesign:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource WadComparisonIconConverter}}" 
+                <materialDesign:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
                                              VerticalAlignment="Center" 
                                              Margin="0,0,5,0" 
                                              Foreground="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}"/>
@@ -58,7 +58,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialDesign:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource WadComparisonIconConverter}}" 
+                <materialDesign:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
                                              VerticalAlignment="Center" 
                                              Margin="0,0,5,0"/>
                 <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" FontWeight="Bold" VerticalAlignment="Center"/>

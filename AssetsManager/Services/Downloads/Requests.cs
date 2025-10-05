@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -61,12 +62,17 @@ namespace AssetsManager.Services.Downloads
             await DownloadHashesAsync("hashes.bintypes.txt", downloadDirectory);
         }
 
-        public async Task SyncHashesIfEnabledAsync(bool syncHashesWithCDTB)
+        public async Task DownloadRstHashesFilesAsync(string downloadDirectory)
         {
-            if (syncHashesWithCDTB)
+            await DownloadHashesAsync("hashes.rst.xxh3.txt", downloadDirectory);
+            await DownloadHashesAsync("hashes.rst.xxh64.txt", downloadDirectory);
+        }
+
+        public async Task DownloadSpecificHashesAsync(List<string> filesToDownload)
+        {
+            foreach (var fileName in filesToDownload)
             {
-                await DownloadGameHashesFilesAsync(_directoriesCreator.HashesNewPath);
-                await DownloadBinHashesFilesAsync(_directoriesCreator.HashesNewPath);
+                await DownloadHashesAsync(fileName, _directoriesCreator.HashesNewPath);
             }
         }
 

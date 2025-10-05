@@ -1,5 +1,5 @@
 using System.Windows.Controls;
-using AssetsManager.Utils;
+using AssetsManager.Services.Updater;
 
 namespace AssetsManager.Views.Help
 {

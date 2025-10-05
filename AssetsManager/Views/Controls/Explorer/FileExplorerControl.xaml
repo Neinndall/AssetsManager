@@ -11,11 +11,10 @@
              d:DesignHeight="450" d:DesignWidth="400">
     <UserControl.Resources>
         <converters:PathToIconConverter x:Key="PathToIconConverter"/>
-        <converters:WadComparisonIconConverter x:Key="WadComparisonIconConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
         <ContextMenu x:Key="ExplorerContextMenu" Opened="ContextMenu_Opened">
-            <MenuItem Header="Extract Selected" Click="ExtractSelected_Click">
+            <MenuItem Header="Extract Selected" x:Name="ExtractMenuItem" Click="ExtractSelected_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="FileDownload"/>
                 </MenuItem.Icon>
@@ -63,7 +62,7 @@
                                                         Height="18" 
                                                         VerticalAlignment="Center" 
                                                         Margin="0,0,5,0"
-                                                        Kind="{Binding Converter={StaticResource WadComparisonIconConverter}}"/>
+                                                        Kind="{Binding Converter={StaticResource PathToIconConverter}}"/>
                             
                             <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14">
                                 <TextBlock.Style>
@@ -107,7 +106,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </TextBlock.Style>
-                                <Run Text="{Binding PreMatch, Mode=OneWay}" /><Run Text="{Binding Match, Mode=OneWay}" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" /><Run Text="{Binding PostMatch, Mode=OneWay}" />
+                                <Run Text="{Binding PreMatch, Mode=OneWay}" /><Run Text="{Binding Match, Mode=OneWay}" Foreground="White" FontWeight="Bold" /><Run Text="{Binding PostMatch, Mode=OneWay}" />
                             </TextBlock>
                         </Grid>
                     </HierarchicalDataTemplate>

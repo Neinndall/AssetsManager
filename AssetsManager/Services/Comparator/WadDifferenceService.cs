@@ -122,6 +122,7 @@ namespace AssetsManager.Services.Comparator
             var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tex", ".dds" };
             var binExtensions = new[] { ".bin" };
             var cssExtensions = new[] { ".css" };
+            var stringTableExtensions = new[] { ".stringtable" };
 
             object GetBinDataObject(byte[] data)
             {
@@ -139,6 +140,22 @@ namespace AssetsManager.Services.Comparator
                 }
             }
 
+            object GetStringTableObject(byte[] data)
+            {
+                if (data == null) return null;
+                try
+                {
+                    using var stream = new MemoryStream(data);
+                    var stringTableDict = StringTableUtils.ParseAndResolve(stream, _hashResolverService);
+                    return stringTableDict;
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "Failed to parse .stringtable file content.");
+                    throw;
+                }
+            }
+
             string GetTextContent(byte[] data)
             {
                 if (data == null) return null;
@@ -151,6 +168,13 @@ namespace AssetsManager.Services.Comparator
                 object oldBinObject = GetBinDataObject(oldData);
                 object newBinObject = GetBinDataObject(newData);
                 return ("bin", oldBinObject, newBinObject);
+            }
+            if (stringTableExtensions.Contains(extension))
+            {
+                await _hashResolverService.LoadRstHashesAsync();
+                object oldStringTableObject = GetStringTableObject(oldData);
+                object newStringTableObject = GetStringTableObject(newData);
+                return ("stringtable", oldStringTableObject, newStringTableObject);
             }
             if (jsExtensions.Contains(extension))
             {

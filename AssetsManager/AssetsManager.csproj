@@ -2,10 +2,10 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
-    <ApplicationIcon>Resources\img\logo.ico</ApplicationIcon>
-    <Version>2.4.0.5</Version>
-    <AssemblyVersion>2.4.0.5</AssemblyVersion>
-    <FileVersion>2.4.0.5</FileVersion>
+    <ApplicationIcon>Resources\Img\logo.ico</ApplicationIcon>
+    <Version>2.4.1.0</Version>
+    <AssemblyVersion>2.4.1.0</AssemblyVersion>
+    <FileVersion>2.4.1.0</FileVersion>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PlatformTarget>x64</PlatformTarget>
     <LangVersion>latest</LangVersion>
@@ -45,18 +45,13 @@
     <EmbeddedResource Include="changelogs.txt" />
     <EmbeddedResource Include="Resources\JsonSyntaxHighlighting.xshd" />
     <EmbeddedResource Include="Resources\ManifestDownloader\ManifestDownloader.exe" />
-    <EmbeddedResource Include="Themes\WebViewScrollbar.css" />
-    <EmbeddedResource Include="Themes\WebViewDarkTheme.css" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Resources\**\*.dds" />
-  </ItemGroup>
-  <ItemGroup>
     <Resource Include="Resources\img\logo.ico" />
   </ItemGroup>
 
-  
   <Target Name="MoveWebView2Loader" AfterTargets="Build;Publish">
     <!-- Mover WebView2Loader.dll desde runtimes\win-x64\native -->
     <ItemGroup>

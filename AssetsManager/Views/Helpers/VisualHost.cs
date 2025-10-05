@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
 
-namespace AssetsManager.Views.Dialogs.Controls
+namespace AssetsManager.Views.Helpers
 {
     public class VisualHost : FrameworkElement
     {

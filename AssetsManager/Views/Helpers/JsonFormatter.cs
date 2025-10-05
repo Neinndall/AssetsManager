@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 
 namespace AssetsManager.Views.Helpers
 {
-    public static class JsonDiffHelper
+    public static class JsonFormatter
     {
         public static (string Text, List<ChangeType> LineTypes) NormalizeTextForAlignment(DiffPaneModel paneModel)
         {

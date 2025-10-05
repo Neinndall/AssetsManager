@@ -1,4 +1,4 @@
-<UserControl x:Class="AssetsManager.Views.Controls.Models.ModelViewerPanelControl"
+<UserControl x:Class="AssetsManager.Views.Controls.Models.ModelPanelControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -28,20 +28,31 @@
                              ItemContainerStyle="{StaticResource ListBoxItemStyle}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Vertical" Margin="10,0,0,0">
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center" Margin="2,0,0,0" Foreground="{StaticResource TextPrimary}"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                        <TextBlock Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center"/>
-                                        <ComboBox Style="{StaticResource ModernComboBox}"
-                                                  ItemsSource="{Binding AvailableTextureNames}"
-                                                  SelectedItem="{Binding SelectedTextureName}"
-                                                  Width="165"
-                                                  Margin="5,0,0,0"/>
-                                    </StackPanel>
-                                </StackPanel>
+                                <Border Margin="0,0,0,4" Padding="0,6,0,6">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                        </StackPanel>
+
+                                        <Grid Grid.Row="1" Margin="0,4,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center" Margin="10,0,8,0"/>
+                                            <ComboBox Grid.Column="1" Style="{StaticResource ModernComboBox}"
+                                                      ItemsSource="{Binding AvailableTextureNames}"
+                                                      SelectedItem="{Binding SelectedTextureName}"
+                                                      Margin="0,0,10,0"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

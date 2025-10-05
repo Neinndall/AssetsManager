@@ -1,7 +1,7 @@
 using AssetsManager.Views.Models;
 using System.Collections.Generic;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Views.Models
 {
     public static class DefaultCategories
     {

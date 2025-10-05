@@ -8,6 +8,8 @@ using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models;
 
+using AssetsManager.Services.Explorer.Tree;
+
 namespace AssetsManager.Views
 {
     public partial class ExplorerWindow : UserControl
@@ -15,27 +17,27 @@ namespace AssetsManager.Views
         public ExplorerWindow(
             LogService logService,
             CustomMessageBoxService customMessageBoxService,
-            HashResolverService hashResolverService,
-            WadNodeLoaderService wadNodeLoaderService,
             WadExtractionService wadExtractionService,
             WadSearchBoxService wadSearchBoxService,
             DirectoriesCreator directoriesCreator,
             ExplorerPreviewService explorerPreviewService,
-            JsBeautifierService jsBeautifierService,
             DiffViewService diffViewService,
-            AppSettings appSettings
+            AppSettings appSettings,
+            TreeBuilderService treeBuilderService,
+            TreeUIManager treeUIManager
         )
         {
             InitializeComponent();
+            
             FileExplorer.LogService = logService;
             FileExplorer.CustomMessageBoxService = customMessageBoxService;
-            FileExplorer.HashResolverService = hashResolverService;
-            FileExplorer.WadNodeLoaderService = wadNodeLoaderService;
             FileExplorer.WadExtractionService = wadExtractionService;
             FileExplorer.WadSearchBoxService = wadSearchBoxService;
             FileExplorer.DiffViewService = diffViewService;
             FileExplorer.DirectoriesCreator = directoriesCreator;
             FileExplorer.AppSettings = appSettings;
+            FileExplorer.TreeBuilderService = treeBuilderService;
+            FileExplorer.TreeUIManager = treeUIManager;
 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;

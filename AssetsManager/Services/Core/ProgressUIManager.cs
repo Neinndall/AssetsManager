@@ -1,17 +1,14 @@
-using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Views.Dialogs;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
 using System.Windows;
+using Material.Icons.WPF;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;
 using AssetsManager.Utils;
-using Material.Icons.WPF;
-using Microsoft.Extensions.DependencyInjection;
-using AssetsManager.Services.Monitor;
 
 namespace AssetsManager.Services.Core
 {
@@ -130,7 +127,7 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "Compare";
                 _progressDetailsWindow.HeaderText = "Comparing WADs";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.UpdateProgress(0, totalFiles, "Comparison starting...", true, null);
+                _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
             });
         }
 
@@ -174,7 +171,7 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "Download";
                 _progressDetailsWindow.HeaderText = taskName;
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.UpdateProgress(0, 1, "Initializing...", true, null); // Use 0 of 1 for indeterminate progress
+                _progressDetailsWindow.UpdateProgress(0, 0, "Initializing...", true, null);
             });
         }
 

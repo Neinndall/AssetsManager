@@ -4,7 +4,9 @@ using Material.Icons.WPF;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Windows.Data;
+using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views.Converters
 {
@@ -21,6 +23,7 @@ namespace AssetsManager.Views.Converters
             { ".lua", MaterialIconKind.LanguageLua },
             { ".txt", MaterialIconKind.FileDocumentOutline },
             { ".log", MaterialIconKind.FileDocumentOutline },
+            { ".stringtable", MaterialIconKind.Translate },
             { ".png", MaterialIconKind.ImageOutline },
             { ".jpg", MaterialIconKind.ImageOutline },
             { ".jpeg", MaterialIconKind.ImageOutline },
@@ -37,22 +40,57 @@ namespace AssetsManager.Views.Converters
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is not FileSystemNodeModel node)
+            return value switch
             {
-                return MaterialIconKind.FileOutline;
+                WadGroupViewModel => MaterialIconKind.PackageVariant,
+                DiffTypeGroupViewModel diffType => GetDiffTypeIcon(diffType.Type),
+                SerializableChunkDiff chunk => GetIcon(Path.GetExtension(chunk.Path), chunk.Path),
+                FileSystemNodeModel node => GetNodeIcon(node),
+                _ => MaterialIconKind.FileQuestionOutline,
+            };
+        }
+
+        private static MaterialIconKind GetNodeIcon(FileSystemNodeModel node)
+        {
+            if (node.Status != DiffStatus.Unchanged && node.Type == NodeType.VirtualDirectory)
+            {
+                return GetDiffStatusIcon(node.Status);
             }
 
-            if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory)
+            switch (node.Type)
             {
-                return MaterialIconKind.FolderOutline;
+                case NodeType.RealDirectory:
+                case NodeType.VirtualDirectory:
+                    return MaterialIconKind.FolderOutline;
+                case NodeType.WadFile:
+                    return MaterialIconKind.PackageVariant;
+                default:
+                    return node.Status != DiffStatus.Unchanged ? GetDiffStatusIcon(node.Status) : GetIcon(node.Extension, node.FullPath);
             }
+        }
 
-            if (node.Type == NodeType.WadFile)
+        private static MaterialIconKind GetDiffStatusIcon(DiffStatus status)
+        {
+            return status switch
             {
-                return MaterialIconKind.PackageVariant;
-            }
+                DiffStatus.New => MaterialIconKind.FilePlusOutline,
+                DiffStatus.Deleted => MaterialIconKind.FileRemoveOutline,
+                DiffStatus.Modified => MaterialIconKind.FileEditOutline,
+                DiffStatus.Renamed => MaterialIconKind.FileMoveOutline,
+                _ => MaterialIconKind.FileQuestionOutline,
+            };
+        }
 
-            return GetIcon(node.Extension, node.FullPath);
+        private static MaterialIconKind GetDiffTypeIcon(ChunkDiffType type)
+        {
+            return type switch
+            {
+                ChunkDiffType.New => MaterialIconKind.FilePlusOutline,
+                ChunkDiffType.Removed => MaterialIconKind.FileRemoveOutline,
+                ChunkDiffType.Modified => MaterialIconKind.FileEditOutline,
+                ChunkDiffType.Renamed => MaterialIconKind.FileMoveOutline,
+                _ => MaterialIconKind.FileQuestionOutline,
+            };
         }
 
         private static MaterialIconKind GetIcon(string extension, string fullPath)

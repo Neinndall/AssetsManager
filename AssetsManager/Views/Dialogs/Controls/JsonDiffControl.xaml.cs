@@ -109,8 +109,8 @@ namespace AssetsManager.Views.Dialogs.Controls
             var modelToShow = _hideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
             var originalModelForNav = _hideUnchangedLines ? _originalDiffModel : null;
 
-            var normalizedOld = JsonDiffHelper.NormalizeTextForAlignment(modelToShow.OldText);
-            var normalizedNew = JsonDiffHelper.NormalizeTextForAlignment(modelToShow.NewText);
+            var normalizedOld = JsonFormatter.NormalizeTextForAlignment(modelToShow.OldText);
+            var normalizedNew = JsonFormatter.NormalizeTextForAlignment(modelToShow.NewText);
 
             OldJsonContent.Document = new TextDocument(normalizedOld.Text);
             NewJsonContent.Document = new TextDocument(normalizedNew.Text);

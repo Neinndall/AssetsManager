@@ -4,15 +4,15 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using AssetsManager.Services.Comparator;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Services.Comparator;
 using AssetsManager.Views.Models;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Helpers;
-using AssetsManager.Services.Core;
+using AssetsManager.Services.Formatting;
 
-namespace AssetsManager.Services.Monitor
+namespace AssetsManager.Services.Core
 {
     public class DiffViewService
     {
@@ -23,8 +23,8 @@ namespace AssetsManager.Services.Monitor
         private readonly JsBeautifierService _jsBeautifierService;
         private readonly CSSParserService _cssParserService;
 
-        private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".tga", ".jpg", ".jpeg", ".bmp", ".gif", ".ico", ".tif", ".tiff", ".webp", ".tex" };
-        private static readonly string[] SupportedTextExtensions = { ".css", ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log", ".glsl", ".vert", ".frag", ".tes", ".bak", ".py", ".lua", ".scd", ".skl", ".wgeo", ".sco", ".ann", ".map" };
+        private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".tga", ".jpg", ".jpeg", ".bmp", ".gif", ".ico", ".webp", ".tex" };
+        private static readonly string[] SupportedTextExtensions = { ".bin", ".css", ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log", ".stringtable" };
 
         public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService)
         {
@@ -152,8 +152,8 @@ namespace AssetsManager.Services.Monitor
             switch (dataType)
             {
                 case "bin":
-                    if (oldData != null) oldText = await JsonDiffHelper.FormatJsonAsync(oldData);
-                    if (newData != null) newText = await JsonDiffHelper.FormatJsonAsync(newData);
+                    if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
+                    if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
                     break;
                 case "js":
                     try
@@ -169,8 +169,12 @@ namespace AssetsManager.Services.Monitor
                     }
                     break;
                 case "json":
-                    if (oldData != null) oldText = await JsonDiffHelper.FormatJsonAsync(oldData);
-                    if (newData != null) newText = await JsonDiffHelper.FormatJsonAsync(newData);
+                    if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
+                    if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
+                    break;
+                case "stringtable":
+                    if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
+                    if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
                     break;
                 case "css":
                     if (oldData != null) oldText = _cssParserService.ConvertToJson((string)oldData);
@@ -196,7 +200,6 @@ namespace AssetsManager.Services.Monitor
 
             if (SupportedImageExtensions.Contains(extension)) return true;
             if (SupportedTextExtensions.Contains(extension)) return true;
-            if (extension == ".bin") return true;
 
             return false;
         }

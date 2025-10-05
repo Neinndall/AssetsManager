@@ -1,23 +1,28 @@
+using System;
+using System.Linq;
 using HelixToolkit.Wpf;
-using AssetsManager.Services;
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Models;
-using AssetsManager.Views.Models;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.IO;
 using System.Windows.Media.Media3D;
 using System.Diagnostics;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using System.Collections.Generic;
-using System.Linq;
+using AssetsManager.Services;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Models;
+using AssetsManager.Views.Models;
+using Microsoft.WindowsAPICodePack.Dialogs;
+using System.Windows;
 
 namespace AssetsManager.Views.Controls.Models
 {
     /// <summary>
-    /// Interaction logic for ModelViewerViewportControl.xaml
+    /// Interaction logic for ModelViewportControl.xaml
     /// </summary>
-    public partial class ModelViewerViewportControl : UserControl
+    public partial class ModelViewportControl : UserControl
     {
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
@@ -32,7 +37,7 @@ namespace AssetsManager.Views.Controls.Models
         private SceneModel _sceneModel;
         public bool IsAnimationPaused { get; private set; }
 
-        public ModelViewerViewportControl()
+        public ModelViewportControl()
         {
             InitializeComponent();
             
@@ -54,9 +59,9 @@ namespace AssetsManager.Views.Controls.Models
             IsAnimationPaused = false;
         }
 
-        public void TogglePauseResume()
+        public void TogglePauseResume(IAnimationAsset animationToToggle)
         {
-            if (_currentAnimation == null) return;
+            if (_currentAnimation != animationToToggle) return;
 
             IsAnimationPaused = !IsAnimationPaused;
             if (IsAnimationPaused)
@@ -67,6 +72,13 @@ namespace AssetsManager.Views.Controls.Models
             {
                 _stopwatch.Start();
             }
+        }
+
+        public void StopAnimation()
+        {
+            _currentAnimation = null;
+            _stopwatch.Stop();
+            IsAnimationPaused = false;
         }
 
         public void SetSkeleton(RigResource skeleton)
@@ -92,7 +104,7 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (Viewport.Camera is not PerspectiveCamera camera) return;
 
-            var position = new Point3D(-14.158, 352.651, 553.062);
+            var position = new Point3D(0, 250, 300);
             var lookDirection = new Vector3D(-2.059, -235.936, -598.980);
             var upDirection = new Vector3D(0.008, 0.930, -0.367);
 
@@ -100,6 +112,56 @@ namespace AssetsManager.Views.Controls.Models
             camera.LookDirection = lookDirection;
             camera.UpDirection = upDirection;
             camera.FieldOfView = 45;
+        }
+
+        public void TakeScreenshot(string filePath)
+        {
+            var renderBitmap = new RenderTargetBitmap((int)Viewport3D.ActualWidth, (int)Viewport3D.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            renderBitmap.Render(Viewport3D);
+
+            // Always use PngBitmapEncoder
+            BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
+            bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
+
+            // Ensure the file path has a .png extension
+            string finalFilePath = filePath;
+            if (Path.GetExtension(finalFilePath).ToLower() != ".png")
+            {
+                finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
+            }
+
+            try
+            {
+                using (var stream = File.Create(finalFilePath))
+                {
+                    bitmapEncoder.Save(stream);
+                }
+                LogService.LogInteractiveSuccess($"Screenshot saved to {finalFilePath}", finalFilePath);
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
+            }
+        }
+
+        private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            ResetCamera();
+        }
+
+        private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
+        {
+            var saveFileDialog = new CommonSaveFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
+                Title = "Save Screenshot File",
+                DefaultExtension = ".png"
+            };
+
+            if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                TakeScreenshot(saveFileDialog.FileName);
+            }
         }
     }
 }

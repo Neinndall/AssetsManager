@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Media3D;
 
-namespace AssetsManager.Views.Camera
+namespace AssetsManager.Views.Helpers
 {
     public class CustomCameraController
     {
@@ -50,7 +50,8 @@ namespace AssetsManager.Views.Camera
                 var currentMousePosition = e.GetPosition(_viewport);
                 var delta = new System.Windows.Point(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
 
-                var delta3D = new Vector3D(-delta.X, delta.Y, 0);
+                double sensitivity = 0.5;
+                var delta3D = new Vector3D(-delta.X * sensitivity, delta.Y * sensitivity, 0);
                 Rotate(delta3D);
 
                 _lastMousePosition = currentMousePosition;

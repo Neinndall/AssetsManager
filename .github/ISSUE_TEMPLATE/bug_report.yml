@@ -65,7 +65,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: "PBE_AssetsDownloader Version"
+      label: "AssetsManager Version"
       description: "e.g., v2.1.0.0, you can find it in the Help -> About window"
       placeholder: "vX.Y.Z.W"
     validations:

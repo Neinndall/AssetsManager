@@ -1,13 +1,3 @@
-using AssetsManager.Services.Hashes;
-using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Services.Core;
-using AssetsManager.Services;
-using AssetsManager.Services.Models;
-using AssetsManager.Services.Explorer;
-using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Versions;
-using AssetsManager.Utils;
 using Serilog;
 using System;
 using System.IO;
@@ -16,11 +6,23 @@ using System.Windows;
 using Serilog.Events;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views;
+using AssetsManager.Services.Updater;
+using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;
 using AssetsManager.Views.Help;
 using AssetsManager.Views.Settings;
 using AssetsManager.Views.Controls;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Monitor;
+using AssetsManager.Services.Models;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Explorer.Tree;
+using AssetsManager.Services.Formatting;
+using AssetsManager.Services.Versions;
 
 namespace AssetsManager
 {
@@ -76,6 +78,8 @@ namespace AssetsManager
             services.AddSingleton<UpdateCheckService>();
             services.AddSingleton<ProgressUIManager>();
             services.AddTransient<ExplorerPreviewService>();
+            services.AddTransient<TreeBuilderService>();
+            services.AddTransient<TreeUIManager>();
             services.AddSingleton<WadSearchBoxService>();
             services.AddTransient<CSSParserService>();
             services.AddSingleton<JsBeautifierService>();

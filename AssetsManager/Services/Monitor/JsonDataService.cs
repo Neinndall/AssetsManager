@@ -2,17 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models;
-using AssetsManager.Views;
-using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Helpers;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Core;
 
@@ -32,30 +26,29 @@ namespace AssetsManager.Services.Monitor
         public event Action<FileUpdateInfo> FileUpdated;
         
         private readonly LogService _logService;
-        private readonly HttpClient _httpClient;
         private readonly AppSettings _appSettings;
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly Requests _requests;
         private readonly IServiceProvider _serviceProvider;
         private readonly DiffViewService _diffViewService;
-        private readonly string statusUrl = "https://raw.communitydragon.org/data/hashes/lol/";
+        private readonly HttpClient _httpClient;
 
         private readonly HashSet<string> _filesRequiringUniquePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "trans.json",
         };
 
-        public JsonDataService(LogService logService, HttpClient httpClient, AppSettings appSettings, DirectoriesCreator directoriesCreator, Requests requests, IServiceProvider serviceProvider, DiffViewService diffViewService)
+        public JsonDataService(LogService logService, AppSettings appSettings, DirectoriesCreator directoriesCreator, Requests requests, IServiceProvider serviceProvider, DiffViewService diffViewService, HttpClient httpClient)
         {
             _logService = logService;
-            _httpClient = httpClient;
             _appSettings = appSettings;
             _directoriesCreator = directoriesCreator;
             _requests = requests;
             _serviceProvider = serviceProvider;
             _diffViewService = diffViewService;
+            _httpClient = httpClient;
         }
-
+        
         public async Task<List<(string Url, DateTime Timestamp)>> GetFileUrlsFromDirectoryAsync(string directoryUrl)
         {
             var fileUrls = new List<(string Url, DateTime Timestamp)>();
@@ -91,67 +84,6 @@ namespace AssetsManager.Services.Monitor
             }
 
             return fileUrls;
-        }
-
-        public async Task<Dictionary<string, long>> GetRemoteHashesSizesAsync()
-        {
-            var result = new Dictionary<string, long>();
-
-            if (_httpClient == null)
-            {
-                _logService.LogError("HttpClient is null. Cannot fetch remote sizes.");
-                return result;
-            }
-
-            if (string.IsNullOrEmpty(statusUrl))
-            {
-                _logService.LogError("statusUrl is null or empty. Cannot fetch remote sizes.");
-                return result;
-            }
-
-            string html;
-            try
-            {
-                html = await _httpClient.GetStringAsync(statusUrl);
-            }
-            catch (HttpRequestException httpEx)
-            {
-                _logService.LogError(httpEx, $"HTTP request failed for '{statusUrl}'.");
-                return result;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, $"An unexpected exception occurred fetching URL '{statusUrl}'.");
-                return result;
-            }
-
-            if (string.IsNullOrEmpty(html))
-            {
-                _logService.LogError("Received empty response from statusUrl.");
-                return result;
-            }
-
-            var regex = new Regex(@"href=""(?<filename>hashes\..*?\.txt)"".*?\s+(?<size>\d+)\s*$", RegexOptions.Multiline);
-
-            foreach (Match match in regex.Matches(html))
-            {
-                string filename = match.Groups["filename"].Value;
-                string sizeStr = match.Groups["size"].Value;
-
-                if (long.TryParse(sizeStr, out long size))
-                {
-                    result[filename] = size;
-                }
-                else
-                {
-                    _logService.LogError($"Invalid size format '{sizeStr}' for file '{filename}'.");
-                }
-            }
-            if (result.Count == 0)
-            {
-                _logService.LogWarning("No hash files hashes.game or hashes.lcu found in the remote directory listing.");
-            }
-            return result;
         }
 
         public async Task<bool> CheckJsonDataUpdatesAsync(bool silent = false, Action onUpdateFound = null)

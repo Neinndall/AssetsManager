@@ -5,7 +5,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using Material3D = System.Windows.Media.Media3D.Material;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Helpers
 {
     public static class SceneElements
     {
@@ -15,28 +15,28 @@ namespace AssetsManager.Views.Models
             double size = 10000; // A large size for the skybox planes
 
             // 1. Load individual textures for each side and create their materials
-            string frontTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Sky/sky_front.dds";
+            string frontTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_front.dds";
             BitmapSource frontTexture = loadTextureFunc(frontTexturePath);
             Material3D frontMaterial = (frontTexture != null) ? new DiffuseMaterial(new ImageBrush(frontTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
             if (frontTexture == null) logErrorFunc($"Failed to load sky_front texture from {frontTexturePath}. Using solid color fallback.");
 
-            string rightTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Sky/sky_right.dds";
+            string rightTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_right.dds";
             BitmapSource rightTexture = loadTextureFunc(rightTexturePath);
             Material3D rightMaterial = (rightTexture != null) ? new DiffuseMaterial(new ImageBrush(rightTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
             if (rightTexture == null) logErrorFunc($"Failed to load sky_right texture from {rightTexturePath}. Using solid color fallback.");
 
-            string backTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Sky/sky_back.dds";
+            string backTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_back.dds";
             BitmapSource backTexture = loadTextureFunc(backTexturePath);
             Material3D backMaterial = (backTexture != null) ? new DiffuseMaterial(new ImageBrush(backTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
             if (backTexture == null) logErrorFunc($"Failed to load sky_back texture from {backTexturePath}. Using solid color fallback.");
 
-            string leftTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Sky/sky_left.dds";
+            string leftTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_left.dds";
             BitmapSource leftTexture = loadTextureFunc(leftTexturePath);
             Material3D leftMaterial = (leftTexture != null) ? new DiffuseMaterial(new ImageBrush(leftTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
             if (leftTexture == null) logErrorFunc($"Failed to load sky_left texture from {leftTexturePath}. Using solid color fallback.");
 
             // Load sky_up texture
-            string skyUpTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Sky/sky_up.dds";
+            string skyUpTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_up.dds";
             BitmapSource skyUpTexture = loadTextureFunc(skyUpTexturePath);
             Material3D skyUpMaterial = (skyUpTexture != null) ? new DiffuseMaterial(new ImageBrush(skyUpTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.LightBlue)); // Fallback color
             if (skyUpTexture == null) logErrorFunc($"Failed to load sky_up texture from {skyUpTexturePath}. Using solid color fallback.");
@@ -128,7 +128,7 @@ namespace AssetsManager.Views.Models
             };
 
             // Load the ground texture
-            string groundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Floor/ground_rift.dds"; // Assuming ground_rift.dds is in the app directory
+            string groundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Floor/ground_rift.dds"; // Assuming ground_rift.dds is in the app directory
             BitmapSource groundTexture = loadTextureFunc(groundTexturePath);
 
             Material3D groundMaterial;

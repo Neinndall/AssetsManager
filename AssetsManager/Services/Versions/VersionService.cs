@@ -263,13 +263,12 @@ namespace AssetsManager.Services.Versions
                 var outputTask = Task.Run(async () =>
                 {
                     string line;
-                    Regex verifyingRegex = new Regex(@"^Verifying file (.+?)\.\.\.$");
                     Regex incorrectRegex = new Regex(@"^File (.+?) is incorrect\.$");
-                    Regex fixingUpRegex = new Regex(@"^Fixing up file (.+?)\.\.\.$");
+                    Regex downloadingRegex = new Regex(@"^Downloading file (.+?)\.\.\.$");
 
                     while ((line = await outputReader.ReadLineAsync()) != null)
                     {
-                        if (verifyingRegex.IsMatch(line))
+                        if (incorrectRegex.IsMatch(line) || downloadingRegex.IsMatch(line))
                         {
                             filesToUpdate++;
                         }
@@ -311,16 +310,26 @@ namespace AssetsManager.Services.Versions
                 {
                     string line;
                     int fileCounter = 0;
-                    Regex verifyingRegex = new Regex(@"^Verifying file (.+?)\.\.\.$");
-                    Regex incorrectRegex = new Regex(@"^File (.+?) is incorrect\.$");
                     Regex fixingUpRegex = new Regex(@"^Fixing up file (.+?)\.\.\.$");
+                    Regex downloadingRegex = new Regex(@"^Downloading file (.+?)\.\.\.$");
 
                     while ((line = await outputReader.ReadLineAsync()) != null)
                     {
-                        Match verifyingMatch = verifyingRegex.Match(line);
-                        if (verifyingMatch.Success)
+                        Match fixingMatch = fixingUpRegex.Match(line);
+                        Match downloadingMatch = downloadingRegex.Match(line);
+                        string fileName = null;
+
+                        if (fixingMatch.Success)
                         {
-                            string fileName = verifyingMatch.Groups[1].Value;
+                            fileName = fixingMatch.Groups[1].Value;
+                        }
+                        else if (downloadingMatch.Success)
+                        {
+                            fileName = downloadingMatch.Groups[1].Value;
+                        }
+
+                        if (fileName != null)
+                        {
                             fileCounter++;
                             VersionDownloadProgressChanged?.Invoke(this, (taskName, fileCounter, totalFiles, fileName));
                         }
@@ -378,7 +387,7 @@ namespace AssetsManager.Services.Versions
                 }
 
                 VersionDownloadStarted?.Invoke(this, taskName);
-                VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files ..."));
+                VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files..."));
 
                 string localesArgument = string.Join(" ", locales);
                 int totalFiles = await GetManifestFileCountAsync(manifestUrl, lolDirectory, localesArgument);
@@ -418,7 +427,7 @@ namespace AssetsManager.Services.Versions
                 }
 
                 VersionDownloadStarted?.Invoke(this, taskName);
-                VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files ..."));
+                VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files..."));
 
                 string gameDirectory = Path.Combine(lolDirectory, "Game");
                 string localesArgument = string.Join(" ", locales);

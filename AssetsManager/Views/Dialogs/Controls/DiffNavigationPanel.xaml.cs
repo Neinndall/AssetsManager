@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using DiffPlex.DiffBuilder.Model;
 using ICSharpCode.AvalonEdit;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {

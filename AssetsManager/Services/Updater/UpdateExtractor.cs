@@ -6,10 +6,10 @@ using System.Text;
 using System.Windows;
 using SharpCompress.Archives;
 using SharpCompress.Common;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Services.Updater
 {
     public class UpdateExtractor
     {
