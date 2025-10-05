@@ -151,7 +151,7 @@ namespace AssetsManager.Views
         private void InitializeNotifyIcon()
         {
             _notifyIcon = new NotifyIcon();
-            var iconUri = new Uri("pack://application:,,,/AssetsManager;component/Resources/img/logo.ico", UriKind.RelativeOrAbsolute);
+            var iconUri = new Uri("pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico", UriKind.RelativeOrAbsolute);
             _notifyIcon.Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(iconUri).Stream);
             _notifyIcon.Text = "AssetsManager";
             _notifyIcon.DoubleClick += (s, args) =>
