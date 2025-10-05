@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://github.com/Neinndall/AssetsManager/blob/main/AssetsManager/Resources/img/full_logo.ico" alt="AssetsManager Logo" width="150">
+  <img src="https://github.com/Neinndall/AssetsManager/blob/main/AssetsManager/Resources/Img/logo.ico" alt="AssetsManager Logo" width="150">
 </div>
 
 ## ✅ APP Reliability
@@ -57,7 +57,6 @@ Explore League of Legends 3D assets like never before.
 1.  **Configure Settings:** Open the `Settings` tab to set up your preferences, including hash synchronization, auto-copy, and backup options.
 2.  **Select Directories:** In the `Home` tab, specify your "New Hashes Directory" and "Old Hashes Directory".
 3.  **Start Download:** Click the "Start Download" button to begin the asset extraction and download process. The application will compare hashes and download only the necessary files.
-4.  **Preview Assets:** Use the `Export` tab to preview specific asset types (images, audio, etc.) and download selected items.
 5.  **Explore & Monitor:** Use the `Explorer`, `Comparator`, `Monitor`, and `Model Viewer` tabs to access the advanced features of the application.
 
 ## ⚙️ Configuration
