@@ -66,6 +66,8 @@ namespace AssetsManager.Views.Controls.Models
                     _animationNames.Clear();
                     MeshesListBox.ItemsSource = null;
                     SceneClearRequested?.Invoke(this, EventArgs.Empty);
+
+                    LoadModelButton.IsEnabled = true;
                 }
             }
         }
@@ -128,6 +130,8 @@ namespace AssetsManager.Views.Controls.Models
                 _loadedModels.Add(_sceneModel);
 
                 CameraResetRequested?.Invoke();
+
+                LoadModelButton.IsEnabled = false;
             }
         }
 
