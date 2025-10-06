@@ -3,13 +3,17 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Utils;
+using BCnEncoder.Shared;
 using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Renderer;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Views.Models;
@@ -53,7 +57,7 @@ namespace AssetsManager.Services.Core
             string extension = Path.GetExtension(pathForCheck).ToLowerInvariant();
             if (SupportedImageExtensions.Contains(extension))
             {
-                await HandleImageDiffAsync(diff, oldPbePath, newPbePath, owner);
+                await HandleImageDiffAsync(diff, oldPbePath, newPbePath, owner, extension);
                 return;
             }
 
@@ -86,14 +90,17 @@ namespace AssetsManager.Services.Core
             }
         }
 
-        private async Task HandleImageDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, System.Windows.Window owner)
+        private async Task HandleImageDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, System.Windows.Window owner, string extension)
         {
             try
             {
                 var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
                 if (dataType == "image")
                 {
-                    var imageDiffWindow = new ImageDiffWindow((BitmapSource)oldData, (BitmapSource)newData, oldPath, newPath) { Owner = owner };
+                    var oldImage = ToBitmapSource((byte[])oldData, extension);
+                    var newImage = ToBitmapSource((byte[])newData, extension);
+
+                    var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath) { Owner = owner };
                     imageDiffWindow.Show();
                 }
                 else
@@ -171,6 +178,53 @@ namespace AssetsManager.Services.Core
             if (SupportedTextExtensions.Contains(extension)) return true;
 
             return false;
+        }
+
+        private BitmapSource ToBitmapSource(byte[] data, string extension)
+        {
+            if (data == null || data.Length == 0) return null;
+
+            if (extension == ".tex" || extension == ".dds")
+            {
+                using (var stream = new MemoryStream(data))
+                {
+                    var texture = Texture.Load(stream);
+                    if (texture.Mips.Length == 0) return null;
+
+                    var mainMip = texture.Mips[0];
+                    var width = mainMip.Width;
+                    var height = mainMip.Height;
+
+                    if (mainMip.Span.TryGetSpan(out Span<ColorRgba32> pixelSpan))
+                    {
+                        var pixelByteSpan = MemoryMarshal.AsBytes(pixelSpan);
+                        var pixelBytes = pixelByteSpan.ToArray();
+                        for (int i = 0; i < pixelBytes.Length; i += 4)
+                        {
+                            var r = pixelBytes[i];
+                            var b = pixelBytes[i + 2];
+                            pixelBytes[i] = b;
+                            pixelBytes[i + 2] = r;
+                        }
+                        return BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixelBytes, width * 4);
+                    }
+
+                    return null;
+                }
+            }
+            else
+            {
+                using (var stream = new MemoryStream(data))
+                {
+                    var bitmapImage = new BitmapImage();
+                    bitmapImage.BeginInit();
+                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmapImage.StreamSource = stream;
+                    bitmapImage.EndInit();
+                    bitmapImage.Freeze();
+                    return bitmapImage;
+                }
+            }
         }
     }
 }

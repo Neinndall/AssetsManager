@@ -1,21 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
-using AssetsManager.Services.Hashes;
-using System.Windows.Media.Imaging;
-using BCnEncoder.Shared;
-using LeagueToolkit.Core.Meta;
-using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Core.Wad;
 using AssetsManager.Views.Models;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Formatting;
 
 namespace AssetsManager.Services.Comparator
 {
@@ -115,64 +104,8 @@ namespace AssetsManager.Services.Comparator
 
         private (string DataType, object OldData, object NewData) PrepareDataFromBytes(byte[] oldData, byte[] newData, string extension)
         {
-            var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tex", ".dds" };
-
-            if (imageExtensions.Contains(extension))
-            {
-                var oldImage = ToBitmapSource(oldData, extension);
-                var newImage = ToBitmapSource(newData, extension);
-                return ("image", oldImage, newImage);
-            }
-
             var dataType = extension.TrimStart('.');
             return (dataType, oldData, newData);
-        }
-
-        private BitmapSource ToBitmapSource(byte[] data, string extension)
-        {
-            if (data == null || data.Length == 0) return null;
-
-            if (extension == ".tex" || extension == ".dds")
-            {
-                using (var stream = new MemoryStream(data))
-                {
-                    var texture = LeagueToolkit.Core.Renderer.Texture.Load(stream);
-                    if (texture.Mips.Length == 0) return null;
-
-                    var mainMip = texture.Mips[0];
-                    var width = mainMip.Width;
-                    var height = mainMip.Height;
-
-                    if (mainMip.Span.TryGetSpan(out Span<ColorRgba32> pixelSpan))
-                    {
-                        var pixelByteSpan = MemoryMarshal.AsBytes(pixelSpan);
-                        var pixelBytes = pixelByteSpan.ToArray();
-                        for (int i = 0; i < pixelBytes.Length; i += 4)
-                        {
-                            var r = pixelBytes[i];
-                            var b = pixelBytes[i + 2];
-                            pixelBytes[i] = b;
-                            pixelBytes[i + 2] = r;
-                        }
-                        return BitmapSource.Create(width, height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, pixelBytes, width * 4);
-                    }
-
-                    return null;
-                }
-            }
-            else
-            {
-                using (var stream = new MemoryStream(data))
-                {
-                    var bitmapImage = new BitmapImage();
-                    bitmapImage.BeginInit();
-                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmapImage.StreamSource = stream;
-                    bitmapImage.EndInit();
-                    bitmapImage.Freeze();
-                    return bitmapImage;
-                }
-            }
         }
     }
 }
