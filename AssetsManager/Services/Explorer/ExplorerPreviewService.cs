@@ -225,13 +225,12 @@ namespace AssetsManager.Services.Explorer
         {
             // Aseguramos la creacion de la carpeta necesaria
             await _directoriesCreator.CreateDirTempPreviewAsync();
-                        
-            if (IsImageExtension(extension)) { await ShowImagePreviewAsync(data); }
-            else if (IsTextureExtension(extension)) { await ShowTexturePreviewAsync(data); }
-            else if (IsVectorImageExtension(extension)) { await ShowSvgPreviewAsync(data); }
-            else if (IsJavaScriptExtension(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
-            else if (IsTextExtension(extension) || IsBinExtension(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
-            else if (IsMediaExtension(extension)) { await ShowAudioVideoPreviewAsync(data, extension); }
+
+            if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data); }
+            else if (SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data); }
+            else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data); }
+            else if (SupportedFileTypes.Media.Contains(extension)) { await ShowAudioVideoPreviewAsync(data, extension); }
+            else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
             else { await ShowUnsupportedPreviewAsync(extension); }
         }
 
@@ -521,12 +520,5 @@ namespace AssetsManager.Services.Explorer
             _unsupportedFileTextBlock.Text = $"Preview not available for '{extension}' files.";
         }
 
-        private bool IsImageExtension(string extension) => extension == ".png" || extension == ".jpg" || extension == ".jpeg";
-        private bool IsVectorImageExtension(string extension) => extension == ".svg";
-        private bool IsTextureExtension(string extension) => extension == ".tex" || extension == ".dds";
-        private bool IsTextExtension(string extension) => extension == ".css" || extension == ".json" || extension == ".xml" || extension == ".yml" || extension == ".yaml" || extension == ".ini" || extension == ".log" || extension == ".txt" || extension == ".stringtable";
-        private bool IsJavaScriptExtension(string extension) => extension == ".js";
-        private bool IsMediaExtension(string extension) => extension == ".ogg" || extension == ".webm";
-        private bool IsBinExtension(string extension) => extension == ".bin";
     }
 }

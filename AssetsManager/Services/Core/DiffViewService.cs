@@ -31,9 +31,6 @@ namespace AssetsManager.Services.Core
         private readonly LogService _logService;
         private readonly ContentFormatterService _contentFormatterService;
 
-        private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".jpg", ".jpeg", ".tex" };
-        private static readonly string[] SupportedTextExtensions = { ".bin", ".css", ".json", ".js", ".txt", ".xml", ".ini", ".log", ".stringtable" };
-
         public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, ContentFormatterService contentFormatterService)
         {
             _serviceProvider = serviceProvider;
@@ -55,7 +52,7 @@ namespace AssetsManager.Services.Core
             }
 
             string extension = Path.GetExtension(pathForCheck).ToLowerInvariant();
-            if (SupportedImageExtensions.Contains(extension))
+            if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
             {
                 await HandleImageDiffAsync(diff, oldPbePath, newPbePath, owner, extension);
                 return;
@@ -95,18 +92,12 @@ namespace AssetsManager.Services.Core
             try
             {
                 var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
-                if (dataType == "image")
-                {
-                    var oldImage = ToBitmapSource((byte[])oldData, extension);
-                    var newImage = ToBitmapSource((byte[])newData, extension);
+                
+                var oldImage = ToBitmapSource((byte[])oldData, extension);
+                var newImage = ToBitmapSource((byte[])newData, extension);
 
-                    var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath) { Owner = owner };
-                    imageDiffWindow.Show();
-                }
-                else
-                {
-                    _customMessageBoxService.ShowError("Error", "Expected an image but received a different file type.", owner);
-                }
+                var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath) { Owner = owner };
+                imageDiffWindow.Show();
             }
             catch (Exception ex)
             {
@@ -123,7 +114,7 @@ namespace AssetsManager.Services.Core
             }
 
             string extension = Path.GetExtension(newFilePath ?? oldFilePath).ToLowerInvariant();
-            if (SupportedImageExtensions.Contains(extension))
+            if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
             {
                 _customMessageBoxService.ShowInfo("Info", "Image comparison for local files is not implemented yet.", owner);
                 return;
@@ -174,17 +165,21 @@ namespace AssetsManager.Services.Core
 
             string extension = Path.GetExtension(filePath).ToLowerInvariant();
 
-            if (SupportedImageExtensions.Contains(extension)) return true;
-            if (SupportedTextExtensions.Contains(extension)) return true;
-
-            return false;
+            return SupportedFileTypes.Images.Contains(extension) ||
+                   SupportedFileTypes.Textures.Contains(extension) ||
+                   SupportedFileTypes.Json.Contains(extension) ||
+                   SupportedFileTypes.JavaScript.Contains(extension) ||
+                   SupportedFileTypes.Css.Contains(extension) ||
+                   SupportedFileTypes.Bin.Contains(extension) ||
+                   SupportedFileTypes.StringTable.Contains(extension) ||
+                   SupportedFileTypes.PlainText.Contains(extension);
         }
 
         private BitmapSource ToBitmapSource(byte[] data, string extension)
         {
             if (data == null || data.Length == 0) return null;
 
-            if (extension == ".tex" || extension == ".dds")
+            if (SupportedFileTypes.Textures.Contains(extension))
             {
                 using (var stream = new MemoryStream(data))
                 {
