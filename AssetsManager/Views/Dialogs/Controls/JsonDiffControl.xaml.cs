@@ -277,7 +277,14 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             _hideUnchangedLines = HideUnchangedButton.IsChecked ?? false;
             int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(NewJsonContent.TextArea.Caret.Line) ?? -1;
-            await UpdateDiffView(currentDiffIndex);
+            try
+            {
+                await UpdateDiffView(currentDiffIndex);
+            }
+            catch (Exception ex)
+            {
+                CustomMessageBoxService.ShowError("Error", $"Failed to update view: {ex.Message}");
+            }
         }
 
         protected virtual void OnComparisonFinished(bool success)

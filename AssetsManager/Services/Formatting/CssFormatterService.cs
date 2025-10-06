@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace AssetsManager.Services.Formatting
 {
@@ -31,6 +32,7 @@ namespace AssetsManager.Services.Formatting
     public interface ICSSParserService
     {
         string ConvertToJson(string cssContent, ParseOptions options = null);
+        Task<string> ConvertToJsonAsync(string cssContent, ParseOptions options = null);
         List<CSSBlock> ParseGrouped(string cssContent);
         Dictionary<string, Dictionary<string, string>> ParseIndividual(string cssContent);
         Dictionary<string, object> ParseHierarchical(string cssContent);
@@ -38,6 +40,11 @@ namespace AssetsManager.Services.Formatting
 
     public class CSSParserService : ICSSParserService
     {
+        public Task<string> ConvertToJsonAsync(string cssContent, ParseOptions options = null)
+        {
+            return Task.Run(() => ConvertToJson(cssContent, options));
+        }
+
         /// <summary>
         /// Convierte CSS a JSON según las opciones especificadas
         /// </summary>

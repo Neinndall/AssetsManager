@@ -60,7 +60,7 @@ namespace AssetsManager.Services.Core
 
             try
             {
-                var (dataType, oldData, newData, oldPath, newPath) = await Task.Run(() => _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath).Result);
+                var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
                 var (oldText, newText) = await ProcessDataAsync(dataType, oldData, newData);
 
                 loadingWindow.Close();
@@ -176,8 +176,8 @@ namespace AssetsManager.Services.Core
                     }
                     break;
                 case "css":
-                    if (oldData != null) oldText = await _cssParserService.ConvertToJson((string)oldData);
-                    if (newData != null) newText = await _cssParserService.ConvertToJson((string)newData);
+                    if (oldData != null) oldText = await _cssParserService.ConvertToJsonAsync((string)oldData);
+                    if (newData != null) newText = await _cssParserService.ConvertToJsonAsync((string)newData);
                     break;
                 case "text":
                     oldText = (string)oldData ?? string.Empty;

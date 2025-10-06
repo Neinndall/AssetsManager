@@ -85,6 +85,15 @@
                                             <DataTrigger Binding="{Binding Status}" Value="Renamed">
                                                 <Setter Property="Foreground" Value="#FF9800"/>
                                             </DataTrigger>
+
+                                            <!-- 
+                                                Este Trigger es necesario para forzar el texto a blanco en la selección.
+                                                Anula los colores de estado (New, Modified, etc.) definidos arriba,
+                                                ya que el estilo general de TreeViewItem es anulado por este estilo local.
+                                            -->
+                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                                <Setter Property="Foreground" Value="White"/>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </TextBlock.Style>
