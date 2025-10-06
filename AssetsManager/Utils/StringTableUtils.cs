@@ -2,13 +2,25 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json;
+using System.Text.Encodings.Web;
+using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Utils
 {
     public static class StringTableUtils
     {
-        public static Dictionary<string, string> ParseAndResolve(Stream stream, HashResolverService hashResolverService, int gameVersion = 1502)
+        // Record para encapsular los datos parseados y resueltos
+        private record ParsedStringTableData(
+            Dictionary<ulong, string> RstEntries,
+            Dictionary<ulong, string> TruncatedLut,
+            int HashBits,
+            int Version
+        );
+
+        // Método auxiliar para extraer la lógica común de parseo y resolución de hashes
+        private static ParsedStringTableData GetParsedStringTableData(Stream stream, HashResolverService hashResolverService, int gameVersion)
         {
             var (rstEntries, hashBits, fileVersion) = Parse(stream, gameVersion);
 
@@ -22,20 +34,37 @@ namespace AssetsManager.Utils
             {
                 truncatedLut[pair.Key & hashMask] = pair.Value;
             }
+            return new ParsedStringTableData(rstEntries, truncatedLut, hashBits, fileVersion);
+        }
 
-            var finalDict = new Dictionary<string, string>();
-            foreach (var entry in rstEntries)
+        public static Task WriteStringTableAsJsonAsync(Stream outputStream, Stream inputStream, HashResolverService hashResolverService, int gameVersion = 1502)
+        {
+            return Task.Run(() => WriteStringTableAsJson(outputStream, inputStream, hashResolverService, gameVersion));
+        }
+
+        private static void WriteStringTableAsJson(Stream outputStream, Stream inputStream, HashResolverService hashResolverService, int gameVersion = 1502)
+        {
+            var options = new JsonWriterOptions { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+            using var writer = new Utf8JsonWriter(outputStream, options);
+
+            var parsedData = GetParsedStringTableData(inputStream, hashResolverService, gameVersion);
+
+            writer.WriteStartObject();
+            foreach (var entry in parsedData.RstEntries)
             {
-                if (truncatedLut.TryGetValue(entry.Key, out var resolvedKey))
+                string key;
+                if (parsedData.TruncatedLut.TryGetValue(entry.Key, out var resolvedKey))
                 {
-                    finalDict[resolvedKey] = entry.Value;
+                    key = resolvedKey;
                 }
                 else
                 {
-                    finalDict[$"{{{entry.Key:x10}}}"] = entry.Value;
+                    key = $"{{{entry.Key:x10}}}";
                 }
+                writer.WriteString(key, entry.Value);
             }
-            return finalDict;
+            writer.WriteEndObject();
+            writer.Flush();
         }
 
         private static (Dictionary<ulong, string> Entries, int HashBits, int Version) Parse(Stream stream, int gameVersion = 1502)

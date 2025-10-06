@@ -83,6 +83,7 @@ namespace AssetsManager
             services.AddSingleton<WadSearchBoxService>();
             services.AddTransient<CSSParserService>();
             services.AddSingleton<JsBeautifierService>();
+            services.AddSingleton<ContentFormatterService>();
             services.AddSingleton<DiffViewService>();
             services.AddSingleton<MonitorService>();
 

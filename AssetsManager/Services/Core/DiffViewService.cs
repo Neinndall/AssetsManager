@@ -3,9 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Utils;
+using LeagueToolkit.Core.Meta;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Views.Models;
@@ -21,20 +25,18 @@ namespace AssetsManager.Services.Core
         private readonly WadDifferenceService _wadDifferenceService;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly LogService _logService;
-        private readonly JsBeautifierService _jsBeautifierService;
-        private readonly CSSParserService _cssParserService;
+        private readonly ContentFormatterService _contentFormatterService;
 
         private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".tga", ".jpg", ".jpeg", ".bmp", ".gif", ".ico", ".webp", ".tex" };
         private static readonly string[] SupportedTextExtensions = { ".bin", ".css", ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log", ".stringtable" };
 
-        public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService)
+        public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, ContentFormatterService contentFormatterService)
         {
             _serviceProvider = serviceProvider;
             _wadDifferenceService = wadDifferenceService;
             _customMessageBoxService = customMessageBoxService;
             _logService = logService;
-            _jsBeautifierService = jsBeautifierService;
-            _cssParserService = cssParserService;
+            _contentFormatterService = contentFormatterService;
         }
 
         public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, System.Windows.Window owner)
@@ -61,7 +63,7 @@ namespace AssetsManager.Services.Core
             try
             {
                 var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
-                var (oldText, newText) = await ProcessDataAsync(dataType, oldData, newData);
+                var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
 
                 loadingWindow.Close();
 
@@ -126,7 +128,7 @@ namespace AssetsManager.Services.Core
             try
             {
                 var (dataType, oldData, newData) = await _wadDifferenceService.PrepareFileDifferenceDataAsync(oldFilePath, newFilePath);
-                var (oldText, newText) = await ProcessDataAsync(dataType, oldData, newData);
+                var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
 
                 loadingWindow.Close();
 
@@ -149,46 +151,14 @@ namespace AssetsManager.Services.Core
             }
         }
         
-        private async Task<(string oldText, string newText)> ProcessDataAsync(string dataType, object oldData, object newData)
+        private async Task<(string oldText, string newText)> ProcessDataAsync(string dataType, byte[] oldData, byte[] newData)
         {
-            string oldText = string.Empty;
-            string newText = string.Empty;
+            var oldTextTask = _contentFormatterService.GetFormattedStringAsync(dataType, oldData);
+            var newTextTask = _contentFormatterService.GetFormattedStringAsync(dataType, newData);
 
-            switch (dataType)
-            {
-                case "bin":
-                case "json":
-                case "stringtable":
-                    if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
-                    if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
-                    break;
-                case "js":
-                    try
-                    {
-                        if (oldData != null) oldText = await _jsBeautifierService.BeautifyAsync((string)oldData);
-                        if (newData != null) newText = await _jsBeautifierService.BeautifyAsync((string)newData);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogWarning($"JS Beautifier failed: {ex.Message}");
-                        oldText = (string)oldData ?? string.Empty;
-                        newText = (string)newData ?? string.Empty;
-                    }
-                    break;
-                case "css":
-                    if (oldData != null) oldText = await _cssParserService.ConvertToJsonAsync((string)oldData);
-                    if (newData != null) newText = await _cssParserService.ConvertToJsonAsync((string)newData);
-                    break;
-                case "text":
-                    oldText = (string)oldData ?? string.Empty;
-                    newText = (string)newData ?? string.Empty;
-                    break;
-                default:
-                    oldText = oldData?.ToString() ?? string.Empty;
-                    newText = newData?.ToString() ?? string.Empty;
-                    break;
-            }
-            return (oldText, newText);
+            await Task.WhenAll(oldTextTask, newTextTask);
+
+            return (await oldTextTask, await newTextTask);
         }
 
         private bool IsDiffSupported(string filePath)

@@ -15,17 +15,16 @@ using LeagueToolkit.Core.Wad;
 using AssetsManager.Views.Models;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Formatting;
 
 namespace AssetsManager.Services.Comparator
 {
     public class WadDifferenceService
     {
-        private readonly HashResolverService _hashResolverService;
         private readonly LogService _logService;
 
-        public WadDifferenceService(HashResolverService hashResolverService, LogService logService)
+        public WadDifferenceService(LogService logService)
         {
-            _hashResolverService = hashResolverService;
             _logService = logService;
         }
 
@@ -89,7 +88,7 @@ namespace AssetsManager.Services.Comparator
             if (oldData == null && diff.Type != ChunkDiffType.New) return ("error", null, null, null, null);
             if (newData == null && diff.Type != ChunkDiffType.Removed) return ("error", null, null, null, null);
 
-            var (dataType, oldResult, newResult) = await PrepareDataFromBytesAsync(oldData, newData, extension);
+            var (dataType, oldResult, newResult) = PrepareDataFromBytes(oldData, newData, extension);
             return (dataType, oldResult, newResult, diff.OldPath, diff.NewPath);
         }
 
@@ -99,7 +98,7 @@ namespace AssetsManager.Services.Comparator
             byte[] oldData = File.Exists(oldFilePath) ? await File.ReadAllBytesAsync(oldFilePath) : null;
             byte[] newData = File.Exists(newFilePath) ? await File.ReadAllBytesAsync(newFilePath) : null;
 
-            return await PrepareDataFromBytesAsync(oldData, newData, extension);
+            return PrepareDataFromBytes(oldData, newData, extension);
         }
 
         public async Task<byte[]> GetDataFromChunkAsync(FileSystemNodeModel node)
@@ -114,102 +113,19 @@ namespace AssetsManager.Services.Comparator
             return WadChunkUtils.DecompressChunk(compressedData, compressionType);
         }
 
-        private async Task<(string DataType, object OldData, object NewData)> PrepareDataFromBytesAsync(byte[] oldData, byte[] newData, string extension)
+        private (string DataType, object OldData, object NewData) PrepareDataFromBytes(byte[] oldData, byte[] newData, string extension)
         {
-            var jsExtensions = new[] { ".js" };
-            var jsonExtensions = new[] { ".json" };
-            var textExtensions = new[] { ".txt", ".lua", ".xml", ".yaml", ".yml", ".ini", ".log" };
             var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tex", ".dds" };
-            var binExtensions = new[] { ".bin" };
-            var cssExtensions = new[] { ".css" };
-            var stringTableExtensions = new[] { ".stringtable" };
 
-            object GetBinDataObject(byte[] data)
-            {
-                if (data == null) return null;
-                try
-                {
-                    using var stream = new MemoryStream(data);
-                    var bin = new BinTree(stream);
-                    return BinUtils.ConvertBinTreeToDictionary(bin, _hashResolverService);
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, "Failed to parse .bin file content.");
-                    throw;
-                }
-            }
-
-            object GetStringTableObject(byte[] data)
-            {
-                if (data == null) return null;
-                try
-                {
-                    using var stream = new MemoryStream(data);
-                    var stringTableDict = StringTableUtils.ParseAndResolve(stream, _hashResolverService);
-                    return stringTableDict;
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, "Failed to parse .stringtable file content.");
-                    throw;
-                }
-            }
-
-            string GetTextContent(byte[] data)
-            {
-                if (data == null) return null;
-                return Encoding.UTF8.GetString(data);
-            }
-
-            if (binExtensions.Contains(extension))
-            {
-                await _hashResolverService.LoadBinHashesAsync();
-                object oldBinObject = GetBinDataObject(oldData);
-                object newBinObject = GetBinDataObject(newData);
-                return ("bin", oldBinObject, newBinObject);
-            }
-            if (stringTableExtensions.Contains(extension))
-            {
-                await _hashResolverService.LoadRstHashesAsync();
-                object oldStringTableObject = GetStringTableObject(oldData);
-                object newStringTableObject = GetStringTableObject(newData);
-                return ("stringtable", oldStringTableObject, newStringTableObject);
-            }
-            if (jsExtensions.Contains(extension))
-            {
-                string oldText = GetTextContent(oldData);
-                string newText = GetTextContent(newData);
-                return ("js", oldText, newText);
-            }
-            if (jsonExtensions.Contains(extension))
-            {
-                string oldText = GetTextContent(oldData);
-                string newText = GetTextContent(newData);
-                return ("json", oldText, newText);
-            }
-            if (cssExtensions.Contains(extension))
-            {
-                string oldText = GetTextContent(oldData);
-                string newText = GetTextContent(newData);
-                return ("css", oldText, newText);
-            }
-            if (textExtensions.Contains(extension))
-            {
-                string oldText = GetTextContent(oldData);
-                string newText = GetTextContent(newData);
-                return ("text", oldText, newText);
-            }
-            else if (imageExtensions.Contains(extension))
+            if (imageExtensions.Contains(extension))
             {
                 var oldImage = ToBitmapSource(oldData, extension);
                 var newImage = ToBitmapSource(newData, extension);
                 return ("image", oldImage, newImage);
             }
-            else
-            {
-                return ("unsupported", null, null);
-            }
+
+            var dataType = extension.TrimStart('.');
+            return (dataType, oldData, newData);
         }
 
         private BitmapSource ToBitmapSource(byte[] data, string extension)

@@ -51,19 +51,15 @@ namespace AssetsManager.Services.Explorer
 
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly HashResolverService _hashResolverService;
-        private readonly JsBeautifierService _jsBeautifierService;
         private readonly WadDifferenceService _wadDifferenceService;
-        private readonly CSSParserService _cssParserService;
+        private readonly ContentFormatterService _contentFormatterService;
 
-        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, HashResolverService hashResolverService, JsBeautifierService jsBeautifierService, WadDifferenceService wadDifferenceService, CSSParserService cssParserService)
+        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDifferenceService wadDifferenceService, ContentFormatterService contentFormatterService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
-            _hashResolverService = hashResolverService;
-            _jsBeautifierService = jsBeautifierService;
             _wadDifferenceService = wadDifferenceService;
-            _cssParserService = cssParserService;
+            _contentFormatterService = contentFormatterService;
         }
 
         public void Initialize(Image imagePreview, WebView2 webView2Preview, TextEditor textEditor, Panel placeholder, Panel selectFileMessage, Panel unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
@@ -241,68 +237,25 @@ namespace AssetsManager.Services.Explorer
 
         private async Task ShowAvalonEditTextPreviewAsync(byte[] data, string extension)
         {
-            await SetPreviewer(Previewer.AvalonEdit);
             try
             {
-                string textContent;
+                string dataType = extension.TrimStart('.');
+                string textContent = await _contentFormatterService.GetFormattedStringAsync(dataType, data);
+
                 IHighlightingDefinition syntaxHighlighting = null;
-
-                switch (extension)
+                if (dataType == "json" || dataType == "bin" || dataType == "css" || dataType == "stringtable" || dataType == "js")
                 {
-                    case ".bin":
-                        using (var stream = new MemoryStream(data))
-                        {
-                            var binTree = new BinTree(stream);
-                            var binDict = BinUtils.ConvertBinTreeToDictionary(binTree, _hashResolverService);
-                            textContent = await JsonFormatter.FormatJsonAsync(binDict);
-                        }
-                        syntaxHighlighting = GetJsonHighlighting();
-                        break;
-
-                    case ".js":
-                        textContent = Encoding.UTF8.GetString(data);
-                        textContent = await _jsBeautifierService.BeautifyAsync(textContent);
-                        syntaxHighlighting = GetJsonHighlighting();
-                        break;
-
-                    case ".json":
-                        textContent = Encoding.UTF8.GetString(data);
-                        textContent = await JsonFormatter.FormatJsonAsync(textContent);
-                        syntaxHighlighting = GetJsonHighlighting();
-                        break;
-
-                    case ".css":
-                        textContent = Encoding.UTF8.GetString(data);
-                        textContent = _cssParserService.ConvertToJson(textContent);
-                        syntaxHighlighting = GetJsonHighlighting();
-                        break;
-
-                    case ".stringtable":
-                        using (var stream = new MemoryStream(data))
-                        {
-                            var resolvedEntries = StringTableUtils.ParseAndResolve(stream, _hashResolverService);
-                            textContent = await JsonFormatter.FormatJsonAsync(resolvedEntries);
-                        }
-                        syntaxHighlighting = GetJsonHighlighting();
-                        break;
-
-                    case ".xml":
-                        textContent = Encoding.UTF8.GetString(data);
-                        syntaxHighlighting = null;
-                        break;
-
-                    default: // for .txt, .log, .yml, etc.
-                        textContent = Encoding.UTF8.GetString(data);
-                        syntaxHighlighting = null;
-                        break;
+                    syntaxHighlighting = GetJsonHighlighting();
                 }
 
+                await SetPreviewer(Previewer.AvalonEdit);
                 _textEditorPreview.SyntaxHighlighting = syntaxHighlighting;
                 _textEditorPreview.Text = textContent;
                 _textEditorPreview.Focus();
             }
             catch (Exception ex)
             {
+                await SetPreviewer(Previewer.AvalonEdit);
                 _logService.LogError(ex, $"Failed to show text preview for extension {extension}");
                 _textEditorPreview.Text = $"Error showing {extension} file.";
             }
