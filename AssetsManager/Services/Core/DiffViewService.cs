@@ -54,20 +54,21 @@ namespace AssetsManager.Services.Core
                 return;
             }
 
+            var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
+            diffWindow.Owner = owner;
+            diffWindow.ShowLoading(true);
+            diffWindow.Show();
+
             try
             {
-                var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
-                diffWindow.Owner = owner;
-                diffWindow.ShowLoading(true);
-                diffWindow.Show();
-
                 var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
                 var (oldText, newText) = await ProcessDataAsync(dataType, oldData, newData);
 
                 if (oldText == newText)
                 {
-                    diffWindow.Close();
+                    diffWindow.ShowLoading(false);
                     _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
+                    diffWindow.Close();
                     return;
                 }
 
@@ -75,12 +76,12 @@ namespace AssetsManager.Services.Core
             }
             catch (Exception ex)
             {
+                diffWindow.Close();
                 _customMessageBoxService.ShowError("Comparison Error", $"An unexpected error occurred while preparing the file for comparison. Details: {ex.Message}", owner);
                 _logService.LogError(ex, "Error showing WAD diff");
-                throw;
             }
         }
-        
+
         private async Task HandleImageDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, System.Windows.Window owner)
         {
             try
@@ -117,33 +118,34 @@ namespace AssetsManager.Services.Core
                 return;
             }
 
+            var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
+            diffWindow.Owner = owner;
+            diffWindow.ShowLoading(true);
+            diffWindow.Show();
+
             try
             {
-                var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
-                diffWindow.Owner = owner;
-                diffWindow.ShowLoading(true);
-                diffWindow.Show();
-
                 var (dataType, oldData, newData) = await _wadDifferenceService.PrepareFileDifferenceDataAsync(oldFilePath, newFilePath);
                 var (oldText, newText) = await ProcessDataAsync(dataType, oldData, newData);
 
                 if (oldText == newText)
                 {
-                    diffWindow.Close();
+                    diffWindow.ShowLoading(false);
                     _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
+                    diffWindow.Close();
                     return;
                 }
-                
+
                 await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath));
             }
             catch (Exception ex)
             {
+                diffWindow.Close();
                 _customMessageBoxService.ShowError("Comparison Error", $"An unexpected error occurred while preparing the file for comparison. Details: {ex.Message}", owner);
                 _logService.LogError(ex, "Error showing file diff");
-                throw;
             }
         }
-
+        
         private async Task<(string oldText, string newText)> ProcessDataAsync(string dataType, object oldData, object newData)
         {
             string oldText = string.Empty;
