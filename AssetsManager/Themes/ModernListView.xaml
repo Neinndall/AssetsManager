@@ -10,7 +10,7 @@
             <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Template">
@@ -116,6 +116,7 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
+
         <!-- Estilo para tipo Models/Paneles Seleccioanables (Meshes, Animations ...) -->
         <Style x:Key="ListBoxItemStyle" TargetType="ListBoxItem">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -139,6 +140,16 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- Estilo para ListBox con Scroll Suave y apariencia unificada -->
+        <Style x:Key="SmoothScrollListBox" TargetType="ListBox">
+            <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <!-- La propiedad clave para el scroll suave -->
+            <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource ListBoxItemStyle}"/>
         </Style>
 
 </ResourceDictionary>

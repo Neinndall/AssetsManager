@@ -22,10 +22,7 @@
             <TabControl Grid.Row="0" Style="{StaticResource CustomTabControlStyle}">
                 <TabItem Header="Meshes">
                     <ListBox x:Name="MeshesListBox" 
-                             Background="{StaticResource SidebarBackground}"
-                             BorderThickness="1"
-                             BorderBrush="{StaticResource BorderColor}"
-                             ItemContainerStyle="{StaticResource ListBoxItemStyle}">
+                             Style="{StaticResource SmoothScrollListBox}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Margin="0,0,0,4" Padding="0,6,0,6">
@@ -59,10 +56,7 @@
                 </TabItem>
                 <TabItem Header="Animations">
                     <ListBox x:Name="AnimationsListBox"
-                             Background="{StaticResource SidebarBackground}"
-                             BorderThickness="1"
-                             BorderBrush="{StaticResource BorderColor}"
-                             ItemContainerStyle="{StaticResource ListBoxItemStyle}">
+                             Style="{StaticResource SmoothScrollListBox}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -104,10 +98,7 @@
                 </TabItem>
                 <TabItem Header="Models">
                     <ListBox x:Name="ModelsListBox"
-                             Background="{StaticResource SidebarBackground}"
-                             BorderThickness="1"
-                             BorderBrush="{StaticResource BorderColor}"
-                             ItemContainerStyle="{StaticResource ListBoxItemStyle}">
+                             Style="{StaticResource SmoothScrollListBox}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid>
