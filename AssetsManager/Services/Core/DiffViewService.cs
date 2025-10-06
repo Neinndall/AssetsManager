@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -54,29 +55,30 @@ namespace AssetsManager.Services.Core
                 return;
             }
 
-            var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
-            diffWindow.Owner = owner;
-            diffWindow.ShowLoading(true);
-            diffWindow.Show();
+            var loadingWindow = new LoadingDiffWindow { Owner = owner };
+            loadingWindow.Show();
 
             try
             {
-                var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
+                var (dataType, oldData, newData, oldPath, newPath) = await Task.Run(() => _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath).Result);
                 var (oldText, newText) = await ProcessDataAsync(dataType, oldData, newData);
+
+                loadingWindow.Close();
 
                 if (oldText == newText)
                 {
-                    diffWindow.ShowLoading(false);
                     _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
-                    diffWindow.Close();
                     return;
                 }
 
+                var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
+                diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath);
+                diffWindow.ShowDialog();
             }
             catch (Exception ex)
             {
-                diffWindow.Close();
+                loadingWindow.Close();
                 _customMessageBoxService.ShowError("Comparison Error", $"An unexpected error occurred while preparing the file for comparison. Details: {ex.Message}", owner);
                 _logService.LogError(ex, "Error showing WAD diff");
             }
@@ -118,29 +120,30 @@ namespace AssetsManager.Services.Core
                 return;
             }
 
-            var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
-            diffWindow.Owner = owner;
-            diffWindow.ShowLoading(true);
-            diffWindow.Show();
+            var loadingWindow = new LoadingDiffWindow { Owner = owner };
+            loadingWindow.Show();
 
             try
             {
                 var (dataType, oldData, newData) = await _wadDifferenceService.PrepareFileDifferenceDataAsync(oldFilePath, newFilePath);
                 var (oldText, newText) = await ProcessDataAsync(dataType, oldData, newData);
 
+                loadingWindow.Close();
+
                 if (oldText == newText)
                 {
-                    diffWindow.ShowLoading(false);
                     _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
-                    diffWindow.Close();
                     return;
                 }
 
+                var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
+                diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath));
+                diffWindow.ShowDialog();
             }
             catch (Exception ex)
             {
-                diffWindow.Close();
+                loadingWindow.Close();
                 _customMessageBoxService.ShowError("Comparison Error", $"An unexpected error occurred while preparing the file for comparison. Details: {ex.Message}", owner);
                 _logService.LogError(ex, "Error showing file diff");
             }
@@ -154,6 +157,8 @@ namespace AssetsManager.Services.Core
             switch (dataType)
             {
                 case "bin":
+                case "json":
+                case "stringtable":
                     if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
                     if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
                     break;
@@ -170,17 +175,9 @@ namespace AssetsManager.Services.Core
                         newText = (string)newData ?? string.Empty;
                     }
                     break;
-                case "json":
-                    if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
-                    if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
-                    break;
-                case "stringtable":
-                    if (oldData != null) oldText = await JsonFormatter.FormatJsonAsync(oldData);
-                    if (newData != null) newText = await JsonFormatter.FormatJsonAsync(newData);
-                    break;
                 case "css":
-                    if (oldData != null) oldText = _cssParserService.ConvertToJson((string)oldData);
-                    if (newData != null) newText = _cssParserService.ConvertToJson((string)newData);
+                    if (oldData != null) oldText = await _cssParserService.ConvertToJson((string)oldData);
+                    if (newData != null) newText = await _cssParserService.ConvertToJson((string)newData);
                     break;
                 case "text":
                     oldText = (string)oldData ?? string.Empty;

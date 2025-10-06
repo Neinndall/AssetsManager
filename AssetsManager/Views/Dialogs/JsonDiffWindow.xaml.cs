@@ -1,16 +1,12 @@
-using AssetsManager.Services;
-using AssetsManager.Services.Core;
-using System.IO;
+using System;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Media.Animation;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class JsonDiffWindow : Window
     {
-        private readonly Storyboard _loadingAnimation;
-
         public JsonDiffWindow(CustomMessageBoxService customMessageBoxService)
         {
             InitializeComponent();
@@ -23,25 +19,20 @@ namespace AssetsManager.Views.Dialogs
                 }
             };
 
-            var originalStoryboard = (Storyboard)this.TryFindResource("SpinningIconAnimation");
-            if (originalStoryboard != null)
-            {
-                _loadingAnimation = originalStoryboard.Clone();
-                Storyboard.SetTarget(_loadingAnimation, ProgressIcon);
-            }
+            // Start invisible to prevent visual jump
+            Visibility = Visibility.Hidden;
+            Loaded += JsonDiffWindow_Loaded;
         }
 
-        public void ShowLoading(bool show)
+        private void JsonDiffWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            LoadingOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-            if (show)
-            {
-                _loadingAnimation?.Begin();
-            }
-            else
-            {
-                _loadingAnimation?.Stop();
-            }
+            Loaded -= JsonDiffWindow_Loaded;
+            
+            // Scroll to the first difference while the window is still invisible
+            JsonDiffControl.FocusFirstDifference();
+
+            // Now make the window visible in its final, correct state
+            Visibility = Visibility.Visible;
         }
 
         // Used by DiffViewService when the file content is already processed and available in memory.
@@ -49,7 +40,6 @@ namespace AssetsManager.Views.Dialogs
         {
             JsonDiffControl.Visibility = Visibility.Visible;
             await JsonDiffControl.LoadAndDisplayDiffAsync(oldText, newText, oldFileName, newFileName);
-            ShowLoading(false);
         }
     }
 }

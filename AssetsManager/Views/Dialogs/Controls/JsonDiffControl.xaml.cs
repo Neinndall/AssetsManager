@@ -39,6 +39,11 @@ namespace AssetsManager.Views.Dialogs.Controls
             SetupScrollSync();
         }
 
+        public void FocusFirstDifference()
+        {
+            DiffNavigationPanel?.NavigateToNextDifference(0);
+        }
+
         public async Task LoadAndDisplayDiffAsync(string oldText, string newText, string oldFileName, string newFileName)
         {
             try
@@ -49,7 +54,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
 
                 DiffGrid.Visibility = Visibility.Visible;
-                UpdateDiffView();
+                await UpdateDiffView();
             }
             catch (Exception ex)
             {
@@ -102,15 +107,19 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
-        private void UpdateDiffView(int? diffIndexToRestore = null)
+        private async Task UpdateDiffView(int? diffIndexToRestore = null)
         {
             if (_originalDiffModel == null) return;
 
             var modelToShow = _hideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
             var originalModelForNav = _hideUnchangedLines ? _originalDiffModel : null;
 
-            var normalizedOld = JsonFormatter.NormalizeTextForAlignment(modelToShow.OldText);
-            var normalizedNew = JsonFormatter.NormalizeTextForAlignment(modelToShow.NewText);
+            var (normalizedOld, normalizedNew) = await Task.Run(() =>
+            {
+                var nOld = JsonFormatter.NormalizeTextForAlignment(modelToShow.OldText);
+                var nNew = JsonFormatter.NormalizeTextForAlignment(modelToShow.NewText);
+                return (nOld, nNew);
+            });
 
             OldJsonContent.Document = new TextDocument(normalizedOld.Text);
             NewJsonContent.Document = new TextDocument(normalizedNew.Text);
@@ -132,10 +141,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                 {
                     DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
                 }
-                else
-                {
-                    DiffNavigationPanel?.NavigateToNextDifference(0);
-                }
+
             };
             NewJsonContent.TextArea.TextView.LayoutUpdated += layoutUpdatedHandler;
         }
@@ -267,11 +273,11 @@ namespace AssetsManager.Views.Dialogs.Controls
             NewJsonContent.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
         }
 
-        private void HideUnchangedButton_Click(object sender, RoutedEventArgs e)
+        private async void HideUnchangedButton_Click(object sender, RoutedEventArgs e)
         {
             _hideUnchangedLines = HideUnchangedButton.IsChecked ?? false;
             int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(NewJsonContent.TextArea.Caret.Line) ?? -1;
-            UpdateDiffView(currentDiffIndex);
+            await UpdateDiffView(currentDiffIndex);
         }
 
         protected virtual void OnComparisonFinished(bool success)

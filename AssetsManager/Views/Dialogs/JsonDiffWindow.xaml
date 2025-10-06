@@ -13,61 +13,6 @@
     <Grid>
         <controls:JsonDiffControl x:Name="JsonDiffControl"/>
         
-        <!-- Loading Overlay MEJORADO -->
-        <Grid x:Name="LoadingOverlay" 
-              Background="#E61E1E1E" 
-              IsHitTestVisible="True"
-              Margin="0,117,0,0"
-              Panel.ZIndex="999">
-
-            <!-- Fondo que bloquea interacciones -->
-            <Rectangle Fill="Transparent" />
-
-            <!-- Contenedor central -->
-            <Border Background="{StaticResource CardBackground}" 
-                    BorderBrush="{StaticResource BorderColor}" 
-                    BorderThickness="1" 
-                    CornerRadius="12" 
-                    Padding="40,30" 
-                    HorizontalAlignment="Center" 
-                    VerticalAlignment="Center">
-
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-
-                    <!-- Fila 1: Icono y Texto Principal -->
-                    <StackPanel Orientation="Horizontal" 
-                                HorizontalAlignment="Center" 
-                                Margin="0,0,0,12">
-
-                        <!-- Icono -->
-                        <icons:MaterialIcon x:Name="ProgressIcon" 
-                                            Kind="Sync" 
-                                            Foreground="{StaticResource AccentBrush}" 
-                                            Width="24" 
-                                            Height="24" 
-                                            RenderTransformOrigin="0.5,0.5"
-                                            VerticalAlignment="Center"
-                                            Margin="0,0,10,0">
-                            <icons:MaterialIcon.RenderTransform>
-                                <RotateTransform/>
-                            </icons:MaterialIcon.RenderTransform>
-                        </icons:MaterialIcon>
-
-                        <!-- Texto principal -->
-                        <TextBlock Text="Processing files..." 
-                                   Foreground="{StaticResource TextPrimary}" 
-                                   FontSize="16" 
-                                   FontWeight="Medium"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-
-                    <!-- Fila 2: Texto Secundario -->
-                    <TextBlock Text="Please wait while the comparison is being prepared" 
-                               Foreground="{StaticResource TextMuted}" 
-                               FontSize="12" 
-                               TextAlignment="Center"/>
-                </StackPanel>
-            </Border>
-        </Grid>
+        
     </Grid>
 </Window>
