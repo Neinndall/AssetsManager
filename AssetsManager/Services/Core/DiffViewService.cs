@@ -31,8 +31,8 @@ namespace AssetsManager.Services.Core
         private readonly LogService _logService;
         private readonly ContentFormatterService _contentFormatterService;
 
-        private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".tga", ".jpg", ".jpeg", ".bmp", ".gif", ".ico", ".webp", ".tex" };
-        private static readonly string[] SupportedTextExtensions = { ".bin", ".css", ".json", ".js", ".txt", ".xml", ".yaml", ".html", ".ini", ".log", ".stringtable" };
+        private static readonly string[] SupportedImageExtensions = { ".png", ".dds", ".jpg", ".jpeg", ".tex" };
+        private static readonly string[] SupportedTextExtensions = { ".bin", ".css", ".json", ".js", ".txt", ".xml", ".ini", ".log", ".stringtable" };
 
         public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, ContentFormatterService contentFormatterService)
         {

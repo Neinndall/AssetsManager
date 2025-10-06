@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Wad;
 using AssetsManager.Views.Models;
@@ -104,8 +105,17 @@ namespace AssetsManager.Services.Comparator
 
         private (string DataType, object OldData, object NewData) PrepareDataFromBytes(byte[] oldData, byte[] newData, string extension)
         {
-            var dataType = extension.TrimStart('.');
-            return (dataType, oldData, newData);
+            var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tex", ".dds" };
+
+            if (imageExtensions.Contains(extension))
+            {
+                return ("image", oldData, newData);
+            }
+            else
+            {
+                var dataType = extension.TrimStart('.');
+                return (dataType, oldData, newData);
+            }
         }
     }
 }
