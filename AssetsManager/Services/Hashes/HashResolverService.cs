@@ -89,11 +89,21 @@ namespace AssetsManager.Services.Hashes
             });
         }
 
+        /// <summary>
+        /// Resolves a 64-bit game or LCU path hash into a readable file path.
+        /// </summary>
+        /// <param name="pathHash">The 64-bit hash to resolve.</param>
+        /// <returns>The resolved path or the hash as a 16-character hex string if not found.</returns>
         public string ResolveHash(ulong pathHash)
         {
             return _hashToPathMap.TryGetValue(pathHash, out var path) ? path : pathHash.ToString("x16");
         }
 
+        /// <summary>
+        /// Resolves a 32-bit BIN hash (entry, field, type, etc.) into its readable name.
+        /// </summary>
+        /// <param name="hash">The 32-bit hash to resolve.</param>
+        /// <returns>The resolved name or the hash as an 8-character hex string if not found.</returns>
         public string ResolveBinHashGeneral(uint hash)
         {
             if (_binEntriesMap.TryGetValue(hash, out var path)) return path;
@@ -101,6 +111,18 @@ namespace AssetsManager.Services.Hashes
             if (_binTypesMap.TryGetValue(hash, out path)) return path;
             if (_binHashesMap.TryGetValue(hash, out path)) return path;
             return hash.ToString("x8");
+        }
+
+        /// <summary>
+        /// Resolves a 64-bit RST text hash into its readable string.
+        /// </summary>
+        /// <param name="rstHash">The 64-bit hash to resolve.</param>
+        /// <returns>The resolved string or the hash as a 16-character hex string if not found.</returns>
+        public string ResolveRstHash(ulong rstHash)
+        {
+            if (_rstXxh3HashesMap.TryGetValue(rstHash, out var path)) return path;
+            if (_rstXxh64HashesMap.TryGetValue(rstHash, out path)) return path;
+            return rstHash.ToString("x16");
         }
 
         public async Task LoadRstHashesAsync()

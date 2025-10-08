@@ -1,7 +1,7 @@
-using DiffPlex.DiffBuilder.Model;
-using Newtonsoft.Json;
 using System;
+using Newtonsoft.Json;
 using System.Collections.Generic;
+using DiffPlex.DiffBuilder.Model;
 using System.IO;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
