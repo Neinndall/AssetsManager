@@ -41,12 +41,12 @@ namespace AssetsManager.Services.Explorer
 
             foreach (var wadGroup in diffsByWad)
             {
-                var wadNode = new FileSystemNodeModel(wadGroup.Key, true, wadGroup.Key, wadGroup.Key);
+                var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
 
                 var newFiles = wadGroup.Where(d => d.Type == ChunkDiffType.New).ToList();
                 if (newFiles.Any())
                 {
-                    var newFilesNode = new FileSystemNodeModel("[+] New", true, "New", wadGroup.Key) { Status = DiffStatus.New };
+                    var newFilesNode = new FileSystemNodeModel($"[+] New ({newFiles.Count})", true, "New", wadGroup.Key) { Status = DiffStatus.New };
                     foreach (var file in newFiles)
                     {
                         string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");
@@ -60,7 +60,7 @@ namespace AssetsManager.Services.Explorer
                 var modifiedFiles = wadGroup.Where(d => d.Type == ChunkDiffType.Modified).ToList();
                 if (modifiedFiles.Any())
                 {
-                    var modifiedFilesNode = new FileSystemNodeModel("[~] Modified", true, "Modified", wadGroup.Key) { Status = DiffStatus.Modified };
+                    var modifiedFilesNode = new FileSystemNodeModel($"[~] Modified ({modifiedFiles.Count})", true, "Modified", wadGroup.Key) { Status = DiffStatus.Modified };
                     foreach (var file in modifiedFiles)
                     {
                         string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");
@@ -74,7 +74,7 @@ namespace AssetsManager.Services.Explorer
                 var renamedFiles = wadGroup.Where(d => d.Type == ChunkDiffType.Renamed).ToList();
                 if (renamedFiles.Any())
                 {
-                    var renamedFilesNode = new FileSystemNodeModel("[>] Renamed", true, "Renamed", wadGroup.Key) { Status = DiffStatus.Renamed };
+                    var renamedFilesNode = new FileSystemNodeModel($"[>] Renamed ({renamedFiles.Count})", true, "Renamed", wadGroup.Key) { Status = DiffStatus.Renamed };
                     foreach (var file in renamedFiles)
                     {
                         string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");
@@ -89,7 +89,7 @@ namespace AssetsManager.Services.Explorer
                 var deletedFiles = wadGroup.Where(d => d.Type == ChunkDiffType.Removed).ToList();
                 if (deletedFiles.Any())
                 {
-                    var deletedFilesNode = new FileSystemNodeModel("[-] Deleted", true, "Deleted", wadGroup.Key) { Status = DiffStatus.Deleted };
+                    var deletedFilesNode = new FileSystemNodeModel($"[-] Deleted ({deletedFiles.Count})", true, "Deleted", wadGroup.Key) { Status = DiffStatus.Deleted };
                     foreach (var file in deletedFiles)
                     {
                         string chunkPath = Path.Combine(backupRoot, "wad_chunks", "old", $"{file.OldPathHash:X16}.chunk");
