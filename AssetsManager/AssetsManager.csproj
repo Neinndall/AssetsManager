@@ -3,16 +3,12 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
     <ApplicationIcon>Resources\Img\logo.ico</ApplicationIcon>
-    <Version>2.4.1.0</Version>
-    <AssemblyVersion>2.4.1.0</AssemblyVersion>
-    <FileVersion>2.4.1.0</FileVersion>
+    <Version>2.4.1.1</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PlatformTarget>x64</PlatformTarget>
-    <LangVersion>latest</LangVersion>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
   <PropertyGroup>
-    <AssemblyTitle>AssetsManager</AssemblyTitle>
     <Product>AssetsManager</Product>
     <Company>Neinndall</Company>
   </PropertyGroup>
@@ -49,7 +45,7 @@
 
   <ItemGroup>
     <Resource Include="Resources\**\*.dds" />
-    <Resource Include="Resources\img\logo.ico" />
+    <Resource Include="Resources\Img\logo.ico" />
   </ItemGroup>
 
   <Target Name="MoveWebView2Loader" AfterTargets="Build;Publish">

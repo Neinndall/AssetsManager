@@ -1,4 +1,3 @@
-// AssetsManager/Info/ApplicationInfos.cs
 using System;
 using System.Reflection;
 

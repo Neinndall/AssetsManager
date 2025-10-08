@@ -72,7 +72,7 @@ namespace AssetsManager.Views
             ProgressUIManager progressUIManager,
             DiffViewService diffViewService,
             MonitorService monitorService,
-            VersionService versionService, // Add this
+            VersionService versionService,
             WadExtractionService wadExtractionService)
         {
             InitializeComponent();
