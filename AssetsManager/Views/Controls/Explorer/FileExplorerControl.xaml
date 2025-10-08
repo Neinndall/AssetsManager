@@ -80,7 +80,6 @@
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Status}" Value="Deleted">
                                                 <Setter Property="Foreground" Value="#F44336"/>
-                                                <Setter Property="TextDecorations" Value="Strikethrough"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Status}" Value="Renamed">
                                                 <Setter Property="Foreground" Value="#FF9800"/>
