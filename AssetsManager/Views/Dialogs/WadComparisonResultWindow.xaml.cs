@@ -16,6 +16,7 @@ using System.Windows.Input;
 using AssetsManager.Views.Helpers;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Explorer;
@@ -273,13 +274,13 @@ namespace AssetsManager.Views.Dialogs
             }
             else
             {
-                var dialog = new Microsoft.WindowsAPICodePack.Dialogs.CommonOpenFileDialog
+                var dialog = new CommonOpenFileDialog
                 {
                     IsFolderPicker = true,
                     Title = "Select Destination Folder for Extraction"
                 };
 
-                if (dialog.ShowDialog() == Microsoft.WindowsAPICodePack.Dialogs.CommonFileDialogResult.Ok)
+                if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     rootDestinationPath = dialog.FileName;
                 }
