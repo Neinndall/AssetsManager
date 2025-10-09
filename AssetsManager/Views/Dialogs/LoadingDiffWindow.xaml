@@ -12,6 +12,6 @@
         Background="Transparent"
         WindowStartupLocation="CenterScreen">
     <Grid>
-        <controls:LoadingDiffControl/>
+        <controls:LoadingDiffControl x:Name="LoadingControl"/>
     </Grid>
 </Window>
