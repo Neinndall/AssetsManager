@@ -65,10 +65,9 @@ namespace AssetsManager.Services.Core
                 var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
                 var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
 
-                loadingWindow.Close();
-
                 if (oldText == newText)
                 {
+                    loadingWindow.Close();
                     _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
                     return;
                 }
@@ -76,6 +75,8 @@ namespace AssetsManager.Services.Core
                 var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath);
+                
+                loadingWindow.Close();
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)
@@ -127,10 +128,9 @@ namespace AssetsManager.Services.Core
                 var (dataType, oldData, newData) = await _wadDifferenceService.PrepareFileDifferenceDataAsync(oldFilePath, newFilePath);
                 var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
 
-                loadingWindow.Close();
-
                 if (oldText == newText)
                 {
+                    loadingWindow.Close();
                     _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
                     return;
                 }
@@ -138,6 +138,8 @@ namespace AssetsManager.Services.Core
                 var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath));
+
+                loadingWindow.Close();
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)

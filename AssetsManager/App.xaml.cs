@@ -143,6 +143,8 @@ namespace AssetsManager
                 return;
             }
 
+            // Set the AUMID for the application to ensure that notifications are correctly associated with the app.
+            // This is called as early as possible to handle any UI elements or notifications that might appear during startup.
             SingleInstance.SetCurrentProcessExplicitAppUserModelID(SingleInstance.AUMID);
 
             base.OnStartup(e);

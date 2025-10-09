@@ -182,7 +182,7 @@ namespace AssetsManager.Views
                 _notifyIcon.Visible = true;
                 new ToastContentBuilder()
                     .AddText("AssetsManager")
-                    .AddText("ℹ️ The application has been minimized to the system tray.")
+                    .AddText("ℹ️ The application has been minimized to the tray.")
                     .Show();
             }
         }
