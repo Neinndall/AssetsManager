@@ -52,7 +52,7 @@ namespace AssetsManager.Views.Converters
 
         private static MaterialIconKind GetNodeIcon(FileSystemNodeModel node)
         {
-            if (node.Status != DiffStatus.Unchanged && node.Type == NodeType.VirtualDirectory)
+            if (node.Status != DiffStatus.Unchanged && node.Type == NodeType.VirtualDirectory && node.FullPath == node.Status.ToString())
             {
                 return GetDiffStatusIcon(node.Status);
             }
@@ -69,7 +69,7 @@ namespace AssetsManager.Views.Converters
                 case NodeType.WadFile:
                     return MaterialIconKind.PackageVariant;
                 default:
-                    return node.Status != DiffStatus.Unchanged ? GetDiffStatusIcon(node.Status) : GetIcon(node.Extension, node.FullPath);
+                    return GetIcon(node.Extension, node.FullPath);
             }
         }
 
