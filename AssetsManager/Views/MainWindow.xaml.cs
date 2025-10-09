@@ -195,7 +195,7 @@ namespace AssetsManager.Views
             }
             
             // Use the compat manager for robust notification support in WPF
-            if (_appSettings.MinimizeToTrayOnClose && Visibility != Visibility.Visible)
+            if (Visibility != Visibility.Visible)
             {
                 new ToastContentBuilder()
                     .AddText("AssetsManager")
