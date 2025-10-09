@@ -143,6 +143,8 @@ namespace AssetsManager
                 return;
             }
 
+            SingleInstance.SetCurrentProcessExplicitAppUserModelID(SingleInstance.AUMID);
+
             base.OnStartup(e);
 
             var logService = ServiceProvider.GetRequiredService<LogService>();

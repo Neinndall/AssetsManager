@@ -10,6 +10,7 @@ namespace AssetsManager.Utils
     public static class SingleInstance
     {
         private static Mutex _mutex;
+        public const string AUMID = "AssetsManager";
         public static readonly uint WM_SHOW_APP = RegisterWindowMessage("AssetsManager_ShowApp");
 
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
@@ -17,6 +18,9 @@ namespace AssetsManager.Utils
 
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("shell32.dll", SetLastError = true)]
+        public static extern void SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
         private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
 

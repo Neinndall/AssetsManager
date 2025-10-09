@@ -19,7 +19,7 @@ using AssetsManager.Views.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;
-using CommunityToolkit.WinUI.Notifications;
+using Microsoft.Toolkit.Uwp.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 using Windows.Data.Xml.Dom;
 using Windows.UI.Notifications;
@@ -174,6 +174,38 @@ namespace AssetsManager.Views
             System.Windows.Application.Current.Shutdown();
         }
 
+        private void MainWindow_StateChanged(object sender, EventArgs e)
+        {
+            if (WindowState == WindowState.Minimized && _appSettings.MinimizeToTrayOnClose)
+            {
+                Hide();
+                _notifyIcon.Visible = true;
+                new ToastContentBuilder()
+                    .AddText("AssetsManager")
+                    .AddText("ℹ️ The application has been minimized to the system tray.")
+                    .Show();
+            }
+        }
+
+        private void OnUpdatesFound(string message, string latestVersion)
+        {
+            if (!string.IsNullOrEmpty(latestVersion))
+            {
+                _latestAppVersionAvailable = latestVersion;
+            }
+            
+            // Use the compat manager for robust notification support in WPF
+            if (_appSettings.MinimizeToTrayOnClose && Visibility != Visibility.Visible)
+            {
+                new ToastContentBuilder()
+                    .AddText("AssetsManager")
+                    .AddText(message)
+                    .Show();
+            }
+
+            ShowNotification(true, message);
+        }
+        
         private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
         {
             Dispatcher.Invoke(() =>
@@ -199,25 +231,6 @@ namespace AssetsManager.Views
                     resultWindow.Show();
                 }
             });
-        }
-
-        private void OnUpdatesFound(string message, string latestVersion)
-        {
-            if (!string.IsNullOrEmpty(latestVersion))
-            {
-                _latestAppVersionAvailable = latestVersion;
-            }
-            
-            // Use the compat manager for robust notification support in WPF
-            if (Visibility != Visibility.Visible)
-            {
-                ToastNotificationManagerCompat.CreateToastNotifier().Show(new ToastNotification(new ToastContentBuilder()
-                    .AddText("AssetsManager")
-                    .AddText(message)
-                    .GetToastContent().GetXml()));
-            }
-
-            ShowNotification(true, message);
         }
 
         private bool IsAnySettingActive()
@@ -325,16 +338,6 @@ namespace AssetsManager.Views
             }
             _updateCheckService.Stop();
             _updateCheckService.Start();
-        }
-
-        private void MainWindow_StateChanged(object sender, EventArgs e)
-        {
-            if (WindowState == WindowState.Minimized && _appSettings.MinimizeToTrayOnClose)
-            {
-                Hide();
-                _notifyIcon.Visible = true;
-                _notifyIcon.ShowBalloonTip(1000, "AssetsManager", "The application has been minimized to the system tray.", ToolTipIcon.Info);
-            }
         }
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
