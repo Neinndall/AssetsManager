@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System;
 using System.Linq;
-using AssetsManager.Services.Parsers.Wwise;
+using AssetsManager.Services.Parsers;
 using AssetsManager.Views.Models;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -23,8 +23,7 @@ namespace AssetsManager.Services.Audio
         public List<AudioEventNode> ParseAudioBank(byte[] audioData, byte[] eventsData, byte[] binData)
         {
             var eventNameMap = GetEventsFromBin(binData);
-            var availableWems = ParseAudioBankForWemIds(audioData);
-            var audioTree = ParseEventsBank(eventsData, eventNameMap, availableWems);
+            var audioTree = ParseEventsBank(eventsData, eventNameMap, null);
             return audioTree;
         }
 
@@ -102,7 +101,7 @@ namespace AssetsManager.Services.Audio
             if (eventsData == null) return eventNodes;
 
             using var stream = new MemoryStream(eventsData);
-            var bnkFile = BnkFile.Parse(stream, _logService);
+            var bnkFile = BnkParser.Parse(stream, _logService);
 
             if (bnkFile?.Hirc?.Objects == null) 
             {
@@ -176,13 +175,5 @@ namespace AssetsManager.Services.Audio
 
             return eventNodes;
         }
-
-        private List<uint> ParseAudioBankForWemIds(byte[] audioData)
-        {
-            var wemIds = new List<uint>();
-            if (audioData == null) return wemIds;
-            // TODO: Implement WPK/BNK parsing to extract all WEM IDs.
-            return wemIds;
-        }
-    }
-}
+    }      
+}          

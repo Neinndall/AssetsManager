@@ -1,23 +1,14 @@
 using AssetsManager.Services.Core;
+using AssetsManager.Views.Models;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace AssetsManager.Services.Parsers.Wwise
+namespace AssetsManager.Services.Parsers
 {
-    public class WpkWem
+    public static class WpkParser
     {
-        public uint Id { get; set; }
-        public uint Offset { get; set; }
-        public uint Size { get; set; }
-    }
-
-    public class WpkFile
-    {
-        public uint Version { get; set; }
-        public List<WpkWem> Wems { get; } = new List<WpkWem>();
-
         public static WpkFile Parse(Stream stream, LogService logService)
         {
             var wpk = new WpkFile();
@@ -31,7 +22,7 @@ namespace AssetsManager.Services.Parsers.Wwise
 
             wpk.Version = reader.ReadUInt32();
             uint wemCount = reader.ReadUInt32();
-            logService?.Log($"[WPK DEBUG] WPK Version: {wpk.Version}, Found {wemCount} WEM entries.");
+            logService.LogDebug($"[WPK DEBUG] WPK Version: {wpk.Version}, Found {wemCount} WEM entries.");
 
             var wemInfoOffsets = new List<uint>();
             for (int i = 0; i < wemCount; i++)
@@ -53,17 +44,17 @@ namespace AssetsManager.Services.Parsers.Wwise
                 int bytesToRead = (int)nameLengthInChars * 2; // UTF-16 uses 2 bytes per character
                 byte[] nameBytes = reader.ReadBytes(bytesToRead);
                 string wemName = Encoding.Unicode.GetString(nameBytes).TrimEnd('\0');
-                logService?.Log($"[WPK DEBUG] Read entry: NameLength={nameLengthInChars} chars ({bytesToRead} bytes), Decoded Name='{wemName}'");
+                logService.LogDebug($"[WPK DEBUG] Read entry: NameLength={nameLengthInChars} chars ({bytesToRead} bytes), Decoded Name='{wemName}'");
 
                 if (uint.TryParse(wemName.Replace(".wem", ""), out uint wemId))
                 {
                     wem.Id = wemId;
                     wpk.Wems.Add(wem);
-                    logService?.Log($"[WPK DEBUG] Success. Parsed ID: {wemId}");
+                    logService.LogDebug($"[WPK DEBUG] Success. Parsed ID: {wemId}");
                 }
                 else
                 {
-                    logService?.Log($"[WPK DEBUG] Failure. Could not parse ID from name: '{wemName}'");
+                    logService.LogDebug($"[WPK DEBUG] Failure. Could not parse ID from name: '{wemName}'");
                 }
             }
 

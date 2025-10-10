@@ -381,13 +381,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task HandleAudioBankSelection(FileSystemNodeModel wpkNode)
         {
-            LogService?.Log($"Audio bank file selected: {wpkNode.Name}. Finding associated files...");
-
             // 1. Find sibling .bnk file
             var parentPath = TreeUIManager.FindNodePath(RootNodes, wpkNode);
             if (parentPath == null || parentPath.Count < 2)
             {
-                LogService?.LogError(null, $"Could not find parent for node {wpkNode.Name}");
+                LogService.LogError(null, $"Could not find parent for node {wpkNode.Name}");
                 return;
             }
             var parentNode = parentPath[parentPath.Count - 2];
@@ -395,7 +393,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (eventsNode == null)
             {
-                LogService?.LogError(null, $"Could not find sibling _vo_events.bnk for {wpkNode.Name}");
+                LogService.LogError(null, $"Could not find sibling _vo_events.bnk for {wpkNode.Name}");
                 return;
             }
 
@@ -430,7 +428,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (binNode == null)
             {
-                LogService?.LogError(null, $"Could not find associated .bin file at {binPath}");
+                LogService.LogError(null, $"Could not find associated .bin file at {binPath}");
                 await Application.Current.Dispatcher.InvokeAsync(() => { wpkNode.Children.Clear(); wpkNode.IsExpanded = false; });
                 return;
             }
@@ -442,13 +440,12 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (binData == null || wpkData == null || eventsData == null)
             {
-                LogService?.LogError(null, "Failed to read data for one or more audio bank files.");
+                LogService.LogError(null, "Failed to read data for one or more audio bank files.");
                 return;
             }
 
             var audioTree = AudioBankService.ParseAudioBank(wpkData, eventsData, binData);
-            LogService?.Log($"Found {audioTree.Count} audio events in .bin file.");
-
+            
             // 4. Populate tree
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {

@@ -13,7 +13,7 @@ using Microsoft.Web.WebView2.Wpf;
 using LeagueToolkit.Core.Renderer;
 using BCnEncoder.Shared;
 using System.Runtime.InteropServices;
-using AssetsManager.Services.Parsers.Wwise;
+using AssetsManager.Services.Parsers;
 using System.Windows;
 using System.Text.Json;
 using System.Reflection;
@@ -159,7 +159,7 @@ namespace AssetsManager.Services.Explorer
                 await Task.Run(() =>
                 {
                     using var wpkStream = new MemoryStream(wpkData);
-                    var wpk = WpkFile.Parse(wpkStream, _logService);
+                    var wpk = WpkParser.Parse(wpkStream, _logService);
                     var wem = wpk.Wems.FirstOrDefault(w => w.Id == node.WemId);
                     if (wem != null)
                     {

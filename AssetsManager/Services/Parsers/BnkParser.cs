@@ -1,97 +1,14 @@
 using AssetsManager.Services.Core;
-using System.Collections.Generic;
+using AssetsManager.Views.Models;
 using System.IO;
 
-namespace AssetsManager.Services.Parsers.Wwise
+namespace AssetsManager.Services.Parsers
 {
-    public enum BnkObjectType
+    public static class BnkParser
     {
-        Settings = 1,
-        Sound = 2,
-        Action = 3,
-        Event = 4,
-        RandomOrSequenceContainer = 5,
-        SwitchContainer = 6,
-        ActorMixer = 7,
-        AudioBus = 8,
-        BlendContainer = 9,
-        MusicSegment = 10,
-        MusicTrack = 11,
-        MusicSwitchContainer = 12,
-        MusicPlaylistContainer = 13,
-        Attenuation = 14,
-        DialogueEvent = 15,
-        MotionBus = 16,
-        MotionFX = 17,
-        Effect = 18,
-        AuxiliaryBus = 19
-    }
-
-    public class BnkObjectData { }
-
-    public class SoundBnkObjectData : BnkObjectData
-    {
-        public uint WemId { get; set; }
-        public uint SourceId { get; set; }
-        public uint ObjectId { get; set; }
-        public byte StreamType { get; set; }
-    }
-
-    public class EventBnkObjectData : BnkObjectData
-    {
-        public List<uint> ActionIds { get; set; } = new List<uint>();
-    }
-
-    public class ActionBnkObjectData : BnkObjectData
-    {
-        public byte Scope { get; set; }
-        public byte Type { get; set; }
-        public uint ObjectId { get; set; }
-        public uint SwitchGroupId { get; set; }
-        public uint SwitchId { get; set; }
-    }
-
-    public class RandomOrSequenceContainerBnkObjectData : BnkObjectData
-    {
-        public uint ParentId { get; set; }
-        public List<uint> Children { get; set; } = new List<uint>();
-    }
-
-    public class SwitchContainerBnkObjectData : BnkObjectData
-    {
-        public uint ParentId { get; set; }
-        public List<uint> Children { get; set; } = new List<uint>();
-    }
-
-    public class BnkObject
-    {
-        public BnkObjectType Type { get; set; }
-        public uint Size { get; set; }
-        public uint Id { get; set; }
-        public BnkObjectData Data { get; set; }
-    }
-
-    public class BnkSectionData { }
-
-    public class BkhdSectionData : BnkSectionData
-    {
-        public uint Version { get; set; }
-        public uint Id { get; set; }
-    }
-
-    public class HircSectionData : BnkSectionData
-    {
-        public List<BnkObject> Objects { get; set; } = new List<BnkObject>();
-    }
-
-    public class BnkFile
-    {
-        public BkhdSectionData Bkhd { get; set; }
-        public HircSectionData Hirc { get; set; }
-
         public static BnkFile Parse(Stream stream, LogService logService)
         {
-            logService?.Log($"[BNK DIAGNOSTIC] Stream received. Length: {stream.Length} bytes.");
+            logService.LogDebug($"[BNK DIAGNOSTIC] Stream received. Length: {stream.Length} bytes.");
             var bnk = new BnkFile();
             using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, true);
 
@@ -102,11 +19,11 @@ namespace AssetsManager.Services.Parsers.Wwise
                 uint sectionSize = reader.ReadUInt32();
                 long nextSectionStart = reader.BaseStream.Position + sectionSize;
 
-                logService?.Log($"[BNK DEBUG] Found section: {signature}, Size: {sectionSize}, Pos: {sectionStartPos}");
+                logService.LogDebug($"[BNK DEBUG] Found section: {signature}, Size: {sectionSize}, Pos: {sectionStartPos}");
 
                 if (nextSectionStart > reader.BaseStream.Length)
                 {
-                    logService?.Log($"[BNK ERROR] Invalid section size for {signature}. Aborting.");
+                    logService.LogDebug($"[BNK ERROR] Invalid section size for {signature}. Aborting.");
                     break;
                 }
 
@@ -124,7 +41,7 @@ namespace AssetsManager.Services.Parsers.Wwise
                     case "HIRC":
                         bnk.Hirc = new HircSectionData();
                         uint objectCount = reader.ReadUInt32();
-                        logService?.Log($"[BNK DEBUG] HIRC section has {objectCount} objects.");
+                        logService.LogDebug($"[BNK DEBUG] HIRC section has {objectCount} objects.");
 
                         for (int i = 0; i < objectCount; i++)
                         {
@@ -201,12 +118,12 @@ namespace AssetsManager.Services.Parsers.Wwise
                         break;
 
                     default:
-                        logService?.Log($"[BNK DEBUG] Skipping section: {signature}");
+                        logService.LogDebug($"[BNK DEBUG] Skipping section: {signature}");
                         reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
                         break;
                 }
             }
-            logService?.Log($"[BNK DIAGNOSTIC] Finished parsing. Final stream position: {reader.BaseStream.Position}");
+            logService.LogDebug($"[BNK DIAGNOSTIC] Finished parsing. Final stream position: {reader.BaseStream.Position}");
             return bnk;
         }
     }
