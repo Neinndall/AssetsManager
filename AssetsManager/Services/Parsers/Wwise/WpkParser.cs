@@ -1,3 +1,4 @@
+using AssetsManager.Services.Core;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -17,7 +18,7 @@ namespace AssetsManager.Services.Parsers.Wwise
         public uint Version { get; set; }
         public List<WpkWem> Wems { get; } = new List<WpkWem>();
 
-        public static WpkFile Parse(Stream stream)
+        public static WpkFile Parse(Stream stream, LogService logService)
         {
             var wpk = new WpkFile();
             using var reader = new BinaryReader(stream, Encoding.ASCII, true);
@@ -30,6 +31,7 @@ namespace AssetsManager.Services.Parsers.Wwise
 
             wpk.Version = reader.ReadUInt32();
             uint wemCount = reader.ReadUInt32();
+            logService?.Log($"[WPK DEBUG] WPK Version: {wpk.Version}, Found {wemCount} WEM entries.");
 
             var wemInfoOffsets = new List<uint>();
             for (int i = 0; i < wemCount; i++)
@@ -43,16 +45,29 @@ namespace AssetsManager.Services.Parsers.Wwise
 
                 var wem = new WpkWem
                 {
-                    Id = reader.ReadUInt32(),
                     Offset = reader.ReadUInt32(),
                     Size = reader.ReadUInt32()
                 };
 
-                wpk.Wems.Add(wem);
+                uint nameLengthInChars = reader.ReadUInt32();
+                int bytesToRead = (int)nameLengthInChars * 2; // UTF-16 uses 2 bytes per character
+                byte[] nameBytes = reader.ReadBytes(bytesToRead);
+                string wemName = Encoding.Unicode.GetString(nameBytes).TrimEnd('\0');
+                logService?.Log($"[WPK DEBUG] Read entry: NameLength={nameLengthInChars} chars ({bytesToRead} bytes), Decoded Name='{wemName}'");
+
+                if (uint.TryParse(wemName.Replace(".wem", ""), out uint wemId))
+                {
+                    wem.Id = wemId;
+                    wpk.Wems.Add(wem);
+                    logService?.Log($"[WPK DEBUG] Success. Parsed ID: {wemId}");
+                }
+                else
+                {
+                    logService?.Log($"[WPK DEBUG] Failure. Could not parse ID from name: '{wemName}'");
+                }
             }
 
             return wpk;
         }
-
     }
 }

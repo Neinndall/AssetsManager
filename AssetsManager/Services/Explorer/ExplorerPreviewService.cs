@@ -154,7 +154,7 @@ namespace AssetsManager.Services.Explorer
                 await Task.Run(() =>
                 {
                     using var wpkStream = new MemoryStream(wpkData);
-                    var wpk = WpkFile.Parse(wpkStream);
+                    var wpk = WpkFile.Parse(wpkStream, _logService);
                     var wem = wpk.Wems.FirstOrDefault(w => w.Id == node.WemId);
                     if (wem != null)
                     {
