@@ -49,13 +49,15 @@ namespace AssetsManager.Services.Explorer
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly WadDifferenceService _wadDifferenceService;
         private readonly ContentFormatterService _contentFormatterService;
+        private readonly WemConversionService _wemConversionService;
 
-        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDifferenceService wadDifferenceService, ContentFormatterService contentFormatterService)
+        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDifferenceService wadDifferenceService, ContentFormatterService contentFormatterService, WemConversionService wemConversionService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _wadDifferenceService = wadDifferenceService;
             _contentFormatterService = contentFormatterService;
+            _wemConversionService = wemConversionService;
         }
 
         public void Initialize(Image imagePreview, WebView2 webView2Preview, TextEditor textEditor, Panel placeholder, Panel selectFileMessage, Panel unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
@@ -281,9 +283,23 @@ namespace AssetsManager.Services.Explorer
             if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data); }
             else if (SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data); }
             else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data); }
+            else if (extension == ".wem") { await PreviewWemAsync(data); }
             else if (SupportedFileTypes.Media.Contains(extension)) { await ShowAudioVideoPreviewAsync(data, extension); }
             else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
             else { await ShowUnsupportedPreviewAsync(extension); }
+        }
+
+        private async Task PreviewWemAsync(byte[] wemData)
+        {
+            byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData);
+            if (oggData != null)
+            {
+                await ShowAudioVideoPreviewAsync(oggData, ".ogg");
+            }
+            else
+            {
+                await ShowUnsupportedPreviewAsync(".wem");
+            }
         }
 
         private async Task ShowAvalonEditTextPreviewAsync(byte[] data, string extension)
@@ -481,7 +497,6 @@ namespace AssetsManager.Services.Explorer
                 var mimeType = extension switch
                 {
                     ".ogg" => "audio/ogg",
-                    ".wem" => "audio/wem",
                     ".webm" => "video/webm",
                     _ => "application/octet-stream"
                 };

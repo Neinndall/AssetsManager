@@ -85,6 +85,7 @@ namespace AssetsManager
             services.AddTransient<CSSParserService>();
             services.AddSingleton<JsBeautifierService>();
             services.AddSingleton<ContentFormatterService>();
+            services.AddSingleton<WemConversionService>();
             services.AddSingleton<DiffViewService>();
             services.AddSingleton<MonitorService>();
 
