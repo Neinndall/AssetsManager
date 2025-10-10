@@ -36,6 +36,7 @@ namespace AssetsManager.Views.Converters
             { ".bin", MaterialIconKind.FileCodeOutline },
             { ".skl", MaterialIconKind.Person },
             { ".skn", MaterialIconKind.Person },
+            { ".wpk", MaterialIconKind.FolderMusicOutline },
         };
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

@@ -13,6 +13,7 @@ using Microsoft.Web.WebView2.Wpf;
 using LeagueToolkit.Core.Renderer;
 using BCnEncoder.Shared;
 using System.Runtime.InteropServices;
+using AssetsManager.Services.Parsers.Wwise;
 using System.Windows;
 using System.Text.Json;
 using System.Reflection;
@@ -101,7 +102,7 @@ namespace AssetsManager.Services.Explorer
             }
             _currentlyDisplayedNode = node;      
 
-            if (node == null || node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile)
+            if (node == null || node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || SupportedFileTypes.AudioBank.Contains(node.Extension))
             {
                 await ResetPreviewAsync();
                 return;
@@ -117,10 +118,66 @@ namespace AssetsManager.Services.Explorer
                 {
                     await PreviewRealFile(node);
                 }
+                else if (node.Type == NodeType.AudioSound)
+                {
+                    await PreviewWemFromWpkAsync(node);
+                }
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Failed to preview file '{node.FullPath}'.");
+                await ShowUnsupportedPreviewAsync(node.Extension);
+            }
+        }
+
+        private async Task PreviewWemFromWpkAsync(FileSystemNodeModel node)
+        {
+            if (string.IsNullOrEmpty(node.SourceWadPath) || node.SourceChunkPathHash == 0 || node.WemId == 0)
+            {
+                await ShowUnsupportedPreviewAsync(node.Extension);
+                return;
+            }
+
+            try
+            {
+                // Step 1: Get the parent WPK data from the WAD
+                byte[] wpkData;
+                using (var wadFile = new WadFile(node.SourceWadPath))
+                {
+                    var chunk = wadFile.FindChunk(node.SourceChunkPathHash);
+                    using var decompressedOwner = wadFile.LoadChunkDecompressed(chunk);
+                    wpkData = decompressedOwner.Span.ToArray();
+                }
+
+                // Step 2: Parse the WPK and extract the WEM data
+                byte[] wemData = null;
+                await Task.Run(() =>
+                {
+                    using var wpkStream = new MemoryStream(wpkData);
+                    var wpk = WpkFile.Parse(wpkStream);
+                    var wem = wpk.Wems.FirstOrDefault(w => w.Id == node.WemId);
+                    if (wem != null)
+                    {
+                        using var reader = new BinaryReader(wpkStream);
+                        wpkStream.Seek(wem.Offset, SeekOrigin.Begin);
+                        wemData = reader.ReadBytes((int)wem.Size);
+                    }
+                });
+
+                if (wemData != null)
+                {
+                    // Step 3: Dispatch to the media player
+                    await DispatchPreview(wemData, ".wem");
+                }
+                else
+                {
+                    _logService.LogWarning($"WEM file with ID {node.WemId} not found inside its parent WPK.");
+                    await ShowUnsupportedPreviewAsync(node.Extension);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to preview audio sound: {node.Name}");
                 await ShowUnsupportedPreviewAsync(node.Extension);
             }
         }
@@ -424,7 +481,7 @@ namespace AssetsManager.Services.Explorer
                 var mimeType = extension switch
                 {
                     ".ogg" => "audio/ogg",
-                    ".wav" => "audio/wav",
+                    ".wem" => "audio/wem",
                     ".webm" => "video/webm",
                     _ => "application/octet-stream"
                 };

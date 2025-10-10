@@ -403,7 +403,17 @@ namespace AssetsManager.Views.Controls.Explorer
             var pathParts = wpkNode.FullPath.Split('/');
             string championName = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("characters") && pathParts.ToList().IndexOf(p) < pathParts.ToList().IndexOf("skins"));
             string skinFolder = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("skins"));
-            string skinName = skinFolder == "base" ? "skin0" : skinFolder;
+            
+            string skinName;
+            if (skinFolder == "base")
+            {
+                skinName = "skin0";
+            }
+            else
+            {
+                int.TryParse(skinFolder.Replace("skin", ""), out int skinNumber);
+                skinName = $"skin{skinNumber}";
+            }
             string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
 
             string sourceWadName = Path.GetFileName(wpkNode.SourceWadPath);
@@ -425,7 +435,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
-            // 2. Read .bin data and get events
+            // 3. Read file data
             var binData = await WadExtractionService.GetVirtualFileBytesAsync(binNode);
             var wpkData = await WadExtractionService.GetVirtualFileBytesAsync(wpkNode);
             var eventsData = await WadExtractionService.GetVirtualFileBytesAsync(eventsNode);
@@ -439,7 +449,7 @@ namespace AssetsManager.Views.Controls.Explorer
             var audioTree = AudioBankService.ParseAudioBank(wpkData, eventsData, binData);
             LogService?.Log($"Found {audioTree.Count} audio events in .bin file.");
 
-            // 3. Populate tree
+            // 4. Populate tree
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 wpkNode.Children.Clear();
@@ -448,7 +458,11 @@ namespace AssetsManager.Views.Controls.Explorer
                     var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
                     foreach (var soundNode in eventNode.Sounds)
                     {
-                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, NodeType.AudioSound, soundNode.Id);
+                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, NodeType.AudioSound, soundNode.Id)
+                        {
+                            SourceWadPath = wpkNode.SourceWadPath,
+                            SourceChunkPathHash = wpkNode.SourceChunkPathHash
+                        };
                         newEventNode.Children.Add(newSoundNode);
                     }
                     wpkNode.Children.Add(newEventNode);
