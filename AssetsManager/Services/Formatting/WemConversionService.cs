@@ -21,7 +21,7 @@ namespace AssetsManager.Services.Formatting
         {
             _logService = logService;
             string tempBasePath = Path.Combine(Path.GetTempPath(), "AssetsManager");
-            _vgmstreamExePath = Path.Combine(tempBasePath, "vgmstream", "vgmstream-cli.exe");
+            _vgmstreamExePath = Path.Combine(tempBasePath, "Vgmstream", "vgmstream-cli.exe");
             _tempConversionPath = Path.Combine(tempBasePath, "WemPreview");
 
             EnsureVgmstreamIsExtracted();
@@ -55,7 +55,6 @@ namespace AssetsManager.Services.Formatting
 
                 foreach (var resourceName in resourceNames)
                 {
-                    // Resource name is like "AssetsManager.Resources.vgmstream.vgmstream-cli.exe"
                     // We need to get the actual file name
                     var fileName = string.Join(".", resourceName.Split('.').Skip(3));
 

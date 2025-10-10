@@ -112,15 +112,18 @@ namespace AssetsManager.Services.Explorer
 
             try
             {
+                // This is a virtual file inside a WAD archive.
                 if (node.Type == NodeType.VirtualFile)
                 {
                     await PreviewWadFile(node);
                 }
+                // This is a physical file on the disk, used when in Directory Mode.
                 else if (node.Type == NodeType.RealFile)
                 {
                     await PreviewRealFile(node);
                 }
-                else if (node.Type == NodeType.AudioSound)
+                // This is a special node representing a WEM sound from an audio bank.
+                else if (node.Type == NodeType.WemFile)
                 {
                     await PreviewWemFromWpkAsync(node);
                 }
@@ -283,23 +286,27 @@ namespace AssetsManager.Services.Explorer
             if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data); }
             else if (SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data); }
             else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data); }
-            else if (extension == ".wem") { await PreviewWemAsync(data); }
-            else if (SupportedFileTypes.Media.Contains(extension)) { await ShowAudioVideoPreviewAsync(data, extension); }
+            else if (SupportedFileTypes.Media.Contains(extension))
+            {
+                if (extension == ".wem")
+                {
+                    byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(data);
+                    if (oggData != null)
+                    {
+                        await ShowAudioVideoPreviewAsync(oggData, ".ogg");
+                    }
+                    else
+                    {
+                        await ShowUnsupportedPreviewAsync(".wem");
+                    }
+                }
+                else
+                {
+                    await ShowAudioVideoPreviewAsync(data, extension);
+                }
+            }
             else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
             else { await ShowUnsupportedPreviewAsync(extension); }
-        }
-
-        private async Task PreviewWemAsync(byte[] wemData)
-        {
-            byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData);
-            if (oggData != null)
-            {
-                await ShowAudioVideoPreviewAsync(oggData, ".ogg");
-            }
-            else
-            {
-                await ShowUnsupportedPreviewAsync(".wem");
-            }
         }
 
         private async Task ShowAvalonEditTextPreviewAsync(byte[] data, string extension)

@@ -76,7 +76,7 @@ namespace AssetsManager.Views.Converters
                     return MaterialIconKind.PackageVariant;
                 case NodeType.AudioEvent:
                     return MaterialIconKind.PlaylistMusic;
-                case NodeType.AudioSound:
+                case NodeType.WemFile:
                     return MaterialIconKind.MusicNote;
                 default:
                     return GetIcon(node.Extension, node.FullPath);

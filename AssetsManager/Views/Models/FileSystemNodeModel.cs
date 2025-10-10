@@ -4,7 +4,7 @@ using System.IO;
 
 namespace AssetsManager.Views.Models
 {
-    public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, AudioSound }
+    public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, WemFile }
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted }
 
     public class FileSystemNodeModel : INotifyPropertyChanged
@@ -15,7 +15,7 @@ namespace AssetsManager.Views.Models
         public DiffStatus Status { get; set; } = DiffStatus.Unchanged;
         public string OldPath { get; set; }
         public SerializableChunkDiff ChunkDiff { get; set; }
-        public uint WemId { get; set; } // Only for AudioSound
+        public uint WemId { get; set; } // Only for WemFile
 
         public ObservableCollection<FileSystemNodeModel> Children { get; set; }
 

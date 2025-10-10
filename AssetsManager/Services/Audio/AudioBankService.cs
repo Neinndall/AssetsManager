@@ -51,7 +51,7 @@ namespace AssetsManager.Services.Audio
             {
                 using var stream = new MemoryStream(binData);
                 var binTree = new BinTree(stream);
-                _logService.Log($"[AUDIO DEBUG] BinTree parsed. Found {binTree.Objects.Count} objects.");
+                _logService.LogDebug($"[AUDIO DEBUG] BinTree parsed. Found {binTree.Objects.Count} objects.");
 
                 uint skinCharacterDataPropertiesHash = Fnv1a.HashLower("SkinCharacterDataProperties");
                 uint skinAudioPropertiesHash = Fnv1a.HashLower("skinAudioProperties");
@@ -63,18 +63,18 @@ namespace AssetsManager.Services.Audio
                 {
                     if (obj.ClassHash == skinCharacterDataPropertiesHash)
                     {
-                        _logService.Log("[AUDIO DEBUG] Found SkinCharacterDataProperties object.");
+                        _logService.LogDebug("[AUDIO DEBUG] Found SkinCharacterDataProperties object.");
                         if (obj.Properties.TryGetValue(skinAudioPropertiesHash, out var skinAudioProp) && skinAudioProp is BinTreeStruct skinAudioStruct)
                         {
-                            _logService.Log("[AUDIO DEBUG] Found skinAudioProperties struct.");
+                            _logService.LogDebug("[AUDIO DEBUG] Found skinAudioProperties struct.");
                             if (skinAudioStruct.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer bankUnitsContainer)
                             {
-                                _logService.Log($"[AUDIO DEBUG] Found bankUnits container with {bankUnitsContainer.Elements.Count} units.");
+                                _logService.LogDebug($"[AUDIO DEBUG] Found bankUnits container with {bankUnitsContainer.Elements.Count} units.");
                                 foreach (BinTreeStruct bankUnit in bankUnitsContainer.Elements.OfType<BinTreeStruct>())
                                 {
                                     if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString && nameString.Value.Contains("_VO"))
                                     {
-                                        _logService.Log($"[AUDIO DEBUG] Found VO BankUnit: {nameString.Value}");
+                                        _logService.LogDebug($"[AUDIO DEBUG] Found VO BankUnit: {nameString.Value}");
                                         if (bankUnit.Properties.TryGetValue(eventsHash, out var eventsProp) && eventsProp is BinTreeContainer eventsContainer)
                                         {
                                             foreach (BinTreeString eventNameProp in eventsContainer.Elements.OfType<BinTreeString>())
@@ -82,7 +82,7 @@ namespace AssetsManager.Services.Audio
                                                 uint eventHash = Fnv1Hash(eventNameProp.Value);
                                                 mapEventNames[eventHash] = eventNameProp.Value;
                                             }
-                                            _logService.Log($"[AUDIO DEBUG] Extracted {eventsContainer.Elements.Count} events from this unit.");
+                                            _logService.LogDebug($"[AUDIO DEBUG] Extracted {eventsContainer.Elements.Count} events from this unit.");
                                         }
                                     }
                                 }
@@ -92,8 +92,7 @@ namespace AssetsManager.Services.Audio
                 }
             }
             catch (Exception ex) { _logService.LogError(ex, "[AUDIO DEBUG] Crash during BIN parsing."); }
-
-            _logService.Log($"[AUDIO DEBUG] Finished BIN parsing. Found {mapEventNames.Count} total VO events.");
+            _logService.LogDebug($"[AUDIO DEBUG] Finished BIN parsing. Found {mapEventNames.Count} total VO events.");
             return mapEventNames;
         }
 
@@ -107,12 +106,12 @@ namespace AssetsManager.Services.Audio
 
             if (bnkFile?.Hirc?.Objects == null) 
             {
-                _logService.Log("[AUDIO DEBUG] BNK parsing failed or no HIRC objects found.");
+                _logService.LogDebug("[AUDIO DEBUG] BNK parsing failed or no HIRC objects found.");
                 return eventNodes;
             }
 
             var hircObjects = bnkFile.Hirc.Objects.ToDictionary(o => o.Id);
-            _logService.Log($"[AUDIO DEBUG] BNK parsed. Found {hircObjects.Count} HIRC objects.");
+            _logService.LogDebug($"[AUDIO DEBUG] BNK parsed. Found {hircObjects.Count} HIRC objects.");
 
             void Traverse(uint objectId, AudioEventNode audioEventNode)
             {
@@ -123,7 +122,7 @@ namespace AssetsManager.Services.Audio
                     case BnkObjectType.Sound:
                         if (currentObject.Data is SoundBnkObjectData soundData)
                         {
-                            audioEventNode.Sounds.Add(new AudioSoundNode { Id = soundData.WemId, Name = $"{soundData.WemId}.wem" });
+                            audioEventNode.Sounds.Add(new WemFileNode { Id = soundData.WemId, Name = $"{soundData.WemId}.wem" });
                         }
                         break;
                     case BnkObjectType.Action:
@@ -154,7 +153,7 @@ namespace AssetsManager.Services.Audio
             }
 
             var eventObjects = bnkFile.Hirc.Objects.Where(o => o.Type == BnkObjectType.Event);
-            _logService.Log($"[AUDIO DEBUG] Found {eventObjects.Count()} Event objects in BNK.");
+            _logService.LogDebug($"[AUDIO DEBUG] Found {eventObjects.Count()} Event objects in BNK.");
 
             foreach (var eventObj in eventObjects)
             {
@@ -170,7 +169,7 @@ namespace AssetsManager.Services.Audio
 
                 if (audioEventNode.Sounds.Any() || audioEventNode.Containers.Any())
                 {
-                    _logService.Log($"[AUDIO DEBUG] Processed event '{eventName}', found {audioEventNode.Sounds.Count} sounds.");
+                    _logService.LogDebug($"[AUDIO DEBUG] Processed event '{eventName}', found {audioEventNode.Sounds.Count} sounds.");
                     eventNodes.Add(audioEventNode);
                 }
             }

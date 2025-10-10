@@ -10,15 +10,15 @@ namespace AssetsManager.Views.Models
     public class AudioEventNode : AudioBankNode
     {
         public List<AudioContainerNode> Containers { get; set; } = new List<AudioContainerNode>();
-        public List<AudioSoundNode> Sounds { get; set; } = new List<AudioSoundNode>();
+        public List<WemFileNode> Sounds { get; set; } = new List<WemFileNode>();
     }
 
     public class AudioContainerNode : AudioBankNode
     {
-        public List<AudioSoundNode> Sounds { get; set; } = new List<AudioSoundNode>();
+        public List<WemFileNode> Sounds { get; set; } = new List<WemFileNode>();
     }
 
-    public class AudioSoundNode : AudioBankNode
+    public class WemFileNode : AudioBankNode
     {
         public uint Id { get; set; }
     }

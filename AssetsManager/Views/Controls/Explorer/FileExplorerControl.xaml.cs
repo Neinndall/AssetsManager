@@ -458,7 +458,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
                     foreach (var soundNode in eventNode.Sounds)
                     {
-                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, NodeType.AudioSound, soundNode.Id)
+                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, NodeType.WemFile, soundNode.Id)
                         {
                             SourceWadPath = wpkNode.SourceWadPath,
                             SourceChunkPathHash = wpkNode.SourceChunkPathHash
