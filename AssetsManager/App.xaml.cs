@@ -23,6 +23,7 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Versions;
+using AssetsManager.Services.Audio;
 
 namespace AssetsManager
 {
@@ -103,6 +104,9 @@ namespace AssetsManager
 
             // Model Viewer Services
             services.AddSingleton<ModelLoadingService>();
+
+            // Audio Services
+            services.AddSingleton<AudioBankService>();
 
             // Main Application Logic Service
             services.AddTransient<ExtractionService>();

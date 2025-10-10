@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -175,6 +176,13 @@ namespace AssetsManager.Services.Explorer
                 SourceChunkPathHash = chunkHash,
                 Status = status
             };
+
+            // If the node is a voice audio WPK, add a dummy child to make it expandable
+            if (SupportedFileTypes.AudioBank.Contains(fileNode.Extension) && fileNode.Name.Contains("_vo_audio"))
+            {
+                fileNode.Children.Add(new FileSystemNodeModel());
+            }
+
             currentNode.Children.Add(fileNode);
             return fileNode;
         }

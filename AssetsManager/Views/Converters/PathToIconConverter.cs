@@ -52,6 +52,11 @@ namespace AssetsManager.Views.Converters
 
         private static MaterialIconKind GetNodeIcon(FileSystemNodeModel node)
         {
+            if (node == null || string.IsNullOrEmpty(node.FullPath))
+            {
+                return MaterialIconKind.FileQuestionOutline; // Default icon for nodes without a path
+            }
+
             if (node.Status != DiffStatus.Unchanged && node.Type == NodeType.VirtualDirectory && node.FullPath == node.Status.ToString())
             {
                 return GetDiffStatusIcon(node.Status);
@@ -68,6 +73,10 @@ namespace AssetsManager.Views.Converters
                     return MaterialIconKind.FolderOutline;
                 case NodeType.WadFile:
                     return MaterialIconKind.PackageVariant;
+                case NodeType.AudioEvent:
+                    return MaterialIconKind.PlaylistMusic;
+                case NodeType.AudioSound:
+                    return MaterialIconKind.MusicNote;
                 default:
                     return GetIcon(node.Extension, node.FullPath);
             }
@@ -99,6 +108,12 @@ namespace AssetsManager.Views.Converters
 
         private static MaterialIconKind GetIcon(string extension, string fullPath)
         {
+            // 0. Handle null path for dummy nodes
+            if (string.IsNullOrEmpty(fullPath))
+            {
+                return MaterialIconKind.FileQuestionOutline;
+            }
+
             // 1. Check the curated list for a direct match
             if (!string.IsNullOrEmpty(extension) && KnownExtensions.TryGetValue(extension, out var knownIcon))
             {

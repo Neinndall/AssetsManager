@@ -7,6 +7,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models;
+using AssetsManager.Services.Audio;
 
 using AssetsManager.Services.Explorer.Tree;
 
@@ -24,7 +25,8 @@ namespace AssetsManager.Views
             DiffViewService diffViewService,
             AppSettings appSettings,
             TreeBuilderService treeBuilderService,
-            TreeUIManager treeUIManager
+            TreeUIManager treeUIManager,
+            AudioBankService audioBankService
         )
         {
             InitializeComponent();
@@ -38,6 +40,7 @@ namespace AssetsManager.Views
             FileExplorer.AppSettings = appSettings;
             FileExplorer.TreeBuilderService = treeBuilderService;
             FileExplorer.TreeUIManager = treeUIManager;
+            FileExplorer.AudioBankService = audioBankService;
 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;

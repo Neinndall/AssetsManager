@@ -115,6 +115,48 @@ namespace AssetsManager.Services.Explorer
             });
         }
 
+        public Task<byte[]> GetVirtualFileBytesAsync(FileSystemNodeModel fileNode)
+        {
+            return Task.Run(() =>
+            {
+                try
+                {
+                    if (fileNode.Type != NodeType.VirtualFile)
+                    {
+                        _logService.LogWarning($"Attempted to get bytes from a non-virtual file: {fileNode.Name}");
+                        return null;
+                    }
+
+                    byte[] decompressedData;
+
+                    if (fileNode.SourceWadPath.EndsWith(".chunk"))
+                    {
+                        byte[] compressedData = File.ReadAllBytes(fileNode.SourceWadPath);
+                        var compressionType = fileNode.ChunkDiff.Type == ChunkDiffType.Removed ? fileNode.ChunkDiff.OldCompressionType : fileNode.ChunkDiff.NewCompressionType;
+                        decompressedData = WadChunkUtils.DecompressChunk(compressedData, compressionType);
+                    }
+                    else
+                    {
+                        using var wadFile = new WadFile(fileNode.SourceWadPath);
+                        if (!wadFile.Chunks.TryGetValue(fileNode.SourceChunkPathHash, out var chunk))
+                        {
+                            _logService.LogWarning($"Chunk with hash {fileNode.SourceChunkPathHash:x16} not found in {fileNode.SourceWadPath}");
+                            return null;
+                        }
+                        using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
+                        decompressedData = decompressedDataOwner.Span.ToArray();
+                    }
+
+                    return decompressedData;
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.FullPath}");
+                    return null;
+                }
+            });
+        }
+
         private string SanitizeName(string name)
         {
             const int MaxLength = 240; // A bit less than 255 to be safe.

@@ -4,7 +4,7 @@ using System.IO;
 
 namespace AssetsManager.Views.Models
 {
-    public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile }
+    public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, AudioSound }
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted }
 
     public class FileSystemNodeModel : INotifyPropertyChanged
@@ -15,6 +15,8 @@ namespace AssetsManager.Views.Models
         public DiffStatus Status { get; set; } = DiffStatus.Unchanged;
         public string OldPath { get; set; }
         public SerializableChunkDiff ChunkDiff { get; set; }
+        public uint WemId { get; set; } // Only for AudioSound
+
         public ObservableCollection<FileSystemNodeModel> Children { get; set; }
 
         // --- Data for WADs and Chunks ---
@@ -144,10 +146,20 @@ namespace AssetsManager.Views.Models
             Children = new ObservableCollection<FileSystemNodeModel>();
         }
 
-        // Private constructor for the dummy node
-        private FileSystemNodeModel() 
+        // Internal constructor for the dummy node
+        internal FileSystemNodeModel() 
         {
             Name = "Loading...";
+            Children = new ObservableCollection<FileSystemNodeModel>();
+        }
+
+        // Constructor for custom UI nodes like Audio Events/Sounds
+        public FileSystemNodeModel(string name, NodeType type, uint wemId = 0)
+        {
+            Name = name;
+            Type = type;
+            WemId = wemId;
+            FullPath = name; // Path is not relevant for these nodes
             Children = new ObservableCollection<FileSystemNodeModel>();
         }
 

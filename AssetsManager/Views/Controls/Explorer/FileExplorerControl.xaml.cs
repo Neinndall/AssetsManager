@@ -12,6 +12,7 @@ using System.Windows.Threading;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models;
@@ -38,6 +39,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public AppSettings AppSettings { get; set; }
         public TreeBuilderService TreeBuilderService { get; set; }
         public TreeUIManager TreeUIManager { get; set; }
+        public AudioBankService AudioBankService { get; set; }
 
         public ObservableCollection<FileSystemNodeModel> RootNodes { get; set; }
         private readonly DispatcherTimer _searchTimer;
@@ -360,9 +362,94 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private void FileTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        private async void FileTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            FileSelected?.Invoke(this, e);
+            if (e.NewValue is FileSystemNodeModel selectedNode)
+            {
+                bool isAudioWpk = SupportedFileTypes.AudioBank.Contains(selectedNode.Extension) && selectedNode.Name.Contains("_vo_audio");
+                if (isAudioWpk && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
+                {
+                    await HandleAudioBankSelection(selectedNode);
+                }
+                else
+                {
+                    // For any other file, invoke the event to let the previewer handle it.
+                    FileSelected?.Invoke(this, e);
+                }
+            }
+        }
+
+        private async Task HandleAudioBankSelection(FileSystemNodeModel wpkNode)
+        {
+            LogService?.Log($"Audio bank file selected: {wpkNode.Name}. Finding associated files...");
+
+            // 1. Find sibling .bnk file
+            var parentPath = TreeUIManager.FindNodePath(RootNodes, wpkNode);
+            if (parentPath == null || parentPath.Count < 2)
+            {
+                LogService?.LogError(null, $"Could not find parent for node {wpkNode.Name}");
+                return;
+            }
+            var parentNode = parentPath[parentPath.Count - 2];
+            var eventsNode = parentNode.Children.FirstOrDefault(c => c.Name == wpkNode.Name.Replace("_vo_audio.wpk", "_vo_events.bnk"));
+
+            if (eventsNode == null)
+            {
+                LogService?.LogError(null, $"Could not find sibling _vo_events.bnk for {wpkNode.Name}");
+                return;
+            }
+
+            // 2. Find associated .bin file
+            var pathParts = wpkNode.FullPath.Split('/');
+            string championName = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("characters") && pathParts.ToList().IndexOf(p) < pathParts.ToList().IndexOf("skins"));
+            string skinFolder = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("skins"));
+            string skinName = skinFolder == "base" ? "skin0" : skinFolder;
+            string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
+
+            string sourceWadName = Path.GetFileName(wpkNode.SourceWadPath);
+            string[] wadNameParts = sourceWadName.Split('.');
+            string targetWadName = wadNameParts.Length > 3 ? $"{wadNameParts[0]}.{wadNameParts[2]}.{wadNameParts[3]}" : sourceWadName;
+
+            var targetWadNode = FindNodeByName(RootNodes, targetWadName);
+
+            FileSystemNodeModel binNode = null;
+            if (targetWadNode != null)
+            {
+                binNode = await WadSearchBoxService.PerformSearchAsync(binPath, new ObservableCollection<FileSystemNodeModel> { targetWadNode }, LoadAllChildrenForSearch);
+            }
+
+            if (binNode == null)
+            {
+                LogService?.LogError(null, $"Could not find associated .bin file at {binPath}");
+                await Application.Current.Dispatcher.InvokeAsync(() => { wpkNode.Children.Clear(); wpkNode.IsExpanded = false; });
+                return;
+            }
+
+            // 2. Read .bin data and get events
+            var binData = await WadExtractionService.GetVirtualFileBytesAsync(binNode);
+            var wpkData = await WadExtractionService.GetVirtualFileBytesAsync(wpkNode);
+            var eventsData = await WadExtractionService.GetVirtualFileBytesAsync(eventsNode);
+
+            if (binData == null || wpkData == null || eventsData == null)
+            {
+                LogService?.LogError(null, "Failed to read data for one or more audio bank files.");
+                return;
+            }
+
+            var audioTree = AudioBankService.ParseAudioBank(wpkData, eventsData, binData);
+            LogService?.Log($"Found {audioTree.Count} audio events in .bin file.");
+
+            // 3. Populate tree
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                wpkNode.Children.Clear();
+                foreach (var eventNode in audioTree)
+                {
+                    var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
+                    wpkNode.Children.Add(newEventNode);
+                }
+                wpkNode.IsExpanded = true;
+            });
         }
 
         private void Toolbar_SearchTextChanged(object sender, RoutedEventArgs e)
@@ -444,6 +531,27 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
         {
             await TreeBuilderService.LoadAllChildren(node, _currentRootPath);
+        }
+
+        private FileSystemNodeModel FindNodeByName(IEnumerable<FileSystemNodeModel> nodes, string name)
+        {
+            foreach (var node in nodes)
+            {
+                if (node.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return node;
+                }
+
+                if (node.Children != null && node.Children.Any())
+                {
+                    var found = FindNodeByName(node.Children, name);
+                    if (found != null)
+                    {
+                        return found;
+                    }
+                }
+            }
+            return null;
         }
     }
 }
