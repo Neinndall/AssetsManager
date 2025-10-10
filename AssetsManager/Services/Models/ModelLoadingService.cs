@@ -76,6 +76,8 @@ namespace AssetsManager.Services.Models
                 .OrderBy(k => k.Length)
                 .FirstOrDefault();
 
+            string skinName = modelName.Split('.')[0];
+
             foreach (var rangeObj in skinnedMesh.Ranges)
             {
                 string materialName = rangeObj.Material.TrimEnd('\0');
@@ -107,7 +109,7 @@ namespace AssetsManager.Services.Models
                 }
                 meshGeometry.TextureCoordinates = new PointCollection(subTexCoords);
 
-                string initialMatchingKey = FindBestTextureMatch(materialName, loadedTextures.Keys, defaultTextureKey);
+                string initialMatchingKey = FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey);
 
                 var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Magenta)));
 
@@ -189,23 +191,11 @@ namespace AssetsManager.Services.Models
             }
         }
 
-        private string FindBestTextureMatch(string materialName, IEnumerable<string> availableTextureKeys, string defaultTextureKey)
+        private string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey)
         {
             _logService.LogDebug($"Finding texture for material: '{materialName}'");
 
-            // 1. FNV1a hash match (MindCorpViewer's method)
-            uint materialHash = Fnv1aHasher.Hash(materialName);
-            string hashedKey = materialHash.ToString();
-            _logService.LogDebug($"Calculated FNV1a hash: '{hashedKey}' for material '{materialName}'");
-
-            string hashMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(hashedKey, StringComparison.OrdinalIgnoreCase));
-            if (hashMatch != null)
-            {
-                _logService.LogDebug($"Found texture '{hashMatch}' via FNV1a hash.");
-                return hashMatch;
-            }
-
-            // 2. Exact match
+            // 1. Exact match
             string exactMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
             if (exactMatch != null)
             {
@@ -213,8 +203,21 @@ namespace AssetsManager.Services.Models
                 return exactMatch;
             }
 
+            // 2. Generic material override
+            var genericMaterialNames = new List<string> { "body", "face", "head", "eyes" };
+            if (genericMaterialNames.Contains(materialName.ToLower()))
+            {
+                string mainTextureCandidate = $"{skinName}_tx_cm";
+                string genericMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(mainTextureCandidate, StringComparison.OrdinalIgnoreCase));
+                if (genericMatch != null)
+                {
+                    _logService.LogDebug($"Found main texture '{genericMatch}' for generic material '{materialName}'.");
+                    return genericMatch;
+                }
+            }
+
             // 3. Keyword-based scoring match
-            _logService.LogDebug("No hash or exact match found. Trying keyword-based scoring...");
+            _logService.LogDebug("No exact or generic match found. Trying keyword-based scoring...");
             var materialKeywords = materialName.ToLower().Split('_', '-', ' ').Where(k => k != "mat").ToList();
 
             string bestScoringMatch = null;
