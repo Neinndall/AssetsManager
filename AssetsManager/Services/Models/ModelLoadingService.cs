@@ -14,6 +14,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Windows;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Models
 {
@@ -46,9 +47,10 @@ namespace AssetsManager.Services.Models
                 foreach (string texPath in textureFiles)
                 {
                     BitmapSource loadedTex = LoadTexture(texPath);
-                    if (loadedTex != null) 
-                    {                      
-                        loadedTextures[Path.GetFileNameWithoutExtension(texPath)] = loadedTex;
+                    if (loadedTex != null)
+                    {
+                        string textureKey = Path.GetFileName(texPath).Split('.')[0];
+                        loadedTextures[textureKey] = loadedTex;
                     }
                 }
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
@@ -81,7 +83,7 @@ namespace AssetsManager.Services.Models
 
                 var positions = skinnedMesh.VerticesView.GetAccessor(LeagueToolkit.Core.Memory.VertexElement.POSITION.Name).AsVector3Array();
                 var subPositions = new Point3D[rangeObj.VertexCount];
-                for(int i = 0; i < rangeObj.VertexCount; i++)
+                for (int i = 0; i < rangeObj.VertexCount; i++)
                 {
                     var p = positions[rangeObj.StartVertex + i];
                     subPositions[i] = new Point3D(p.X, p.Y, p.Z);
@@ -146,18 +148,25 @@ namespace AssetsManager.Services.Models
                         if (tex.Mips.Length > 0)
                         {
                             Image<Rgba32> imageSharp = tex.Mips[0].ToImage();
-                            using (MemoryStream ms = new MemoryStream())
+
+                            // Efficiently create BitmapSource from raw pixel data, avoiding slow PNG encoding
+                            var pixelBuffer = new byte[imageSharp.Width * imageSharp.Height * 4];
+                            imageSharp.CopyPixelDataTo(pixelBuffer);
+
+                            // Manually swap R and B channels to convert from RGBA (ImageSharp default) to BGRA (WPF default)
+                            for (int i = 0; i < pixelBuffer.Length; i += 4)
                             {
-                                imageSharp.SaveAsBmp(ms);
-                                ms.Position = 0;
-                                BitmapImage bitmapImage = new BitmapImage();
-                                bitmapImage.BeginInit();
-                                bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                                bitmapImage.StreamSource = ms;
-                                bitmapImage.EndInit();
-                                bitmapImage.Freeze();
-                                return bitmapImage;
+                                var r = pixelBuffer[i];
+                                var b = pixelBuffer[i + 2];
+                                pixelBuffer[i] = b;
+                                pixelBuffer[i + 2] = r;
                             }
+
+                            int stride = imageSharp.Width * 4;
+                            var bitmapSource = BitmapSource.Create(imageSharp.Width, imageSharp.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
+                            bitmapSource.Freeze();
+
+                            return bitmapSource;
                         }
                         return null;
                     }
@@ -182,12 +191,31 @@ namespace AssetsManager.Services.Models
 
         private string FindBestTextureMatch(string materialName, IEnumerable<string> availableTextureKeys, string defaultTextureKey)
         {
-            // 1. Exact match (highest priority)
-            string bestMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
-            if (bestMatch != null) return bestMatch;
+            _logService.LogDebug($"Finding texture for material: '{materialName}'");
 
-            // 2. Keyword-based scoring match (the new generalized logic)
-            var materialKeywords = materialName.ToLower().Split('_', '-', ' ');
+            // 1. FNV1a hash match (MindCorpViewer's method)
+            uint materialHash = Fnv1aHasher.Hash(materialName);
+            string hashedKey = materialHash.ToString();
+            _logService.LogDebug($"Calculated FNV1a hash: '{hashedKey}' for material '{materialName}'");
+
+            string hashMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(hashedKey, StringComparison.OrdinalIgnoreCase));
+            if (hashMatch != null)
+            {
+                _logService.LogDebug($"Found texture '{hashMatch}' via FNV1a hash.");
+                return hashMatch;
+            }
+
+            // 2. Exact match
+            string exactMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch != null)
+            {
+                _logService.LogDebug($"Found texture '{exactMatch}' via exact name match.");
+                return exactMatch;
+            }
+
+            // 3. Keyword-based scoring match
+            _logService.LogDebug("No hash or exact match found. Trying keyword-based scoring...");
+            var materialKeywords = materialName.ToLower().Split('_', '-', ' ').Where(k => k != "mat").ToList();
 
             string bestScoringMatch = null;
             int bestScore = 0;
@@ -211,11 +239,23 @@ namespace AssetsManager.Services.Models
                     bestScore = currentScore;
                     bestScoringMatch = key;
                 }
-                // Tie-breaking: if scores are equal, prefer the shorter key name as it's likely more specific
                 else if (currentScore > 0 && currentScore == bestScore)
                 {
-                    if (bestScoringMatch == null || key.Length < bestScoringMatch.Length)
+                    // Tie-breaking logic: prefer textures with _tx_cm, then shorter names
+                    bool bestIsTxCm = bestScoringMatch?.ToLower().Contains("_tx_cm") ?? false;
+                    bool currentIsTxCm = lowerKey.Contains("_tx_cm");
+
+                    if (currentIsTxCm && !bestIsTxCm)
                     {
+                        bestScoringMatch = key; // Current is preferred
+                    }
+                    else if (!currentIsTxCm && bestIsTxCm)
+                    {
+                        // Best is preferred, do nothing
+                    }
+                    else if (bestScoringMatch == null || key.Length < bestScoringMatch.Length)
+                    {
+                        // If both or neither are _tx_cm, fall back to shorter name
                         bestScoringMatch = key;
                     }
                 }
@@ -223,10 +263,12 @@ namespace AssetsManager.Services.Models
 
             if (bestScoringMatch != null)
             {
+                _logService.LogDebug($"Found texture '{bestScoringMatch}' with score {bestScore} via keyword matching.");
                 return bestScoringMatch;
             }
 
             // Fallback
+            _logService.LogDebug($"No texture found. Falling back to default: '{defaultTextureKey}'");
             return defaultTextureKey;
         }
     }
