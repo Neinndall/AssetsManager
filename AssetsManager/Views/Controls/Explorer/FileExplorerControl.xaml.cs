@@ -446,6 +446,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 foreach (var eventNode in audioTree)
                 {
                     var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
+                    foreach (var soundNode in eventNode.Sounds)
+                    {
+                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, NodeType.AudioSound, soundNode.Id);
+                        newEventNode.Children.Add(newSoundNode);
+                    }
                     wpkNode.Children.Add(newEventNode);
                 }
                 wpkNode.IsExpanded = true;

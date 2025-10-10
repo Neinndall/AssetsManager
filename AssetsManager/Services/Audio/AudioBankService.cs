@@ -28,6 +28,20 @@ namespace AssetsManager.Services.Audio
             return audioTree;
         }
 
+        private static uint Fnv1Hash(string input)
+        {
+            const uint offsetBasis = 2166136261;
+            const uint prime = 16777619;
+
+            uint hash = offsetBasis;
+            foreach (byte b in System.Text.Encoding.ASCII.GetBytes(input.ToLowerInvariant()))
+            {
+                hash *= prime;
+                hash ^= b;
+            }
+            return hash;
+        }
+
         private Dictionary<uint, string> GetEventsFromBin(byte[] binData)
         {
             var mapEventNames = new Dictionary<uint, string>();
@@ -65,7 +79,7 @@ namespace AssetsManager.Services.Audio
                                         {
                                             foreach (BinTreeString eventNameProp in eventsContainer.Elements.OfType<BinTreeString>())
                                             {
-                                                uint eventHash = Fnv1a.HashLower(eventNameProp.Value);
+                                                uint eventHash = Fnv1Hash(eventNameProp.Value);
                                                 mapEventNames[eventHash] = eventNameProp.Value;
                                             }
                                             _logService.Log($"[AUDIO DEBUG] Extracted {eventsContainer.Elements.Count} events from this unit.");
