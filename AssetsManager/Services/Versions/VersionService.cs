@@ -264,11 +264,12 @@ namespace AssetsManager.Services.Versions
                 {
                     string line;
                     Regex incorrectRegex = new Regex(@"^File (.+?) is incorrect\.$");
-                    Regex downloadingRegex = new Regex(@"^Downloading file (.+?)\.\.\.$");
+                    Regex missingRegex = new Regex(@"^File (.+?) is missing\.$");
 
                     while ((line = await outputReader.ReadLineAsync()) != null)
                     {
-                        if (incorrectRegex.IsMatch(line) || downloadingRegex.IsMatch(line))
+                        _logService.LogDebug($"[ManifestDownloader PRE-VERIFY] {line}");
+                        if (incorrectRegex.IsMatch(line) || missingRegex.IsMatch(line))
                         {
                             filesToUpdate++;
                         }
@@ -315,6 +316,7 @@ namespace AssetsManager.Services.Versions
 
                     while ((line = await outputReader.ReadLineAsync()) != null)
                     {
+                        _logService.LogDebug($"[ManifestDownloader DOWNLOAD] {line}");
                         Match fixingMatch = fixingUpRegex.Match(line);
                         Match downloadingMatch = downloadingRegex.Match(line);
                         string fileName = null;
