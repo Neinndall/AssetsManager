@@ -46,7 +46,7 @@ namespace AssetsManager.Services.Audio
                     {
                         allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = wem.Offset, Size = wem.Size };
                     }
-                    _logService.Log($"[AUDIO] Found {allWems.Count} WEM entries in WPK.");
+                    _logService.LogDebug($"[AUDIO] Found {allWems.Count} WEM entries in WPK.");
                 }
             }
             else if (audioBnkData != null) // Fallback to BNK if WPK is not present
@@ -60,7 +60,7 @@ namespace AssetsManager.Services.Audio
                     {
                         allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = (uint)(wem.Offset + dataOffset), Size = wem.Size };
                     }
-                    _logService.Log($"[AUDIO] WPK not found for VO bank, using BNK as fallback. Found {allWems.Count} WEM metadata entries.");
+                    _logService.LogDebug($"[AUDIO] WPK not found for VO bank, using BNK as fallback. Found {allWems.Count} WEM metadata entries.");
                 }
             }
 
@@ -91,7 +91,7 @@ namespace AssetsManager.Services.Audio
                         // The offset in DIDX is relative to the start of the DATA section, so we calculate the absolute offset.
                         allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = (uint)(wem.Offset + dataOffset), Size = wem.Size };
                     }
-                    _logService.Log($"[AUDIO] Found {allWems.Count} WEM metadata entries in audio BNK.");
+                    _logService.LogDebug($"[AUDIO] Found {allWems.Count} WEM metadata entries in audio BNK.");
                 }
             }
 
@@ -126,7 +126,7 @@ namespace AssetsManager.Services.Audio
                     });
                 }
                 eventNodes.Add(unknownNode);
-                _logService.Log($"[AUDIO] Added 'Unknown' node with {unlinkedWemIds.Count} unlinked sounds.");
+                _logService.LogDebug($"[AUDIO] Added 'Unknown' node with {unlinkedWemIds.Count} unlinked sounds.");
             }
         }
 
@@ -188,7 +188,7 @@ namespace AssetsManager.Services.Audio
                 }
             }
             catch (Exception ex) { _logService.LogError(ex, "[AUDIO] Crash during BIN parsing."); }
-            _logService.Log($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total {bankType} events.");
+            _logService.LogDebug($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total {bankType} events.");
             return mapEventNames;
         }
 
@@ -219,7 +219,7 @@ namespace AssetsManager.Services.Audio
                             if (wemMetadata != null && wemMetadata.ContainsKey(soundData.WemId))
                             {
                                 var wemInfo = wemMetadata[soundData.WemId];
-                                _logService.Log($"[AUDIO] Linking sound: {soundData.WemId}");
+                                _logService.LogDebug($"[AUDIO] Linking sound: {soundData.WemId}");
                                 audioEventNode.Sounds.Add(new WemFileNode 
                                 {
                                     Id = soundData.WemId, 
@@ -230,7 +230,7 @@ namespace AssetsManager.Services.Audio
                             }
                             else
                             {
-                                _logService.Log($"[AUDIO] Sound {soundData.WemId} found in event, but not in audio BNK/WPK.");
+                                _logService.LogDebug($"[AUDIO] Sound {soundData.WemId} found in event, but not in audio BNK/WPK.");
                             }
                         }
                         break;
@@ -281,7 +281,7 @@ namespace AssetsManager.Services.Audio
                 }
             }
 
-            _logService.Log($"[AUDIO] Finished parsing events bank. Created {eventNodes.Count} event nodes.");
+            _logService.LogDebug($"[AUDIO] Finished parsing events bank. Created {eventNodes.Count} event nodes.");
             return eventNodes;
         }
     }
