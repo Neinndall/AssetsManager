@@ -127,6 +127,8 @@ namespace AssetsManager.Services.Explorer
                 // This is a special node representing a WEM sound from an audio bank.
                 else if (node.Type == NodeType.WemFile)
                 {
+                    // The AudioSource property, set during tree creation, tells us whether the WEM
+                    // is sourced from a WPK (standard VO) or a BNK (SFX or VO fallback).
                     if (node.AudioSource == AudioSourceType.Bnk)
                     {
                         await PreviewWemFromBnkAsync(node);
@@ -144,6 +146,9 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        /// <summary>
+        /// Extracts and previews a WEM file that is embedded inside a BNK file.
+        /// </summary>
         private async Task PreviewWemFromBnkAsync(FileSystemNodeModel node)
         {
             if (string.IsNullOrEmpty(node.SourceWadPath) || node.WemSize == 0)
@@ -154,6 +159,7 @@ namespace AssetsManager.Services.Explorer
 
             try
             {
+                // 1. Get the parent BNK file's data from the WAD.
                 byte[] bnkData;
                 using (var wadFile = new WadFile(node.SourceWadPath))
                 {
@@ -162,9 +168,11 @@ namespace AssetsManager.Services.Explorer
                     bnkData = decompressedOwner.Span.ToArray();
                 }
 
+                // 2. Extract the specific WEM data from the BNK data using the absolute offset and size.
                 byte[] wemData = new byte[node.WemSize];
                 Array.Copy(bnkData, node.WemOffset, wemData, 0, node.WemSize);
 
+                // 3. Dispatch for conversion and playback.
                 await DispatchPreview(wemData, ".wem");
             }
             catch (Exception ex)

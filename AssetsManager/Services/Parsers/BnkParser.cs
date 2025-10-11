@@ -118,6 +118,7 @@ namespace AssetsManager.Services.Parsers
                         break;
 
                     case "DIDX":
+                        // Data Index: Contains the ID, offset, and size of each WEM file in the DATA section.
                         bnk.Didx = new DidxSectionData();
                         int wemCount = (int)sectionSize / 12;
                         for (int i = 0; i < wemCount; i++)
@@ -133,6 +134,8 @@ namespace AssetsManager.Services.Parsers
                         break;
 
                     case "DATA":
+                        // Data: A large block containing all the raw WEM file data, concatenated.
+                        // We only need to store the starting offset of this section to calculate absolute WEM offsets.
                         bnk.Data = new DataSectionData { Offset = reader.BaseStream.Position };
                         reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
                         break;

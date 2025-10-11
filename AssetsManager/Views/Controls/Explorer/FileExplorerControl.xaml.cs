@@ -378,92 +378,112 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async Task HandleAudioBankExpansion(FileSystemNodeModel audioNode)
+        private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
         {
-            var parentPath = TreeUIManager.FindNodePath(RootNodes, audioNode);
+            var parentPath = TreeUIManager.FindNodePath(RootNodes, clickedNode);
             if (parentPath == null || parentPath.Count < 2)
             {
-                LogService.LogError(null, $"Could not find parent for node {audioNode.Name}");
+                LogService.LogError(null, $"Could not find parent for node {clickedNode.Name}");
                 return;
             }
             var parentNode = parentPath[parentPath.Count - 2];
 
-            bool isVo = audioNode.Name.Contains("_vo_audio");
-            string eventsFileExtension = isVo ? "_vo_events.bnk" : "_sfx_events.bnk";
-            string audioFileExtension = isVo ? "_vo_audio.wpk" : "_sfx_audio.bnk";
+            bool isVo = clickedNode.Name.Contains("_vo_audio");
 
-            var eventsNode = parentNode.Children.FirstOrDefault(c => c.Name == audioNode.Name.Replace(audioFileExtension, eventsFileExtension));
-            if (eventsNode == null)
+            // 1. Find all sibling audio files (.wpk, .bnk) based on a common base name.
+            string baseName = clickedNode.Name.Replace("_vo_audio.wpk", "").Replace("_vo_audio.bnk", "").Replace("_vo_events.bnk", "").Replace("_sfx_audio.bnk", "").Replace("_sfx_events.bnk", "");
+            
+            FileSystemNodeModel wpkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_vo_audio.wpk") : null;
+            FileSystemNodeModel audioBnkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_vo_audio.bnk") : parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_sfx_audio.bnk");
+            FileSystemNodeModel eventsBnkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_vo_events.bnk") : parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_sfx_events.bnk");
+
+            if (eventsBnkNode == null)
             {
-                LogService.LogError(null, $"Could not find sibling {eventsFileExtension} for {audioNode.Name}");
+                LogService.LogError(null, $"Could not find required events.bnk file for {clickedNode.Name}");
                 return;
             }
 
-            var pathParts = audioNode.FullPath.Split('/');
+            // 2. Find the associated .bin file using path manipulation.
+            var pathParts = clickedNode.FullPath.Split('/');
             string championName = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("characters") && pathParts.ToList().IndexOf(p) < pathParts.ToList().IndexOf("skins"));
             string skinFolder = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("skins"));
-
             string skinName = (skinFolder == "base") ? "skin0" : $"skin{int.Parse(skinFolder.Replace("skin", ""))}";
             string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
 
-            string sourceWadName = Path.GetFileName(audioNode.SourceWadPath);
+            string sourceWadName = Path.GetFileName(clickedNode.SourceWadPath);
             string[] wadNameParts = sourceWadName.Split('.');
             string targetWadName = wadNameParts.Length > 3 ? $"{wadNameParts[0]}.{wadNameParts[2]}.{wadNameParts[3]}" : sourceWadName;
 
             var targetWadNode = FindNodeByName(RootNodes, targetWadName);
-            FileSystemNodeModel binNode = null;
-            if (targetWadNode != null)
-            {
-                binNode = await WadSearchBoxService.PerformSearchAsync(binPath, new ObservableCollection<FileSystemNodeModel> { targetWadNode }, LoadAllChildrenForSearch);
-            }
+            FileSystemNodeModel binNode = (targetWadNode != null) ? await WadSearchBoxService.PerformSearchAsync(binPath, new ObservableCollection<FileSystemNodeModel> { targetWadNode }, LoadAllChildrenForSearch) : null;
 
             if (binNode == null)
             {
                 LogService.LogError(null, $"Could not find associated .bin file at {binPath}");
-                await Application.Current.Dispatcher.InvokeAsync(() => { audioNode.Children.Clear(); audioNode.IsExpanded = false; });
+                await Application.Current.Dispatcher.InvokeAsync(() => { clickedNode.Children.Clear(); clickedNode.IsExpanded = false; });
                 return;
             }
 
+            // 3. Read all necessary file data from the WAD.
             var binData = await WadExtractionService.GetVirtualFileBytesAsync(binNode);
-            var audioData = await WadExtractionService.GetVirtualFileBytesAsync(audioNode);
-            var eventsData = await WadExtractionService.GetVirtualFileBytesAsync(eventsNode);
+            var eventsData = await WadExtractionService.GetVirtualFileBytesAsync(eventsBnkNode);
+            byte[] wpkData = (isVo && wpkNode != null) ? await WadExtractionService.GetVirtualFileBytesAsync(wpkNode) : null;
+            byte[] audioBnkFileData = isVo ? ((audioBnkNode != null) ? await WadExtractionService.GetVirtualFileBytesAsync(audioBnkNode) : null) : await WadExtractionService.GetVirtualFileBytesAsync(audioBnkNode);
 
-            if (binData == null || audioData == null || eventsData == null)
-            {
-                LogService.LogError(null, "Failed to read data for one or more audio bank files.");
-                return;
-            }
-
+            // 4. Call the appropriate service method to parse the data and build the audio tree.
             List<AudioEventNode> audioTree;
             if (isVo)
             {
-                audioTree = AudioBankService.ParseAudioBank(audioData, eventsData, binData);
+                audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, binData);
             }
             else
             {
-                // Placeholder for the new SFX parsing logic
-                audioTree = AudioBankService.ParseSfxAudioBank(audioData, eventsData, binData);
+                audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, binData);
             }
 
+            // 5. Populate the tree view with the results.
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                audioNode.Children.Clear();
+                clickedNode.Children.Clear();
                 foreach (var eventNode in audioTree)
                 {
                     var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
                     foreach (var soundNode in eventNode.Sounds)
                     {
+                        // Determine the correct source file (WPK or BNK) for the sound.
+                        // This is crucial for the previewer to know where to extract the WEM data from.
+                        AudioSourceType sourceType;
+                        ulong sourceHash;
+                        if (isVo)
+                        {
+                            if (wpkNode != null)
+                            {
+                                sourceType = AudioSourceType.Wpk;
+                                sourceHash = wpkNode.SourceChunkPathHash;
+                            }
+                            else
+                            {
+                                sourceType = AudioSourceType.Bnk;
+                                sourceHash = audioBnkNode.SourceChunkPathHash;
+                            }
+                        }
+                        else
+                        {
+                            sourceType = AudioSourceType.Bnk;
+                            sourceHash = audioBnkNode.SourceChunkPathHash;
+                        }
+
                         var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
                         {
-                            SourceWadPath = audioNode.SourceWadPath,
-                            SourceChunkPathHash = audioNode.SourceChunkPathHash,
-                            AudioSource = isVo ? AudioSourceType.Wpk : AudioSourceType.Bnk
+                            SourceWadPath = clickedNode.SourceWadPath,
+                            SourceChunkPathHash = sourceHash,
+                            AudioSource = sourceType
                         };
                         newEventNode.Children.Add(newSoundNode);
                     }
-                    audioNode.Children.Add(newEventNode);
+                    clickedNode.Children.Add(newEventNode);
                 }
-                audioNode.IsExpanded = true;
+                clickedNode.IsExpanded = true;
             });
         }
 
