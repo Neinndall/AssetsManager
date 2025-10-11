@@ -108,6 +108,7 @@ namespace AssetsManager
 
             // Audio Services
             services.AddSingleton<AudioBankService>();
+            services.AddSingleton<AudioBankLinkerService>();
 
             // Main Application Logic Service
             services.AddTransient<ExtractionService>();

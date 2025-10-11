@@ -40,6 +40,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public TreeBuilderService TreeBuilderService { get; set; }
         public TreeUIManager TreeUIManager { get; set; }
         public AudioBankService AudioBankService { get; set; }
+        public AudioBankLinkerService AudioBankLinkerService { get; set; }
 
         public ObservableCollection<FileSystemNodeModel> RootNodes { get; set; }
         private readonly DispatcherTimer _searchTimer;
@@ -380,65 +381,34 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
         {
-            var parentPath = TreeUIManager.FindNodePath(RootNodes, clickedNode);
-            if (parentPath == null || parentPath.Count < 2)
+            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, RootNodes, _currentRootPath);
+            if (linkedBank == null)
             {
-                LogService.LogError(null, $"Could not find parent for node {clickedNode.Name}");
-                return;
+                return; // Errors are logged by the service
             }
-            var parentNode = parentPath[parentPath.Count - 2];
 
             bool isVo = clickedNode.Name.Contains("_vo_audio");
 
-            // 1. Find all sibling audio files (.wpk, .bnk) based on a common base name.
-            string baseName = clickedNode.Name.Replace("_vo_audio.wpk", "").Replace("_vo_audio.bnk", "").Replace("_vo_events.bnk", "").Replace("_sfx_audio.bnk", "").Replace("_sfx_events.bnk", "");
-            
-            FileSystemNodeModel wpkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_vo_audio.wpk") : null;
-            FileSystemNodeModel audioBnkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_vo_audio.bnk") : parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_sfx_audio.bnk");
-            FileSystemNodeModel eventsBnkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_vo_events.bnk") : parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_sfx_events.bnk");
+            // Read other file data from the WAD.
+            var eventsData = await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode);
+            byte[] wpkData = (isVo && linkedBank.WpkNode != null) ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
+            byte[] audioBnkFileData = isVo ? ((linkedBank.AudioBnkNode != null) ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null) : await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode);
 
-            if (eventsBnkNode == null)
+            if (eventsData == null)
             {
-                LogService.LogError(null, $"Could not find required events.bnk file for {clickedNode.Name}");
+                LogService.LogError(null, "Failed to read required data for events file.");
                 return;
             }
-
-            // 2. Find the associated .bin file using path manipulation.
-            var pathParts = clickedNode.FullPath.Split('/');
-            string championName = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("characters") && pathParts.ToList().IndexOf(p) < pathParts.ToList().IndexOf("skins"));
-            string skinFolder = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("skins"));
-            string skinName = (skinFolder == "base") ? "skin0" : $"skin{int.Parse(skinFolder.Replace("skin", ""))}";
-            string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
-
-            string sourceWadName = Path.GetFileName(clickedNode.SourceWadPath);
-            string[] wadNameParts = sourceWadName.Split('.');
-            string targetWadName = wadNameParts.Length > 3 ? $"{wadNameParts[0]}.{wadNameParts[2]}.{wadNameParts[3]}" : sourceWadName;
-
-            var targetWadNode = FindNodeByName(RootNodes, targetWadName);
-            FileSystemNodeModel binNode = (targetWadNode != null) ? await WadSearchBoxService.PerformSearchAsync(binPath, new ObservableCollection<FileSystemNodeModel> { targetWadNode }, LoadAllChildrenForSearch) : null;
-
-            if (binNode == null)
-            {
-                LogService.LogError(null, $"Could not find associated .bin file at {binPath}");
-                await Application.Current.Dispatcher.InvokeAsync(() => { clickedNode.Children.Clear(); clickedNode.IsExpanded = false; });
-                return;
-            }
-
-            // 3. Read all necessary file data from the WAD.
-            var binData = await WadExtractionService.GetVirtualFileBytesAsync(binNode);
-            var eventsData = await WadExtractionService.GetVirtualFileBytesAsync(eventsBnkNode);
-            byte[] wpkData = (isVo && wpkNode != null) ? await WadExtractionService.GetVirtualFileBytesAsync(wpkNode) : null;
-            byte[] audioBnkFileData = isVo ? ((audioBnkNode != null) ? await WadExtractionService.GetVirtualFileBytesAsync(audioBnkNode) : null) : await WadExtractionService.GetVirtualFileBytesAsync(audioBnkNode);
 
             // 4. Call the appropriate service method to parse the data and build the audio tree.
             List<AudioEventNode> audioTree;
             if (isVo)
             {
-                audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, binData);
+                audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
             }
             else
             {
-                audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, binData);
+                audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
             }
 
             // 5. Populate the tree view with the results.
@@ -456,21 +426,21 @@ namespace AssetsManager.Views.Controls.Explorer
                         ulong sourceHash;
                         if (isVo)
                         {
-                            if (wpkNode != null)
+                            if (linkedBank.WpkNode != null)
                             {
                                 sourceType = AudioSourceType.Wpk;
-                                sourceHash = wpkNode.SourceChunkPathHash;
+                                sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
                             }
                             else
                             {
                                 sourceType = AudioSourceType.Bnk;
-                                sourceHash = audioBnkNode.SourceChunkPathHash;
+                                sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
                             }
                         }
                         else
                         {
                             sourceType = AudioSourceType.Bnk;
-                            sourceHash = audioBnkNode.SourceChunkPathHash;
+                            sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
                         }
 
                         var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
@@ -568,25 +538,6 @@ namespace AssetsManager.Views.Controls.Explorer
             await TreeBuilderService.LoadAllChildren(node, _currentRootPath);
         }
 
-        private FileSystemNodeModel FindNodeByName(IEnumerable<FileSystemNodeModel> nodes, string name)
-        {
-            foreach (var node in nodes)
-            {
-                if (node.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-                {
-                    return node;
-                }
 
-                if (node.Children != null && node.Children.Any())
-                {
-                    var found = FindNodeByName(node.Children, name);
-                    if (found != null)
-                    {
-                        return found;
-                    }
-                }
-            }
-            return null;
-        }
     }
 }

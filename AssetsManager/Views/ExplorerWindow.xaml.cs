@@ -26,7 +26,8 @@ namespace AssetsManager.Views
             AppSettings appSettings,
             TreeBuilderService treeBuilderService,
             TreeUIManager treeUIManager,
-            AudioBankService audioBankService
+            AudioBankService audioBankService,
+            AudioBankLinkerService audioBankLinkerService
         )
         {
             InitializeComponent();
@@ -41,6 +42,7 @@ namespace AssetsManager.Views
             FileExplorer.TreeBuilderService = treeBuilderService;
             FileExplorer.TreeUIManager = treeUIManager;
             FileExplorer.AudioBankService = audioBankService;
+            FileExplorer.AudioBankLinkerService = audioBankLinkerService;
 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;

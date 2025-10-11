@@ -28,9 +28,9 @@ namespace AssetsManager.Services.Audio
             _logService = logService;
         }
 
-        public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData)
+        public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData, string baseName)
         {
-            var eventNameMap = GetEventsFromBin(binData, "_VO");
+            var eventNameMap = GetEventsFromBin(binData, baseName);
 
             var allWems = new Dictionary<uint, WemSoundInfo>();
             
@@ -72,9 +72,9 @@ namespace AssetsManager.Services.Audio
             return eventNodes;
         }
 
-        public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData)
+        public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData, string baseName)
         {
-            var eventNameMap = GetEventsFromBin(binData, "_SFX");
+            var eventNameMap = GetEventsFromBin(binData, baseName);
 
             var allWems = new Dictionary<uint, WemSoundInfo>();
             // For SFX banks, the audio data is stored inside the main .bnk file itself.
@@ -144,7 +144,7 @@ namespace AssetsManager.Services.Audio
             return hash;
         }
 
-        private Dictionary<uint, string> GetEventsFromBin(byte[] binData, string bankType)
+        private Dictionary<uint, string> GetEventsFromBin(byte[] binData, string bankName)
         {
             var mapEventNames = new Dictionary<uint, string>();
             if (binData == null || binData.Length == 0) return mapEventNames;
@@ -155,30 +155,51 @@ namespace AssetsManager.Services.Audio
                 var binTree = new BinTree(stream);
 
                 uint skinCharacterDataPropertiesHash = Fnv1a.HashLower("SkinCharacterDataProperties");
+                uint mapAudioDataPropertiesHash = Fnv1a.HashLower("MapAudioDataProperties");
                 uint skinAudioPropertiesHash = Fnv1a.HashLower("skinAudioProperties");
                 uint bankUnitsHash = Fnv1a.HashLower("bankUnits");
                 uint eventsHash = Fnv1a.HashLower("events");
                 uint nameHash = Fnv1a.HashLower("name");
 
+                string normalizedBankName = bankName.ToLowerInvariant().Replace("_vo", "").Replace("_sfx", "");
+
                 foreach (var obj in binTree.Objects.Values)
                 {
+                    BinTreeContainer bankUnitsContainer = null;
+
                     if (obj.ClassHash == skinCharacterDataPropertiesHash)
                     {
                         if (obj.Properties.TryGetValue(skinAudioPropertiesHash, out var skinAudioProp) && skinAudioProp is BinTreeStruct skinAudioStruct)
                         {
-                            if (skinAudioStruct.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer bankUnitsContainer)
+                            if (skinAudioStruct.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer container)
                             {
-                                foreach (BinTreeStruct bankUnit in bankUnitsContainer.Elements.OfType<BinTreeStruct>())
+                                bankUnitsContainer = container;
+                            }
+                        }
+                    }
+                    else if (obj.ClassHash == mapAudioDataPropertiesHash)
+                    {
+                        if (obj.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer container)
+                        {
+                            bankUnitsContainer = container;
+                        }
+                    }
+
+                    if (bankUnitsContainer != null)
+                    {
+                        foreach (BinTreeStruct bankUnit in bankUnitsContainer.Elements.OfType<BinTreeStruct>())
+                        {
+                            if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString)
+                            {
+                                string normalizedUnitName = nameString.Value.ToLowerInvariant().Replace("_vo", "").Replace("_sfx", "");
+                                if (normalizedUnitName == normalizedBankName)
                                 {
-                                    if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString && nameString.Value.Contains(bankType))
+                                    if (bankUnit.Properties.TryGetValue(eventsHash, out var eventsProp) && eventsProp is BinTreeContainer eventsContainer)
                                     {
-                                        if (bankUnit.Properties.TryGetValue(eventsHash, out var eventsProp) && eventsProp is BinTreeContainer eventsContainer)
+                                        foreach (BinTreeString eventNameProp in eventsContainer.Elements.OfType<BinTreeString>())
                                         {
-                                            foreach (BinTreeString eventNameProp in eventsContainer.Elements.OfType<BinTreeString>())
-                                            {
-                                                uint eventHash = Fnv1Hash(eventNameProp.Value);
-                                                mapEventNames[eventHash] = eventNameProp.Value;
-                                            }
+                                            uint eventHash = Fnv1Hash(eventNameProp.Value);
+                                            mapEventNames[eventHash] = eventNameProp.Value;
                                         }
                                     }
                                 }
@@ -186,9 +207,10 @@ namespace AssetsManager.Services.Audio
                         }
                     }
                 }
+
             }
             catch (Exception ex) { _logService.LogError(ex, "[AUDIO] Crash during BIN parsing."); }
-            _logService.LogDebug($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total {bankType} events.");
+            _logService.Log($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total events for bank '{bankName}'.");
             return mapEventNames;
         }
 
