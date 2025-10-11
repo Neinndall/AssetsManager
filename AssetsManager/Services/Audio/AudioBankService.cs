@@ -177,13 +177,6 @@ namespace AssetsManager.Services.Audio
                             }
                         }
                     }
-                    else if (obj.ClassHash == mapAudioDataPropertiesHash)
-                    {
-                        if (obj.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer container)
-                        {
-                            bankUnitsContainer = container;
-                        }
-                    }
 
                     if (bankUnitsContainer != null)
                     {

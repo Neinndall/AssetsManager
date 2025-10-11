@@ -51,15 +51,7 @@ namespace AssetsManager.Services.Audio
 
             var binData = await _wadExtractionService.GetVirtualFileBytesAsync(binFindingResult.BinNode);
 
-            // Find sibling files using the new logic
-            var siblingsResult = await FindSiblingFilesAsync(clickedNode, rootNodes, currentRootPath, binData);
-
-            // Fallback to old logic if new logic fails
-            if (siblingsResult.EventsBnkNode == null)
-            {
-                _logService.LogWarning($"[AUDIO] Could not find siblings via .bin for {clickedNode.Name}. Falling back to name-based search.");
-                siblingsResult = FindSiblingFilesByName(clickedNode, rootNodes);
-            }
+            var siblingsResult = FindSiblingFilesByName(clickedNode, rootNodes);
 
             return new LinkedAudioBank
             {
@@ -120,24 +112,6 @@ namespace AssetsManager.Services.Audio
                 }
             }
 
-            // Strategy 2: Map/Global Audio
-            if (wadRoot != null)
-            {
-                string[] wadNameParts = wadRoot.Name.Split('.');
-                string baseWadName = wadNameParts.First();
-                string mainWadName = baseWadName + ".wad.client";
-                var mainWadNode = FindNodeByName(rootNodes, mainWadName);
-
-                if (mainWadNode != null)
-                {
-                    string binPath = $"data/maps/shipping/{baseWadName}/{baseWadName}.bin";
-                    if (baseWadName.Equals("Common", StringComparison.OrdinalIgnoreCase)) binPath = $"data/maps/shipping/common/common.bin";
-
-                    _logService.Log($"[AUDIO] Champion/Skin BIN not found, attempting map/global search for '{binPath}' in WAD '{mainWadNode.Name}'");
-                    var binNode = await _wadSearchBoxService.PerformSearchAsync(binPath, new ObservableCollection<FileSystemNodeModel> { mainWadNode }, loader);
-                    if (binNode != null) return (binNode, baseName);
-                }
-            }
 
             // Strategy 3: Fallback Audio
             if (wadRoot != null)
@@ -149,91 +123,6 @@ namespace AssetsManager.Services.Audio
             }
 
             return (null, baseName);
-        }
-
-        private async Task<(FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode)> FindSiblingFilesAsync(FileSystemNodeModel clickedNode, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, byte[] binData)
-        {
-            if (binData == null) return (null, null, null);
-
-            try
-            {
-                using var binStream = new MemoryStream(binData);
-                var binTree = new BinTree(binStream);
-
-                var skinAudioProp = binTree.Objects.Values
-                    .SelectMany(o => o.Properties)
-                    .FirstOrDefault(p => _hashResolverService.ResolveBinHashGeneral(p.Key) == "skinAudioProperties");
-
-                if (skinAudioProp.Value is BinTreeStruct skinAudioStruct)
-                {
-                    var bankUnitsProperty = skinAudioStruct.Properties
-                        .FirstOrDefault(p => _hashResolverService.ResolveBinHashGeneral(p.Key) == "bankUnits");
-
-                    if (bankUnitsProperty.Value is BinTreeContainer bankUnitsContainer)
-                    {
-                        var matchingBankUnits = new List<BinTreeStruct>();
-                        foreach (BinTreeStruct bankUnitStruct in bankUnitsContainer.Elements)
-                        {
-                            var bankPathProperty = bankUnitStruct.Properties.FirstOrDefault(p => _hashResolverService.ResolveBinHashGeneral(p.Key) == "bankPath");
-                            if (bankPathProperty.Value is BinTreeContainer bankPathContainer)
-                            {
-                                var paths = bankPathContainer.Elements.Select(p =>
-                                {
-                                    if (p is BinTreeWadChunkLink chunkLink)
-                                        return _hashResolverService.ResolveHash(chunkLink.Value);
-                                    if (p is BinTreeString stringValue)
-                                        return stringValue.Value;
-                                    return null;
-                                }).Where(p => p != null).ToList();
-
-                                if (paths.Any(p => string.Equals(p, clickedNode.FullPath, StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    matchingBankUnits.Add(bankUnitStruct);
-                                }
-                            }
-                        }
-
-                        if (matchingBankUnits.Any())
-                        {
-                            BinTreeStruct bestMatch = matchingBankUnits.FirstOrDefault(bu => bu.Properties.Any(p => _hashResolverService.ResolveBinHashGeneral(p.Key) == "events")) ?? matchingBankUnits.First();
-
-                            var finalBankPathProperty = bestMatch.Properties.FirstOrDefault(p => _hashResolverService.ResolveBinHashGeneral(p.Key) == "bankPath");
-                            if (finalBankPathProperty.Value is BinTreeContainer finalBankPathContainer)
-                            {
-                                var finalPaths = finalBankPathContainer.Elements.Select(p =>
-                                {
-                                    if (p is BinTreeWadChunkLink chunkLink)
-                                        return _hashResolverService.ResolveHash(chunkLink.Value);
-                                    if (p is BinTreeString stringValue)
-                                        return stringValue.Value;
-                                    return null;
-                                }).Where(p => p != null).ToList();
-                                
-                                FileSystemNodeModel wpkNode = null, audioBnkNode = null, eventsBnkNode = null;
-                                Func<FileSystemNodeModel, Task> loader = async (node) => await LoadAllChildrenForSearch(node, currentRootPath);
-
-                                foreach (var path in finalPaths)
-                                {
-                                    var node = await _wadSearchBoxService.PerformSearchAsync(path, rootNodes, loader);
-                                    if (node != null)
-                                    {
-                                        if (node.Name.EndsWith("_vo_audio.wpk")) wpkNode = node;
-                                        else if (node.Name.EndsWith("_vo_audio.bnk") || node.Name.EndsWith("_sfx_audio.bnk")) audioBnkNode = node;
-                                        else if (node.Name.EndsWith("_vo_events.bnk") || node.Name.EndsWith("_sfx_events.bnk")) eventsBnkNode = node;
-                                    }
-                                }
-                                return (wpkNode, audioBnkNode, eventsBnkNode);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to parse .bin file to find audio siblings.");
-            }
-
-            return (null, null, null);
         }
 
         private async Task LoadAllChildrenForSearch(FileSystemNodeModel node, string rootPath)
