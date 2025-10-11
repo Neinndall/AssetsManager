@@ -24,7 +24,31 @@ namespace AssetsManager.Services.Audio
         public List<AudioEventNode> ParseAudioBank(byte[] audioData, byte[] eventsData, byte[] binData)
         {
             var eventNameMap = GetEventsFromBin(binData, "_VO");
-            return ParseEventsBank(eventsData, eventNameMap, null);
+            var eventNodes = ParseEventsBank(eventsData, eventNameMap, null);
+
+            // Find unlinked sounds
+            var allWemsInWpk = new List<WpkWem>();
+            if (audioData != null)
+            {
+                using var audioStream = new MemoryStream(audioData);
+                var wpkFile = WpkParser.Parse(audioStream, _logService);
+                if (wpkFile?.Wems != null) allWemsInWpk.AddRange(wpkFile.Wems);
+            }
+
+            var linkedWemIds = new HashSet<uint>(eventNodes.SelectMany(e => e.Sounds).Select(s => s.Id));
+            var unlinkedWems = allWemsInWpk.Where(w => !linkedWemIds.Contains(w.Id)).ToList();
+
+            if (unlinkedWems.Any())
+            {
+                var unknownNode = new AudioEventNode { Name = "Unknown" };
+                foreach (var wem in unlinkedWems)
+                {
+                    unknownNode.Sounds.Add(new WemFileNode { Id = wem.Id, Name = $"{wem.Id}.wem" });
+                }
+                eventNodes.Add(unknownNode);
+            }
+
+            return eventNodes;
         }
 
         public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData)
@@ -46,7 +70,30 @@ namespace AssetsManager.Services.Audio
                 }
             }
 
-            return ParseEventsBank(eventsData, eventNameMap, wemMetadata);
+            var eventNodes = ParseEventsBank(eventsData, eventNameMap, wemMetadata);
+
+            // Find unlinked sounds
+            var linkedWemIds = new HashSet<uint>(eventNodes.SelectMany(e => e.Sounds).Select(s => s.Id));
+            var unlinkedWemIds = wemMetadata.Keys.Where(id => !linkedWemIds.Contains(id)).ToList();
+
+            if (unlinkedWemIds.Any())
+            {
+                var unknownNode = new AudioEventNode { Name = "Unknown" };
+                foreach (var wemId in unlinkedWemIds)
+                {
+                    var wemInfo = wemMetadata[wemId];
+                    unknownNode.Sounds.Add(new WemFileNode
+                    {
+                        Id = wemId,
+                        Name = $"{wemId}.wem",
+                        Offset = wemInfo.Offset,
+                        Size = wemInfo.Size
+                    });
+                }
+                eventNodes.Add(unknownNode);
+            }
+
+            return eventNodes;
         }
 
         private static uint Fnv1Hash(string input)
