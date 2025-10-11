@@ -14,6 +14,13 @@ namespace AssetsManager.Services.Audio
 {
     public class AudioBankService
     {
+        private class WemSoundInfo
+        {
+            public uint Id { get; set; }
+            public uint Offset { get; set; }
+            public uint Size { get; set; }
+        }
+
         private readonly LogService _logService;
 
         public AudioBankService(LogService logService)
@@ -24,29 +31,24 @@ namespace AssetsManager.Services.Audio
         public List<AudioEventNode> ParseAudioBank(byte[] audioData, byte[] eventsData, byte[] binData)
         {
             var eventNameMap = GetEventsFromBin(binData, "_VO");
-            var eventNodes = ParseEventsBank(eventsData, eventNameMap, null);
 
-            // Find unlinked sounds
-            var allWemsInWpk = new List<WpkWem>();
+            var allWems = new Dictionary<uint, WemSoundInfo>();
             if (audioData != null)
             {
                 using var audioStream = new MemoryStream(audioData);
                 var wpkFile = WpkParser.Parse(audioStream, _logService);
-                if (wpkFile?.Wems != null) allWemsInWpk.AddRange(wpkFile.Wems);
-            }
-
-            var linkedWemIds = new HashSet<uint>(eventNodes.SelectMany(e => e.Sounds).Select(s => s.Id));
-            var unlinkedWems = allWemsInWpk.Where(w => !linkedWemIds.Contains(w.Id)).ToList();
-
-            if (unlinkedWems.Any())
-            {
-                var unknownNode = new AudioEventNode { Name = "Unknown" };
-                foreach (var wem in unlinkedWems)
+                if (wpkFile?.Wems != null)
                 {
-                    unknownNode.Sounds.Add(new WemFileNode { Id = wem.Id, Name = $"{wem.Id}.wem" });
+                    foreach (var wem in wpkFile.Wems)
+                    {
+                        allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = wem.Offset, Size = wem.Size };
+                    }
+                    _logService.Log($"[AUDIO] Found {allWems.Count} WEM entries in WPK.");
                 }
-                eventNodes.Add(unknownNode);
             }
+
+            var eventNodes = ParseEventsBank(eventsData, eventNameMap, allWems);
+            AddUnknownSoundsNode(eventNodes, allWems);
 
             return eventNodes;
         }
@@ -55,33 +57,41 @@ namespace AssetsManager.Services.Audio
         {
             var eventNameMap = GetEventsFromBin(binData, "_SFX");
 
-            Dictionary<uint, WemInfo> wemMetadata = new Dictionary<uint, WemInfo>();
+            var allWems = new Dictionary<uint, WemSoundInfo>();
             if (audioData != null)
             {
                 using var audioStream = new MemoryStream(audioData);
                 var audioBnk = BnkParser.Parse(audioStream, _logService);
-                if (audioBnk?.Didx?.Wems != null)
+                if (audioBnk?.Didx?.Wems != null && audioBnk.Data != null)
                 {
+                    long dataOffset = audioBnk.Data.Offset;
                     foreach(var wem in audioBnk.Didx.Wems)
                     {
-                        wemMetadata[wem.Id] = wem;
+                        allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = (uint)(wem.Offset + dataOffset), Size = wem.Size };
                     }
-                    _logService.Log($"[AUDIO] Found {wemMetadata.Count} WEM metadata entries in audio BNK.");
+                    _logService.Log($"[AUDIO] Found {allWems.Count} WEM metadata entries in audio BNK.");
                 }
             }
 
-            var eventNodes = ParseEventsBank(eventsData, eventNameMap, wemMetadata);
+            var eventNodes = ParseEventsBank(eventsData, eventNameMap, allWems);
+            AddUnknownSoundsNode(eventNodes, allWems);
 
-            // Find unlinked sounds
+            return eventNodes;
+        }
+
+        private void AddUnknownSoundsNode(List<AudioEventNode> eventNodes, Dictionary<uint, WemSoundInfo> allSounds)
+        {
+            if (allSounds == null || !allSounds.Any()) return;
+
             var linkedWemIds = new HashSet<uint>(eventNodes.SelectMany(e => e.Sounds).Select(s => s.Id));
-            var unlinkedWemIds = wemMetadata.Keys.Where(id => !linkedWemIds.Contains(id)).ToList();
+            var unlinkedWemIds = allSounds.Keys.Where(id => !linkedWemIds.Contains(id)).ToList();
 
             if (unlinkedWemIds.Any())
             {
                 var unknownNode = new AudioEventNode { Name = "Unknown" };
                 foreach (var wemId in unlinkedWemIds)
                 {
-                    var wemInfo = wemMetadata[wemId];
+                    var wemInfo = allSounds[wemId];
                     unknownNode.Sounds.Add(new WemFileNode
                     {
                         Id = wemId,
@@ -91,9 +101,8 @@ namespace AssetsManager.Services.Audio
                     });
                 }
                 eventNodes.Add(unknownNode);
+                _logService.Log($"[AUDIO] Added 'Unknown' node with {unlinkedWemIds.Count} unlinked sounds.");
             }
-
-            return eventNodes;
         }
 
         private static uint Fnv1Hash(string input)
@@ -158,7 +167,7 @@ namespace AssetsManager.Services.Audio
             return mapEventNames;
         }
 
-        private List<AudioEventNode> ParseEventsBank(byte[] eventsData, Dictionary<uint, string> eventNameMap, Dictionary<uint, WemInfo> wemMetadata)
+        private List<AudioEventNode> ParseEventsBank(byte[] eventsData, Dictionary<uint, string> eventNameMap, Dictionary<uint, WemSoundInfo> wemMetadata)
         {
             var eventNodes = new List<AudioEventNode>();
             if (eventsData == null) return eventNodes;
@@ -182,15 +191,10 @@ namespace AssetsManager.Services.Audio
                     case BnkObjectType.Sound:
                         if (currentObject.Data is SoundBnkObjectData soundData)
                         {
-                            if (wemMetadata == null) // VO Audio Bank
-                            {
-                                _logService.Log($"[AUDIO] Linking VO sound: {soundData.WemId}");
-                                audioEventNode.Sounds.Add(new WemFileNode { Id = soundData.WemId, Name = $"{soundData.WemId}.wem" });
-                            }
-                            else if (wemMetadata.ContainsKey(soundData.WemId)) // SFX Audio Bank
+                            if (wemMetadata != null && wemMetadata.ContainsKey(soundData.WemId))
                             {
                                 var wemInfo = wemMetadata[soundData.WemId];
-                                _logService.Log($"[AUDIO] Linking SFX sound: {soundData.WemId}");
+                                _logService.Log($"[AUDIO] Linking sound: {soundData.WemId}");
                                 audioEventNode.Sounds.Add(new WemFileNode 
                                 {
                                     Id = soundData.WemId, 
@@ -201,7 +205,7 @@ namespace AssetsManager.Services.Audio
                             }
                             else
                             {
-                                _logService.Log($"[AUDIO] Sound {soundData.WemId} found in event, but not in audio BNK DIDX.");
+                                _logService.Log($"[AUDIO] Sound {soundData.WemId} found in event, but not in audio BNK/WPK.");
                             }
                         }
                         break;

@@ -132,6 +132,11 @@ namespace AssetsManager.Services.Parsers
                         reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
                         break;
 
+                    case "DATA":
+                        bnk.Data = new DataSectionData { Offset = reader.BaseStream.Position };
+                        reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
+                        break;
+
                     default:
                         logService.LogDebug($"[BNK DEBUG] Skipping section: {signature}");
                         reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);

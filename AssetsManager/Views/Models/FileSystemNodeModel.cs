@@ -6,6 +6,7 @@ namespace AssetsManager.Views.Models
 {
     public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, WemFile }
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted }
+    public enum AudioSourceType { Wpk, Bnk }
 
     public class FileSystemNodeModel : INotifyPropertyChanged
     {
@@ -18,6 +19,7 @@ namespace AssetsManager.Views.Models
         public uint WemId { get; set; } // Only for WemFile
         public uint WemOffset { get; set; } // Only for WemFile from BNK
         public uint WemSize { get; set; } // Only for WemFile from BNK
+        public AudioSourceType AudioSource { get; set; } // Only for WemFile
 
         public ObservableCollection<FileSystemNodeModel> Children { get; set; }
 

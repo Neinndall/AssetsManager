@@ -456,7 +456,8 @@ namespace AssetsManager.Views.Controls.Explorer
                         var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
                         {
                             SourceWadPath = audioNode.SourceWadPath,
-                            SourceChunkPathHash = audioNode.SourceChunkPathHash
+                            SourceChunkPathHash = audioNode.SourceChunkPathHash,
+                            AudioSource = isVo ? AudioSourceType.Wpk : AudioSourceType.Bnk
                         };
                         newEventNode.Children.Add(newSoundNode);
                     }

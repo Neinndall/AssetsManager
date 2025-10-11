@@ -127,7 +127,7 @@ namespace AssetsManager.Services.Explorer
                 // This is a special node representing a WEM sound from an audio bank.
                 else if (node.Type == NodeType.WemFile)
                 {
-                    if (node.SourceWadPath.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
+                    if (node.AudioSource == AudioSourceType.Bnk)
                     {
                         await PreviewWemFromBnkAsync(node);
                     }

@@ -94,10 +94,16 @@ namespace AssetsManager.Views.Models
         public List<WemInfo> Wems { get; set; } = new List<WemInfo>();
     }
 
+    public class DataSectionData : BnkSectionData
+    {
+        public long Offset { get; set; }
+    }
+
     public class BnkFile
     {
         public BkhdSectionData Bkhd { get; set; }
         public HircSectionData Hirc { get; set; }
         public DidxSectionData Didx { get; set; }
+        public DataSectionData Data { get; set; }
     }
 }
