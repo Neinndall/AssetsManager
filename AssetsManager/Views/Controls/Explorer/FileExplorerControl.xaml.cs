@@ -390,9 +390,9 @@ namespace AssetsManager.Views.Controls.Explorer
             bool isVo = clickedNode.Name.Contains("_vo_audio");
 
             // Read other file data from the WAD.
-            var eventsData = await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode);
+            var eventsData = linkedBank.EventsBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
             byte[] wpkData = (isVo && linkedBank.WpkNode != null) ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-            byte[] audioBnkFileData = isVo ? ((linkedBank.AudioBnkNode != null) ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null) : await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode);
+            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
 
             if (eventsData == null)
             {

@@ -161,8 +161,6 @@ namespace AssetsManager.Services.Audio
                 uint eventsHash = Fnv1a.HashLower("events");
                 uint nameHash = Fnv1a.HashLower("name");
 
-                string normalizedBankName = bankName.ToLowerInvariant().Replace("_vo", "").Replace("_sfx", "");
-
                 foreach (var obj in binTree.Objects.Values)
                 {
                     BinTreeContainer bankUnitsContainer = null;
@@ -184,8 +182,7 @@ namespace AssetsManager.Services.Audio
                         {
                             if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString)
                             {
-                                string normalizedUnitName = nameString.Value.ToLowerInvariant().Replace("_vo", "").Replace("_sfx", "");
-                                if (normalizedUnitName == normalizedBankName)
+                                if (string.Equals(nameString.Value, bankName, StringComparison.OrdinalIgnoreCase))
                                 {
                                     if (bankUnit.Properties.TryGetValue(eventsHash, out var eventsProp) && eventsProp is BinTreeContainer eventsContainer)
                                     {

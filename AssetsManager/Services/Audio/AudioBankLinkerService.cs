@@ -72,12 +72,12 @@ namespace AssetsManager.Services.Audio
             }
             var parentNode = parentPath[parentPath.Count - 2];
 
-            bool isVo = clickedNode.Name.Contains("_vo_audio");
-            string baseName = clickedNode.Name.Replace("_vo_audio.wpk", "").Replace("_vo_audio.bnk", "").Replace("_vo_events.bnk", "").Replace("_sfx_audio.bnk", "").Replace("_sfx_events.bnk", "");
+            bool isVo = clickedNode.Name.Contains("_vo_");
+            string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
 
-            FileSystemNodeModel wpkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_vo_audio.wpk") : null;
-            FileSystemNodeModel audioBnkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_vo_audio.bnk") : parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_sfx_audio.bnk");
-            FileSystemNodeModel eventsBnkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_vo_events.bnk") : parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_sfx_events.bnk");
+            FileSystemNodeModel wpkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_audio.wpk") : null;
+            FileSystemNodeModel audioBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_audio.bnk");
+            FileSystemNodeModel eventsBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_events.bnk");
 
             return (wpkNode, audioBnkNode, eventsBnkNode);
         }
@@ -86,7 +86,7 @@ namespace AssetsManager.Services.Audio
         {
             var parentPath = _treeUIManager.FindNodePath(rootNodes, clickedNode);
             var wadRoot = parentPath?.FirstOrDefault(p => p.Type == NodeType.WadFile);
-            string baseName = clickedNode.Name.Replace("_vo_audio.wpk", "").Replace("_vo_audio.bnk", "").Replace("_vo_events.bnk", "").Replace("_sfx_audio.bnk", "").Replace("_sfx_events.bnk", "");
+            string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
 
             Func<FileSystemNodeModel, Task> loader = async (node) => await LoadAllChildrenForSearch(node, currentRootPath);
 
