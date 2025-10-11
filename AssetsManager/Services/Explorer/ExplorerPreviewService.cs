@@ -127,12 +127,49 @@ namespace AssetsManager.Services.Explorer
                 // This is a special node representing a WEM sound from an audio bank.
                 else if (node.Type == NodeType.WemFile)
                 {
-                    await PreviewWemFromWpkAsync(node);
+                    if (node.SourceWadPath.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await PreviewWemFromBnkAsync(node);
+                    }
+                    else
+                    {
+                        await PreviewWemFromWpkAsync(node);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Failed to preview file '{node.FullPath}'.");
+                await ShowUnsupportedPreviewAsync(node.Extension);
+            }
+        }
+
+        private async Task PreviewWemFromBnkAsync(FileSystemNodeModel node)
+        {
+            if (string.IsNullOrEmpty(node.SourceWadPath) || node.WemSize == 0)
+            {
+                await ShowUnsupportedPreviewAsync(node.Extension);
+                return;
+            }
+
+            try
+            {
+                byte[] bnkData;
+                using (var wadFile = new WadFile(node.SourceWadPath))
+                {
+                    var chunk = wadFile.FindChunk(node.SourceChunkPathHash);
+                    using var decompressedOwner = wadFile.LoadChunkDecompressed(chunk);
+                    bnkData = decompressedOwner.Span.ToArray();
+                }
+
+                byte[] wemData = new byte[node.WemSize];
+                Array.Copy(bnkData, node.WemOffset, wemData, 0, node.WemSize);
+
+                await DispatchPreview(wemData, ".wem");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to preview audio sound from BNK: {node.Name}");
                 await ShowUnsupportedPreviewAsync(node.Extension);
             }
         }

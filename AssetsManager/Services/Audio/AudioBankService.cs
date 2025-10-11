@@ -20,11 +20,33 @@ namespace AssetsManager.Services.Audio
         {
             _logService = logService;
         }
+
         public List<AudioEventNode> ParseAudioBank(byte[] audioData, byte[] eventsData, byte[] binData)
         {
-            var eventNameMap = GetEventsFromBin(binData);
-            var audioTree = ParseEventsBank(eventsData, eventNameMap, null);
-            return audioTree;
+            var eventNameMap = GetEventsFromBin(binData, "_VO");
+            return ParseEventsBank(eventsData, eventNameMap, null);
+        }
+
+        public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData)
+        {
+            var eventNameMap = GetEventsFromBin(binData, "_SFX");
+
+            Dictionary<uint, WemInfo> wemMetadata = new Dictionary<uint, WemInfo>();
+            if (audioData != null)
+            {
+                using var audioStream = new MemoryStream(audioData);
+                var audioBnk = BnkParser.Parse(audioStream, _logService);
+                if (audioBnk?.Didx?.Wems != null)
+                {
+                    foreach(var wem in audioBnk.Didx.Wems)
+                    {
+                        wemMetadata[wem.Id] = wem;
+                    }
+                    _logService.Log($"[AUDIO] Found {wemMetadata.Count} WEM metadata entries in audio BNK.");
+                }
+            }
+
+            return ParseEventsBank(eventsData, eventNameMap, wemMetadata);
         }
 
         private static uint Fnv1Hash(string input)
@@ -41,7 +63,7 @@ namespace AssetsManager.Services.Audio
             return hash;
         }
 
-        private Dictionary<uint, string> GetEventsFromBin(byte[] binData)
+        private Dictionary<uint, string> GetEventsFromBin(byte[] binData, string bankType)
         {
             var mapEventNames = new Dictionary<uint, string>();
             if (binData == null || binData.Length == 0) return mapEventNames;
@@ -50,7 +72,6 @@ namespace AssetsManager.Services.Audio
             {
                 using var stream = new MemoryStream(binData);
                 var binTree = new BinTree(stream);
-                _logService.LogDebug($"[AUDIO DEBUG] BinTree parsed. Found {binTree.Objects.Count} objects.");
 
                 uint skinCharacterDataPropertiesHash = Fnv1a.HashLower("SkinCharacterDataProperties");
                 uint skinAudioPropertiesHash = Fnv1a.HashLower("skinAudioProperties");
@@ -62,18 +83,14 @@ namespace AssetsManager.Services.Audio
                 {
                     if (obj.ClassHash == skinCharacterDataPropertiesHash)
                     {
-                        _logService.LogDebug("[AUDIO DEBUG] Found SkinCharacterDataProperties object.");
                         if (obj.Properties.TryGetValue(skinAudioPropertiesHash, out var skinAudioProp) && skinAudioProp is BinTreeStruct skinAudioStruct)
                         {
-                            _logService.LogDebug("[AUDIO DEBUG] Found skinAudioProperties struct.");
                             if (skinAudioStruct.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer bankUnitsContainer)
                             {
-                                _logService.LogDebug($"[AUDIO DEBUG] Found bankUnits container with {bankUnitsContainer.Elements.Count} units.");
                                 foreach (BinTreeStruct bankUnit in bankUnitsContainer.Elements.OfType<BinTreeStruct>())
                                 {
-                                    if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString && nameString.Value.Contains("_VO"))
+                                    if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString && nameString.Value.Contains(bankType))
                                     {
-                                        _logService.LogDebug($"[AUDIO DEBUG] Found VO BankUnit: {nameString.Value}");
                                         if (bankUnit.Properties.TryGetValue(eventsHash, out var eventsProp) && eventsProp is BinTreeContainer eventsContainer)
                                         {
                                             foreach (BinTreeString eventNameProp in eventsContainer.Elements.OfType<BinTreeString>())
@@ -81,7 +98,6 @@ namespace AssetsManager.Services.Audio
                                                 uint eventHash = Fnv1Hash(eventNameProp.Value);
                                                 mapEventNames[eventHash] = eventNameProp.Value;
                                             }
-                                            _logService.LogDebug($"[AUDIO DEBUG] Extracted {eventsContainer.Elements.Count} events from this unit.");
                                         }
                                     }
                                 }
@@ -90,12 +106,12 @@ namespace AssetsManager.Services.Audio
                     }
                 }
             }
-            catch (Exception ex) { _logService.LogError(ex, "[AUDIO DEBUG] Crash during BIN parsing."); }
-            _logService.LogDebug($"[AUDIO DEBUG] Finished BIN parsing. Found {mapEventNames.Count} total VO events.");
+            catch (Exception ex) { _logService.LogError(ex, "[AUDIO] Crash during BIN parsing."); }
+            _logService.Log($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total {bankType} events.");
             return mapEventNames;
         }
 
-        private List<AudioEventNode> ParseEventsBank(byte[] eventsData, Dictionary<uint, string> eventNameMap, List<uint> availableWemIds)
+        private List<AudioEventNode> ParseEventsBank(byte[] eventsData, Dictionary<uint, string> eventNameMap, Dictionary<uint, WemInfo> wemMetadata)
         {
             var eventNodes = new List<AudioEventNode>();
             if (eventsData == null) return eventNodes;
@@ -103,14 +119,12 @@ namespace AssetsManager.Services.Audio
             using var stream = new MemoryStream(eventsData);
             var bnkFile = BnkParser.Parse(stream, _logService);
 
-            if (bnkFile?.Hirc?.Objects == null) 
+            if (bnkFile?.Hirc?.Objects == null)
             {
-                _logService.LogDebug("[AUDIO DEBUG] BNK parsing failed or no HIRC objects found.");
                 return eventNodes;
             }
 
             var hircObjects = bnkFile.Hirc.Objects.ToDictionary(o => o.Id);
-            _logService.LogDebug($"[AUDIO DEBUG] BNK parsed. Found {hircObjects.Count} HIRC objects.");
 
             void Traverse(uint objectId, AudioEventNode audioEventNode)
             {
@@ -121,7 +135,27 @@ namespace AssetsManager.Services.Audio
                     case BnkObjectType.Sound:
                         if (currentObject.Data is SoundBnkObjectData soundData)
                         {
-                            audioEventNode.Sounds.Add(new WemFileNode { Id = soundData.WemId, Name = $"{soundData.WemId}.wem" });
+                            if (wemMetadata == null) // VO Audio Bank
+                            {
+                                _logService.Log($"[AUDIO] Linking VO sound: {soundData.WemId}");
+                                audioEventNode.Sounds.Add(new WemFileNode { Id = soundData.WemId, Name = $"{soundData.WemId}.wem" });
+                            }
+                            else if (wemMetadata.ContainsKey(soundData.WemId)) // SFX Audio Bank
+                            {
+                                var wemInfo = wemMetadata[soundData.WemId];
+                                _logService.Log($"[AUDIO] Linking SFX sound: {soundData.WemId}");
+                                audioEventNode.Sounds.Add(new WemFileNode 
+                                {
+                                    Id = soundData.WemId, 
+                                    Name = $"{soundData.WemId}.wem",
+                                    Offset = wemInfo.Offset,
+                                    Size = wemInfo.Size
+                                });
+                            }
+                            else
+                            {
+                                _logService.Log($"[AUDIO] Sound {soundData.WemId} found in event, but not in audio BNK DIDX.");
+                            }
                         }
                         break;
                     case BnkObjectType.Action:
@@ -152,7 +186,6 @@ namespace AssetsManager.Services.Audio
             }
 
             var eventObjects = bnkFile.Hirc.Objects.Where(o => o.Type == BnkObjectType.Event);
-            _logService.LogDebug($"[AUDIO DEBUG] Found {eventObjects.Count()} Event objects in BNK.");
 
             foreach (var eventObj in eventObjects)
             {
@@ -168,12 +201,12 @@ namespace AssetsManager.Services.Audio
 
                 if (audioEventNode.Sounds.Any() || audioEventNode.Containers.Any())
                 {
-                    _logService.LogDebug($"[AUDIO DEBUG] Processed event '{eventName}', found {audioEventNode.Sounds.Count} sounds.");
                     eventNodes.Add(audioEventNode);
                 }
             }
 
+            _logService.Log($"[AUDIO] Finished parsing events bank. Created {eventNodes.Count} event nodes.");
             return eventNodes;
         }
-    }      
-}          
+    }
+}

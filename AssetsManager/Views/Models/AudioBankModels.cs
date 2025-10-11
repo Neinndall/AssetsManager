@@ -21,5 +21,7 @@ namespace AssetsManager.Views.Models
     public class WemFileNode : AudioBankNode
     {
         public uint Id { get; set; }
+        public uint Offset { get; set; }
+        public uint Size { get; set; }
     }
 }

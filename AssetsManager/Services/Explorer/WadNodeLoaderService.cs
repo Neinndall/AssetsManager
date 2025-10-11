@@ -177,8 +177,8 @@ namespace AssetsManager.Services.Explorer
                 Status = status
             };
 
-            // If the node is a voice audio WPK, add a dummy child to make it expandable
-            if (SupportedFileTypes.AudioBank.Contains(fileNode.Extension) && fileNode.Name.Contains("_vo_audio"))
+            // If the node is an audio bank, add a dummy child to make it expandable
+            if (SupportedFileTypes.AudioBank.Contains(fileNode.Extension) && (fileNode.Name.Contains("_vo_audio") || fileNode.Name.Contains("_sfx_audio")))
             {
                 fileNode.Children.Add(new FileSystemNodeModel());
             }

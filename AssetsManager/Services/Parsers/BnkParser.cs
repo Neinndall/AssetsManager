@@ -117,6 +117,21 @@ namespace AssetsManager.Services.Parsers
                         reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
                         break;
 
+                    case "DIDX":
+                        bnk.Didx = new DidxSectionData();
+                        int wemCount = (int)sectionSize / 12;
+                        for (int i = 0; i < wemCount; i++)
+                        {
+                            bnk.Didx.Wems.Add(new WemInfo
+                            {
+                                Id = reader.ReadUInt32(),
+                                Offset = reader.ReadUInt32(),
+                                Size = reader.ReadUInt32()
+                            });
+                        }
+                        reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
+                        break;
+
                     default:
                         logService.LogDebug($"[BNK DEBUG] Skipping section: {signature}");
                         reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);

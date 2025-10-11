@@ -6,7 +6,7 @@ namespace AssetsManager.Utils
         public static readonly string[] Textures = { ".dds", ".tex" };
         public static readonly string[] VectorImages = { ".svg" };
         public static readonly string[] Media = { ".ogg", ".wem", ".webm" };
-        public static readonly string[] AudioBank = { ".wpk" };
+        public static readonly string[] AudioBank = { ".wpk", ".bnk" };
 
         public static readonly string[] Json = { ".json" };
         public static readonly string[] JavaScript = { ".js" };

@@ -16,6 +16,8 @@ namespace AssetsManager.Views.Models
         public string OldPath { get; set; }
         public SerializableChunkDiff ChunkDiff { get; set; }
         public uint WemId { get; set; } // Only for WemFile
+        public uint WemOffset { get; set; } // Only for WemFile from BNK
+        public uint WemSize { get; set; } // Only for WemFile from BNK
 
         public ObservableCollection<FileSystemNodeModel> Children { get; set; }
 
@@ -153,12 +155,23 @@ namespace AssetsManager.Views.Models
             Children = new ObservableCollection<FileSystemNodeModel>();
         }
 
-        // Constructor for custom UI nodes like Audio Events/Sounds
-        public FileSystemNodeModel(string name, NodeType type, uint wemId = 0)
+        // Constructor for custom UI nodes like Audio Events
+        public FileSystemNodeModel(string name, NodeType type)
         {
             Name = name;
             Type = type;
+            FullPath = name; // Path is not relevant for these nodes
+            Children = new ObservableCollection<FileSystemNodeModel>();
+        }
+
+        // Constructor for WemFile nodes
+        public FileSystemNodeModel(string name, uint wemId, uint wemOffset = 0, uint wemSize = 0)
+        {
+            Name = name;
+            Type = NodeType.WemFile;
             WemId = wemId;
+            WemOffset = wemOffset;
+            WemSize = wemSize;
             FullPath = name; // Path is not relevant for these nodes
             Children = new ObservableCollection<FileSystemNodeModel>();
         }
