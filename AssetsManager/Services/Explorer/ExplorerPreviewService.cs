@@ -607,5 +607,17 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        public async Task ShowPreviewForRealFileWithTemporaryExtension(FileSystemNodeModel node, string tempExtension)
+        {
+            if (!File.Exists(node.FullPath))
+            {
+                await ShowUnsupportedPreviewAsync("File not found");
+                return;
+            }
+
+            byte[] fileData = await File.ReadAllBytesAsync(node.FullPath);
+            await DispatchPreview(fileData, tempExtension);
+        }
+
     }
 }

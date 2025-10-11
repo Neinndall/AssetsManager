@@ -42,13 +42,20 @@ namespace AssetsManager.Views.Controls.Explorer
 
             var selectedExtension = ExtensionComboBox.SelectedItem.ToString();
 
-            var tempNode = new FileSystemNodeModel(_currentNode.Name + selectedExtension, false, _currentNode.FullPath + selectedExtension, _currentNode.SourceWadPath)
+            if (_currentNode.Type == NodeType.RealFile)
             {
-                ChunkDiff = _currentNode.ChunkDiff,
-                SourceChunkPathHash = _currentNode.SourceChunkPathHash
-            };
+                await ExplorerPreviewService.ShowPreviewForRealFileWithTemporaryExtension(_currentNode, selectedExtension);
+            }
+            else // For VirtualFile, etc.
+            {
+                var tempNode = new FileSystemNodeModel(_currentNode.Name + selectedExtension, false, _currentNode.FullPath + selectedExtension, _currentNode.SourceWadPath)
+                {
+                    ChunkDiff = _currentNode.ChunkDiff,
+                    SourceChunkPathHash = _currentNode.SourceChunkPathHash
+                };
 
-            await ShowPreviewAsync(tempNode);
+                await ShowPreviewAsync(tempNode);
+            }
         }
 
         private void FilePreviewerControl_PreviewKeyDown(object sender, KeyEventArgs e)
