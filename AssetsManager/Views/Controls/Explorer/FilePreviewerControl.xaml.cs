@@ -23,6 +23,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public PinnedFilesManager ViewModel { get; set; }
         private bool _isLoaded = false;
 
+        private FileSystemNodeModel _currentNode;
         private bool _isShowingTemporaryPreview = false;
 
         public FilePreviewerControl()
@@ -33,6 +34,21 @@ namespace AssetsManager.Views.Controls.Explorer
             this.Loaded += FilePreviewerControl_Loaded;
             this.Unloaded += FilePreviewerControl_Unloaded;
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+        }
+
+        private async void TryPreviewWithoutExt_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentNode == null || ExtensionComboBox.SelectedItem == null) return;
+
+            var selectedExtension = ExtensionComboBox.SelectedItem.ToString();
+
+            var tempNode = new FileSystemNodeModel(_currentNode.Name + selectedExtension, false, _currentNode.FullPath + selectedExtension, _currentNode.SourceWadPath)
+            {
+                ChunkDiff = _currentNode.ChunkDiff,
+                SourceChunkPathHash = _currentNode.SourceChunkPathHash
+            };
+
+            await ShowPreviewAsync(tempNode);
         }
 
         private void FilePreviewerControl_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -112,6 +128,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
+                ExtensionComboBox.ItemsSource = new[] { ".bin", ".dds", ".tex" };
+                ExtensionComboBox.SelectedIndex = 0;
+
                 ExplorerPreviewService.Initialize(
                     ImagePreview,
                     WebView2Preview,
@@ -119,6 +138,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     PreviewPlaceholder,
                     SelectFileMessagePanel,
                     UnsupportedFileMessagePanel,
+                    ExtensionlessFilePanel,
                     UnsupportedFileMessage,
                     DetailsPreview
                 );
@@ -147,6 +167,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
+            _currentNode = node;
+
             var existingPin = ViewModel.PinnedFiles.FirstOrDefault(p => p.Node == node && !p.IsDetailsTab);
 
             if (existingPin != null)
