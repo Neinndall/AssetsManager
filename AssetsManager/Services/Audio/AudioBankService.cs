@@ -2,100 +2,135 @@ using System.Collections.Generic;
 using System.IO;
 using System;
 using System.Linq;
-using AssetsManager.Services.Parsers;
-using AssetsManager.Views.Models;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
-
+using AssetsManager.Services.Parsers;
+using AssetsManager.Views.Models;
 using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Audio
 {
     public class AudioBankService
     {
+        private class WemSoundInfo
+        {
+            public uint Id { get; set; }
+            public uint Offset { get; set; }
+            public uint Size { get; set; }
+        }
+
         private readonly LogService _logService;
 
         public AudioBankService(LogService logService)
         {
             _logService = logService;
         }
-        public List<AudioEventNode> ParseAudioBank(byte[] audioData, byte[] eventsData, byte[] binData)
-        {
-            var eventNameMap = GetEventsFromBin(binData);
-            var audioTree = ParseEventsBank(eventsData, eventNameMap, null);
-            return audioTree;
-        }
 
-        private static uint Fnv1Hash(string input)
+        public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData, string baseName, BinType binType)
         {
-            const uint offsetBasis = 2166136261;
-            const uint prime = 16777619;
+            var eventNameMap = BinParser.GetEventsFromBin(binData, baseName, binType, _logService);
 
-            uint hash = offsetBasis;
-            foreach (byte b in System.Text.Encoding.ASCII.GetBytes(input.ToLowerInvariant()))
+            var allWems = new Dictionary<uint, WemSoundInfo>();
+            
+            // For VO banks, WPK is the primary source of audio. The accompanying BNK might be redundant or supplementary.
+            // We prioritize the WPK and only use the BNK as a fallback if the WPK is missing.
+            if (wpkData != null)
             {
-                hash *= prime;
-                hash ^= b;
-            }
-            return hash;
-        }
-
-        private Dictionary<uint, string> GetEventsFromBin(byte[] binData)
-        {
-            var mapEventNames = new Dictionary<uint, string>();
-            if (binData == null || binData.Length == 0) return mapEventNames;
-
-            try
-            {
-                using var stream = new MemoryStream(binData);
-                var binTree = new BinTree(stream);
-                _logService.LogDebug($"[AUDIO DEBUG] BinTree parsed. Found {binTree.Objects.Count} objects.");
-
-                uint skinCharacterDataPropertiesHash = Fnv1a.HashLower("SkinCharacterDataProperties");
-                uint skinAudioPropertiesHash = Fnv1a.HashLower("skinAudioProperties");
-                uint bankUnitsHash = Fnv1a.HashLower("bankUnits");
-                uint eventsHash = Fnv1a.HashLower("events");
-                uint nameHash = Fnv1a.HashLower("name");
-
-                foreach (var obj in binTree.Objects.Values)
+                using var audioStream = new MemoryStream(wpkData);
+                var wpkFile = WpkParser.Parse(audioStream, _logService);
+                if (wpkFile?.Wems != null)
                 {
-                    if (obj.ClassHash == skinCharacterDataPropertiesHash)
+                    foreach (var wem in wpkFile.Wems)
                     {
-                        _logService.LogDebug("[AUDIO DEBUG] Found SkinCharacterDataProperties object.");
-                        if (obj.Properties.TryGetValue(skinAudioPropertiesHash, out var skinAudioProp) && skinAudioProp is BinTreeStruct skinAudioStruct)
-                        {
-                            _logService.LogDebug("[AUDIO DEBUG] Found skinAudioProperties struct.");
-                            if (skinAudioStruct.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer bankUnitsContainer)
-                            {
-                                _logService.LogDebug($"[AUDIO DEBUG] Found bankUnits container with {bankUnitsContainer.Elements.Count} units.");
-                                foreach (BinTreeStruct bankUnit in bankUnitsContainer.Elements.OfType<BinTreeStruct>())
-                                {
-                                    if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString && nameString.Value.Contains("_VO"))
-                                    {
-                                        _logService.LogDebug($"[AUDIO DEBUG] Found VO BankUnit: {nameString.Value}");
-                                        if (bankUnit.Properties.TryGetValue(eventsHash, out var eventsProp) && eventsProp is BinTreeContainer eventsContainer)
-                                        {
-                                            foreach (BinTreeString eventNameProp in eventsContainer.Elements.OfType<BinTreeString>())
-                                            {
-                                                uint eventHash = Fnv1Hash(eventNameProp.Value);
-                                                mapEventNames[eventHash] = eventNameProp.Value;
-                                            }
-                                            _logService.LogDebug($"[AUDIO DEBUG] Extracted {eventsContainer.Elements.Count} events from this unit.");
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = wem.Offset, Size = wem.Size };
                     }
+                    _logService.LogDebug($"[AUDIO] Found {allWems.Count} WEM entries in WPK.");
                 }
             }
-            catch (Exception ex) { _logService.LogError(ex, "[AUDIO DEBUG] Crash during BIN parsing."); }
-            _logService.LogDebug($"[AUDIO DEBUG] Finished BIN parsing. Found {mapEventNames.Count} total VO events.");
-            return mapEventNames;
+            
+            if (audioBnkData != null)
+            {
+                using var audioStream = new MemoryStream(audioBnkData);
+                var audioBnk = BnkParser.Parse(audioStream, _logService);
+                if (audioBnk?.Didx?.Wems != null && audioBnk.Data != null)
+                {
+                    long dataOffset = audioBnk.Data.Offset;
+                    foreach(var wem in audioBnk.Didx.Wems)
+                    {
+                        allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = (uint)(wem.Offset + dataOffset), Size = wem.Size };
+                    }
+                    _logService.LogDebug($"[AUDIO] WPK not found for VO bank, using BNK as fallback. Found {allWems.Count} WEM metadata entries.");
+                }
+            }
+
+            // Parse the events and link them to the sounds found above.
+            var eventNodes = ParseEventsBank(eventsData, eventNameMap, allWems);
+            // Find any sounds that were not linked to an event and group them under "Unknown".
+            AddUnknownSoundsNode(eventNodes, allWems);
+
+            return eventNodes;
         }
 
-        private List<AudioEventNode> ParseEventsBank(byte[] eventsData, Dictionary<uint, string> eventNameMap, List<uint> availableWemIds)
+        public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData, string baseName, BinType binType)
+        {
+            var eventNameMap = BinParser.GetEventsFromBin(binData, baseName, binType, _logService);
+
+            var allWems = new Dictionary<uint, WemSoundInfo>();
+            // For SFX banks, the audio data is stored inside the main .bnk file itself.
+            // We parse its DIDX and DATA sections to get the offset and size of each WEM.
+            if (audioData != null)
+            {
+                using var audioStream = new MemoryStream(audioData);
+                var audioBnk = BnkParser.Parse(audioStream, _logService);
+                if (audioBnk?.Didx?.Wems != null && audioBnk.Data != null)
+                {
+                    long dataOffset = audioBnk.Data.Offset;
+                    foreach(var wem in audioBnk.Didx.Wems)
+                    {
+                        // The offset in DIDX is relative to the start of the DATA section, so we calculate the absolute offset.
+                        allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = (uint)(wem.Offset + dataOffset), Size = wem.Size };
+                    }
+                    _logService.LogDebug($"[AUDIO] Found {allWems.Count} WEM metadata entries in audio BNK.");
+                }
+            }
+
+            var eventNodes = ParseEventsBank(eventsData, eventNameMap, allWems);
+            AddUnknownSoundsNode(eventNodes, allWems);
+
+            return eventNodes;
+        }
+
+        /// <summary>
+        /// Finds all sounds that were not associated with any event and groups them into a new "Unknown" node.
+        /// </summary>
+        private void AddUnknownSoundsNode(List<AudioEventNode> eventNodes, Dictionary<uint, WemSoundInfo> allSounds)
+        {
+            if (allSounds == null || !allSounds.Any()) return;
+
+            var linkedWemIds = new HashSet<uint>(eventNodes.SelectMany(e => e.Sounds).Select(s => s.Id));
+            var unlinkedWemIds = allSounds.Keys.Where(id => !linkedWemIds.Contains(id)).ToList();
+
+            if (unlinkedWemIds.Any())
+            {
+                var unknownNode = new AudioEventNode { Name = "Unknown" };
+                foreach (var wemId in unlinkedWemIds)
+                {
+                    var wemInfo = allSounds[wemId];
+                    unknownNode.Sounds.Add(new WemFileNode
+                    {
+                        Id = wemId,
+                        Name = $"{wemId}.wem",
+                        Offset = wemInfo.Offset,
+                        Size = wemInfo.Size
+                    });
+                }
+                eventNodes.Add(unknownNode);
+                _logService.LogDebug($"[AUDIO] Added 'Unknown' node with {unlinkedWemIds.Count} unlinked sounds.");
+            }
+        }
+
+        private List<AudioEventNode> ParseEventsBank(byte[] eventsData, Dictionary<uint, string> eventNameMap, Dictionary<uint, WemSoundInfo> wemMetadata)
         {
             var eventNodes = new List<AudioEventNode>();
             if (eventsData == null) return eventNodes;
@@ -103,14 +138,12 @@ namespace AssetsManager.Services.Audio
             using var stream = new MemoryStream(eventsData);
             var bnkFile = BnkParser.Parse(stream, _logService);
 
-            if (bnkFile?.Hirc?.Objects == null) 
+            if (bnkFile?.Hirc?.Objects == null)
             {
-                _logService.LogDebug("[AUDIO DEBUG] BNK parsing failed or no HIRC objects found.");
                 return eventNodes;
             }
 
             var hircObjects = bnkFile.Hirc.Objects.ToDictionary(o => o.Id);
-            _logService.LogDebug($"[AUDIO DEBUG] BNK parsed. Found {hircObjects.Count} HIRC objects.");
 
             void Traverse(uint objectId, AudioEventNode audioEventNode)
             {
@@ -121,7 +154,22 @@ namespace AssetsManager.Services.Audio
                     case BnkObjectType.Sound:
                         if (currentObject.Data is SoundBnkObjectData soundData)
                         {
-                            audioEventNode.Sounds.Add(new WemFileNode { Id = soundData.WemId, Name = $"{soundData.WemId}.wem" });
+                            if (wemMetadata != null && wemMetadata.ContainsKey(soundData.WemId))
+                            {
+                                var wemInfo = wemMetadata[soundData.WemId];
+                                _logService.LogDebug($"[AUDIO] Linking sound: {soundData.WemId}");
+                                audioEventNode.Sounds.Add(new WemFileNode 
+                                {
+                                    Id = soundData.WemId, 
+                                    Name = $"{soundData.WemId}.wem",
+                                    Offset = wemInfo.Offset,
+                                    Size = wemInfo.Size
+                                });
+                            }
+                            else
+                            {
+                                _logService.LogDebug($"[AUDIO] Sound {soundData.WemId} found in event, but not in audio BNK/WPK.");
+                            }
                         }
                         break;
                     case BnkObjectType.Action:
@@ -152,7 +200,6 @@ namespace AssetsManager.Services.Audio
             }
 
             var eventObjects = bnkFile.Hirc.Objects.Where(o => o.Type == BnkObjectType.Event);
-            _logService.LogDebug($"[AUDIO DEBUG] Found {eventObjects.Count()} Event objects in BNK.");
 
             foreach (var eventObj in eventObjects)
             {
@@ -168,12 +215,12 @@ namespace AssetsManager.Services.Audio
 
                 if (audioEventNode.Sounds.Any() || audioEventNode.Containers.Any())
                 {
-                    _logService.LogDebug($"[AUDIO DEBUG] Processed event '{eventName}', found {audioEventNode.Sounds.Count} sounds.");
                     eventNodes.Add(audioEventNode);
                 }
             }
 
+            _logService.LogDebug($"[AUDIO] Finished parsing events bank. Created {eventNodes.Count} event nodes.");
             return eventNodes;
         }
-    }      
-}          
+    }
+}

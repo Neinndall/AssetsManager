@@ -82,9 +82,28 @@ namespace AssetsManager.Views.Models
         public List<BnkObject> Objects { get; set; } = new List<BnkObject>();
     }
 
+    public class WemInfo
+    {
+        public uint Id { get; set; }
+        public uint Offset { get; set; }
+        public uint Size { get; set; }
+    }
+
+    public class DidxSectionData : BnkSectionData
+    {
+        public List<WemInfo> Wems { get; set; } = new List<WemInfo>();
+    }
+
+    public class DataSectionData : BnkSectionData
+    {
+        public long Offset { get; set; }
+    }
+
     public class BnkFile
     {
         public BkhdSectionData Bkhd { get; set; }
         public HircSectionData Hirc { get; set; }
+        public DidxSectionData Didx { get; set; }
+        public DataSectionData Data { get; set; }
     }
 }

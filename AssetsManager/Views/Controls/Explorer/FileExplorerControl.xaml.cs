@@ -40,6 +40,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public TreeBuilderService TreeBuilderService { get; set; }
         public TreeUIManager TreeUIManager { get; set; }
         public AudioBankService AudioBankService { get; set; }
+        public AudioBankLinkerService AudioBankLinkerService { get; set; }
 
         public ObservableCollection<FileSystemNodeModel> RootNodes { get; set; }
         private readonly DispatcherTimer _searchTimer;
@@ -366,105 +367,84 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
-                bool isAudioWpk = SupportedFileTypes.AudioBank.Contains(selectedNode.Extension) && selectedNode.Name.Contains("_vo_audio");
-                if (isAudioWpk && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
+                if (selectedNode.IsAudioBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
-                    await HandleAudioBankSelection(selectedNode);
+                    await HandleAudioBankExpansion(selectedNode);
                 }
                 else
                 {
-                    // For any other file, invoke the event to let the previewer handle it.
                     FileSelected?.Invoke(this, e);
                 }
             }
         }
 
-        private async Task HandleAudioBankSelection(FileSystemNodeModel wpkNode)
+        private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
         {
-            // 1. Find sibling .bnk file
-            var parentPath = TreeUIManager.FindNodePath(RootNodes, wpkNode);
-            if (parentPath == null || parentPath.Count < 2)
+            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, RootNodes, _currentRootPath);
+            if (linkedBank == null)
             {
-                LogService.LogError(null, $"Could not find parent for node {wpkNode.Name}");
-                return;
-            }
-            var parentNode = parentPath[parentPath.Count - 2];
-            var eventsNode = parentNode.Children.FirstOrDefault(c => c.Name == wpkNode.Name.Replace("_vo_audio.wpk", "_vo_events.bnk"));
-
-            if (eventsNode == null)
-            {
-                LogService.LogError(null, $"Could not find sibling _vo_events.bnk for {wpkNode.Name}");
-                return;
+                return; // Errors are logged by the service
             }
 
-            // 2. Find associated .bin file
-            var pathParts = wpkNode.FullPath.Split('/');
-            string championName = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("characters") && pathParts.ToList().IndexOf(p) < pathParts.ToList().IndexOf("skins"));
-            string skinFolder = pathParts.FirstOrDefault(p => pathParts.ToList().IndexOf(p) > pathParts.ToList().IndexOf("skins"));
-            
-            string skinName;
-            if (skinFolder == "base")
+            bool isVo = clickedNode.Name.Contains("_vo_audio");
+
+            // Read other file data from the WAD.
+            var eventsData = linkedBank.EventsBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
+            byte[] wpkData = linkedBank.WpkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
+            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
+
+            if (eventsData == null)
             {
-                skinName = "skin0";
+                LogService.LogError(null, "Failed to read required data for events file.");
+                return;
+            }
+
+            // 4. Call the appropriate service method to parse the data and build the audio tree.
+            List<AudioEventNode> audioTree;
+            if (wpkData != null)
+            {
+                audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
             }
             else
             {
-                int.TryParse(skinFolder.Replace("skin", ""), out int skinNumber);
-                skinName = $"skin{skinNumber}";
-            }
-            string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
-
-            string sourceWadName = Path.GetFileName(wpkNode.SourceWadPath);
-            string[] wadNameParts = sourceWadName.Split('.');
-            string targetWadName = wadNameParts.Length > 3 ? $"{wadNameParts[0]}.{wadNameParts[2]}.{wadNameParts[3]}" : sourceWadName;
-
-            var targetWadNode = FindNodeByName(RootNodes, targetWadName);
-
-            FileSystemNodeModel binNode = null;
-            if (targetWadNode != null)
-            {
-                binNode = await WadSearchBoxService.PerformSearchAsync(binPath, new ObservableCollection<FileSystemNodeModel> { targetWadNode }, LoadAllChildrenForSearch);
+                audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
             }
 
-            if (binNode == null)
-            {
-                LogService.LogError(null, $"Could not find associated .bin file at {binPath}");
-                await Application.Current.Dispatcher.InvokeAsync(() => { wpkNode.Children.Clear(); wpkNode.IsExpanded = false; });
-                return;
-            }
-
-            // 3. Read file data
-            var binData = await WadExtractionService.GetVirtualFileBytesAsync(binNode);
-            var wpkData = await WadExtractionService.GetVirtualFileBytesAsync(wpkNode);
-            var eventsData = await WadExtractionService.GetVirtualFileBytesAsync(eventsNode);
-
-            if (binData == null || wpkData == null || eventsData == null)
-            {
-                LogService.LogError(null, "Failed to read data for one or more audio bank files.");
-                return;
-            }
-
-            var audioTree = AudioBankService.ParseAudioBank(wpkData, eventsData, binData);
-            
-            // 4. Populate tree
+            // 5. Populate the tree view with the results.
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                wpkNode.Children.Clear();
+                clickedNode.Children.Clear();
                 foreach (var eventNode in audioTree)
                 {
                     var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
                     foreach (var soundNode in eventNode.Sounds)
                     {
-                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, NodeType.WemFile, soundNode.Id)
+                        // Determine the correct source file (WPK or BNK) for the sound.
+                        // This is crucial for the previewer to know where to extract the WEM data from.
+                        AudioSourceType sourceType;
+                        ulong sourceHash;
+                        if (linkedBank.WpkNode != null)
                         {
-                            SourceWadPath = wpkNode.SourceWadPath,
-                            SourceChunkPathHash = wpkNode.SourceChunkPathHash
+                            sourceType = AudioSourceType.Wpk;
+                            sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
+                        }
+                        else
+                        {
+                            sourceType = AudioSourceType.Bnk;
+                            sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
+                        }
+
+                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
+                        {
+                            SourceWadPath = clickedNode.SourceWadPath,
+                            SourceChunkPathHash = sourceHash,
+                            AudioSource = sourceType
                         };
                         newEventNode.Children.Add(newSoundNode);
                     }
-                    wpkNode.Children.Add(newEventNode);
+                    clickedNode.Children.Add(newEventNode);
                 }
-                wpkNode.IsExpanded = true;
+                clickedNode.IsExpanded = true;
             });
         }
 
@@ -549,25 +529,6 @@ namespace AssetsManager.Views.Controls.Explorer
             await TreeBuilderService.LoadAllChildren(node, _currentRootPath);
         }
 
-        private FileSystemNodeModel FindNodeByName(IEnumerable<FileSystemNodeModel> nodes, string name)
-        {
-            foreach (var node in nodes)
-            {
-                if (node.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-                {
-                    return node;
-                }
 
-                if (node.Children != null && node.Children.Any())
-                {
-                    var found = FindNodeByName(node.Children, name);
-                    if (found != null)
-                    {
-                        return found;
-                    }
-                }
-            }
-            return null;
-        }
     }
 }

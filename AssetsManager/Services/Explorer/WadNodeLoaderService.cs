@@ -123,6 +123,19 @@ namespace AssetsManager.Services.Explorer
                 node.Children.Add(child);
                 SortChildrenRecursively(child);
             }
+
+            // Post-process to remove expander from redundant VO BNK files
+            var voWpks = node.Children.Where(c => c.Name.Contains("_vo_audio.wpk")).Select(c => c.Name).ToHashSet();
+            var voBnks = node.Children.Where(c => c.Name.Contains("_vo_audio.bnk")).ToList();
+
+            foreach (var bnkNode in voBnks)
+            {
+                string correspondingWpk = bnkNode.Name.Replace(".bnk", ".wpk");
+                if (voWpks.Contains(correspondingWpk))
+                {
+                    bnkNode.Children.Clear(); // Remove the dummy node, thus removing the expander
+                }
+            }
         }
 
         public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode)
@@ -177,8 +190,8 @@ namespace AssetsManager.Services.Explorer
                 Status = status
             };
 
-            // If the node is a voice audio WPK, add a dummy child to make it expandable
-            if (SupportedFileTypes.AudioBank.Contains(fileNode.Extension) && fileNode.Name.Contains("_vo_audio"))
+            // Add a dummy child to all audio banks to make them expandable. Redundant ones will be pruned after sorting.
+            if (fileNode.IsAudioBank)
             {
                 fileNode.Children.Add(new FileSystemNodeModel());
             }
