@@ -87,9 +87,9 @@ namespace AssetsManager.Services.Explorer
                 {
                     byte[] decompressedData;
 
-                    if (fileNode.SourceWadPath.EndsWith(".chunk"))
+                    if (!string.IsNullOrEmpty(fileNode.BackupChunkPath))
                     {
-                        byte[] compressedData = File.ReadAllBytes(fileNode.SourceWadPath);
+                        byte[] compressedData = File.ReadAllBytes(fileNode.BackupChunkPath);
                         var compressionType = fileNode.ChunkDiff.Type == ChunkDiffType.Removed ? fileNode.ChunkDiff.OldCompressionType : fileNode.ChunkDiff.NewCompressionType;
                         decompressedData = WadChunkUtils.DecompressChunk(compressedData, compressionType);
                     }
@@ -129,9 +129,9 @@ namespace AssetsManager.Services.Explorer
 
                     byte[] decompressedData;
 
-                    if (fileNode.SourceWadPath.EndsWith(".chunk"))
+                    if (!string.IsNullOrEmpty(fileNode.BackupChunkPath))
                     {
-                        byte[] compressedData = File.ReadAllBytes(fileNode.SourceWadPath);
+                        byte[] compressedData = File.ReadAllBytes(fileNode.BackupChunkPath);
                         var compressionType = fileNode.ChunkDiff.Type == ChunkDiffType.Removed ? fileNode.ChunkDiff.OldCompressionType : fileNode.ChunkDiff.NewCompressionType;
                         decompressedData = WadChunkUtils.DecompressChunk(compressedData, compressionType);
                     }

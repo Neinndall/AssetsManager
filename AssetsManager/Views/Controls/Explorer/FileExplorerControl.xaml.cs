@@ -42,6 +42,9 @@ namespace AssetsManager.Views.Controls.Explorer
         public AudioBankService AudioBankService { get; set; }
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
 
+        public string NewLolPath { get; set; }
+        public string OldLolPath { get; set; }
+
         public ObservableCollection<FileSystemNodeModel> RootNodes { get; set; }
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
@@ -136,6 +139,8 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task BuildWadTreeAsync(string rootPath)
         {
             _currentRootPath = rootPath;
+            NewLolPath = null;
+            OldLolPath = null;
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
@@ -173,6 +178,8 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
             _currentRootPath = rootPath;
+            NewLolPath = null;
+            OldLolPath = null;
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
 
@@ -218,8 +225,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                var backupNodes = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath);
+                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath);
                 RootNodes.Clear();
+                NewLolPath = newLolPath;
+                OldLolPath = oldLolPath;
                 foreach (var node in backupNodes)
                 {
                     RootNodes.Add(node);
@@ -287,9 +296,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void ViewChanges_Click(object sender, RoutedEventArgs e)
         {
-            if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null } selectedNode) return;
+            if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null, BackupChunkPath: not null } selectedNode) return;
 
-            string backupDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(selectedNode.SourceWadPath)));
+            // backupDir is three levels up from the chunk path (e.g., /backup_root/wad_chunks/new/file.chunk)
+            string backupDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(selectedNode.BackupChunkPath)));
             string oldChunksPath = Path.Combine(backupDir, "wad_chunks", "old");
             string newChunksPath = Path.Combine(backupDir, "wad_chunks", "new");
 
@@ -380,13 +390,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
         {
-            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, RootNodes, _currentRootPath);
+            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, RootNodes, _currentRootPath, NewLolPath, OldLolPath);
             if (linkedBank == null)
             {
                 return; // Errors are logged by the service
             }
-
-            bool isVo = clickedNode.Name.Contains("_vo_audio");
 
             // Read other file data from the WAD.
             var eventsData = linkedBank.EventsBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
@@ -414,6 +422,21 @@ namespace AssetsManager.Views.Controls.Explorer
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 clickedNode.Children.Clear();
+
+                // Determine the absolute source WAD path for the child sound nodes.
+                string absoluteSourceWadPath;
+                if (clickedNode.ChunkDiff != null && (!string.IsNullOrEmpty(NewLolPath) || !string.IsNullOrEmpty(OldLolPath)))
+                {
+                    // Backup mode: construct the absolute path from the base LoL directory and the relative WAD path.
+                    string basePath = clickedNode.ChunkDiff.Type == ChunkDiffType.Removed ? OldLolPath : NewLolPath;
+                    absoluteSourceWadPath = Path.Combine(basePath, clickedNode.SourceWadPath);
+                }
+                else
+                {
+                    // Normal mode: the SourceWadPath should already be absolute.
+                    absoluteSourceWadPath = clickedNode.SourceWadPath;
+                }
+
                 foreach (var eventNode in audioTree)
                 {
                     var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
@@ -436,7 +459,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                         var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
                         {
-                            SourceWadPath = clickedNode.SourceWadPath,
+                            SourceWadPath = absoluteSourceWadPath, // Use the resolved absolute path
                             SourceChunkPathHash = sourceHash,
                             AudioSource = sourceType
                         };

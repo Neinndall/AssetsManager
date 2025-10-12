@@ -64,10 +64,10 @@ namespace AssetsManager.Services.Explorer.Tree
             return new ObservableCollection<FileSystemNodeModel>(nodes);
         }
 
-        public async Task<ObservableCollection<FileSystemNodeModel>> BuildTreeFromBackupAsync(string jsonPath)
+        public async Task<(ObservableCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath)
         {
-            var nodes = await _wadNodeLoaderService.LoadFromBackupAsync(jsonPath);
-            return new ObservableCollection<FileSystemNodeModel>(nodes);
+            var (nodes, newLolPath, oldLolPath) = await _wadNodeLoaderService.LoadFromBackupAsync(jsonPath);
+            return (new ObservableCollection<FileSystemNodeModel>(nodes), newLolPath, oldLolPath);
         }
 
         public async Task LoadAllChildren(FileSystemNodeModel node, string currentRootPath)
