@@ -239,16 +239,9 @@ namespace AssetsManager.Services.Explorer
         public async Task ResetPreviewAsync()
         {
             _currentlyDisplayedNode = null;
-
-            // Limpiar WebView antes de cambiar al placeholder
-            await ClearWebViewAsync();
-            
-            await SetPreviewer(Previewer.Placeholder);
-            _selectFileMessagePanel.Visibility = Visibility.Visible;
-            _unsupportedFileMessagePanel.Visibility = Visibility.Collapsed;
-            _extensionlessFilePanel.Visibility = Visibility.Collapsed;
+            await SetPreviewerAsync(Previewer.Placeholder);
         }
-        
+
         // Método centralizado para limpiar el WebView
         private async Task ClearWebViewAsync()
         {
@@ -256,10 +249,10 @@ namespace AssetsManager.Services.Explorer
             {
                 if (_webView2Preview?.CoreWebView2 != null)
                 {
-                    var blankPage = @"<!DOCTYPE html><html><head><style>html, body {background-color: #252526 !important;margin: 0;padding: 0;height: 100vh;overflow: hidden;}</style></head><body></body></html>";
-                    _webView2Preview.CoreWebView2.NavigateToString(blankPage);
-                    // Pequeña pausa para que tome efecto
-                    await Task.Delay(50);
+                    // Using about:blank is faster and more reliable than NavigateToString
+                    _webView2Preview.CoreWebView2.Navigate("about:blank");
+                    // A minimal delay might still be useful for visual consistency
+                    await Task.Delay(1);
                 }
             }
             catch (Exception ex)
@@ -337,16 +330,13 @@ namespace AssetsManager.Services.Explorer
                     syntaxHighlighting = GetJsonHighlighting();
                 }
 
-                await SetPreviewer(Previewer.AvalonEdit);
-                _textEditorPreview.SyntaxHighlighting = syntaxHighlighting;
-                _textEditorPreview.Text = textContent;
-                _textEditorPreview.Focus();
+                await SetPreviewerAsync(Previewer.AvalonEdit, (textContent, syntaxHighlighting));
             }
             catch (Exception ex)
             {
-                await SetPreviewer(Previewer.AvalonEdit);
                 _logService.LogError(ex, $"Failed to show text preview for extension {extension}");
-                _textEditorPreview.Text = $"Error showing {extension} file.";
+                string errorText = $"Error showing {extension} file.";
+                await SetPreviewerAsync(Previewer.AvalonEdit, (errorText, (IHighlightingDefinition)null));
             }
         }
 
@@ -365,45 +355,97 @@ namespace AssetsManager.Services.Explorer
             return _jsonHighlightingDefinition;
         }
 
-        // Versión limpia de SetPreviewer
-        private async Task SetPreviewer(Previewer previewer)
+        private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null)
         {
-            if (_activePreviewer == previewer) return;
-
-            if (previewer == Previewer.WebView)
-            {
-                await ClearWebViewAsync();
-            }
-
+            // Step 1: Clean the canvas. Hide all panels and clear their content.
             _imagePreview.Visibility = Visibility.Collapsed;
             _webView2Preview.Visibility = Visibility.Collapsed;
             _textEditorPreview.Visibility = Visibility.Collapsed;
             _previewPlaceholder.Visibility = Visibility.Collapsed;
             _detailsPreview.Visibility = Visibility.Collapsed;
 
-            switch (previewer)
+            _imagePreview.Source = null;
+            _textEditorPreview.Clear();
+
+            if (_activePreviewer == Previewer.WebView)
             {
-                case Previewer.Image:
-                    _imagePreview.Visibility = Visibility.Visible;
-                    break;
-                case Previewer.WebView:
-                    _webView2Preview.Visibility = Visibility.Visible;
-                    break;
-                case Previewer.AvalonEdit:
-                    _textEditorPreview.Text = string.Empty;
-                    _textEditorPreview.Visibility = Visibility.Visible;
-                    break;
-                case Previewer.Placeholder:
-                    _previewPlaceholder.Visibility = Visibility.Visible;
-                    break;
+                await ClearWebViewAsync();
             }
 
-            _activePreviewer = previewer;
+            _activePreviewer = newPreviewer;
+
+            // Step 2: Assign content and reveal the correct panel.
+            switch (newPreviewer)
+            {
+                case Previewer.Image:
+                    if (content is ImageSource imageSource)
+                    {
+                        _imagePreview.Source = imageSource;
+                        _imagePreview.Visibility = Visibility.Visible;
+                    }
+                    break;
+
+                case Previewer.WebView:
+                    if (content is string htmlContent && _webView2Preview.CoreWebView2 != null)
+                    {
+                        // To prevent white flashes, we make the control visible only after navigation is complete.
+                        void OnNavigationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
+                        {
+                            _webView2Preview.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
+                            
+                            // This needs to be run on the UI thread.
+                            _webView2Preview.Dispatcher.Invoke(() => 
+                            {
+                                _webView2Preview.Visibility = Visibility.Visible;
+                            });
+                        }
+
+                        _webView2Preview.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
+                        _webView2Preview.CoreWebView2.NavigateToString(htmlContent);
+                    }
+                    break;
+
+                case Previewer.AvalonEdit:
+                    if (content is ValueTuple<string, IHighlightingDefinition> textData)
+                    {
+                        _textEditorPreview.Text = textData.Item1;
+                        _textEditorPreview.SyntaxHighlighting = textData.Item2;
+                        _textEditorPreview.Visibility = Visibility.Visible;
+                        _textEditorPreview.Focus();
+                    }
+                    break;
+
+                case Previewer.Placeholder:
+                    _previewPlaceholder.Visibility = Visibility.Visible;
+                    if (content is string extension)
+                    {
+                        // This is for unsupported files
+                        _selectFileMessagePanel.Visibility = Visibility.Collapsed;
+                        if (string.IsNullOrEmpty(extension))
+                        {
+                            _unsupportedFileMessagePanel.Visibility = Visibility.Collapsed;
+                            _extensionlessFilePanel.Visibility = Visibility.Visible;
+                        }
+                        else
+                        {
+                            _extensionlessFilePanel.Visibility = Visibility.Collapsed;
+                            _unsupportedFileMessagePanel.Visibility = Visibility.Visible;
+                            _unsupportedFileTextBlock.Text = $"Preview not available for '{extension}' files.";
+                        }
+                    }
+                    else
+                    {
+                        // This is for the default "Select a file" message
+                        _selectFileMessagePanel.Visibility = Visibility.Visible;
+                        _unsupportedFileMessagePanel.Visibility = Visibility.Collapsed;
+                        _extensionlessFilePanel.Visibility = Visibility.Collapsed;
+                    }
+                    break;
+            }
         }
 
         private async Task ShowImagePreviewAsync(byte[] data)
         {
-            await SetPreviewer(Previewer.Image);
             var bitmap = await Task.Run(() =>
             {
                 using var stream = new MemoryStream(data);
@@ -415,12 +457,12 @@ namespace AssetsManager.Services.Explorer
                 bmp.Freeze();
                 return bmp;
             });
-            _imagePreview.Source = bitmap;
+
+            await SetPreviewerAsync(Previewer.Image, bitmap);
         }
 
         private async Task ShowTexturePreviewAsync(byte[] data)
         {
-            await SetPreviewer(Previewer.Image);
             var bitmapSource = await Task.Run(() =>
             {
                 using var stream = new MemoryStream(data);
@@ -450,7 +492,7 @@ namespace AssetsManager.Services.Explorer
 
             if (bitmapSource != null)
             {
-                _imagePreview.Source = bitmapSource;
+                await SetPreviewerAsync(Previewer.Image, bitmapSource);
             }
             else
             {
@@ -468,12 +510,10 @@ namespace AssetsManager.Services.Explorer
 
             try
             {
-                await SetPreviewer(Previewer.WebView);
-            
                 string svgContent = Encoding.UTF8.GetString(data);
                 var htmlContent = $@"<!DOCTYPE html><html><head><meta charset=""UTF-8""/><style>html, body {{background-color: transparent !important;display: flex;justify-content: center;align-items: center;height: 100vh;margin: 0;padding: 20px;box-sizing: border-box;overflow: hidden;}}svg {{width: 90%;height: 90%;object-fit: contain;}}</style></head><body>{svgContent}</body></html>";
-                
-                _webView2Preview.CoreWebView2.NavigateToString(htmlContent);
+
+                await SetPreviewerAsync(Previewer.WebView, htmlContent);
             }
             catch (Exception ex)
             {
@@ -492,9 +532,7 @@ namespace AssetsManager.Services.Explorer
 
             try
             {
-                await SetPreviewer(Previewer.WebView);
-
-                // Limpiar archivos temporales
+                // Clean up previous temp files before creating a new one.
                 await Task.Run(() =>
                 {
                     try
@@ -510,89 +548,34 @@ namespace AssetsManager.Services.Explorer
                     }
                 });
 
-                // Crear el nuevo archivo temporal
                 var tempFileName = $"preview_{DateTime.Now.Ticks}{extension}";
                 var tempFilePath = Path.Combine(_directoriesCreator.TempPreviewPath, tempFileName);
                 await File.WriteAllBytesAsync(tempFilePath, data);
 
-                // Preparar el contenido HTML
                 var mimeType = extension switch
                 {
                     ".ogg" => "audio/ogg",
                     ".webm" => "video/webm",
                     _ => "application/octet-stream"
                 };
-                
+
                 string tag = mimeType.StartsWith("video/") ? "video" : "audio";
                 string extraAttributes = tag == "video" ? "muted" : "";
                 var fileUrl = $"https://preview.assets/{tempFileName}";
-                
+
                 var htmlContent = $@"
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset='UTF-8'>
-                        <style>
-                            html, body {{
-                                background-color: #252526 !important;
-                                margin: 0;
-                                padding: 0;
-                                height: 100vh;
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                overflow: hidden;
-                            }}
-                            
-                            {tag} {{
-                                width: {(tag == "audio" ? "300px" : "auto")};
-                                height: {(tag == "audio" ? "80px" : "auto")};
-                                max-width: 100%;
-                                max-height: 100%;
-                                background-color: #252526;
-                                object-fit: contain;
-                                opacity: 0;
-                                transition: opacity 0.2s ease-out;
-                            }}
-                            
-                            {tag}.loaded {{
-                                opacity: 1;
-                            }}
-                        </style>
-                        <script>
-                            document.addEventListener('DOMContentLoaded', function() {{
-                                const mediaElement = document.getElementById('mediaElement');
-                                
-                                // Mostrar el elemento una vez que esté listo
-                                mediaElement.addEventListener('loadeddata', function() {{
-                                    mediaElement.classList.add('loaded');
-                                }});
-                                
-                                // Manejar errores
-                                mediaElement.addEventListener('error', function() {{
-                                    console.error('Error loading media');
-                                    mediaElement.style.opacity = '1'; // Mostrar aunque haya error
-                                }});
-                                
-                                // Fallback: mostrar después de 1 segundo si no hay evento loadeddata
-                                setTimeout(function() {{
-                                    if (!mediaElement.classList.contains('loaded')) {{
-                                        mediaElement.classList.add('loaded');
-                                    }}
-                                }}, 1000);
-                            }});
-                        </script>
-                    </head>
-                    <body>
-                        <{tag} id='mediaElement' controls autoplay {extraAttributes}>
-                            <source src='{fileUrl}' type='{mimeType}'>
+                    <!DOCTYPE html><html><head><meta charset='UTF-8'>
+                    <style>
+                        html, body {{ background-color: #252526 !important; margin: 0; padding: 0; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }}
+                        {tag} {{ width: {(tag == "audio" ? "300px" : "auto")}; height: {(tag == "audio" ? "80px" : "auto")}; max-width: 100%; max-height: 100%; background-color: #252526; object-fit: contain; }}
+                    </style>
+                    </head><body>
+                        <{tag} id='mediaElement' controls autoplay {extraAttributes} src='{fileUrl}' type='{mimeType}'>
                             Your browser doesn't support this {(tag == "video" ? "video" : "audio")} format.
                         </{tag}>
-                    </body>
-                    </html>";
+                    </body></html>";
 
-                // Navegar al contenido final
-                _webView2Preview.CoreWebView2.NavigateToString(htmlContent);
+                await SetPreviewerAsync(Previewer.WebView, htmlContent);
             }
             catch (Exception ex)
             {
@@ -603,20 +586,7 @@ namespace AssetsManager.Services.Explorer
 
         private async Task ShowUnsupportedPreviewAsync(string extension)
         {
-            await SetPreviewer(Previewer.Placeholder);
-            _selectFileMessagePanel.Visibility = Visibility.Collapsed;
-
-            if (string.IsNullOrEmpty(extension))
-            {
-                _unsupportedFileMessagePanel.Visibility = Visibility.Collapsed;
-                _extensionlessFilePanel.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                _extensionlessFilePanel.Visibility = Visibility.Collapsed;
-                _unsupportedFileMessagePanel.Visibility = Visibility.Visible;
-                _unsupportedFileTextBlock.Text = $"Preview not available for '{extension}' files.";
-            }
+            await SetPreviewerAsync(Previewer.Placeholder, extension);
         }
 
         public async Task ShowPreviewForRealFileWithTemporaryExtension(FileSystemNodeModel node, string tempExtension)
