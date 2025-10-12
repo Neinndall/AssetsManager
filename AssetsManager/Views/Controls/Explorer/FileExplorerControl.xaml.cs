@@ -367,7 +367,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
-                bool isAudioBank = SupportedFileTypes.AudioBank.Contains(selectedNode.Extension) && (selectedNode.Name.Contains("_vo_audio") || selectedNode.Name.Contains("_sfx_audio"));
+                bool isAudioBank = SupportedFileTypes.AudioBank.Contains(selectedNode.Extension) && selectedNode.Name.Contains("_audio");
                 if (isAudioBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
                     await HandleAudioBankExpansion(selectedNode);
@@ -404,11 +404,11 @@ namespace AssetsManager.Views.Controls.Explorer
             List<AudioEventNode> audioTree;
             if (isVo)
             {
-                audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
+                audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
             }
             else
             {
-                audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
+                audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
             }
 
             // 5. Populate the tree view with the results.

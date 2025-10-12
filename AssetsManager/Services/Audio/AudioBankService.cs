@@ -27,9 +27,9 @@ namespace AssetsManager.Services.Audio
             _logService = logService;
         }
 
-        public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData, string baseName)
+        public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData, string baseName, BinType binType)
         {
-            var eventNameMap = BinParser.GetEventsFromBin(binData, baseName, _logService);
+            var eventNameMap = BinParser.GetEventsFromBin(binData, baseName, binType, _logService);
 
             var allWems = new Dictionary<uint, WemSoundInfo>();
             
@@ -71,9 +71,9 @@ namespace AssetsManager.Services.Audio
             return eventNodes;
         }
 
-        public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData, string baseName)
+        public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData, string baseName, BinType binType)
         {
-            var eventNameMap = BinParser.GetEventsFromBin(binData, baseName, _logService);
+            var eventNameMap = BinParser.GetEventsFromBin(binData, baseName, binType, _logService);
 
             var allWems = new Dictionary<uint, WemSoundInfo>();
             // For SFX banks, the audio data is stored inside the main .bnk file itself.
