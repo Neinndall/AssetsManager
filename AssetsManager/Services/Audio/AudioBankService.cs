@@ -173,7 +173,7 @@ namespace AssetsManager.Services.Audio
                         }
                         break;
                     case BnkObjectType.Action:
-                        if (currentObject.Data is ActionBnkObjectData actionData && (actionData.Type == 2 || actionData.Type == 4))
+                        if (currentObject.Data is ActionBnkObjectData actionData)
                         {
                             Traverse(actionData.ObjectId, audioEventNode);
                         }
