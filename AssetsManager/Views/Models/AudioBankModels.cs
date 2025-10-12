@@ -24,4 +24,16 @@ namespace AssetsManager.Views.Models
         public uint Offset { get; set; }
         public uint Size { get; set; }
     }
+
+    public enum BinType { Champion, Map, Unknown }
+
+    public class LinkedAudioBank
+    {
+        public FileSystemNodeModel WpkNode { get; set; }
+        public FileSystemNodeModel AudioBnkNode { get; set; }
+        public FileSystemNodeModel EventsBnkNode { get; set; }
+        public byte[] BinData { get; set; }
+        public string BaseName { get; set; }
+        public BinType BinType { get; set; }
+    }
 }

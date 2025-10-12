@@ -54,7 +54,7 @@ namespace AssetsManager.Services.Parsers
                             };
                             long objEnd = reader.BaseStream.Position + bnkObject.Size - 4;
 
-                            logService.Log($"[BNK HIRC Object] Type: {(byte)bnkObject.Type} ({bnkObject.Type}), ID: {bnkObject.Id}");
+                            logService.LogDebug($"[BNK HIRC Object] Type: {(byte)bnkObject.Type} ({bnkObject.Type}), ID: {bnkObject.Id}");
 
                             switch (bnkObject.Type)
                             {

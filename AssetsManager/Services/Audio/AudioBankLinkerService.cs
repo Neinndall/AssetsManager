@@ -1,17 +1,16 @@
-
-using AssetsManager.Services.Hashes;
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Explorer;
-using AssetsManager.Services.Explorer.Tree;
-using AssetsManager.Views.Models;
-using LeagueToolkit.Core.Meta;
-using LeagueToolkit.Core.Meta.Properties;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Explorer.Tree;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Services.Audio
 {
@@ -268,17 +267,5 @@ namespace AssetsManager.Services.Audio
             }
             return null;
         }
-    }
-
-    public enum BinType { Champion, Map, Unknown }
-
-    public class LinkedAudioBank
-    {
-        public FileSystemNodeModel WpkNode { get; set; }
-        public FileSystemNodeModel AudioBnkNode { get; set; }
-        public FileSystemNodeModel EventsBnkNode { get; set; }
-        public byte[] BinData { get; set; }
-        public string BaseName { get; set; }
-        public BinType BinType { get; set; }
     }
 }
