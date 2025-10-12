@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace AssetsManager.Utils
 {
     public static class SupportedFileTypes
