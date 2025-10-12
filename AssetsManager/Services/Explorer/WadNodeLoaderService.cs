@@ -124,14 +124,14 @@ namespace AssetsManager.Services.Explorer
                 SortChildrenRecursively(child);
             }
 
-            // Post-process to remove expander from redundant VO BNK files
-            var voWpks = node.Children.Where(c => c.Name.Contains("_vo_audio.wpk")).Select(c => c.Name).ToHashSet();
-            var voBnks = node.Children.Where(c => c.Name.Contains("_vo_audio.bnk")).ToList();
+            // Post-process to remove expander from redundant BNK files when a WPK exists
+            var audioWpks = node.Children.Where(c => c.Name.EndsWith("_audio.wpk")).Select(c => c.Name).ToHashSet();
+            var audioBnks = node.Children.Where(c => c.Name.EndsWith("_audio.bnk")).ToList();
 
-            foreach (var bnkNode in voBnks)
+            foreach (var bnkNode in audioBnks)
             {
                 string correspondingWpk = bnkNode.Name.Replace(".bnk", ".wpk");
-                if (voWpks.Contains(correspondingWpk))
+                if (audioWpks.Contains(correspondingWpk))
                 {
                     bnkNode.Children.Clear(); // Remove the dummy node, thus removing the expander
                 }

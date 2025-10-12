@@ -172,27 +172,87 @@ namespace AssetsManager.Services.Audio
                             }
                         }
                         break;
+
                     case BnkObjectType.Action:
-                        if (currentObject.Data is ActionBnkObjectData actionData && (actionData.Type == 2 || actionData.Type == 4))
+                        if (currentObject.Data is ActionBnkObjectData actionData)
                         {
                             Traverse(actionData.ObjectId, audioEventNode);
                         }
                         break;
+
                     case BnkObjectType.RandomOrSequenceContainer:
                         if (currentObject.Data is RandomOrSequenceContainerBnkObjectData containerData)
                         {
-                            foreach (var soundId in containerData.Children)
+                            foreach (var childId in containerData.Children)
                             {
-                                Traverse(soundId, audioEventNode);
+                                Traverse(childId, audioEventNode);
                             }
                         }
                         break;
+
                     case BnkObjectType.SwitchContainer:
                         if (currentObject.Data is SwitchContainerBnkObjectData switchData)
                         {
                             foreach (var childId in switchData.Children)
                             {
                                 Traverse(childId, audioEventNode);
+                            }
+                        }
+                        break;
+
+                    case BnkObjectType.MusicPlaylistContainer:
+                        if (currentObject.Data is MusicPlaylistContainerBnkObjectData playlistData)
+                        {
+                            foreach (var childId in playlistData.Children)
+                            {
+                                Traverse(childId, audioEventNode);
+                            }
+                        }
+                        break;
+
+                    case BnkObjectType.MusicSwitchContainer:
+                        if (currentObject.Data is MusicSwitchContainerBnkObjectData musicSwitchData)
+                        {
+                            foreach (var childId in musicSwitchData.Children)
+                            {
+                                Traverse(childId, audioEventNode);
+                            }
+                        }
+                        break;
+
+                    case BnkObjectType.MusicSegment:
+                        if (currentObject.Data is MusicSegmentBnkObjectData segmentData)
+                        {
+                            foreach (var childId in segmentData.Children)
+                            {
+                                Traverse(childId, audioEventNode);
+                            }
+                        }
+                        break;
+
+                    case BnkObjectType.MusicTrack:
+                        if (currentObject.Data is MusicTrackBnkObjectData trackData)
+                        {
+                            // CRITICAL FIX: MusicTrack.Children contains WEM IDs directly, not HIRC object IDs
+                            // These are file IDs that need to be looked up in wemMetadata, not traversed as HIRC objects
+                            foreach (var wemId in trackData.Children)
+                            {
+                                if (wemMetadata != null && wemMetadata.ContainsKey(wemId))
+                                {
+                                    var wemInfo = wemMetadata[wemId];
+                                    _logService.LogDebug($"[AUDIO] Linking WEM from MusicTrack: {wemId}");
+                                    audioEventNode.Sounds.Add(new WemFileNode 
+                                    {
+                                        Id = wemId, 
+                                        Name = $"{wemId}.wem",
+                                        Offset = wemInfo.Offset,
+                                        Size = wemInfo.Size
+                                    });
+                                }
+                                else
+                                {
+                                    _logService.LogDebug($"[AUDIO] WEM {wemId} found in MusicTrack, but not in audio BNK/WPK.");
+                                }
                             }
                         }
                         break;

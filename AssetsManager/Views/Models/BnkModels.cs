@@ -61,6 +61,27 @@ namespace AssetsManager.Views.Models
         public List<uint> Children { get; set; } = new List<uint>();
     }
 
+    public class MusicTrackBnkObjectData : BnkObjectData
+    {
+        public List<uint> Children { get; set; } = new List<uint>();
+    }
+
+    public class MusicSegmentBnkObjectData : BnkObjectData
+    {
+        public List<uint> Children { get; set; } = new List<uint>();
+    }
+
+    public class MusicSwitchContainerBnkObjectData : BnkObjectData
+    {
+        public uint ParentId { get; set; }
+        public List<uint> Children { get; set; } = new List<uint>();
+    }
+
+    public class MusicPlaylistContainerBnkObjectData : BnkObjectData
+    {
+        public List<uint> Children { get; set; } = new List<uint>();
+    }
+
     public class BnkObject
     {
         public BnkObjectType Type { get; set; }
