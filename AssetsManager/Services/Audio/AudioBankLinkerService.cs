@@ -73,10 +73,9 @@ namespace AssetsManager.Services.Audio
             }
             var parentNode = parentPath[parentPath.Count - 2];
 
-            bool isVo = clickedNode.Name.Contains("_vo_");
             string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
 
-            FileSystemNodeModel wpkNode = isVo ? parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_audio.wpk") : null;
+            FileSystemNodeModel wpkNode = parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_audio.wpk");
             FileSystemNodeModel audioBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_audio.bnk");
             FileSystemNodeModel eventsBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_events.bnk");
 

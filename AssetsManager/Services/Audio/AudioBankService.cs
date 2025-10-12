@@ -48,7 +48,8 @@ namespace AssetsManager.Services.Audio
                     _logService.LogDebug($"[AUDIO] Found {allWems.Count} WEM entries in WPK.");
                 }
             }
-            else if (audioBnkData != null) // Fallback to BNK if WPK is not present
+            
+            if (audioBnkData != null)
             {
                 using var audioStream = new MemoryStream(audioBnkData);
                 var audioBnk = BnkParser.Parse(audioStream, _logService);

@@ -390,7 +390,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             // Read other file data from the WAD.
             var eventsData = linkedBank.EventsBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
-            byte[] wpkData = (isVo && linkedBank.WpkNode != null) ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
+            byte[] wpkData = linkedBank.WpkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
             byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
 
             if (eventsData == null)
@@ -401,7 +401,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             // 4. Call the appropriate service method to parse the data and build the audio tree.
             List<AudioEventNode> audioTree;
-            if (isVo)
+            if (wpkData != null)
             {
                 audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
             }
@@ -423,18 +423,10 @@ namespace AssetsManager.Views.Controls.Explorer
                         // This is crucial for the previewer to know where to extract the WEM data from.
                         AudioSourceType sourceType;
                         ulong sourceHash;
-                        if (isVo)
+                        if (linkedBank.WpkNode != null)
                         {
-                            if (linkedBank.WpkNode != null)
-                            {
-                                sourceType = AudioSourceType.Wpk;
-                                sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
-                            }
-                            else
-                            {
-                                sourceType = AudioSourceType.Bnk;
-                                sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
-                            }
+                            sourceType = AudioSourceType.Wpk;
+                            sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
                         }
                         else
                         {
