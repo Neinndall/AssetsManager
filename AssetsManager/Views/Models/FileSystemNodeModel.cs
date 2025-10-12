@@ -26,6 +26,7 @@ namespace AssetsManager.Views.Models
 
         // --- Data for WADs and Chunks ---
         public string SourceWadPath { get; set; } // Only for VirtualFile/VirtualDirectory
+        public string BackupChunkPath { get; set; } // Only for nodes from a backup
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
         public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();

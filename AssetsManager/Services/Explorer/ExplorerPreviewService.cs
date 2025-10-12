@@ -51,14 +51,16 @@ namespace AssetsManager.Services.Explorer
         private readonly WadDifferenceService _wadDifferenceService;
         private readonly ContentFormatterService _contentFormatterService;
         private readonly WemConversionService _wemConversionService;
+        private readonly WadExtractionService _wadExtractionService;
 
-        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDifferenceService wadDifferenceService, ContentFormatterService contentFormatterService, WemConversionService wemConversionService)
+        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDifferenceService wadDifferenceService, ContentFormatterService contentFormatterService, WemConversionService wemConversionService, WadExtractionService wadExtractionService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _wadDifferenceService = wadDifferenceService;
             _contentFormatterService = contentFormatterService;
             _wemConversionService = wemConversionService;
+            _wadExtractionService = wadExtractionService;
         }
 
         public void Initialize(Image imagePreview, WebView2 webView2Preview, TextEditor textEditor, Panel placeholder, Panel selectFileMessage, Panel unsupportedFileMessage, Panel extensionlessFilePanel, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
@@ -280,50 +282,15 @@ namespace AssetsManager.Services.Explorer
 
         private async Task PreviewWadFile(FileSystemNodeModel node)
         {
-            if (string.IsNullOrEmpty(node.SourceWadPath))
+            byte[] decompressedData = await _wadExtractionService.GetVirtualFileBytesAsync(node);
+
+            if (decompressedData == null)
             {
                 await ShowUnsupportedPreviewAsync(node.Extension);
                 return;
             }
 
-            if (node.SourceWadPath.EndsWith(".chunk"))
-            {
-                byte[] decompressedData = await _wadDifferenceService.GetDataFromChunkAsync(node);
-                if (decompressedData == null)
-                {
-                    await ShowUnsupportedPreviewAsync(node.Extension);
-                    return;
-                }
-                await DispatchPreview(decompressedData, node.Extension);
-            }
-            else
-            {
-                if (node.SourceChunkPathHash == 0)
-                {
-                    await ShowUnsupportedPreviewAsync(node.Extension);
-                    return;
-                }
-
-                byte[] decompressedData;
-                try
-                {
-                    decompressedData = await Task.Run(() =>
-                    {
-                        using var wadFile = new WadFile(node.SourceWadPath);
-                        var chunk = wadFile.FindChunk(node.SourceChunkPathHash);
-                        using var decompressedOwner = wadFile.LoadChunkDecompressed(chunk);
-                        return decompressedOwner.Span.ToArray();
-                    });
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Failed to decompress chunk for preview: {node.FullPath}");
-                    await ShowUnsupportedPreviewAsync(node.Extension);
-                    return;
-                }
-
-                await DispatchPreview(decompressedData, node.Extension);
-            }
+            await DispatchPreview(decompressedData, node.Extension);
         }
 
         private async Task DispatchPreview(byte[] data, string extension)
