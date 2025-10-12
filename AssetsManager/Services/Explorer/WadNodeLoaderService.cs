@@ -191,7 +191,7 @@ namespace AssetsManager.Services.Explorer
             };
 
             // Add a dummy child to all audio banks to make them expandable. Redundant ones will be pruned after sorting.
-            if (SupportedFileTypes.AudioBank.Contains(fileNode.Extension) && fileNode.Name.Contains("_audio"))
+            if (fileNode.IsAudioBank)
             {
                 fileNode.Children.Add(new FileSystemNodeModel());
             }

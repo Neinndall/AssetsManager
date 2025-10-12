@@ -1,3 +1,4 @@
+using AssetsManager.Utils;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -28,6 +29,8 @@ namespace AssetsManager.Views.Models
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
         public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();
+
+        public bool IsAudioBank => SupportedFileTypes.IsExpandableAudioBank(Name);
 
         private bool _isExpanded;
         public bool IsExpanded

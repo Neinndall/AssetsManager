@@ -14,5 +14,11 @@ namespace AssetsManager.Utils
         public static readonly string[] Bin = { ".bin" };
         public static readonly string[] StringTable = { ".stringtable" };
         public static readonly string[] PlainText = { ".txt", ".xml", ".yaml", ".yml", ".ini", ".log", ".lua" };
+
+        public static bool IsExpandableAudioBank(string fileName)
+        {
+            string extension = System.IO.Path.GetExtension(fileName).ToLowerInvariant();
+            return AudioBank.Contains(extension) && fileName.Contains("_audio");
+        }
     }
 }

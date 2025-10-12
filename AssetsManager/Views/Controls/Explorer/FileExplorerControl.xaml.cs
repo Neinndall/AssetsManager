@@ -367,8 +367,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
-                bool isAudioBank = SupportedFileTypes.AudioBank.Contains(selectedNode.Extension) && selectedNode.Name.Contains("_audio");
-                if (isAudioBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
+                if (selectedNode.IsAudioBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
                     await HandleAudioBankExpansion(selectedNode);
                 }
