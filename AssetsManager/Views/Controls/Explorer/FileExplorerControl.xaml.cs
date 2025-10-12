@@ -401,21 +401,23 @@ namespace AssetsManager.Views.Controls.Explorer
             byte[] wpkData = linkedBank.WpkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
             byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
 
-            if (eventsData == null)
-            {
-                LogService.LogError(null, "Failed to read required data for events file.");
-                return;
-            }
-
-            // 4. Call the appropriate service method to parse the data and build the audio tree.
             List<AudioEventNode> audioTree;
-            if (wpkData != null)
+            if (linkedBank.BinData != null)
             {
-                audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                // BIN-based parsing (Champions, Maps)
+                if (wpkData != null)
+                {
+                    audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                }
+                else
+                {
+                    audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                }
             }
             else
             {
-                audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                // Generic parsing (no BIN file)
+                audioTree = AudioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
             }
 
             // 5. Populate the tree view with the results.
