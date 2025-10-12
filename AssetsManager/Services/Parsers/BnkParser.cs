@@ -54,6 +54,8 @@ namespace AssetsManager.Services.Parsers
                             };
                             long objEnd = reader.BaseStream.Position + bnkObject.Size - 4;
 
+                            logService.Log($"[BNK HIRC Object] Type: {(byte)bnkObject.Type} ({bnkObject.Type}), ID: {bnkObject.Id}");
+
                             switch (bnkObject.Type)
                             {
                                 case BnkObjectType.Sound:
@@ -109,6 +111,63 @@ namespace AssetsManager.Services.Parsers
                                     uint childCountSwitch = reader.ReadUInt32();
                                     for (int j = 0; j < childCountSwitch; j++) switchContainerData.Children.Add(reader.ReadUInt32());
                                     bnkObject.Data = switchContainerData;
+                                    break;
+
+                                case BnkObjectType.MusicSegment:
+                                    var musicSegmentData = new MusicSegmentBnkObjectData();
+                                    reader.BaseStream.Seek(1, SeekOrigin.Current);
+                                    BnkParseHelper.SkipBaseParams(reader, bnk.Bkhd.Version);
+                                    uint segmentTrackIdAmount = reader.ReadUInt32();
+                                    for (int j = 0; j < segmentTrackIdAmount; j++) musicSegmentData.Children.Add(reader.ReadUInt32());
+                                    bnkObject.Data = musicSegmentData;
+                                    break;
+
+                                case BnkObjectType.MusicPlaylistContainer:
+                                    var musicPlaylistData = new MusicPlaylistContainerBnkObjectData();
+                                    reader.BaseStream.Seek(1, SeekOrigin.Current);
+                                    BnkParseHelper.SkipBaseParams(reader, bnk.Bkhd.Version);
+                                    uint playlistTrackIdAmount = reader.ReadUInt32();
+                                    for (int j = 0; j < playlistTrackIdAmount; j++) musicPlaylistData.Children.Add(reader.ReadUInt32());
+                                    bnkObject.Data = musicPlaylistData;
+                                    break;
+
+                                case BnkObjectType.MusicTrack:
+                                    var musicTrackData = new MusicTrackBnkObjectData();
+                                    reader.BaseStream.Seek(1, SeekOrigin.Current);
+                                    uint playlistItemCount = reader.ReadUInt32();
+                                    reader.BaseStream.Seek(14 * playlistItemCount, SeekOrigin.Current);
+                                    uint sourcesCount = reader.ReadUInt32();
+                                    for (int j = 0; j < sourcesCount; j++)
+                                    {
+                                        reader.BaseStream.Seek(4, SeekOrigin.Current); // track_index
+                                        uint fileId = reader.ReadUInt32();
+                                        musicTrackData.Children.Add(fileId);
+                                        reader.BaseStream.Seek(36, SeekOrigin.Current); // Rest of track_source_info struct (44 - 8)
+                                    }
+                                    bnkObject.Data = musicTrackData;
+                                    break;
+
+                                case BnkObjectType.MusicSwitchContainer:
+                                    var musicSwitchContainerData = new MusicSwitchContainerBnkObjectData();
+                                    reader.BaseStream.Seek(1, SeekOrigin.Current);
+                                    (musicSwitchContainerData.ParentId, _) = BnkParseHelper.SkipBaseParams(reader, bnk.Bkhd.Version);
+                                    uint numSwitchChildren = reader.ReadUInt32();
+                                    for (int j = 0; j < numSwitchChildren; j++) musicSwitchContainerData.Children.Add(reader.ReadUInt32());
+                                    reader.BaseStream.Seek(23, SeekOrigin.Current);
+                                    uint numStingers = reader.ReadUInt32();
+                                    reader.BaseStream.Seek(24 * numStingers, SeekOrigin.Current);
+                                    uint numRules = reader.ReadUInt32();
+                                    for (int j = 0; j < numRules; j++)
+                                    {
+                                        uint numSources = reader.ReadUInt32();
+                                        reader.BaseStream.Seek(4 * numSources, SeekOrigin.Current);
+                                        uint numDestinations = reader.ReadUInt32();
+                                        reader.BaseStream.Seek(4 * numDestinations, SeekOrigin.Current);
+                                        reader.BaseStream.Seek(bnk.Bkhd.Version <= 0x84 ? 45 : 47, SeekOrigin.Current);
+                                        bool hasTransObject = reader.ReadByte() != 0;
+                                        if (hasTransObject) reader.BaseStream.Seek(30, SeekOrigin.Current);
+                                    }
+                                    bnkObject.Data = musicSwitchContainerData;
                                     break;
                             }
                             bnk.Hirc.Objects.Add(bnkObject);
