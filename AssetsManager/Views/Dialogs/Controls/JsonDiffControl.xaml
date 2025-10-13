@@ -170,7 +170,7 @@
                                                  Padding="0,8"
                                                  ShowLineNumbers="True"
                                                  WordWrap="False"
-                                                 HorizontalScrollBarVisibility="Auto"
+                                                 HorizontalScrollBarVisibility="Visible"
                                                  VerticalScrollBarVisibility="Auto"/>
                         </Border>
                     </Grid>
@@ -221,7 +221,7 @@
                                                  Padding="0,8"
                                                  ShowLineNumbers="True"
                                                  WordWrap="False"
-                                                 HorizontalScrollBarVisibility="Auto"
+                                                 HorizontalScrollBarVisibility="Visible"
                                                  VerticalScrollBarVisibility="Auto"/>
                         </Border>
                     </Grid>

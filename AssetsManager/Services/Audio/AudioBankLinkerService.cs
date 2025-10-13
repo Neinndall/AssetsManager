@@ -59,12 +59,15 @@ namespace AssetsManager.Services.Audio
                 _logService.Log($"[AUDIO_BACKUP] Determined base path: {basePath}");
 
                 var (binNode, baseName, binType) = await FindAssociatedBinFileFromWadsAsync(clickedNode, basePath);
-                if (binNode == null)
+                byte[] binData = null;
+                if (binNode != null)
+                {
+                    binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
+                }
+                else
                 {
                     _logService.LogWarning($"[AUDIO] Could not find any associated .bin file for {clickedNode.Name} in backup mode. Event names will be unavailable.");
                 }
-
-                var binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
 
                 var siblingsResult = await FindSiblingFilesFromWadsAsync(clickedNode, basePath);
 
@@ -82,12 +85,15 @@ namespace AssetsManager.Services.Audio
             {
                 // Normal Mode
                 var (binNode, baseName, binType) = await FindAssociatedBinFileAsync(clickedNode, rootNodes, currentRootPath);
-                if (binNode == null)
+                byte[] binData = null;
+                if (binNode != null)
+                {
+                    binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
+                }
+                else
                 {
                     _logService.LogWarning($"[AUDIO] Could not find any associated .bin file for {clickedNode.Name}. Event names will be unavailable.");
                 }
-
-                var binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
 
                 var siblingsResult = FindSiblingFilesByName(clickedNode, rootNodes);
 
@@ -156,15 +162,19 @@ namespace AssetsManager.Services.Audio
                 }
             }
 
-            // Fallback for unknown types
-            string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
-            return new BinFileStrategy($"{baseName}.bin", sourceWadName, BinType.Unknown);
+            // For any other case, we don't have a reliable way to find the .bin file.
+            return null;
         }
 
         private async Task<(FileSystemNodeModel BinNode, string BaseName, BinType Type)> FindAssociatedBinFileFromWadsAsync(FileSystemNodeModel clickedNode, string basePath)
         {
             string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
             var strategy = GetBinFileSearchStrategy(clickedNode);
+
+            if (strategy == null)
+            {
+                return (null, baseName, BinType.Unknown);
+            }
 
             string wadDirectory;
             if (strategy.Type == BinType.Champion)
@@ -220,6 +230,12 @@ namespace AssetsManager.Services.Audio
         {
             string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
             var strategy = GetBinFileSearchStrategy(clickedNode);
+
+            if (strategy == null)
+            {
+                return (null, baseName, BinType.Unknown);
+            }
+
             Func<FileSystemNodeModel, Task> loader = async (node) => await LoadAllChildrenForSearch(node, currentRootPath);
 
             var targetWadNode = FindNodeByName(rootNodes, strategy.TargetWadName);
@@ -229,17 +245,7 @@ namespace AssetsManager.Services.Audio
                 if (binNode != null) return (binNode, baseName, strategy.Type);
             }
 
-            // Fallback for cases where the initial strategy fails
-            var parentPath = _treeUIManager.FindNodePath(rootNodes, clickedNode);
-            var wadRoot = parentPath?.FirstOrDefault(p => p.Type == NodeType.WadFile);
-            if (wadRoot != null)
-            {
-                _logService.Log($"[AUDIO] Specific BIN not found, attempting global search for '{strategy.BinPath}' in WAD '{wadRoot.Name}'");
-                var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableCollection<FileSystemNodeModel> { wadRoot }, loader);
-                if (binNode != null) return (binNode, baseName, BinType.Unknown);
-            }
-
-            return (null, baseName, strategy.Type);
+            return (null, baseName, strategy.Type);        
         }
 
         private async Task LoadAllChildrenForSearch(FileSystemNodeModel node, string rootPath)

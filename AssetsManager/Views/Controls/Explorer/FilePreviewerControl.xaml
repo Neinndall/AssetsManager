@@ -155,7 +155,7 @@
                                    IsReadOnly="True"
                                    ShowLineNumbers="True"
                                    WordWrap="False"
-                                   HorizontalScrollBarVisibility="Auto"
+                                   HorizontalScrollBarVisibility="Visible"
                                    VerticalScrollBarVisibility="Auto"
                                    Padding="0"
                                    Margin="-4,0,0,0"/>
