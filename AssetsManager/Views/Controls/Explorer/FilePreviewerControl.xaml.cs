@@ -129,7 +129,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async void FilePreviewerControl_Loaded(object sender, RoutedEventArgs e)
+        private void FilePreviewerControl_Loaded(object sender, RoutedEventArgs e)
         {
             if (_isLoaded) return;
 
@@ -140,7 +140,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 ExplorerPreviewService.Initialize(
                     ImagePreview,
-                    WebView2Preview,
+                    WebViewContainer, // Pass the container grid
                     TextEditorPreview,
                     PreviewPlaceholder,
                     SelectFileMessagePanel,
@@ -150,8 +150,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     DetailsPreview
                 );
 
-                await InitializeWebView2();
-                await ExplorerPreviewService.ConfigureWebViewAfterInitializationAsync();
                 _isLoaded = true;
             }
             catch (Exception ex)
@@ -219,29 +217,6 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async Task InitializeWebView2()
-        {
-            await DirectoriesCreator.CreateDirTempPreviewAsync();
-            try
-            {
-                var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: DirectoriesCreator.WebView2DataPath);
-                await WebView2Preview.EnsureCoreWebView2Async(environment);
 
-                WebView2Preview.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                    "preview.assets",
-                    DirectoriesCreator.TempPreviewPath,
-                    CoreWebView2HostResourceAccessKind.Allow
-                );
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "WebView2 initialization failed. Previews will be affected.");
-                CustomMessageBoxService.ShowError(
-                    "Error",
-                    "Could not initialize content viewer. Some previews may not work correctly.",
-                    Window.GetWindow(this)
-                );
-            }
-        }
     }
 }

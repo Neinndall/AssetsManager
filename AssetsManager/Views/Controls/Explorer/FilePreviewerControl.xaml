@@ -159,7 +159,7 @@
                                    VerticalScrollBarVisibility="Auto"
                                    Padding="0"
                                    Margin="-4,0,0,0"/>
-            <wv2:WebView2 x:Name="WebView2Preview" DefaultBackgroundColor="#252526" Visibility="Collapsed"/>
+            <Grid x:Name="WebViewContainer"/>
 
             <shared:FindInDocumentControl x:Name="FindInDocumentControl"
                                           Grid.Row="0"

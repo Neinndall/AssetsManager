@@ -35,7 +35,7 @@ namespace AssetsManager.Services.Explorer
         private FileSystemNodeModel _currentlyDisplayedNode;
 
         private Image _imagePreview;
-        private WebView2 _webView2Preview;
+        private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
         private Panel _previewPlaceholder;
         private Panel _selectFileMessagePanel;
@@ -63,10 +63,10 @@ namespace AssetsManager.Services.Explorer
             _wadExtractionService = wadExtractionService;
         }
 
-        public void Initialize(Image imagePreview, WebView2 webView2Preview, TextEditor textEditor, Panel placeholder, Panel selectFileMessage, Panel unsupportedFileMessage, Panel extensionlessFilePanel, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
+        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, Panel placeholder, Panel selectFileMessage, Panel unsupportedFileMessage, Panel extensionlessFilePanel, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
         {
             _imagePreview = imagePreview;
-            _webView2Preview = webView2Preview;
+            _webViewContainer = webViewContainer;
             _textEditorPreview = textEditor;
             _previewPlaceholder = placeholder;
             _selectFileMessagePanel = selectFileMessage;
@@ -76,29 +76,6 @@ namespace AssetsManager.Services.Explorer
             _detailsPreview = detailsPreview;
         }
 
-        public async Task ConfigureWebViewAfterInitializationAsync()
-        {
-            try
-            {
-                if (_webView2Preview?.CoreWebView2 == null)
-                {
-                    _logService.LogWarning("WebView2 not initialized when trying to configure");
-                    return;
-                }
-                
-                // Initial page background
-                await ClearWebViewAsync();
-                
-                // Additional configurations
-                _webView2Preview.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
-                _webView2Preview.CoreWebView2.Settings.AreDevToolsEnabled = false;
-                _webView2Preview.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to configure WebView2 after initialization");
-            }
-        }
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
@@ -242,24 +219,6 @@ namespace AssetsManager.Services.Explorer
             await SetPreviewerAsync(Previewer.Placeholder);
         }
 
-        // Método centralizado para limpiar el WebView
-        private async Task ClearWebViewAsync()
-        {
-            try
-            {
-                if (_webView2Preview?.CoreWebView2 != null)
-                {
-                    // Using about:blank is faster and more reliable than NavigateToString
-                    _webView2Preview.CoreWebView2.Navigate("about:blank");
-                    // A minimal delay might still be useful for visual consistency
-                    await Task.Delay(1);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to clear WebView");
-            }
-        }
 
         private async Task PreviewRealFile(FileSystemNodeModel node)
         {
@@ -355,26 +314,31 @@ namespace AssetsManager.Services.Explorer
             return _jsonHighlightingDefinition;
         }
 
-        private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null)
+        private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false)
         {
-            // Step 1: Clean the canvas. Hide all panels and clear their content.
+            // Part 1: Hide all static panels and clear their content.
             _imagePreview.Visibility = Visibility.Collapsed;
-            _webView2Preview.Visibility = Visibility.Collapsed;
             _textEditorPreview.Visibility = Visibility.Collapsed;
             _previewPlaceholder.Visibility = Visibility.Collapsed;
             _detailsPreview.Visibility = Visibility.Collapsed;
-
             _imagePreview.Source = null;
             _textEditorPreview.Clear();
 
+            // Part 2: If the previous previewer was a WebView, destroy it.
             if (_activePreviewer == Previewer.WebView)
             {
-                await ClearWebViewAsync();
+                // Find the WebView2 instance in the container, dispose it, and remove it.
+                var webView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
+                if (webView != null)
+                {
+                    webView.Dispose();
+                    _webViewContainer.Children.Remove(webView);
+                }
             }
 
             _activePreviewer = newPreviewer;
 
-            // Step 2: Assign content and reveal the correct panel.
+            // Part 3: Show the new content.
             switch (newPreviewer)
             {
                 case Previewer.Image:
@@ -386,22 +350,10 @@ namespace AssetsManager.Services.Explorer
                     break;
 
                 case Previewer.WebView:
-                    if (content is string htmlContent && _webView2Preview.CoreWebView2 != null)
+                    if (content is string htmlContent)
                     {
-                        // To prevent white flashes, we make the control visible only after navigation is complete.
-                        void OnNavigationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
-                        {
-                            _webView2Preview.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
-                            
-                            // This needs to be run on the UI thread.
-                            _webView2Preview.Dispatcher.Invoke(() => 
-                            {
-                                _webView2Preview.Visibility = Visibility.Visible;
-                            });
-                        }
-
-                        _webView2Preview.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
-                        _webView2Preview.CoreWebView2.NavigateToString(htmlContent);
+                        // This is the new "nuclear" option. Create, initialize, and show a new WebView.
+                        await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
                     }
                     break;
 
@@ -441,6 +393,64 @@ namespace AssetsManager.Services.Explorer
                         _extensionlessFilePanel.Visibility = Visibility.Collapsed;
                     }
                     break;
+            }
+        }
+
+        private async Task CreateAndShowWebViewAsync(string htmlContent, bool shouldAutoplay)
+        {
+            try
+            {
+                var webView = new WebView2()
+                {
+                    DefaultBackgroundColor = System.Drawing.Color.FromArgb(37, 37, 38)
+                };
+
+                _webViewContainer.Children.Add(webView);
+
+                // Initialize CoreWebView2
+                var environment = await Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(userDataFolder: _directoriesCreator.WebView2DataPath);
+                await webView.EnsureCoreWebView2Async(environment);
+
+                // Set settings and mappings
+                webView.CoreWebView2.SetVirtualHostNameToFolderMapping("preview.assets", _directoriesCreator.TempPreviewPath, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+                webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+                webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+                webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
+
+                // Navigate and handle autoplay
+                void OnNavigationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
+                {
+                    webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
+                    if (shouldAutoplay)
+                    {
+                        webView.Dispatcher.Invoke(async () =>
+                        {
+                            try
+                            {
+                                await webView.CoreWebView2.ExecuteScriptAsync("playMedia();");
+                            }
+                            catch (Exception ex)
+                            {
+                                _logService.LogError(ex, "Failed to autoplay media");
+                            }
+                        });
+                    }
+                }
+
+                webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
+                webView.CoreWebView2.NavigateToString(htmlContent);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to create, initialize, and show WebView2.");
+                // Clean up a failed creation
+                var webView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
+                if (webView != null)
+                {
+                    webView.Dispose();
+                    _webViewContainer.Children.Remove(webView);
+                }
+                await ShowUnsupportedPreviewAsync(".media"); // Show a generic error
             }
         }
 
@@ -502,7 +512,7 @@ namespace AssetsManager.Services.Explorer
 
         private async Task ShowSvgPreviewAsync(byte[] data)
         {
-            if (_webView2Preview?.CoreWebView2 == null)
+            if (_webViewContainer == null)
             {
                 await ShowUnsupportedPreviewAsync(".svg");
                 return;
@@ -524,7 +534,7 @@ namespace AssetsManager.Services.Explorer
 
         private async Task ShowAudioVideoPreviewAsync(byte[] data, string extension)
         {
-            if (_webView2Preview?.CoreWebView2 == null)
+            if (_webViewContainer == null)
             {
                 await ShowUnsupportedPreviewAsync(extension);
                 return;
@@ -564,18 +574,79 @@ namespace AssetsManager.Services.Explorer
                 var fileUrl = $"https://preview.assets/{tempFileName}";
 
                 var htmlContent = $@"
-                    <!DOCTYPE html><html><head><meta charset='UTF-8'>
-                    <style>
-                        html, body {{ background-color: #252526 !important; margin: 0; padding: 0; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }}
-                        {tag} {{ width: {(tag == "audio" ? "300px" : "auto")}; height: {(tag == "audio" ? "80px" : "auto")}; max-width: 100%; max-height: 100%; background-color: #252526; object-fit: contain; }}
-                    </style>
-                    </head><body>
-                        <{tag} id='mediaElement' controls autoplay {extraAttributes} src='{fileUrl}' type='{mimeType}'>
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset='UTF-8'>
+                        <style>
+                            html, body {{
+                                background-color: #252526 !important;
+                                margin: 0;
+                                padding: 0;
+                                height: 100vh;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                overflow: hidden;
+                            }}
+                            
+                            {tag} {{
+                                width: {(tag == "audio" ? "300px" : "auto")};
+                                height: {(tag == "audio" ? "80px" : "auto")};
+                                max-width: 100%;
+                                max-height: 100%;
+                                background-color: #252526;
+                                object-fit: contain;
+                                opacity: 0;
+                                transition: opacity 0.2s ease-out;
+                            }}
+                            
+                            {tag}.loaded {{
+                                opacity: 1;
+                            }}
+                        </style>
+                    </head>
+                    <body>
+                        <{tag} id='mediaElement' controls preload='auto' {extraAttributes}>
+                            <source src='{fileUrl}' type='{mimeType}'>
                             Your browser doesn't support this {(tag == "video" ? "video" : "audio")} format.
                         </{tag}>
-                    </body></html>";
+                        <script>
+                            const mediaElement = document.getElementById('mediaElement');
+                            
+                            // Función para reproducir (llamada desde C#)
+                            window.playMedia = function() {{
+                                if (mediaElement.readyState >= 2) {{
+                                    mediaElement.play().catch(e => console.log('Play error:', e));
+                                }} else {{
+                                    mediaElement.addEventListener('canplay', function() {{
+                                        mediaElement.play().catch(e => console.log('Play error:', e));
+                                    }}, {{ once: true }});
+                                }}
+                            }};
+                            
+                            // Mostrar el elemento una vez que esté listo
+                            mediaElement.addEventListener('loadeddata', function() {{
+                                mediaElement.classList.add('loaded');
+                            }});
+                            
+                            // Manejar errores
+                            mediaElement.addEventListener('error', function() {{
+                                console.error('Error loading media');
+                                mediaElement.style.opacity = '1';
+                            }});
+                            
+                            // Fallback: mostrar después de 1 segundo si no hay evento loadeddata
+                            setTimeout(function() {{
+                                if (!mediaElement.classList.contains('loaded')) {{
+                                    mediaElement.classList.add('loaded');
+                                }}
+                            }}, 1000);
+                        </script>
+                    </body>
+                    </html>";
 
-                await SetPreviewerAsync(Previewer.WebView, htmlContent);
+                await SetPreviewerAsync(Previewer.WebView, htmlContent, shouldAutoplay: true);
             }
             catch (Exception ex)
             {
