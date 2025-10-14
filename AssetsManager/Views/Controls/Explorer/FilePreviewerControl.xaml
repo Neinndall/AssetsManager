@@ -92,39 +92,7 @@
                                TextWrapping="Wrap"
                                TextAlignment="Center"/>
                 </StackPanel>
-                <StackPanel x:Name="ExtensionlessFilePanel"
-                            Orientation="Vertical"
-                            HorizontalAlignment="Center"
-                            Visibility="Collapsed">
-                    <materialIcons:MaterialIcon Kind="FileQuestionOutline"
-                                                Width="48" Height="48"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource TextMuted}"
-                                                Opacity="0.5"/>
-                    <TextBlock Text="This file has no extension."
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextMuted}"
-                               HorizontalAlignment="Center"
-                               Margin="0,16,0,0"/>
-                    <TextBlock Text="Select a file type to preview it as:"
-                               FontSize="14"
-                               Foreground="{StaticResource TextMuted}"
-                               HorizontalAlignment="Center"
-                               Margin="0,8,0,16"
-                               Opacity="0.7"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <ComboBox x:Name="ExtensionComboBox"
-                                  Width="120"
-                                  Style="{StaticResource ModernComboBox}"
-                                  VerticalAlignment="Center"/>
-                        <Button x:Name="TryPreviewButton"
-                                Content="Try Preview"
-                                Style="{StaticResource ModernButton}"
-                                Margin="8,0,0,0"
-                                Click="TryPreviewWithoutExt_Click"/>
-                    </StackPanel>
-                </StackPanel>
+
                 <StackPanel x:Name="UnsupportedFileMessagePanel"
                             Orientation="Vertical"
                             HorizontalAlignment="Center"

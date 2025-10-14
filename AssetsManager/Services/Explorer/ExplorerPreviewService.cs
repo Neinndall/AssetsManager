@@ -40,7 +40,7 @@ namespace AssetsManager.Services.Explorer
         private Panel _previewPlaceholder;
         private Panel _selectFileMessagePanel;
         private Panel _unsupportedFileMessagePanel;
-        private Panel _extensionlessFilePanel;
+
         private TextBlock _unsupportedFileTextBlock;
         private UserControl _detailsPreview;
 
@@ -63,7 +63,7 @@ namespace AssetsManager.Services.Explorer
             _wadExtractionService = wadExtractionService;
         }
 
-        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, Panel placeholder, Panel selectFileMessage, Panel unsupportedFileMessage, Panel extensionlessFilePanel, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
+        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, Panel placeholder, Panel selectFileMessage, Panel unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
         {
             _imagePreview = imagePreview;
             _webViewContainer = webViewContainer;
@@ -71,7 +71,6 @@ namespace AssetsManager.Services.Explorer
             _previewPlaceholder = placeholder;
             _selectFileMessagePanel = selectFileMessage;
             _unsupportedFileMessagePanel = unsupportedFileMessage;
-            _extensionlessFilePanel = extensionlessFilePanel;
             _unsupportedFileTextBlock = unsupportedFileTextBlock;
             _detailsPreview = detailsPreview;
         }
@@ -373,24 +372,14 @@ namespace AssetsManager.Services.Explorer
                     {
                         // This is for unsupported files
                         _selectFileMessagePanel.Visibility = Visibility.Collapsed;
-                        if (string.IsNullOrEmpty(extension))
-                        {
-                            _unsupportedFileMessagePanel.Visibility = Visibility.Collapsed;
-                            _extensionlessFilePanel.Visibility = Visibility.Visible;
-                        }
-                        else
-                        {
-                            _extensionlessFilePanel.Visibility = Visibility.Collapsed;
-                            _unsupportedFileMessagePanel.Visibility = Visibility.Visible;
-                            _unsupportedFileTextBlock.Text = $"Preview not available for '{extension}' files.";
-                        }
+                        _unsupportedFileMessagePanel.Visibility = Visibility.Visible;
+                        _unsupportedFileTextBlock.Text = $"Preview not available for '{extension}' files.";
                     }
                     else
                     {
                         // This is for the default "Select a file" message
                         _selectFileMessagePanel.Visibility = Visibility.Visible;
                         _unsupportedFileMessagePanel.Visibility = Visibility.Collapsed;
-                        _extensionlessFilePanel.Visibility = Visibility.Collapsed;
                     }
                     break;
             }
@@ -660,17 +649,7 @@ namespace AssetsManager.Services.Explorer
             await SetPreviewerAsync(Previewer.Placeholder, extension);
         }
 
-        public async Task ShowPreviewForRealFileWithTemporaryExtension(FileSystemNodeModel node, string tempExtension)
-        {
-            if (!File.Exists(node.FullPath))
-            {
-                await ShowUnsupportedPreviewAsync("File not found");
-                return;
-            }
 
-            byte[] fileData = await File.ReadAllBytesAsync(node.FullPath);
-            await DispatchPreview(fileData, tempExtension);
-        }
 
     }
 }

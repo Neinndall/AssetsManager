@@ -36,27 +36,7 @@ namespace AssetsManager.Views.Controls.Explorer
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         }
 
-        private async void TryPreviewWithoutExt_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentNode == null || ExtensionComboBox.SelectedItem == null) return;
 
-            var selectedExtension = ExtensionComboBox.SelectedItem.ToString();
-
-            if (_currentNode.Type == NodeType.RealFile)
-            {
-                await ExplorerPreviewService.ShowPreviewForRealFileWithTemporaryExtension(_currentNode, selectedExtension);
-            }
-            else // For VirtualFile, etc.
-            {
-                var tempNode = new FileSystemNodeModel(_currentNode.Name + selectedExtension, false, _currentNode.FullPath + selectedExtension, _currentNode.SourceWadPath)
-                {
-                    ChunkDiff = _currentNode.ChunkDiff,
-                    SourceChunkPathHash = _currentNode.SourceChunkPathHash
-                };
-
-                await ShowPreviewAsync(tempNode);
-            }
-        }
 
         private void FilePreviewerControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
@@ -135,9 +115,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                ExtensionComboBox.ItemsSource = new[] { ".bin", ".dds", ".tex" };
-                ExtensionComboBox.SelectedIndex = 0;
-
                 ExplorerPreviewService.Initialize(
                     ImagePreview,
                     WebViewContainer, // Pass the container grid
@@ -145,7 +122,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     PreviewPlaceholder,
                     SelectFileMessagePanel,
                     UnsupportedFileMessagePanel,
-                    ExtensionlessFilePanel,
                     UnsupportedFileMessage,
                     DetailsPreview
                 );
