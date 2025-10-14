@@ -153,10 +153,7 @@ namespace AssetsManager.Services.Explorer
                     foreach (var chunk in wadFile.Chunks.Values)
                     {
                         string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
-                        if (!string.IsNullOrEmpty(virtualPath) && virtualPath != chunk.PathHash.ToString("x16"))
-                        {
-                            AddNodeToVirtualTree(rootVirtualNode, virtualPath, pathToWad, chunk.PathHash);
-                        }
+                        AddNodeToVirtualTree(rootVirtualNode, virtualPath, pathToWad, chunk.PathHash);
                     }
                 }
 
