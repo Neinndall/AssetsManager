@@ -155,7 +155,10 @@ namespace AssetsManager.Services.Explorer
                     {
                         string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
 
-                        if (virtualPath == chunk.PathHash.ToString("x16")) // Unresolved hash
+                        bool isUnresolved = virtualPath == chunk.PathHash.ToString("x16");
+                        bool noExtension = !Path.HasExtension(virtualPath);
+
+                        if (isUnresolved || noExtension)
                         {
                             using (var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk))
                             {
