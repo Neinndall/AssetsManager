@@ -1,6 +1,7 @@
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models;
 using LeagueToolkit.Core.Wad;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -153,6 +154,20 @@ namespace AssetsManager.Services.Explorer
                     foreach (var chunk in wadFile.Chunks.Values)
                     {
                         string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
+
+                        if (virtualPath == chunk.PathHash.ToString("x16")) // Unresolved hash
+                        {
+                            using (var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk))
+                            {
+                                var decompressedData = decompressedDataOwner.Memory.Span;
+                                string extension = FileTypeDetector.GuessExtension(decompressedData);
+                                if (!string.IsNullOrEmpty(extension))
+                                {
+                                    virtualPath = virtualPath + "." + extension;
+                                }
+                            }
+                        }
+
                         AddNodeToVirtualTree(rootVirtualNode, virtualPath, pathToWad, chunk.PathHash);
                     }
                 }
