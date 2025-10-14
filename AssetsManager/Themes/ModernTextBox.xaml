@@ -44,25 +44,6 @@
         </Setter>
     </Style>
 
-    <!-- Editable Modern TextBox Style for SearchBox -->
-    <Style x:Key="EditableModernTextBox" TargetType="TextBox">
-        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
-        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="5,0"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="CaretBrush" Value="{StaticResource TextPrimary}"/>
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-            </Trigger>
-            <Trigger Property="IsFocused" Value="True">
-                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-            </Trigger>
-        </Style.Triggers>
-    </Style>
-
     <!-- Animated SearchBox Style -->
     <Style x:Key="AnimatedSearchBoxStyle" TargetType="TextBox">
         <Setter Property="Width" Value="0"/>

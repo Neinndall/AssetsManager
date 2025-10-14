@@ -28,9 +28,10 @@
 
             <TextBox x:Name="SearchTextBox"
                      Grid.Column="0"
-                     Style="{StaticResource EditableModernTextBox}"
-                     VerticalContentAlignment="Center"
-                     KeyDown="SearchTextBox_KeyDown"/>
+                     Style="{StaticResource StandardSearchBoxStyle}"
+                     KeyDown="SearchTextBox_KeyDown"
+                     TextChanged="SearchTextBox_TextChanged"
+                     Padding="5,0"/>
 
             <Button x:Name="PreviousButton" Grid.Column="1" Style="{StaticResource FindIconButton}" Click="PreviousButton_Click" ToolTip="Find Previous" VerticalAlignment="Center">
                 <materialIcons:MaterialIcon Kind="ChevronUp" />
