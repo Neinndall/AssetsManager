@@ -20,6 +20,7 @@ namespace AssetsManager.Utils
         private static readonly byte[] ANM_SIGNATURE = { 0x72, 0x41, 0x6E, 0x6D }; // "rAnm"
         private static readonly byte[] BIN_PROP_SIGNATURE = { 0x50, 0x52, 0x4F, 0x50 }; // "PROP"
         private static readonly byte[] BIN_PTCH_SIGNATURE = { 0x50, 0x54, 0x43, 0x48 }; // "PTCH"
+        private static readonly byte[] ICO_SIGNATURE = { 0x00, 0x00, 0x01, 0x00 };
 
         public static string GuessExtension(Span<byte> data)
         {
@@ -35,6 +36,7 @@ namespace AssetsManager.Utils
             if (StartsWith(data, SKN_SIGNATURE)) return "skn";
             if (StartsWith(data, ANM_SIGNATURE)) return "anm";
             if (StartsWith(data, BIN_PROP_SIGNATURE) || StartsWith(data, BIN_PTCH_SIGNATURE)) return "bin";
+            if (StartsWith(data, ICO_SIGNATURE)) return "ico";
 
             if (StartsWith(data, WEBP_SIGNATURE) && Contains(data, WEBP_VP8X_SIGNATURE, 8)) return "webp";
             if (StartsWith(data, WEM_SIGNATURE) && Contains(data, WEM_WAVE_SIGNATURE, 8)) return "wem";
@@ -42,6 +44,7 @@ namespace AssetsManager.Utils
             // Text-based formats
             string potentialText = Encoding.UTF8.GetString(data.Slice(0, Math.Min(data.Length, 100))).TrimStart();
             if (potentialText.StartsWith("{") || potentialText.StartsWith("[")) return "json";
+            if (potentialText.StartsWith("<!DOCTYPE html>", StringComparison.OrdinalIgnoreCase) || potentialText.StartsWith("<html>", StringComparison.OrdinalIgnoreCase)) return "html";
             if (potentialText.StartsWith("<?xml") || potentialText.StartsWith("<svg")) return "svg";
             if (potentialText.StartsWith("<")) return "xml";
             if (potentialText.StartsWith("function") || potentialText.StartsWith("var ") || potentialText.StartsWith("let ") || potentialText.StartsWith("const ")) return "js";
