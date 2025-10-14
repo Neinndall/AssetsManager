@@ -68,7 +68,7 @@ namespace AssetsManager.Views.Converters
             {
                 case NodeType.RealDirectory:
                 case NodeType.VirtualDirectory:
-                    if (node.FullPath.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || node.FullPath.EndsWith(".wads.client", StringComparison.OrdinalIgnoreCase))
+                    if (node.FullPath.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || node.FullPath.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
                     {
                         return MaterialIconKind.PackageVariant;
                     }
