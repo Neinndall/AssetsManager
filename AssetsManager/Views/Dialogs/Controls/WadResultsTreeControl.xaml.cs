@@ -45,11 +45,27 @@ namespace AssetsManager.Views.Dialogs.Controls
         public WadResultsTreeControl()
         {
             InitializeComponent();
+            Loaded += WadResultsTreeControl_Loaded;
+        }
+
+        private void WadResultsTreeControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            searchTextBox.ApplyTemplate();
+            if (searchTextBox.Template.FindName("ClearTextButton", searchTextBox) is Button clearButton)
+            {
+                clearButton.Click += (s, args) =>
+                {
+                    searchTextBox.Text = string.Empty;
+                };
+            }
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            searchPlaceholder.Visibility = string.IsNullOrEmpty(searchTextBox.Text) ? Visibility.Visible : Visibility.Collapsed;
+            if (searchTextBox.Template.FindName("ClearTextButton", searchTextBox) is Button clearButton)
+            {
+                clearButton.Visibility = string.IsNullOrEmpty(searchTextBox.Text) ? Visibility.Collapsed : Visibility.Visible;
+            }
             SearchTextChanged?.Invoke(this, e);
         }
 

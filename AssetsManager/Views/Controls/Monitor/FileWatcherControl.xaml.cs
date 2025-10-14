@@ -43,6 +43,15 @@ namespace AssetsManager.Views.Controls.Monitor
                 MonitoredItemsListView.ItemsSource = _allMonitoredUrls;
                 MonitorService.MonitoredItems.CollectionChanged += MonitoredItems_CollectionChanged;
             }
+
+            txtSearch.ApplyTemplate();
+            if (txtSearch.Template.FindName("ClearTextButton", txtSearch) is Button clearButton)
+            {
+                clearButton.Click += (s, args) =>
+                {
+                    txtSearch.Text = string.Empty;
+                };
+            }
         }
 
         private void MonitoredItems_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -176,6 +185,11 @@ namespace AssetsManager.Views.Controls.Monitor
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
             FilterMonitoredItems(txtSearch.Text);
+
+            if (txtSearch.Template.FindName("ClearTextButton", txtSearch) is Button clearButton)
+            {
+                clearButton.Visibility = string.IsNullOrEmpty(txtSearch.Text) ? Visibility.Collapsed : Visibility.Visible;
+            }
         }
     }
 }

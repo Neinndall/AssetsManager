@@ -31,12 +31,31 @@ namespace AssetsManager.Views.Controls.Shared
             searchTimer = new DispatcherTimer();
             searchTimer.Interval = TimeSpan.FromMilliseconds(300);
             searchTimer.Tick += SearchTimer_Tick;
+
+            Loaded += SearchBoxControl_Loaded;
+        }
+
+        private void SearchBoxControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            SearchTextBox.ApplyTemplate();
+            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
+            {
+                clearButton.Click += (s, args) =>
+                {
+                    SearchTextBox.Text = string.Empty;
+                };
+            }
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             searchTimer.Stop();
             searchTimer.Start();
+
+            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
+            {
+                clearButton.Visibility = string.IsNullOrEmpty(SearchTextBox.Text) ? Visibility.Collapsed : Visibility.Visible;
+            }
         }
 
         private void SearchTimer_Tick(object sender, EventArgs e)

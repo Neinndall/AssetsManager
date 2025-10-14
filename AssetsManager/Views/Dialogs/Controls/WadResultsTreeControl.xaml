@@ -92,30 +92,11 @@
             </StackPanel>
 
             <!-- Search Box -->
-            <Grid Grid.Row="1" Margin="0,0,0,8">
-                <Border Background="{StaticResource DarkBackground}"
-                        BorderBrush="{StaticResource BorderColor}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        SnapsToDevicePixels="True"/>
-                <TextBox x:Name="searchTextBox"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         Padding="12,8"
-                         Margin="2"
-                         Foreground="{StaticResource TextPrimary}"
-                         FontSize="14"
-                         CaretBrush="White"
-                         TextChanged="SearchTextBox_TextChanged"/>
-                <TextBlock Text="🔍 Search files..."
-                           x:Name="searchPlaceholder"
-                           IsHitTestVisible="False"
-                           Foreground="{StaticResource TextMuted}"
-                           FontSize="14"
-                           VerticalAlignment="Center"
-                           Margin="14,0,0,0">
-                </TextBlock>
-            </Grid>
+            <TextBox x:Name="searchTextBox"
+                     Grid.Row="1"
+                     Style="{StaticResource StandardSearchBoxStyle}"
+                     Margin="0,0,0,8"
+                     TextChanged="SearchTextBox_TextChanged"/>
 
             <Border Grid.Row="2"
                     Background="{StaticResource DarkBackground}"

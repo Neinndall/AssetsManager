@@ -7,8 +7,7 @@
              d:DesignHeight="30" d:DesignWidth="200">
     <Grid>
         <TextBox x:Name="SearchTextBox"
-                 VerticalContentAlignment="Center"
-                 Tag="{Binding Tag, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                 Style="{StaticResource StandardSearchBoxStyle}"
                  TextChanged="SearchTextBox_TextChanged"/>
     </Grid>
 </UserControl>
