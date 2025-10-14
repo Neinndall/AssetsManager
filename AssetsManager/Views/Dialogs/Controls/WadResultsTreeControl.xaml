@@ -105,7 +105,7 @@
                          Margin="2"
                          Foreground="{StaticResource TextPrimary}"
                          FontSize="14"
-                         CaretBrush="Transparent"
+                         CaretBrush="White"
                          TextChanged="SearchTextBox_TextChanged"/>
                 <TextBlock Text="🔍 Search files..."
                            x:Name="searchPlaceholder"
