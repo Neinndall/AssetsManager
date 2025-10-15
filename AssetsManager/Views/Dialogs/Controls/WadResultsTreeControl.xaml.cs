@@ -15,8 +15,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         public object SelectedItem => resultsTreeView.SelectedItem;
         
         public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
-        public MenuItem ExtractMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => "Extract Selected".Equals(m.Header as string));
-        public MenuItem SaveMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => "Save Selected".Equals(m.Header as string));
 
         public static readonly RoutedEvent ViewDifferencesClickEvent = EventManager.RegisterRoutedEvent(
             nameof(ViewDifferencesClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
@@ -25,24 +23,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             add { AddHandler(ViewDifferencesClickEvent, value); }
             remove { RemoveHandler(ViewDifferencesClickEvent, value); }
-        }
-
-        public static readonly RoutedEvent ExtractMenuItemClickEvent = EventManager.RegisterRoutedEvent(
-            nameof(ExtractMenuItemClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
-
-        public event RoutedEventHandler ExtractMenuItemClick
-        {
-            add { AddHandler(ExtractMenuItemClickEvent, value); }
-            remove { RemoveHandler(ExtractMenuItemClickEvent, value); }
-        }
-
-        public static readonly RoutedEvent SaveMenuItemClickEvent = EventManager.RegisterRoutedEvent(
-            nameof(SaveMenuItemClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
-
-        public event RoutedEventHandler SaveMenuItemClick
-        {
-            add { AddHandler(SaveMenuItemClickEvent, value); }
-            remove { RemoveHandler(SaveMenuItemClickEvent, value); }
         }
 
         public IEnumerable<object> ItemsSource
@@ -86,16 +66,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         private void ViewDifferences_Click(object sender, RoutedEventArgs e)
         {
             RaiseEvent(new RoutedEventArgs(ViewDifferencesClickEvent, SelectedItem));
-        }
-
-        private void ExtractMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            RaiseEvent(new RoutedEventArgs(ExtractMenuItemClickEvent, SelectedItem));
-        }
-
-        private void SaveMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            RaiseEvent(new RoutedEventArgs(SaveMenuItemClickEvent, SelectedItem));
         }
 
         public void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)

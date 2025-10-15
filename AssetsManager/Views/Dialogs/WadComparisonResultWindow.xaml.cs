@@ -53,14 +53,13 @@ namespace AssetsManager.Views.Dialogs
         private readonly WadPackagingService _wadPackagingService;
         private readonly DiffViewService _diffViewService;
         private readonly HashResolverService _hashResolverService;
-        private readonly WadExtractionService _wadExtractionService;
-        private readonly WadSavingService _wadSavingService; 
+
         private readonly AppSettings _appSettings;
         private readonly string _oldPbePath;
         private readonly string _newPbePath;
         private readonly string _sourceJsonPath; // Path to the loaded wadcomparison.json
 
-        public WadComparisonResultWindow(List<ChunkDiff> diffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, WadExtractionService wadExtractionService, WadSavingService wadSavingService, AppSettings appSettings, string oldPbePath, string newPbePath)
+        public WadComparisonResultWindow(List<ChunkDiff> diffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, AppSettings appSettings, string oldPbePath, string newPbePath)
         {
             InitializeComponent();
             _serviceProvider = serviceProvider;
@@ -72,8 +71,6 @@ namespace AssetsManager.Views.Dialogs
             _wadPackagingService = wadPackagingService;
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
-            _wadExtractionService = wadExtractionService;
-            _wadSavingService = wadSavingService;
             _appSettings = appSettings;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
@@ -94,7 +91,7 @@ namespace AssetsManager.Views.Dialogs
             PopulateResults(_serializableDiffs);
         }
 
-        public WadComparisonResultWindow(List<SerializableChunkDiff> serializableDiffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, WadExtractionService wadExtractionService, WadSavingService wadSavingService, AppSettings appSettings, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
+        public WadComparisonResultWindow(List<SerializableChunkDiff> serializableDiffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, AppSettings appSettings, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
         {
             InitializeComponent();
             _serviceProvider = serviceProvider;
@@ -106,8 +103,6 @@ namespace AssetsManager.Views.Dialogs
             _wadPackagingService = wadPackagingService;
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
-            _wadExtractionService = wadExtractionService;
-            _wadSavingService = wadSavingService;
             _appSettings = appSettings;
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
@@ -254,202 +249,10 @@ namespace AssetsManager.Views.Dialogs
                     viewDiffMenuItem.IsEnabled = true;
                 }
             }
-
-            if (ResultsTree.ExtractMenuItem is MenuItem extractMenuItem)
-            {
-                extractMenuItem.IsEnabled = GetExtractableDiffsFromSelection().Any();
-            }
-
-            if (ResultsTree.SaveMenuItem is MenuItem saveMenuItem)
-            {
-                saveMenuItem.IsEnabled = GetSavableDiffsFromSelection().Any();
-            }
         }
 
-        private async void SaveMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            List<SerializableChunkDiff> diffsToSave = GetSavableDiffsFromSelection();
-            if (!diffsToSave.Any())
-            {
-                _customMessageBoxService.ShowInfo("Info", "No savable files in the current selection.", this);
-                return;
-            }
 
-            string rootDestinationPath = null;
-            if (!string.IsNullOrEmpty(_appSettings.DefaultExtractedSelectDirectory) && Directory.Exists(_appSettings.DefaultExtractedSelectDirectory))
-            {
-                rootDestinationPath = _appSettings.DefaultExtractedSelectDirectory;
-            }
-            else
-            {
-                var dialog = new CommonOpenFileDialog
-                {
-                    IsFolderPicker = true,
-                    Title = "Select Destination Folder for Saving"
-                };
 
-                if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    rootDestinationPath = dialog.FileName;
-                }
-            }
 
-            if (rootDestinationPath != null)
-            {
-                if (ResultsTree.SelectedItem is WadGroupViewModel selectedWad)
-                {
-                    rootDestinationPath = Path.Combine(rootDestinationPath, selectedWad.WadName);
-                    Directory.CreateDirectory(rootDestinationPath);
-                }
-
-                _logService.Log("Saving selected files...");
-                int successCount = 0;
-
-                foreach (var diff in diffsToSave)
-                {
-                    try
-                    {
-                        await _wadSavingService.ProcessAndSaveDiffAsync(diff, rootDestinationPath, _oldPbePath, _newPbePath);
-                        successCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, $"Failed to save {diff.FileName}");
-                    }
-                }
-
-                if (successCount == diffsToSave.Count)
-                {
-                    _customMessageBoxService.ShowSuccess("Success", "Successfully saved selected assets.");
-                    _logService.LogInteractiveSuccess($"Successfully saved to {rootDestinationPath}", rootDestinationPath);
-                }
-                else
-                {
-                    _customMessageBoxService.ShowWarning("Partial Success", $"Successfully saved {successCount} out of {diffsToSave.Count} asset(s). Check logs for details.");
-                }
-            }
-        }
-
-        private List<SerializableChunkDiff> GetSavableDiffsFromSelection()
-        {
-            var selectedItem = ResultsTree.SelectedItem;
-            var savableDiffs = new List<SerializableChunkDiff>();
-
-            if (selectedItem is SerializableChunkDiff singleDiff)
-            {
-                savableDiffs.Add(singleDiff);
-            }
-            else if (selectedItem is DiffTypeGroupViewModel typeGroup)
-            {
-                savableDiffs.AddRange(typeGroup.Diffs);
-            }
-            else if (selectedItem is WadGroupViewModel wadGroup)
-            {
-                savableDiffs.AddRange(wadGroup.Types.SelectMany(t => t.Diffs));
-            }
-
-            return savableDiffs;
-        }
-
-        private async void ExtractMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            List<SerializableChunkDiff> diffsToExtract = GetExtractableDiffsFromSelection();
-            if (!diffsToExtract.Any())
-            {
-                _customMessageBoxService.ShowInfo("Info", "No extractable files (New, Modified, Renamed, or Removed) in the current selection.", this);
-                return;
-            }
-
-            string rootDestinationPath = null;
-            if (!string.IsNullOrEmpty(_appSettings.DefaultExtractedSelectDirectory) && Directory.Exists(_appSettings.DefaultExtractedSelectDirectory))
-            {
-                rootDestinationPath = _appSettings.DefaultExtractedSelectDirectory;
-            }
-            else
-            {
-                var dialog = new CommonOpenFileDialog
-                {
-                    IsFolderPicker = true,
-                    Title = "Select Destination Folder for Extraction"
-                };
-
-                if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    rootDestinationPath = dialog.FileName;
-                }
-            }
-
-            if (rootDestinationPath != null)
-            {
-                if (ResultsTree.SelectedItem is WadGroupViewModel selectedWad)
-                {
-                    rootDestinationPath = Path.Combine(rootDestinationPath, selectedWad.WadName);
-                    Directory.CreateDirectory(rootDestinationPath);
-                }
-
-                _logService.Log("Extracting selected files...");
-                int successCount = 0;
-
-                foreach (var diff in diffsToExtract)
-                {
-                    try
-                    {
-                        string typeFolder = diff.Type.ToString();
-                        string finalDestinationPath = Path.Combine(rootDestinationPath, typeFolder);
-                        Directory.CreateDirectory(finalDestinationPath);
-
-                        string basePath = (diff.Type == ChunkDiffType.Removed) ? _oldPbePath : _newPbePath;
-                        string sourceWadPath = Path.Combine(basePath, diff.SourceWadFile);
-
-                        var node = new FileSystemNodeModel(diff.FileName, false, diff.Path, sourceWadPath)
-                        {
-                            SourceChunkPathHash = (diff.Type == ChunkDiffType.Removed) ? diff.OldPathHash : diff.NewPathHash,
-                            ChunkDiff = diff,
-                            Status = (DiffStatus)diff.Type
-                        };
-
-                        await _wadExtractionService.ExtractNodeAsync(node, finalDestinationPath);
-                        successCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, $"Failed to extract {diff.FileName}");
-                    }
-                }
-
-                if (successCount == diffsToExtract.Count)
-                {
-                    _customMessageBoxService.ShowSuccess("Success", "Successfully extracted selected assets.");
-                    _logService.LogInteractiveSuccess($"Successfully extracted to {rootDestinationPath}", rootDestinationPath);
-                }
-                else
-                {
-                    _customMessageBoxService.ShowWarning("Partial Success", $"Successfully extracted {successCount} out of {diffsToExtract.Count} asset(s). Check logs for details.");
-                }
-            }
-        }
-
-        private List<SerializableChunkDiff> GetExtractableDiffsFromSelection()
-        {
-            var selectedItem = ResultsTree.SelectedItem;
-            var downloadableDiffs = new List<SerializableChunkDiff>();
-
-            if (selectedItem is SerializableChunkDiff singleDiff && (singleDiff.Type == ChunkDiffType.New || singleDiff.Type == ChunkDiffType.Modified || singleDiff.Type == ChunkDiffType.Renamed || singleDiff.Type == ChunkDiffType.Removed))
-            {
-                downloadableDiffs.Add(singleDiff);
-            }
-            else if (selectedItem is DiffTypeGroupViewModel typeGroup && (typeGroup.Type == ChunkDiffType.New || typeGroup.Type == ChunkDiffType.Modified || typeGroup.Type == ChunkDiffType.Renamed || typeGroup.Type == ChunkDiffType.Removed))
-            {
-                downloadableDiffs.AddRange(typeGroup.Diffs);
-            }
-            else if (selectedItem is WadGroupViewModel wadGroup)
-            {
-                downloadableDiffs.AddRange(wadGroup.Types
-                    .Where(t => t.Type == ChunkDiffType.New || t.Type == ChunkDiffType.Modified || t.Type == ChunkDiffType.Renamed || t.Type == ChunkDiffType.Removed)
-                    .SelectMany(t => t.Diffs));
-            }
-
-            return downloadableDiffs;
-        }
     }
 }
