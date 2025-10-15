@@ -383,7 +383,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (SaveMenuItem is not null)
             {
-                SaveMenuItem.IsEnabled = true; 
+                SaveMenuItem.IsEnabled = _isWadMode;
             }
 
             if (PinMenuItem is not null)

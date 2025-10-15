@@ -65,6 +65,18 @@ namespace AssetsManager.Services.Explorer
 
         public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
         {
+            if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
+            {
+                string currentDestinationPath = Path.Combine(destinationPath, node.Name);
+                Directory.CreateDirectory(currentDestinationPath);
+
+                foreach (var child in node.Children)
+                {
+                    await ProcessAndSaveAsync(child, currentDestinationPath, rootNodes, currentRootPath);
+                }
+                return;
+            }
+
             string extension = Path.GetExtension(node.Name).ToLower();
 
             switch (extension)
