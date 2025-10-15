@@ -64,7 +64,7 @@ namespace AssetsManager.Services.Parsers
                 }
             }
             catch (Exception ex) { logService.LogError(ex, "[AUDIO] Crash during BIN parsing."); }
-            logService.Log($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total events for bank '{bankName}'.");
+            logService.LogDebug($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total events for bank '{bankName}'.");
             return mapEventNames;
         }
 
