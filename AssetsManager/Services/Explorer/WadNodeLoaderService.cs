@@ -130,15 +130,28 @@ namespace AssetsManager.Services.Explorer
             }
 
             // Post-process to remove expander from redundant BNK files when a WPK exists
-            var audioWpks = node.Children.Where(c => c.Name.EndsWith("_audio.wpk")).Select(c => c.Name).ToHashSet();
-            var audioBnks = node.Children.Where(c => c.Name.EndsWith("_audio.bnk")).ToList();
+            var wpkFiles = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith(".wpk")).Select(c => Path.GetFileNameWithoutExtension(c.Name)).ToHashSet();
+            var bnkFiles = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith(".bnk")).ToList();
 
-            foreach (var bnkNode in audioBnks)
+            foreach (var bnkNode in bnkFiles)
             {
-                string correspondingWpk = bnkNode.Name.Replace(".bnk", ".wpk");
-                if (audioWpks.Contains(correspondingWpk))
+                string baseName = Path.GetFileNameWithoutExtension(bnkNode.Name);
+                if (wpkFiles.Contains(baseName))
                 {
                     bnkNode.Children.Clear(); // Remove the dummy node, thus removing the expander
+                }
+            }
+
+            // Post-process to remove expander from redundant _events.bnk files when a _audio.bnk exists
+            var audioBnks = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith("_audio.bnk")).Select(c => c.Name).ToHashSet();
+            var eventsBnks = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith("_events.bnk")).ToList();
+
+            foreach (var eventsBnkNode in eventsBnks)
+            {
+                string correspondingAudioBnk = eventsBnkNode.Name.Replace("_events.bnk", "_audio.bnk");
+                if (audioBnks.Contains(correspondingAudioBnk))
+                {
+                    eventsBnkNode.Children.Clear(); // Remove the dummy node, thus removing the expander
                 }
             }
         }
@@ -242,11 +255,7 @@ namespace AssetsManager.Services.Explorer
                 Status = status
             };
 
-            // Add a dummy child to all audio banks to make them expandable. Redundant ones will be pruned after sorting.
-            if (fileNode.IsAudioBank)
-            {
-                fileNode.Children.Add(new FileSystemNodeModel());
-            }
+
 
             currentNode.Children.Add(fileNode);
             return fileNode;

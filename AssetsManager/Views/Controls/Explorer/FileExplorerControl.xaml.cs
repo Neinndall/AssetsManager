@@ -285,14 +285,16 @@ namespace AssetsManager.Views.Controls.Explorer
                 try
                 {
                     LogService.Log("Extracting selected files...");
-                    await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath);
 
+                    string logPath = destinationPath;
                     if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile)
                     {
-                        destinationPath = Path.Combine(destinationPath, selectedNode.Name);
+                        logPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
 
-                    LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name} to {destinationPath}", destinationPath);
+                    await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath);
+
+                    LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name} to {logPath}", logPath);
                 }
                 catch (Exception ex)
                 {
@@ -338,7 +340,11 @@ namespace AssetsManager.Views.Controls.Explorer
                     LogService.Log("Processing and saving selected files...");
                     await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath);
 
-                    if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile)
+                    if (selectedNode.Type == NodeType.SoundBank)
+                    {
+                        destinationPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
+                    }
+                    else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile)
                     {
                         destinationPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
@@ -441,7 +447,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
-                if (selectedNode.IsAudioBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
+                if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
                     await HandleAudioBankExpansion(selectedNode);
                 }

@@ -31,6 +31,7 @@ namespace AssetsManager.Services.Explorer
         {
             switch (node.Type)
             {
+                case NodeType.SoundBank:
                 case NodeType.VirtualFile:
                     await ExtractVirtualFileAsync(node, destinationPath);
                     break;
@@ -121,7 +122,7 @@ namespace AssetsManager.Services.Explorer
             {
                 try
                 {
-                    if (fileNode.Type != NodeType.VirtualFile)
+                    if (fileNode.Type != NodeType.VirtualFile && fileNode.Type != NodeType.SoundBank)
                     {
                         _logService.LogWarning($"Attempted to get bytes from a non-virtual file: {fileNode.Name}");
                         return null;

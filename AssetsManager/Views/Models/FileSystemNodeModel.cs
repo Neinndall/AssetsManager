@@ -5,7 +5,7 @@ using System.IO;
 
 namespace AssetsManager.Views.Models
 {
-    public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, WemFile }
+    public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, WemFile, SoundBank }
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted }
     public enum AudioSourceType { Wpk, Bnk }
 
@@ -31,7 +31,7 @@ namespace AssetsManager.Views.Models
 
         public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();
 
-        public bool IsAudioBank => SupportedFileTypes.IsExpandableAudioBank(Name);
+        
 
         private bool _isExpanded;
         public bool IsExpanded
@@ -137,6 +137,11 @@ namespace AssetsManager.Views.Models
                     Type = NodeType.WadFile;
                     Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
                 }
+                else if (lowerPath.EndsWith(".wpk") || lowerPath.EndsWith(".bnk"))
+                {
+                    Type = NodeType.SoundBank;
+                    Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                }
                 else
                 {
                     Type = NodeType.RealFile; // It's a real file on the filesystem
@@ -150,8 +155,25 @@ namespace AssetsManager.Views.Models
             Name = name;
             FullPath = virtualPath;
             SourceWadPath = sourceWad;
-            Type = isDirectory ? NodeType.VirtualDirectory : NodeType.VirtualFile;
             Children = new ObservableCollection<FileSystemNodeModel>();
+
+            if (isDirectory)
+            {
+                Type = NodeType.VirtualDirectory;
+            }
+            else
+            {
+                string lowerName = name.ToLowerInvariant();
+                if (lowerName.EndsWith(".wpk") || lowerName.EndsWith(".bnk"))
+                {
+                    Type = NodeType.SoundBank;
+                    Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                }
+                else
+                {
+                    Type = NodeType.VirtualFile;
+                }
+            }
         }
 
         // Internal constructor for the dummy node
