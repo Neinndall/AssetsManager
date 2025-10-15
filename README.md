@@ -13,12 +13,14 @@ AssetsManager is a tool for League of Legends enthusiasts who need to analyze, m
 
 ## ✨ Key Features
 
-*   **Obtain automatically the new assets from each update:** Efficiently compares local and server hashes to download only new or modified assets from CommunityDragon.
-*   **WAD Comparison and Backups:** Compare `.wad` archives between two PBE directories to identify new, modified, deleted, or renamed assets. Includes a side-by-side visual diff for image changes (`ImageDiffWindow`). Save comparison results asynchronously as a lightweight, self-contained package. This includes only the changed file chunks, allowing for easy sharing and review without the original PBE directories.
-*   **WAD Explorer** Browse game files with a familiar file-tree interface, featuring a highly advanced real-time search to instantly filter results or navigate directly to any file or folder. The integrated previewer supports a wide range of formats, including textures (`.tex`, `.dds`), images (`.png`, `.svg`), text, audio, video, and provides a readable visualization for binary `.bin` files.
-*   **3D Model Viewer:** A fully integrated tool to load and inspect 3D models (`.skn`), skeletons (`.skl`), and play animations (`.anm`) directly within the application.
-
-And much more!!
+*   **Automatic Asset Downloading**: Automatically detects and downloads new assets from PBE updates.
+*   **Advanced WAD Comparator**: Compares WAD files between different versions to identify new, modified, or deleted assets.
+*   **Wad Explorer**: Explores WAD archives with a file tree interface and previews dozens of formats.
+*   **3D Model Viewer**: Inspects 3D models (.skn), skeletons (.skl), and animations (.anm) with a built-in viewer.
+*   **Asset Monitoring**: Tracks remote assets, JSON files, and the PBE server status for real-time updates.
+*   **Version Management**: Easily manages and downloads different versions of the League of Legends client and its plugins.
+*   **Smart Extraction and Saving**: Extracts raw assets or saves them in more user-friendly formats (e.g., .tex to .png, .bin to .json).
+*   **Audio Bank Analysis**: Explores audio banks (.wpk, .bnk), visualizes the event hierarchy with their names, and plays the associated sounds.
 
 ## 🦾 Advanced Functionality
 
