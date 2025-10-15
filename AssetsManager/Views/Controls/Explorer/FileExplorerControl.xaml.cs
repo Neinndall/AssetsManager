@@ -287,7 +287,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     LogService.Log("Extracting selected files...");
                     await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath);
 
-                    if (selectedNode.IsDirectory || selectedNode.Type == NodeType.WadFile)
+                    if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile)
                     {
                         destinationPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
@@ -338,7 +338,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     LogService.Log("Processing and saving selected files...");
                     await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath);
 
-                    if (selectedNode.IsDirectory || selectedNode.Type == NodeType.WadFile)
+                    if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile)
                     {
                         destinationPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
