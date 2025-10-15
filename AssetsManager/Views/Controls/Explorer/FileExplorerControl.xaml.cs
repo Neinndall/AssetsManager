@@ -400,7 +400,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (PinMenuItem is not null)
             {
-                PinMenuItem.IsEnabled = selectedNode.Type != NodeType.RealDirectory && selectedNode.Type != NodeType.VirtualDirectory;
+                PinMenuItem.IsEnabled = selectedNode.Type != NodeType.RealDirectory && selectedNode.Type != NodeType.VirtualDirectory && selectedNode.Type != NodeType.WadFile;
             }
 
             if (ViewChangesMenuItem is not null)
