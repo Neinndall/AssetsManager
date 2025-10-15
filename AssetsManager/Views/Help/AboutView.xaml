@@ -39,7 +39,7 @@
                                      Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
                 </StackPanel>
-                <TextBlock Text="This app is designed to automatically download and manage new assets from League of Legends PBE server updates. It helps content creators and developers stay up-to-date with the latest changes and additions to the game."
+                <TextBlock Text="AssetsManager is a tool for League of Legends enthusiasts who need to analyze, manage, and track changes to game assets from PBE server updates. It goes beyond simple downloading, offering a powerful suite of features for deep asset analysis, a 3D model viewer, exploration, and monitoring for changes."
                            Foreground="{StaticResource TextPrimary}"
                            FontSize="13"
                            TextWrapping="Wrap"/>
@@ -66,16 +66,14 @@
                     </StackPanel>
                 </StackPanel>
 
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  Automatic detection of new PBE updates."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  Downloads and organizes new game assets."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  Supports synchronization with CDTB."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  Auto-copy functionality for hash files."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  Back-Ups for old hash files."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  Asset preview before downloading."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  Built-in player for video files (.webm, .ogg) and audio."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  JSON file comparison tool."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  History tracking for JSON file differences."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="•  Manually download assets from other days with differences text files."/>
+                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Text="•  Automatic Asset Downloading: Automatically detects and downloads new assets from PBE updates."/>
+                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Text="•  Advanced WAD Comparator: Compares WAD files between different versions to identify new, modified, or deleted assets."/>
+                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Text="•  Powerful File Explorer: Explores WAD archives with a file tree interface and previews dozens of formats."/>
+                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Text="•  3D Model Viewer: Inspects 3D models (.skn), skeletons (.skl), and animations (.anm) with a built-in viewer."/>
+                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Text="•  Asset Monitoring: Tracks remote assets, JSON files, and the PBE server status for real-time updates."/>
+                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Text="•  Version Management: Easily manages and downloads different versions of the League of Legends client and its plugins."/>
+                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Text="•  Smart Extraction and Saving: Extracts raw assets or saves them in more user-friendly formats (e.g., .tex to .png, .bin to .json)."/>
+                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Text="•  Audio Bank Analysis: Explores audio banks (.wpk, .bnk), visualizes the event hierarchy with their names, and plays the associated sounds."/>
             </StackPanel>
         </Border>
     </StackPanel>

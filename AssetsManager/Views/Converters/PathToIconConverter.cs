@@ -23,6 +23,7 @@ namespace AssetsManager.Views.Converters
             { ".lua", MaterialIconKind.LanguageLua },
             { ".txt", MaterialIconKind.FileDocumentOutline },
             { ".log", MaterialIconKind.FileDocumentOutline },
+            { ".info", MaterialIconKind.FileDocumentOutline },
             { ".stringtable", MaterialIconKind.Translate },
             { ".png", MaterialIconKind.ImageOutline },
             { ".jpg", MaterialIconKind.ImageOutline },
