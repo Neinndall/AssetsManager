@@ -67,7 +67,7 @@ namespace AssetsManager.Services.Explorer
         {
             if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
             {
-                string currentDestinationPath = Path.Combine(destinationPath, node.Name);
+                string currentDestinationPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
                 Directory.CreateDirectory(currentDestinationPath);
 
                 foreach (var child in node.Children)
@@ -121,7 +121,7 @@ namespace AssetsManager.Services.Explorer
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync("js", fileBytes);
 
-            string filePath = Path.Combine(destinationPath, node.Name);
+            string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
 
             await File.WriteAllTextAsync(filePath, formattedContent);
         }
@@ -129,7 +129,7 @@ namespace AssetsManager.Services.Explorer
         private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
         {
             string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
-            string audioBankPath = Path.Combine(destinationPath, audioBankName);
+            string audioBankPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(audioBankName));
             Directory.CreateDirectory(audioBankPath);
 
             var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
@@ -158,7 +158,7 @@ namespace AssetsManager.Services.Explorer
 
             foreach (var eventNode in audioTree)
             {
-                string eventPath = Path.Combine(audioBankPath, eventNode.Name);
+                string eventPath = Path.Combine(audioBankPath, _wadExtractionService.SanitizeName(eventNode.Name));
                 Directory.CreateDirectory(eventPath);
 
                 foreach (var soundNode in eventNode.Sounds)
@@ -188,7 +188,7 @@ namespace AssetsManager.Services.Explorer
                         if (oggData != null)
                         {
                             string fileName = Path.ChangeExtension(soundNode.Name, ".ogg");
-                            string filePath = Path.Combine(eventPath, fileName);
+                            string filePath = Path.Combine(eventPath, _wadExtractionService.SanitizeName(fileName));
                             await File.WriteAllBytesAsync(filePath, oggData);
                         }
                     }
@@ -227,7 +227,7 @@ namespace AssetsManager.Services.Explorer
                     encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
 
                     string fileName = Path.ChangeExtension(node.Name, ".png");
-                    string filePath = Path.Combine(destinationPath, fileName);
+                    string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
 
                     using (var fileStream = new FileStream(filePath, FileMode.Create))
                     {
@@ -245,7 +245,7 @@ namespace AssetsManager.Services.Explorer
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync(type, fileBytes);
             
             string fileName = Path.ChangeExtension(node.Name, ".json");
-            string filePath = Path.Combine(destinationPath, fileName);
+            string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
 
             await File.WriteAllTextAsync(filePath, formattedContent);
         }

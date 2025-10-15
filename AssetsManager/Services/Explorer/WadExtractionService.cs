@@ -157,7 +157,7 @@ namespace AssetsManager.Services.Explorer
             });
         }
 
-        private string SanitizeName(string name)
+        public string SanitizeName(string name)
         {
             const int MaxLength = 240; // A bit less than 255 to be safe.
             if (name.Length > MaxLength)
