@@ -27,7 +27,8 @@ namespace AssetsManager.Views
             TreeBuilderService treeBuilderService,
             TreeUIManager treeUIManager,
             AudioBankService audioBankService,
-            AudioBankLinkerService audioBankLinkerService
+            AudioBankLinkerService audioBankLinkerService,
+            WadSavingService wadSavingService
         )
         {
             InitializeComponent();
@@ -35,6 +36,7 @@ namespace AssetsManager.Views
             FileExplorer.LogService = logService;
             FileExplorer.CustomMessageBoxService = customMessageBoxService;
             FileExplorer.WadExtractionService = wadExtractionService;
+            FileExplorer.WadSavingService = wadSavingService;
             FileExplorer.WadSearchBoxService = wadSearchBoxService;
             FileExplorer.DiffViewService = diffViewService;
             FileExplorer.DirectoriesCreator = directoriesCreator;

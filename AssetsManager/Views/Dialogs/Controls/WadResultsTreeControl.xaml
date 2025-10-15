@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:AssetsManager.Views.Dialogs.Controls"
              xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
-             xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="400">
     <UserControl.Resources>
@@ -15,12 +15,17 @@
         <ContextMenu x:Key="WadDiffContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="View Differences" x:Name="ViewDifferencesMenuItem" Click="ViewDifferences_Click">
                 <MenuItem.Icon>
-                    <materialDesign:MaterialIcon Kind="FileFindOutline"/>
+                    <materialIcons:MaterialIcon Kind="FileFindOutline"/>
                 </MenuItem.Icon>
             </MenuItem>
             <MenuItem Header="Extract Selected" Click="ExtractMenuItem_Click">
                 <MenuItem.Icon>
-                    <materialDesign:MaterialIcon Kind="ArchiveArrowDownOutline"/>
+                    <materialIcons:MaterialIcon Kind="ArchiveArrowDownOutline" />
+                </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Save Selected" Click="SaveMenuItem_Click">
+                <MenuItem.Icon>
+                    <materialIcons:MaterialIcon Kind="ContentSave" />
                 </MenuItem.Icon>
             </MenuItem>
         </ContextMenu>
@@ -31,7 +36,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialDesign:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
                                              VerticalAlignment="Center" 
                                              Margin="0,0,5,0"/>
                 <TextBlock Grid.Column="1" Text="{Binding FileName}" VerticalAlignment="Center"/>
@@ -44,7 +49,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialDesign:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
                                              VerticalAlignment="Center" 
                                              Margin="0,0,5,0" 
                                              Foreground="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}"/>
@@ -69,7 +74,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialDesign:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
                                              VerticalAlignment="Center" 
                                              Margin="0,0,5,0"/>
                 <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -84,7 +89,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                <materialDesign:MaterialIcon Kind="FormatListGroup" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                <materialIcons:MaterialIcon Kind="FormatListGroup" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                 <TextBlock Text="Differences" 
                              FontSize="16" 
                              FontWeight="SemiBold"

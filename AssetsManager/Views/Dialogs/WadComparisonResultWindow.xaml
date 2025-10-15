@@ -75,7 +75,8 @@
                                               SearchTextChanged="SearchTextBox_TextChanged"
                                               WadContextMenuOpening="ResultsTree_ContextMenuOpening"
                                               ViewDifferencesClick="ViewDifferences_Click"
-                                              ExtractMenuItemClick="ExtractMenuItem_Click"/>
+                                              ExtractMenuItemClick="ExtractMenuItem_Click"
+                                              SaveMenuItemClick="SaveMenuItem_Click"/>
 
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
 

@@ -19,6 +19,11 @@
                     <materialIcons:MaterialIcon Kind="FileDownload"/>
                 </MenuItem.Icon>
             </MenuItem>
+            <MenuItem Header="Save Selected" x:Name="SaveMenuItem" Click="SaveSelected_Click">
+                <MenuItem.Icon>
+                    <materialIcons:MaterialIcon Kind="ContentSave"/>
+                </MenuItem.Icon>
+            </MenuItem>
             <MenuItem Header="View Changes" x:Name="ViewChangesMenuItem" Click="ViewChanges_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="CompareHorizontal"/>

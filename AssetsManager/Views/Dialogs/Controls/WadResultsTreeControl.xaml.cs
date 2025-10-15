@@ -9,6 +9,15 @@ namespace AssetsManager.Views.Dialogs.Controls
 {
     public partial class WadResultsTreeControl : UserControl
     {
+        public event RoutedPropertyChangedEventHandler<object> SelectedItemChanged;
+        public event TextChangedEventHandler SearchTextChanged;
+        public event RoutedEventHandler WadContextMenuOpening;
+        public object SelectedItem => resultsTreeView.SelectedItem;
+        
+        public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
+        public MenuItem ExtractMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => "Extract Selected".Equals(m.Header as string));
+        public MenuItem SaveMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => "Save Selected".Equals(m.Header as string));
+
         public static readonly RoutedEvent ViewDifferencesClickEvent = EventManager.RegisterRoutedEvent(
             nameof(ViewDifferencesClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
 
@@ -27,20 +36,20 @@ namespace AssetsManager.Views.Dialogs.Controls
             remove { RemoveHandler(ExtractMenuItemClickEvent, value); }
         }
 
-        public event RoutedPropertyChangedEventHandler<object> SelectedItemChanged;
-        public event TextChangedEventHandler SearchTextChanged;
-        public event RoutedEventHandler WadContextMenuOpening;
+        public static readonly RoutedEvent SaveMenuItemClickEvent = EventManager.RegisterRoutedEvent(
+            nameof(SaveMenuItemClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
+
+        public event RoutedEventHandler SaveMenuItemClick
+        {
+            add { AddHandler(SaveMenuItemClickEvent, value); }
+            remove { RemoveHandler(SaveMenuItemClickEvent, value); }
+        }
 
         public IEnumerable<object> ItemsSource
         {
             get => resultsTreeView.ItemsSource as IEnumerable<object>;
             set => resultsTreeView.ItemsSource = value;
         }
-
-        public object SelectedItem => resultsTreeView.SelectedItem;
-
-        public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
-        public MenuItem ExtractMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => "Extract Selected".Equals(m.Header as string));
 
         public WadResultsTreeControl()
         {
@@ -82,6 +91,11 @@ namespace AssetsManager.Views.Dialogs.Controls
         private void ExtractMenuItem_Click(object sender, RoutedEventArgs e)
         {
             RaiseEvent(new RoutedEventArgs(ExtractMenuItemClickEvent, SelectedItem));
+        }
+
+        private void SaveMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            RaiseEvent(new RoutedEventArgs(SaveMenuItemClickEvent, SelectedItem));
         }
 
         public void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)

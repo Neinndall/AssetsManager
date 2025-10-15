@@ -28,11 +28,13 @@ namespace AssetsManager.Views.Controls.Explorer
         public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "PinMenuItem");
         public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewChangesMenuItem");
         public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ExtractMenuItem");
+        public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "SaveMenuItem");
 
         // Injected Services
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public WadExtractionService WadExtractionService { get; set; }
+        public WadSavingService WadSavingService { get; set; }
         public WadSearchBoxService WadSearchBoxService { get; set; }
         public DiffViewService DiffViewService { get; set; }
         public DirectoriesCreator DirectoriesCreator { get; set; }
@@ -294,6 +296,51 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private async void SaveSelected_Click(object sender, RoutedEventArgs e)
+        {
+            if (WadSavingService == null)
+            {
+                CustomMessageBoxService.ShowError("Error", "Wad Saving Service is not available.", Window.GetWindow(this));
+                return;
+            }
+
+            if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode)
+            {
+                CustomMessageBoxService.ShowInfo("Info", "Please select a file or folder to save.", Window.GetWindow(this));
+                return;
+            }
+
+            string destinationPath = null;
+
+            if (!string.IsNullOrEmpty(AppSettings.DefaultExtractedSelectDirectory) && Directory.Exists(AppSettings.DefaultExtractedSelectDirectory))
+            {
+                destinationPath = AppSettings.DefaultExtractedSelectDirectory;
+            }
+            else
+            {
+                var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select Destination Folder" };
+                if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    destinationPath = dialog.FileName;
+                }
+            }
+
+            if (destinationPath != null)
+            {
+                try
+                {
+                    LogService.Log("Processing and saving selected files...");
+                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath);
+                    LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name} to {destinationPath}", destinationPath);
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, $"Failed to save '{selectedNode.Name}'.");
+                    CustomMessageBoxService.ShowError("Error", $"An error occurred during save: {ex.Message}", Window.GetWindow(this));
+                }
+            }
+        }
+
         private async void ViewChanges_Click(object sender, RoutedEventArgs e)
         {
             if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null, BackupChunkPath: not null } selectedNode) return;
@@ -332,6 +379,11 @@ namespace AssetsManager.Views.Controls.Explorer
             if (ExtractMenuItem is not null)
             {
                 ExtractMenuItem.IsEnabled = _isWadMode;
+            }
+
+            if (SaveMenuItem is not null)
+            {
+                SaveMenuItem.IsEnabled = true; 
             }
 
             if (PinMenuItem is not null)

@@ -88,6 +88,7 @@ namespace AssetsManager
             services.AddSingleton<WemConversionService>();
             services.AddSingleton<DiffViewService>();
             services.AddSingleton<MonitorService>();
+            services.AddSingleton<WadSavingService>();
 
             // Versions Service
             services.AddSingleton<VersionService>();
