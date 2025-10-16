@@ -1,9 +1,9 @@
+
 <UserControl x:Class="AssetsManager.Views.Controls.Monitor.HistoryViewControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
@@ -64,6 +64,7 @@
         <!-- ListView sin GridView -->
         <ListView x:Name="DiffHistoryListView" 
                   Grid.Row="2"
+                  ItemsSource="{Binding PaginatedHistory}"
                   Margin="0"
                   Style="{StaticResource ModernListView}"
                   ItemContainerStyle="{StaticResource ModernListViewItem}"
@@ -90,20 +91,54 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <!-- Panel de botones -->
-        <StackPanel Grid.Row="3" 
-                   Orientation="Horizontal" 
-                   HorizontalAlignment="Right"
-                   Margin="0,10,0,0">
-            <Button x:Name="btnViewDiff" 
-                    Content="View Diff" 
-                    Style="{StaticResource SecondaryButton}" 
-                    Margin="0,0,8,0" 
-                    Click="btnViewDiff_Click"/>
-            <Button x:Name="btnRemoveSelected" 
-                    Content="Remove" 
-                    Style="{StaticResource DestructiveButton}" 
-                    Click="btnRemoveSelected_Click"/>
-        </StackPanel>
+        <!-- Panel de botones y paginación -->
+        <Grid Grid.Row="3" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Pagination Controls -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Grid.Column="0">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding TotalPages}" Value="0">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <Button Style="{StaticResource TransparentIconButton}"
+                        Click="PrevPage_Click"
+                        IsEnabled="{Binding CanGoToPrevPage}">
+                    <materialDesign:MaterialIcon Kind="ChevronLeft" />
+                </Button>
+
+                <TextBlock VerticalAlignment="Center" Margin="5,0" Foreground="{StaticResource TextPrimary}">
+                    <Run Text="{Binding CurrentPage, Mode=OneWay}" />
+                    <Run Text="/" />
+                    <Run Text="{Binding TotalPages, Mode=OneWay}" />
+                </TextBlock>
+
+                <Button Style="{StaticResource TransparentIconButton}"
+                        Click="NextPage_Click"
+                        IsEnabled="{Binding CanGoToNextPage}">
+                    <materialDesign:MaterialIcon Kind="ChevronRight" />
+                </Button>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Grid.Column="1">
+                <Button x:Name="btnViewDiff" 
+                        Content="View Diff" 
+                        Style="{StaticResource SecondaryButton}" 
+                        Margin="0,0,8,0" 
+                        Click="btnViewDiff_Click"/>
+                <Button x:Name="btnRemoveSelected" 
+                        Content="Remove" 
+                        Style="{StaticResource DestructiveButton}" 
+                        Click="btnRemoveSelected_Click"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>

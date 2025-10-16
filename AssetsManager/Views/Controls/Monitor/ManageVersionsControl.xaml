@@ -218,9 +218,9 @@
                     </Button>
 
                     <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
-                        <Run Text="{Binding LeagueClientCurrentPage}" />
+                        <Run Text="{Binding LeagueClientCurrentPage, Mode=OneWay}" />
                         <Run Text="/" />
-                        <Run Text="{Binding LeagueClientTotalPages}" />
+                        <Run Text="{Binding LeagueClientTotalPages, Mode=OneWay}" />
                     </TextBlock>
 
                     <Button Style="{StaticResource TransparentIconButton}"
@@ -342,9 +342,9 @@
                     </Button>
 
                     <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
-                        <Run Text="{Binding LoLGameClientCurrentPage}" />
+                        <Run Text="{Binding LoLGameClientCurrentPage, Mode=OneWay}" />
                         <Run Text="/" />
-                        <Run Text="{Binding LoLGameClientTotalPages}" />
+                        <Run Text="{Binding LoLGameClientTotalPages, Mode=OneWay}" />
                     </TextBlock>
 
                     <Button Style="{StaticResource TransparentIconButton}"

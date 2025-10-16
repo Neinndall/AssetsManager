@@ -1,14 +1,13 @@
+
 using System;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
+using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -18,6 +17,8 @@ namespace AssetsManager.Views.Controls.Monitor
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public DiffViewService DiffViewService { get; set; }
+
+        private HistoryViewModel _viewModel;
 
         public HistoryViewControl()
         {
@@ -29,8 +30,9 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (AppSettings != null)
             {
-                DiffHistoryListView.ItemsSource = null;
-                DiffHistoryListView.ItemsSource = AppSettings.DiffHistory;
+                _viewModel = new HistoryViewModel();
+                this.DataContext = _viewModel;
+                _viewModel.LoadHistory(AppSettings.DiffHistory);
             }
         }
 
@@ -73,9 +75,7 @@ namespace AssetsManager.Views.Controls.Monitor
                         }
 
                         AppSettings.SaveSettings(AppSettings);
-                        // Refresh UI by re-setting the ItemsSource
-                        DiffHistoryListView.ItemsSource = null;
-                        DiffHistoryListView.ItemsSource = AppSettings.DiffHistory;
+                        _viewModel.LoadHistory(AppSettings.DiffHistory);
                     }
                     catch (Exception ex)
                     {
@@ -88,6 +88,16 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 CustomMessageBoxService.ShowInfo("Info", "Please select one or more history entries to delete.", Window.GetWindow(this), CustomMessageBoxIcon.Warning);
             }
+        }
+
+        private void PrevPage_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.PrevPage();
+        }
+
+        private void NextPage_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.NextPage();
         }
     }
 }

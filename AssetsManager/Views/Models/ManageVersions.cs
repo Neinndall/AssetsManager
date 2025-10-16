@@ -44,7 +44,7 @@ namespace AssetsManager.Views.Models
         public int LeagueClientTotalPages
         {
             get => _leagueClientTotalPages;
-            set
+            private set
             {
                 if (_leagueClientTotalPages != value)
                 {
@@ -80,7 +80,7 @@ namespace AssetsManager.Views.Models
         public int LoLGameClientTotalPages
         {
             get => _loLGameClientTotalPages;
-            set
+            private set
             {
                 if (_loLGameClientTotalPages != value)
                 {
