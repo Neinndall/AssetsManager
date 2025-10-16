@@ -111,101 +111,103 @@
         <!-- League Client Versions List -->
         <Border Style="{StaticResource SettingsCard}" Padding="24,24,24,12">
             <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialDesign:MaterialIcon Kind="DesktopClassic" 
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   FontSize="20" 
-                                                   Margin="0,0,12,0" 
-                                                   VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="League Client Versions" 
-                                     FontSize="15" 
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Versions of the League of Legends client" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <materialDesign:MaterialIcon Kind="DesktopClassic" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       FontSize="20" 
+                                                       Margin="0,0,12,0" 
+                                                       VerticalAlignment="Center"/>
+                        <StackPanel>
+                            <TextBlock Text="League Client Versions" 
+                                         FontSize="15" 
+                                         FontWeight="SemiBold"
+                                         Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Versions of the League of Legends client" 
+                                         FontSize="12" 
+                                         Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
 
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Column="0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="24*"/>
-                                <ColumnDefinition Width="22*"/>
-                                <ColumnDefinition Width="54*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <materialDesign:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
-                                    <TextBlock Text="File Name" Style="{StaticResource HeaderTextStyle}"/>
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="1" Style="{StaticResource HalfModernGridViewColumnHeader}">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <materialDesign:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
-                                    <TextBlock Text="Date" Style="{StaticResource HeaderTextStyle}"/>
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="2" Style="{StaticResource LastModernGridViewColumnHeader}">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <materialDesign:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
-                                    <TextBlock Text="Manifest URL" Style="{StaticResource HeaderTextStyle}"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                        <ListView Grid.Row="1" x:Name="LeagueClientVersionsListView"
-                                  ItemsSource="{Binding LeagueClientVersions}"
-                                  Style="{StaticResource ModernListView}"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
-                                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="24*"/>
-                                            <ColumnDefinition Width="22*"/>
-                                            <ColumnDefinition Width="54*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Grid.Column="0" Margin="0,0,10,0">
-                                            <TextBlock Text="{Binding FileName}"
-                                                       Style="{StaticResource CellTextStyle}"
-                                                       FontWeight="Medium"
-                                                       TextAlignment="Center" />
-                                        </Border>
-                                        <Border Grid.Column="1" Margin="5,0,10,0">
-                                            <TextBlock Text="{Binding Date}" 
-                                                       Style="{StaticResource CellTextStyle}"
-                                                       FontWeight="Medium"
-                                                       TextAlignment="Center" />
-                                        </Border>
-                                        <Grid Grid.Column="2">
-                                            <TextBlock Text="{Binding Content}" 
-                                                       Style="{StaticResource CellTextStyle}"
-                                                       FontWeight="Medium"
-                                                       TextAlignment="Center" />
+                        <Grid Grid.Column="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24*"/>
+                                    <ColumnDefinition Width="22*"/>
+                                    <ColumnDefinition Width="54*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <materialDesign:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
+                                        <TextBlock Text="File Name" Style="{StaticResource HeaderTextStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1" Style="{StaticResource HalfModernGridViewColumnHeader}">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <materialDesign:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
+                                        <TextBlock Text="Date" Style="{StaticResource HeaderTextStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2" Style="{StaticResource LastModernGridViewColumnHeader}">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <materialDesign:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
+                                        <TextBlock Text="Manifest URL" Style="{StaticResource HeaderTextStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                            <ListView Grid.Row="1" x:Name="LeagueClientVersionsListView"
+                                      ItemsSource="{Binding LeagueClientVersions}"
+                                      Style="{StaticResource ModernListView}"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
+                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="24*"/>
+                                                <ColumnDefinition Width="22*"/>
+                                                <ColumnDefinition Width="54*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Margin="0,0,10,0">
+                                                <TextBlock Text="{Binding FileName}"
+                                                           Style="{StaticResource CellTextStyle}"
+                                                           FontWeight="Medium"
+                                                           TextAlignment="Center" />
+                                            </Border>
+                                            <Border Grid.Column="1" Margin="5,0,10,0">
+                                                <TextBlock Text="{Binding Date}" 
+                                                           Style="{StaticResource CellTextStyle}"
+                                                           FontWeight="Medium"
+                                                           TextAlignment="Center" />
+                                            </Border>
+                                            <Grid Grid.Column="2">
+                                                <TextBlock Text="{Binding Content}" 
+                                                           Style="{StaticResource CellTextStyle}"
+                                                           FontWeight="Medium"
+                                                           TextAlignment="Center" />
+                                            </Grid>
                                         </Grid>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
                     </Grid>
-                </Grid>
+                </StackPanel>
 
                 <!-- Pagination Controls for League Client Versions -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
@@ -233,101 +235,103 @@
         <!-- LoL Game Client Versions List -->
         <Border Style="{StaticResource SettingsCard}" Padding="24,24,24,12">
             <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialDesign:MaterialIcon Kind="FolderMultipleOutline" 
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   FontSize="20" 
-                                                   Margin="0,0,12,0" 
-                                                   VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Game Client Versions" 
-                                     FontSize="15" 
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Versions of the Game Client" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <materialDesign:MaterialIcon Kind="FolderMultipleOutline" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       FontSize="20" 
+                                                       Margin="0,0,12,0" 
+                                                       VerticalAlignment="Center"/>
+                        <StackPanel>
+                            <TextBlock Text="Game Client Versions" 
+                                         FontSize="15" 
+                                         FontWeight="SemiBold"
+                                         Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Versions of the Game Client" 
+                                         FontSize="12" 
+                                         Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
 
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Column="0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="24*"/>
-                                <ColumnDefinition Width="22*"/>
-                                <ColumnDefinition Width="54*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <materialDesign:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
-                                    <TextBlock Text="File Name" Style="{StaticResource HeaderTextStyle}"/>
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="1" Style="{StaticResource HalfModernGridViewColumnHeader}">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <materialDesign:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
-                                    <TextBlock Text="Date" Style="{StaticResource HeaderTextStyle}"/>
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="2" Style="{StaticResource LastModernGridViewColumnHeader}">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <materialDesign:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
-                                    <TextBlock Text="Manifest URL" Style="{StaticResource HeaderTextStyle}"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                        <ListView Grid.Row="1" x:Name="LoLGameClientVersionsListView" 
-                                  ItemsSource="{Binding LoLGameClientVersions}"
-                                  Style="{StaticResource ModernListView}"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
-                                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="24*"/>
-                                            <ColumnDefinition Width="22*"/>
-                                            <ColumnDefinition Width="54*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Grid.Column="0" Margin="0,0,10,0">
-                                            <TextBlock Text="{Binding FileName}"
-                                                       Style="{StaticResource CellTextStyle}"
-                                                       FontWeight="Medium"
-                                                       TextAlignment="Center" />
-                                        </Border>
-                                        <Border Grid.Column="1" Margin="5,0,10,0">
-                                            <TextBlock Text="{Binding Date}"
-                                                       Style="{StaticResource CellTextStyle}"
-                                                       FontWeight="Medium"
-                                                       TextAlignment="Center" />
-                                        </Border>
-                                        <Grid Grid.Column="2">
-                                            <TextBlock Text="{Binding Content}" 
-                                                       Style="{StaticResource CellTextStyle}"
-                                                       FontWeight="Medium"
-                                                       TextAlignment="Center" />
+                        <Grid Grid.Column="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24*"/>
+                                    <ColumnDefinition Width="22*"/>
+                                    <ColumnDefinition Width="54*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <materialDesign:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
+                                        <TextBlock Text="File Name" Style="{StaticResource HeaderTextStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1" Style="{StaticResource HalfModernGridViewColumnHeader}">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <materialDesign:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
+                                        <TextBlock Text="Date" Style="{StaticResource HeaderTextStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2" Style="{StaticResource LastModernGridViewColumnHeader}">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <materialDesign:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
+                                        <TextBlock Text="Manifest URL" Style="{StaticResource HeaderTextStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                            <ListView Grid.Row="1" x:Name="LoLGameClientVersionsListView" 
+                                      ItemsSource="{Binding LoLGameClientVersions}"
+                                      Style="{StaticResource ModernListView}"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
+                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="24*"/>
+                                                <ColumnDefinition Width="22*"/>
+                                                <ColumnDefinition Width="54*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Margin="0,0,10,0">
+                                                <TextBlock Text="{Binding FileName}"
+                                                           Style="{StaticResource CellTextStyle}"
+                                                           FontWeight="Medium"
+                                                           TextAlignment="Center" />
+                                            </Border>
+                                            <Border Grid.Column="1" Margin="5,0,10,0">
+                                                <TextBlock Text="{Binding Date}"
+                                                           Style="{StaticResource CellTextStyle}"
+                                                           FontWeight="Medium"
+                                                           TextAlignment="Center" />
+                                            </Border>
+                                            <Grid Grid.Column="2">
+                                                <TextBlock Text="{Binding Content}" 
+                                                           Style="{StaticResource CellTextStyle}"
+                                                           FontWeight="Medium"
+                                                           TextAlignment="Center" />
+                                            </Grid>
                                         </Grid>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
                     </Grid>
-                </Grid>
+                </StackPanel>
 
                 <!-- Pagination Controls for LoL Game Client Versions -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
