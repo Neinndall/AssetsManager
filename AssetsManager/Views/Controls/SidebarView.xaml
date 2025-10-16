@@ -8,30 +8,7 @@
              mc:Ignorable="d" 
              d:DesignHeight="730" d:DesignWidth="180"
              Width="64">
-             
-    <UserControl.Triggers>
-        <EventTrigger RoutedEvent="MouseEnter">
-            <BeginStoryboard>
-                <Storyboard>
-                    <StaticResource ResourceKey="ExpandSidebar"/>
-                    <BooleanAnimationUsingKeyFrames Storyboard.TargetProperty="IsExpanded">
-                        <DiscreteBooleanKeyFrame KeyTime="0:0:0" Value="True"/>
-                    </BooleanAnimationUsingKeyFrames>
-                </Storyboard>
-            </BeginStoryboard>
-        </EventTrigger>
-        <EventTrigger RoutedEvent="MouseLeave">
-            <BeginStoryboard>
-                <Storyboard>
-                    <StaticResource ResourceKey="CollapseSidebar"/>
-                    <BooleanAnimationUsingKeyFrames Storyboard.TargetProperty="IsExpanded">
-                        <DiscreteBooleanKeyFrame KeyTime="0:0:0" Value="False"/>
-                    </BooleanAnimationUsingKeyFrames>
-                </Storyboard>
-            </BeginStoryboard>
-        </EventTrigger>
-    </UserControl.Triggers> 
-    
+
     <Border Background="{StaticResource CardBackground}" 
             BorderBrush="{StaticResource BorderColor}" 
             BorderThickness="0,0,1,0" 
@@ -46,6 +23,17 @@
             <StackPanel Grid.Row="0" 
                         VerticalAlignment="Top" 
                         Margin="8,16,8,0">
+
+                <RadioButton x:Name="ToggleExpansionButton" Style="{StaticResource SidebarRadioButtonStyle}" Click="ToggleExpansion_Click" Margin="0,0,0,4">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Menu" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Grid.Column="1" Text="Panel" FontWeight="Medium" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                    </Grid>
+                </RadioButton>
 
                 <RadioButton x:Name="HomeButton" Style="{StaticResource SidebarRadioButtonStyle}" Click="MenuButton_Click" Tag="Home" Margin="0,0,0,4" IsChecked="True" GroupName="SidebarNavigation">
                     <Grid>
