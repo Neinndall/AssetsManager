@@ -13,14 +13,13 @@ AssetsManager is a tool for League of Legends enthusiasts who need to analyze, m
 
 ## ✨ Key Features
 
-*   **Automatic Asset Downloading**: Automatically detects and downloads new assets from PBE updates.
+*   **Download automatically new assets**: Automatically detects and downloads new assets from PBE updates.
 *   **Advanced WAD Comparator**: Compares WAD files between different versions to identify new, modified, or deleted assets.
-*   **Wad Explorer**: Explores WAD archives with a file tree interface and previews dozens of formats.
+*   **Powerful File Explorer**: Explore WAD with powerful tools with archives with a file tree interface and previews dozens of formats.
 *   **3D Model Viewer**: Inspects 3D models (.skn), skeletons (.skl), and animations (.anm) with a built-in viewer.
 *   **Asset Monitoring**: Tracks remote assets, JSON files, and the PBE server status for real-time updates.
-*   **Version Management**: Easily manages and downloads different versions of the League of Legends client and its plugins.
-*   **Smart Extraction and Saving**: Extracts raw assets or saves them in more user-friendly formats (e.g., .tex to .png, .bin to .json).
-*   **Audio Bank Analysis**: Explores audio banks (.wpk, .bnk), visualizes the event hierarchy with their names, and plays the associated sounds.
+*   **Version Management**: Manages and downloads diferentes versiones de LoL Game Client or Plugins.
+*   **Audio Bank**: Explores audio banks (.wpk, .bnk), visualizes the event hierarchy with their names, and plays the associated sounds.
 
 ## 🦾 Advanced Functionality
 

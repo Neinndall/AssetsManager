@@ -70,113 +70,92 @@
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Margin="10,0,0,0">
-                        <Run Text="• "/>
-                        <Run Text="Automatic Asset Downloading"/>
+                               Margin="6,0,0,0">
+                        <Run Text="• Download automatically new assets"/>
                     </TextBlock>
                     <TextBlock Text="Automatically detects and downloads new assets from PBE updates."
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
-                               Margin="25,2,0,8"/>
+                               Margin="20,2,0,8"/>
                 </StackPanel>
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Margin="10,0,0,0">
-                        <Run Text="• "/>
-                        <Run Text="Advanced WAD Comparator"/>
+                               Margin="6,0,0,0">
+                        <Run Text="• Advanced WAD Comparator"/>
                     </TextBlock>
                     <TextBlock Text="Compares WAD files between different versions to identify new, modified, or deleted assets."
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
-                               Margin="25,2,0,8"/>
+                               Margin="20,2,0,8"/>
                 </StackPanel>
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Margin="10,0,0,0">
-                        <Run Text="• "/>
-                        <Run Text="Powerful File Explorer"/>
+                               Margin="6,0,0,0">
+                        <Run Text="• Powerful File Explorer"/>
                     </TextBlock>
-                    <TextBlock Text="Explores WAD archives with a file tree interface and previews dozens of formats."
+                    <TextBlock Text="Explore WAD with powerful tools with archives with a file tree interface and previews dozens of formats."
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
-                               Margin="25,2,0,8"/>
+                               Margin="20,2,0,8"/>
                 </StackPanel>
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Margin="10,0,0,0">
-                        <Run Text="• "/>
-                        <Run Text="3D Model Viewer"/>
+                               Margin="6,0,0,0">
+                        <Run Text="• 3D Model Viewer"/>
                     </TextBlock>
                     <TextBlock Text="Inspects 3D models (.skn), skeletons (.skl), and animations (.anm) with a built-in viewer."
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
-                               Margin="25,2,0,8"/>
+                               Margin="20,2,0,8"/>
                 </StackPanel>
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Margin="10,0,0,0">
-                        <Run Text="• "/>
-                        <Run Text="Asset Monitoring"/>
+                               Margin="6,0,0,0">
+                        <Run Text="• Asset Monitoring"/>
                     </TextBlock>
                     <TextBlock Text="Tracks remote assets, JSON files, and the PBE server status for real-time updates."
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
-                               Margin="25,2,0,8"/>
+                               Margin="20,2,0,8"/>
                 </StackPanel>
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Margin="10,0,0,0">
-                        <Run Text="• "/>
-                        <Run Text="Version Management"/>
+                               Margin="6,0,0,0">
+                        <Run Text="• Version Management"/>
                     </TextBlock>
-                    <TextBlock Text="Easily manages and downloads different versions of the League of Legends client and its plugins."
+                    <TextBlock Text="Manages and downloads diferentes versiones de LoL Game Client or Plugins."
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
-                               Margin="25,2,0,8"/>
+                               Margin="20,2,0,8"/>
                 </StackPanel>
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Margin="10,0,0,0">
-                        <Run Text="• "/>
-                        <Run Text="Smart Extraction and Saving"/>
+                               Margin="6,0,0,0">
+                        <Run Text="• Audio Bank"/>
                     </TextBlock>
-                    <TextBlock Text="Extracts raw assets or saves them in more user-friendly formats (e.g., .tex to .png, .bin to .json)."
+                    <TextBlock Text="Explores audio banks (.wpk, .bnk) and displays audio events with their names and plays them."
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
-                               Margin="25,2,0,8"/>
-                </StackPanel>
-                <StackPanel Margin="0,4">
-                    <TextBlock Foreground="{StaticResource TextPrimary}"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               Margin="10,0,0,0">
-                        <Run Text="• "/>
-                        <Run Text="Audio Bank Analysis"/>
-                    </TextBlock>
-                    <TextBlock Text="Explores audio banks (.wpk, .bnk), visualizes the event hierarchy with their names, and plays the associated sounds."
-                               Foreground="{StaticResource TextSecondary}"
-                               FontSize="13"
-                               TextWrapping="Wrap"
-                               Margin="25,2,0,8"/>
+                               Margin="20,2,0,8"/>
                 </StackPanel>
             </StackPanel>
         </Border>
