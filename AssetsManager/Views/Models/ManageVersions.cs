@@ -1,5 +1,6 @@
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Versions;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -12,30 +13,87 @@ namespace AssetsManager.Views.Models
     {
         private readonly VersionService _versionService;
         private readonly LogService _logService;
+        private const int PageSize = 10;
+
+        private List<VersionFileInfo> _allLeagueClientVersions;
+        private List<VersionFileInfo> _allLoLGameClientVersions;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        private ObservableCollection<VersionFileInfo> _leagueClientVersions;
-        public ObservableCollection<VersionFileInfo> LeagueClientVersions
+        public ObservableCollection<VersionFileInfo> LeagueClientVersions { get; set; }
+        public ObservableCollection<VersionFileInfo> LoLGameClientVersions { get; set; }
+
+        private int _leagueClientCurrentPage = 1;
+        public int LeagueClientCurrentPage
         {
-            get { return _leagueClientVersions; }
+            get => _leagueClientCurrentPage;
             set
             {
-                _leagueClientVersions = value;
-                OnPropertyChanged(nameof(LeagueClientVersions));
+                if (_leagueClientCurrentPage != value)
+                {
+                    _leagueClientCurrentPage = value;
+                    OnPropertyChanged(nameof(LeagueClientCurrentPage));
+                    OnPropertyChanged(nameof(CanGoToPrevLeagueClientPage));
+                    OnPropertyChanged(nameof(CanGoToNextLeagueClientPage));
+                    UpdateLeagueClientPagedView();
+                }
             }
         }
 
-        private ObservableCollection<VersionFileInfo> _loLGameClientVersions;
-        public ObservableCollection<VersionFileInfo> LoLGameClientVersions
+        private int _leagueClientTotalPages;
+        public int LeagueClientTotalPages
         {
-            get { return _loLGameClientVersions; }
+            get => _leagueClientTotalPages;
             set
             {
-                _loLGameClientVersions = value;
-                OnPropertyChanged(nameof(LoLGameClientVersions));
+                if (_leagueClientTotalPages != value)
+                {
+                    _leagueClientTotalPages = value;
+                    OnPropertyChanged(nameof(LeagueClientTotalPages));
+                    OnPropertyChanged(nameof(CanGoToPrevLeagueClientPage));
+                    OnPropertyChanged(nameof(CanGoToNextLeagueClientPage));
+                }
             }
         }
+
+        public bool CanGoToPrevLeagueClientPage => LeagueClientCurrentPage > 1;
+        public bool CanGoToNextLeagueClientPage => LeagueClientCurrentPage < LeagueClientTotalPages;
+
+        private int _loLGameClientCurrentPage = 1;
+        public int LoLGameClientCurrentPage
+        {
+            get => _loLGameClientCurrentPage;
+            set
+            {
+                if (_loLGameClientCurrentPage != value)
+                {
+                    _loLGameClientCurrentPage = value;
+                    OnPropertyChanged(nameof(LoLGameClientCurrentPage));
+                    OnPropertyChanged(nameof(CanGoToPrevLoLGameClientPage));
+                    OnPropertyChanged(nameof(CanGoToNextLoLGameClientPage));
+                    UpdateLoLGameClientPagedView();
+                }
+            }
+        }
+
+        private int _loLGameClientTotalPages;
+        public int LoLGameClientTotalPages
+        {
+            get => _loLGameClientTotalPages;
+            set
+            {
+                if (_loLGameClientTotalPages != value)
+                {
+                    _loLGameClientTotalPages = value;
+                    OnPropertyChanged(nameof(LoLGameClientTotalPages));
+                    OnPropertyChanged(nameof(CanGoToPrevLoLGameClientPage));
+                    OnPropertyChanged(nameof(CanGoToNextLoLGameClientPage));
+                }
+            }
+        }
+
+        public bool CanGoToPrevLoLGameClientPage => LoLGameClientCurrentPage > 1;
+        public bool CanGoToNextLoLGameClientPage => LoLGameClientCurrentPage < LoLGameClientTotalPages;
 
         public ObservableCollection<LocaleOption> AvailableLocales { get; set; }
 
@@ -43,8 +101,13 @@ namespace AssetsManager.Views.Models
         {
             _versionService = versionService;
             _logService = logService;
+
+            _allLeagueClientVersions = new List<VersionFileInfo>();
+            _allLoLGameClientVersions = new List<VersionFileInfo>();
+
             LeagueClientVersions = new ObservableCollection<VersionFileInfo>();
             LoLGameClientVersions = new ObservableCollection<VersionFileInfo>();
+
             AvailableLocales = new ObservableCollection<LocaleOption>
             {
                 new LocaleOption { Code = "es_ES", IsSelected = false },
@@ -60,19 +123,71 @@ namespace AssetsManager.Views.Models
             {
                 var allFiles = await _versionService.GetVersionFilesAsync();
 
-                LeagueClientVersions.Clear();
-                LoLGameClientVersions.Clear();
+                _allLeagueClientVersions = allFiles.Where(f => f.Category == "league-client").ToList();
+                var gameClientCategories = new[] { "lol-game-client" };
+                _allLoLGameClientVersions = allFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
 
-                foreach (var file in allFiles.Where(f => f.Category == "league-client"))
-                {
-                    LeagueClientVersions.Add(file);
-                }
+                LeagueClientCurrentPage = 1;
+                LoLGameClientCurrentPage = 1;
 
-                var gameClientCategories = new[] { "lol-game-client" }; // Can be expanded with more categories
-                foreach (var file in allFiles.Where(f => gameClientCategories.Contains(f.Category)))
-                {
-                    LoLGameClientVersions.Add(file);
-                }
+                UpdateLeagueClientPagedView();
+                UpdateLoLGameClientPagedView();
+            }
+        }
+
+        private void UpdateLeagueClientPagedView()
+        {
+            LeagueClientTotalPages = (int)Math.Ceiling(_allLeagueClientVersions.Count / (double)PageSize);
+            var pagedItems = _allLeagueClientVersions.Skip((LeagueClientCurrentPage - 1) * PageSize).Take(PageSize);
+
+            LeagueClientVersions.Clear();
+            foreach (var item in pagedItems)
+            {
+                LeagueClientVersions.Add(item);
+            }
+        }
+
+        private void UpdateLoLGameClientPagedView()
+        {
+            LoLGameClientTotalPages = (int)Math.Ceiling(_allLoLGameClientVersions.Count / (double)PageSize);
+            var pagedItems = _allLoLGameClientVersions.Skip((LoLGameClientCurrentPage - 1) * PageSize).Take(PageSize);
+
+            LoLGameClientVersions.Clear();
+            foreach (var item in pagedItems)
+            {
+                LoLGameClientVersions.Add(item);
+            }
+        }
+
+        public void NextLeagueClientPage()
+        {
+            if (CanGoToNextLeagueClientPage)
+            {
+                LeagueClientCurrentPage++;
+            }
+        }
+
+        public void PrevLeagueClientPage()
+        {
+            if (CanGoToPrevLeagueClientPage)
+            {
+                LeagueClientCurrentPage--;
+            }
+        }
+
+        public void NextLoLGameClientPage()
+        {
+            if (CanGoToNextLoLGameClientPage)
+            {
+                LoLGameClientCurrentPage++;
+            }
+        }
+
+        public void PrevLoLGameClientPage()
+        {
+            if (CanGoToPrevLoLGameClientPage)
+            {
+                LoLGameClientCurrentPage--;
             }
         }
 
@@ -82,17 +197,14 @@ namespace AssetsManager.Views.Models
 
             if (_versionService.DeleteVersionFiles(versionsToDelete))
             {
-                foreach (var versionFile in versionsToDelete.ToList()) // ToList() to avoid issues with modifying collection while iterating
+                foreach (var versionFile in versionsToDelete.ToList())
                 {
-                    if (LeagueClientVersions.Contains(versionFile))
-                    {
-                        LeagueClientVersions.Remove(versionFile);
-                    }
-                    else if (LoLGameClientVersions.Contains(versionFile))
-                    {
-                        LoLGameClientVersions.Remove(versionFile);
-                    }
+                    _allLeagueClientVersions.Remove(versionFile);
+                    _allLoLGameClientVersions.Remove(versionFile);
                 }
+                // Recalculate total pages and update views after deletion
+                UpdateLeagueClientPagedView();
+                UpdateLoLGameClientPagedView();
             }
         }
 

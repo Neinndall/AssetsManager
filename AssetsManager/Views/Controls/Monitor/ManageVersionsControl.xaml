@@ -109,7 +109,7 @@
         </Border>
 
         <!-- League Client Versions List -->
-        <Border Style="{StaticResource SettingsCard}">
+        <Border Style="{StaticResource SettingsCard}" Padding="24,24,24,12">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                     <materialDesign:MaterialIcon Kind="DesktopClassic" 
@@ -206,11 +206,32 @@
                         </ListView>
                     </Grid>
                 </Grid>
+
+                <!-- Pagination Controls for League Client Versions -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="PrevLeagueClientPage_Click"
+                            IsEnabled="{Binding CanGoToPrevLeagueClientPage}">
+                        <materialDesign:MaterialIcon Kind="ChevronLeft" />
+                    </Button>
+
+                    <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
+                        <Run Text="{Binding LeagueClientCurrentPage}" />
+                        <Run Text="/" />
+                        <Run Text="{Binding LeagueClientTotalPages}" />
+                    </TextBlock>
+
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="NextLeagueClientPage_Click"
+                            IsEnabled="{Binding CanGoToNextLeagueClientPage}">
+                        <materialDesign:MaterialIcon Kind="ChevronRight" />
+                    </Button>
+                </StackPanel>
             </StackPanel>
         </Border>
 
         <!-- LoL Game Client Versions List -->
-        <Border Style="{StaticResource SettingsCard}">
+        <Border Style="{StaticResource SettingsCard}" Padding="24,24,24,12">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                     <materialDesign:MaterialIcon Kind="FolderMultipleOutline" 
@@ -307,6 +328,27 @@
                         </ListView>
                     </Grid>
                 </Grid>
+
+                <!-- Pagination Controls for LoL Game Client Versions -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="PrevLoLGameClientPage_Click"
+                            IsEnabled="{Binding CanGoToPrevLoLGameClientPage}">
+                        <materialDesign:MaterialIcon Kind="ChevronLeft" />
+                    </Button>
+
+                    <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
+                        <Run Text="{Binding LoLGameClientCurrentPage}" />
+                        <Run Text="/" />
+                        <Run Text="{Binding LoLGameClientTotalPages}" />
+                    </TextBlock>
+
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="NextLoLGameClientPage_Click"
+                            IsEnabled="{Binding CanGoToNextLoLGameClientPage}">
+                        <materialDesign:MaterialIcon Kind="ChevronRight" />
+                    </Button>
+                </StackPanel>
             </StackPanel>
         </Border>
     </StackPanel>
