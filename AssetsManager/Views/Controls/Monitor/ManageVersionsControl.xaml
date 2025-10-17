@@ -109,10 +109,10 @@
         </Border>
 
         <!-- League Client Versions List -->
-        <Border Style="{StaticResource SettingsCard}" Padding="24,24,24,12">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
                         <materialDesign:MaterialIcon Kind="DesktopClassic" 
                                                        Foreground="{StaticResource AccentBrush}"
                                                        FontSize="20" 
@@ -210,7 +210,7 @@
                 </StackPanel>
 
                 <!-- Pagination Controls for League Client Versions -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,-5">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,-15">
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
                             <Style.Triggers>
@@ -242,10 +242,10 @@
         </Border>
 
         <!-- LoL Game Client Versions List -->
-        <Border Style="{StaticResource SettingsCard}" Padding="24,24,24,12">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
                         <materialDesign:MaterialIcon Kind="FolderMultipleOutline" 
                                                        Foreground="{StaticResource AccentBrush}"
                                                        FontSize="20" 
@@ -343,7 +343,7 @@
                 </StackPanel>
 
                 <!-- Pagination Controls for LoL Game Client Versions -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,-5">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,-15">
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
                             <Style.Triggers>
