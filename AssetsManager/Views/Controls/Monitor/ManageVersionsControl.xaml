@@ -211,6 +211,15 @@
 
                 <!-- Pagination Controls for League Client Versions -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,-5">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding LeagueClientTotalPages}" Value="0">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="PrevLeagueClientPage_Click"
                             IsEnabled="{Binding CanGoToPrevLeagueClientPage}">
@@ -335,6 +344,15 @@
 
                 <!-- Pagination Controls for LoL Game Client Versions -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,-5">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding LoLGameClientTotalPages}" Value="0">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="PrevLoLGameClientPage_Click"
                             IsEnabled="{Binding CanGoToPrevLoLGameClientPage}">
