@@ -60,32 +60,59 @@
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Visibility="Visible">
-                <materialDesign:MaterialIcon Kind="CubeOutline"
-                                            Width="64" Height="64"
-                                            HorizontalAlignment="Center"
-                                            Foreground="{StaticResource TextMuted}"
-                                            Opacity="0.5"
-                                            Margin="0,0,0,16"/>
-                <TextBlock Text="SELECT A MODEL OR MAPGEOMETRY"
-                           FontSize="24" 
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TextMuted}"
-                           HorizontalAlignment="Center"
-                           Margin="0,0,0,8"/>
-                <TextBlock Text="Load a .skn or .mapgeo file to visualize it in 3D."
-                           FontSize="16"
-                           Foreground="{StaticResource TextMuted}"
-                           HorizontalAlignment="Center"
-                           Margin="0,0,0,24"
-                           Opacity="0.7"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <Button Content="Load Model"
-                            Style="{StaticResource SecondaryButton}"
-                            Click="OpenFile_Click"/>
-                    <Button Content="Load Map Geometry"
-                            Style="{StaticResource SecondaryButton}"
-                            Click="OpenGeometryFile_Click"
-                            Margin="10,0,0,0"/>
+                <!-- Default Empty State Content -->
+                <StackPanel x:Name="DefaultEmptyStateContent" Visibility="Visible">
+                    <materialDesign:MaterialIcon Kind="CubeOutline"
+                                                Width="64" Height="64"
+                                                HorizontalAlignment="Center"
+                                                Foreground="{StaticResource TextMuted}"
+                                                Opacity="0.5"
+                                                Margin="0,0,0,16"/>
+                    <TextBlock Text="SELECT A MODEL OR MAPGEOMETRY"
+                            FontSize="24" 
+                            FontWeight="SemiBold"
+                            Foreground="{StaticResource TextMuted}"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <TextBlock Text="Load a .skn or .mapgeo file to visualize it in 3D."
+                            FontSize="16"
+                            Foreground="{StaticResource TextMuted}"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,24"
+                            Opacity="0.7"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Load Model"
+                                Style="{StaticResource SecondaryButton}"
+                                Click="OpenFile_Click"/>
+                        <Button Content="Load MapGeometry"
+                                Style="{StaticResource SecondaryButton}"
+                                Click="OpenGeometryFile_Click"
+                                Margin="10,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Loading State Content (Initially Collapsed) -->
+                <StackPanel x:Name="LoadingStateContent" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border CornerRadius="5"
+                            Width="100"
+                            Margin="0,0,0,8"
+                            Background="{StaticResource DarkBackground}" 
+                            BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="1"
+                            SnapsToDevicePixels="True"
+                            ClipToBounds="True">
+                        <ProgressBar IsIndeterminate="True"
+                                     Style="{StaticResource ModernProgressBar}"
+                                     Margin="-1"
+                                     BorderThickness="0"
+                                     Background="Transparent"/>
+                    </Border>
+                    <TextBlock x:Name="LoadingMessageTextBlock"
+                               Text="Loading MapGeometry..."
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextMuted}"
+                               HorizontalAlignment="Center"/>
                 </StackPanel>
             </StackPanel>
 

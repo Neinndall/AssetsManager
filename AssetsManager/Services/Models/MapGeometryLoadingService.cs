@@ -8,18 +8,13 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
-using AssetsManager.Utils;
 using LeagueToolkit.Core.Environment;
 using LeagueToolkit.Core.Meta;
-using LeagueToolkit.Core.Meta.Properties;
-using LeagueToolkit.Core.Renderer;
-using LeagueToolkit.Toolkit;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Models
 {

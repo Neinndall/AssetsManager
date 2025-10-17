@@ -79,9 +79,12 @@ namespace AssetsManager.Views
         private void OpenFile_Click(object sender, RoutedEventArgs e)
         {
             _isMapGeometry = false;
+            DefaultEmptyStateContent.Visibility = Visibility.Visible;
+            LoadingStateContent.Visibility = Visibility.Collapsed;
             var openFileDialog = new CommonOpenFileDialog
             {
-                Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl"), new CommonFileDialogFilter("All Files", "*.*") }
+                Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl"), new CommonFileDialogFilter("All Files", "*.*") },
+                Title = "Select a .skn file"
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -101,52 +104,63 @@ namespace AssetsManager.Views
         private async void OpenGeometryFile_Click(object sender, RoutedEventArgs e)
         {
             _isMapGeometry = true;
-            var openMapGeoDialog = new CommonOpenFileDialog
-            {
-                Filters = { new CommonFileDialogFilter("Map Geometry Files", "*.mapgeo"), new CommonFileDialogFilter("All Files", "*.*") }
-            };
+            DefaultEmptyStateContent.Visibility = Visibility.Collapsed;
+            LoadingStateContent.Visibility = Visibility.Visible;
 
-            if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            try
             {
-                string mapGeoPath = openMapGeoDialog.FileName;
-                string materialsBinPath = Path.ChangeExtension(mapGeoPath, ".materials.bin");
-
-                if (!File.Exists(materialsBinPath))
+                var openMapGeoDialog = new CommonOpenFileDialog
                 {
-                    var openMaterialsBinDialog = new CommonOpenFileDialog
+                    Filters = { new CommonFileDialogFilter("MapGeometry Files", "*.mapgeo"), new CommonFileDialogFilter("All Files", "*.*") },
+                    Title = "Select a .mapgeo file"
+                };
+
+                if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    string mapGeoPath = openMapGeoDialog.FileName;
+                    string materialsBinPath = Path.ChangeExtension(mapGeoPath, ".materials.bin");
+
+                    if (!File.Exists(materialsBinPath))
                     {
-                        Filters = { new CommonFileDialogFilter("Materials files", "*.materials.bin"), new CommonFileDialogFilter("All files", "*.*") },
-                        Title = "Select a materials.bin File",
-                        InitialDirectory = Path.GetDirectoryName(mapGeoPath)
+                        var openMaterialsBinDialog = new CommonOpenFileDialog
+                        {
+                            Filters = { new CommonFileDialogFilter("Materials files", "*.materials.bin"), new CommonFileDialogFilter("All files", "*.*") },
+                            Title = "Select a materials.bin File",
+                            InitialDirectory = Path.GetDirectoryName(mapGeoPath)
+                        };
+
+                        if (openMaterialsBinDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                        {
+                            materialsBinPath = openMaterialsBinDialog.FileName;
+                        }
+                        else
+                        {
+                            _customMessageBoxService.ShowWarning("Materials.bin Not Selected", "Map geometry cannot be loaded without the materials.bin file.");
+                            return;
+                        }
+                    }
+
+                    var openGameDataDialog = new CommonOpenFileDialog
+                    {
+                        IsFolderPicker = true,
+                        Title = "Select Map Root for Textures"
                     };
 
-                    if (openMaterialsBinDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                    if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
                     {
-                        materialsBinPath = openMaterialsBinDialog.FileName;
+                        await PanelControl.LoadMapGeometry(mapGeoPath, materialsBinPath, openGameDataDialog.FileName);
                     }
                     else
                     {
-                        _customMessageBoxService.ShowWarning("Materials.bin Not Selected", "Map geometry cannot be loaded without the materials.bin file.");
-                        return;
+                        _customMessageBoxService.ShowWarning("Game Data Path Not Selected", "Map geometry cannot be loaded without the game data root folder.");
                     }
                 }
-
-                var openGameDataDialog = new CommonOpenFileDialog
-                {
-                    IsFolderPicker = true,
-                    Title = "Select Map Root for Textures"
-                };
-
-                if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    await PanelControl.LoadMapGeometry(mapGeoPath, materialsBinPath, openGameDataDialog.FileName);
-                }
-                else
-                {
-                    _customMessageBoxService.ShowWarning("Game Data Path Not Selected", "Map geometry cannot be loaded without the game data root folder.");
-                }
+            }
+            finally
+            {
+                DefaultEmptyStateContent.Visibility = Visibility.Visible;
+                LoadingStateContent.Visibility = Visibility.Collapsed;
             }
         }
-
     }
 }

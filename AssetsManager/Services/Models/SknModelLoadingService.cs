@@ -1,6 +1,9 @@
-
-using AssetsManager.Services.Core;
-using AssetsManager.Views.Models;
+using System.IO;
+using System.Linq;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Toolkit;
@@ -9,13 +12,10 @@ using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
-using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Media.Media3D;
 using AssetsManager.Utils;
+using AssetsManager.Services.Core;
+using AssetsManager.Views.Models;
+using LeagueToolkit.Core.Memory;
 
 namespace AssetsManager.Services.Models
 {
@@ -84,7 +84,7 @@ namespace AssetsManager.Services.Models
                 string materialName = rangeObj.Material.TrimEnd('\0');
                 MeshGeometry3D meshGeometry = new MeshGeometry3D();
 
-                var positions = skinnedMesh.VerticesView.GetAccessor(LeagueToolkit.Core.Memory.VertexElement.POSITION.Name).AsVector3Array();
+                var positions = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
                 var subPositions = new Point3D[rangeObj.VertexCount];
                 for (int i = 0; i < rangeObj.VertexCount; i++)
                 {
@@ -101,7 +101,7 @@ namespace AssetsManager.Services.Models
                 }
                 meshGeometry.TriangleIndices = triangleIndices;
 
-                var texCoords = skinnedMesh.VerticesView.GetAccessor(LeagueToolkit.Core.Memory.VertexElement.TEXCOORD_0.Name).AsVector2Array();
+                var texCoords = skinnedMesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name).AsVector2Array();
                 var subTexCoords = new System.Windows.Point[rangeObj.VertexCount];
                 for (int i = 0; i < rangeObj.VertexCount; i++)
                 {
