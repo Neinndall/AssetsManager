@@ -8,7 +8,7 @@ using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models
 {
-    public class HistoryViewModel : INotifyPropertyChanged
+    public class HistoryModel : INotifyPropertyChanged
     {
         private const int PageSize = 10;
         private List<JsonDiffHistoryEntry> _allHistoryEntries;

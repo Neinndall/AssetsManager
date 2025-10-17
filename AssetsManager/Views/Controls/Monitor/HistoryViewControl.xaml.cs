@@ -18,7 +18,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public DiffViewService DiffViewService { get; set; }
 
-        private HistoryViewModel _viewModel;
+        private HistoryModel _viewModel;
 
         public HistoryViewControl()
         {
@@ -30,7 +30,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (AppSettings != null)
             {
-                _viewModel = new HistoryViewModel();
+                _viewModel = new HistoryModel();
                 this.DataContext = _viewModel;
                 _viewModel.LoadHistory(AppSettings.DiffHistory);
             }
