@@ -239,32 +239,12 @@ namespace AssetsManager.Services.Models
             {
                 string absoluteFilePath = Path.Combine(gameDataPath, texturePath);
 
-                _logService.Log($"Attempting to load texture from direct file path: {absoluteFilePath}");
                 if (File.Exists(absoluteFilePath))
                 {
                     return await File.ReadAllBytesAsync(absoluteFilePath);
                 }
 
-                _logService.LogWarning($"Direct file not found at '{absoluteFilePath}'. Falling back to WAD virtual path search.");
-
-                string mapName = new DirectoryInfo(gameDataPath).Name;
-                string prefixedPath = $"maps/{mapName.ToLower()}/{texturePath}".Replace('\\', '/');
-
-                _logService.Log($"Attempting to find texture using prefixed virtual path: {prefixedPath}");
-                FileSystemNodeModel textureNode = await _wadNodeLoaderService.FindNodeByVirtualPathAsync(prefixedPath, gameDataPath);
-
-                if (textureNode == null)
-                {
-                    _logService.LogWarning($"Prefixed virtual path not found. Falling back to original virtual path: {texturePath}");
-                    textureNode = await _wadNodeLoaderService.FindNodeByVirtualPathAsync(texturePath, gameDataPath);
-                }
-
-                if (textureNode != null)
-                {
-                    return await _wadExtractionService.GetVirtualFileBytesAsync(textureNode);
-                }
-
-                _logService.LogError($"Texture not found either as a direct file or within WAD archives for path: {texturePath}");
+                _logService.LogError($"Texture file not found at: {absoluteFilePath}");
                 return null;
             }
             catch (Exception ex)

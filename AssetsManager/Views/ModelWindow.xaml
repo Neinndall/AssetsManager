@@ -66,27 +66,27 @@
                                             Foreground="{StaticResource TextMuted}"
                                             Opacity="0.5"
                                             Margin="0,0,0,16"/>
-                <TextBlock Text="SELECT A MODEL"
+                <TextBlock Text="SELECT A MODEL OR MAPGEOMETRY"
                            FontSize="24" 
                            FontWeight="SemiBold"
                            Foreground="{StaticResource TextMuted}"
                            HorizontalAlignment="Center"
                            Margin="0,0,0,8"/>
-                <TextBlock Text="Load a model to visualize it in 3D."
+                <TextBlock Text="Load a .skn or .mapgeo file to visualize it in 3D."
                            FontSize="16"
                            Foreground="{StaticResource TextMuted}"
                            HorizontalAlignment="Center"
                            Margin="0,0,0,24"
                            Opacity="0.7"/>
-                <Button Content="Load Model"
-                        Style="{StaticResource SecondaryButton}"
-                        Click="OpenFile_Click"
-                        HorizontalAlignment="Center"/>
-                <Button Content="Load Geometry"
-                        Style="{StaticResource SecondaryButton}"
-                        Click="OpenGeometryFile_Click"
-                        Margin="10,0,0,0"
-                        HorizontalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Content="Load Model"
+                            Style="{StaticResource SecondaryButton}"
+                            Click="OpenFile_Click"/>
+                    <Button Content="Load Map Geometry"
+                            Style="{StaticResource SecondaryButton}"
+                            Click="OpenGeometryFile_Click"
+                            Margin="10,0,0,0"/>
+                </StackPanel>
             </StackPanel>
 
             <!-- Main Content Grid (initially collapsed) -->

@@ -108,32 +108,42 @@ namespace AssetsManager.Views
 
             if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                var openMaterialsBinDialog = new CommonOpenFileDialog
-                {
-                    Filters = { new CommonFileDialogFilter("Materials files", "*.materials.bin"), new CommonFileDialogFilter("All files", "*.*") },
-                    Title = "Select a materials.bin File"
-                };
+                string mapGeoPath = openMapGeoDialog.FileName;
+                string materialsBinPath = Path.ChangeExtension(mapGeoPath, ".materials.bin");
 
-                if (openMaterialsBinDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                if (!File.Exists(materialsBinPath))
                 {
-                    var openGameDataDialog = new CommonOpenFileDialog
+                    var openMaterialsBinDialog = new CommonOpenFileDialog
                     {
-                        IsFolderPicker = true,
-                        Title = "Select Map Root for Textures"
+                        Filters = { new CommonFileDialogFilter("Materials files", "*.materials.bin"), new CommonFileDialogFilter("All files", "*.*") },
+                        Title = "Select a materials.bin File",
+                        InitialDirectory = Path.GetDirectoryName(mapGeoPath)
                     };
 
-                    if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                    if (openMaterialsBinDialog.ShowDialog() == CommonFileDialogResult.Ok)
                     {
-                        await PanelControl.LoadMapGeometry(openMapGeoDialog.FileName, openMaterialsBinDialog.FileName, openGameDataDialog.FileName);
+                        materialsBinPath = openMaterialsBinDialog.FileName;
                     }
                     else
                     {
-                        _customMessageBoxService.ShowWarning("Game Data Path Not Selected", "Map geometry cannot be loaded without the game data root folder.");
+                        _customMessageBoxService.ShowWarning("Materials.bin Not Selected", "Map geometry cannot be loaded without the materials.bin file.");
+                        return;
                     }
+                }
+
+                var openGameDataDialog = new CommonOpenFileDialog
+                {
+                    IsFolderPicker = true,
+                    Title = "Select Map Root for Textures"
+                };
+
+                if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    await PanelControl.LoadMapGeometry(mapGeoPath, materialsBinPath, openGameDataDialog.FileName);
                 }
                 else
                 {
-                    _customMessageBoxService.ShowWarning("Materials.bin Not Selected", "Map geometry cannot be loaded without the materials.bin file.");
+                    _customMessageBoxService.ShowWarning("Game Data Path Not Selected", "Map geometry cannot be loaded without the game data root folder.");
                 }
             }
         }
