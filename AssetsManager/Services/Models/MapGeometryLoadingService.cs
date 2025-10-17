@@ -1,14 +1,3 @@
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Explorer;
-using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models;
-using LeagueToolkit.Core.Environment;
-using LeagueToolkit.Core.Meta;
-using LeagueToolkit.Core.Meta.Properties;
-using LeagueToolkit.Core.Renderer;
-using LeagueToolkit.Toolkit;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -19,6 +8,18 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
+using AssetsManager.Utils;
+using LeagueToolkit.Core.Environment;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
+using LeagueToolkit.Core.Renderer;
+using LeagueToolkit.Toolkit;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Services.Models
 {
@@ -175,12 +176,12 @@ namespace AssetsManager.Services.Models
                         string normalizedTexturePath = fullTexturePath.Replace('\\', '/').ToLower();
                         try
                         {
-                            byte[] textureBytes = await GetTextureBytesFromWadAsync(normalizedTexturePath, gameDataPath);
+                            byte[] textureBytes = await GetTextureBytesAsync(normalizedTexturePath, gameDataPath);
                             if (textureBytes != null && textureBytes.Length > 0)
                             {
                                 using (MemoryStream ms = new MemoryStream(textureBytes))
                                 {
-                                    BitmapSource loadedTex = LoadTextureFromStream(ms, Path.GetExtension(normalizedTexturePath));
+                                    BitmapSource loadedTex = TextureUtils.LoadTexture(ms, Path.GetExtension(normalizedTexturePath));
                                     if (loadedTex != null)
                                     {
                                         loadedTextures[textureNameKey] = loadedTex;
@@ -231,64 +232,14 @@ namespace AssetsManager.Services.Models
             return sceneModel;
         }
 
-        private BitmapSource LoadTextureFromStream(Stream textureStream, string extension)
-        {
-            try
-            {
-                if (textureStream == null) { return null; }
 
-                if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) || extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
-                {
-                    Texture tex = Texture.Load(textureStream);
-                    if (tex.Mips.Length > 0)
-                    {
-                        Image<Rgba32> imageSharp = tex.Mips[0].ToImage();
-
-                        var pixelBuffer = new byte[imageSharp.Width * imageSharp.Height * 4];
-                        imageSharp.CopyPixelDataTo(pixelBuffer);
-
-                        for (int i = 0; i < pixelBuffer.Length; i += 4)
-                        {
-                            var r = pixelBuffer[i];
-                            var b = pixelBuffer[i + 2];
-                            pixelBuffer[i] = b;
-                            pixelBuffer[i + 2] = r;
-                        }
-
-                        int stride = imageSharp.Width * 4;
-                        var bitmapSource = BitmapSource.Create(imageSharp.Width, imageSharp.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
-                        bitmapSource.Freeze();
-
-                        return bitmapSource;
-                    }
-                    return null;
-                }
-                else
-                {
-                    BitmapImage bitmapImage = new BitmapImage();
-                    bitmapImage.BeginInit();
-                    bitmapImage.StreamSource = textureStream;
-                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmapImage.EndInit();
-                    bitmapImage.Freeze();
-                    return bitmapImage;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to load texture from stream");
-                return null;
-            }
-        }
-
-        private async Task<byte[]> GetTextureBytesFromWadAsync(string texturePath, string gameDataPath)
+        private async Task<byte[]> GetTextureBytesAsync(string texturePath, string gameDataPath)
         {
             try
             {
                 string absoluteFilePath = Path.Combine(gameDataPath, texturePath);
 
                 _logService.Log($"Attempting to load texture from direct file path: {absoluteFilePath}");
-
                 if (File.Exists(absoluteFilePath))
                 {
                     return await File.ReadAllBytesAsync(absoluteFilePath);

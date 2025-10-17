@@ -180,37 +180,13 @@ namespace AssetsManager.Services.Core
         {
             if (data == null || data.Length == 0) return null;
 
-            if (SupportedFileTypes.Textures.Contains(extension))
+            using (var stream = new MemoryStream(data))
             {
-                using (var stream = new MemoryStream(data))
+                if (SupportedFileTypes.Textures.Contains(extension))
                 {
-                    var texture = Texture.Load(stream);
-                    if (texture.Mips.Length == 0) return null;
-
-                    var mainMip = texture.Mips[0];
-                    var width = mainMip.Width;
-                    var height = mainMip.Height;
-
-                    if (mainMip.Span.TryGetSpan(out Span<ColorRgba32> pixelSpan))
-                    {
-                        var pixelByteSpan = MemoryMarshal.AsBytes(pixelSpan);
-                        var pixelBytes = pixelByteSpan.ToArray();
-                        for (int i = 0; i < pixelBytes.Length; i += 4)
-                        {
-                            var r = pixelBytes[i];
-                            var b = pixelBytes[i + 2];
-                            pixelBytes[i] = b;
-                            pixelBytes[i + 2] = r;
-                        }
-                        return BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixelBytes, width * 4);
-                    }
-
-                    return null;
+                    return TextureUtils.LoadTexture(stream, extension);
                 }
-            }
-            else
-            {
-                using (var stream = new MemoryStream(data))
+                else
                 {
                     var bitmapImage = new BitmapImage();
                     bitmapImage.BeginInit();

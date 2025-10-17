@@ -1,4 +1,3 @@
-
 using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Toolkit;
 using SixLabors.ImageSharp;
