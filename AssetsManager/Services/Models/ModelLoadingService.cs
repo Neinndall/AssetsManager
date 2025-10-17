@@ -24,34 +24,8 @@ using AssetsManager.Utils;
 using System.Threading.Tasks;
 using AssetsManager.Services.Explorer;
 
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
 namespace AssetsManager.Services.Models
 {
-    // Helper classes for deserializing the resolved materials.json
-    public class MaterialFile
-    {
-        [JsonPropertyName("objects")]
-        public Dictionary<string, MaterialDef> Objects { get; set; }
-    }
-
-    public class MaterialDef
-    {
-        [JsonPropertyName("name")]
-        public string Name { get; set; }
-        [JsonPropertyName("samplerValues")]
-        public List<SamplerValue> SamplerValues { get; set; }
-    }
-
-    public class SamplerValue
-    {
-        [JsonPropertyName("TextureName")]
-        public string TextureName { get; set; }
-        [JsonPropertyName("texturePath")]
-        public string TexturePath { get; set; }
-    }
-
     public class ModelLoadingService
     {
         private readonly LogService _logService;
@@ -66,6 +40,8 @@ namespace AssetsManager.Services.Models
             _wadExtractionService = wadExtractionService;
             _wadNodeLoaderService = wadNodeLoaderService;
         }
+
+        #region SKN Model Loading
 
         public SceneModel LoadModel(string filePath)
         {
@@ -334,44 +310,23 @@ namespace AssetsManager.Services.Models
         {
             try
             {
-                // This new implementation no longer passes the raw BinTree.
-                // Instead, it fully resolves it to a JSON using BinUtils, then deserializes it
-                // into a strongly-typed dictionary, which is much easier and more reliable to work with.
-                MaterialFile materialFile = null;
-                if (!string.IsNullOrEmpty(materialsPath))
+                // Ensure the necessary BIN hash dictionaries are loaded before processing.
+                await _hashResolverService.LoadBinHashesAsync();
+
+                using (var stream = File.OpenRead(materialsPath))
                 {
-                    // Ensure the necessary BIN hash dictionaries are loaded before processing.
-                    await _hashResolverService.LoadBinHashesAsync();
-
-                    using (var binStream = File.OpenRead(materialsPath))
-                    {
-                        var materialsBin = new BinTree(binStream);
-                        using (var memoryStream = new MemoryStream())
-                        {
-                            await BinUtils.WriteBinTreeAsJsonAsync(memoryStream, materialsBin, _hashResolverService);
-                            memoryStream.Position = 0;
-                            using (var reader = new StreamReader(memoryStream))
-                            {
-                                string jsonContent = await reader.ReadToEndAsync();
-
-                                materialFile = JsonSerializer.Deserialize<MaterialFile>(jsonContent, new JsonSerializerOptions
-                                {
-                                    PropertyNameCaseInsensitive = true
-                                });
-                            }
-                        }
-                    }
+                    var materialsBin = new BinTree(stream);
+                    return await LoadMapGeometryInternal(filePath, materialsBin, gameDataPath);
                 }
-                return await LoadMapGeometryInternal(filePath, materialFile, gameDataPath);
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Failed to load and process materials.bin");
+                _logService.LogError(ex, "Failed to load materials.bin");
                 return null;
             }
         }
 
-        private async Task<SceneModel> LoadMapGeometryInternal(string filePath, MaterialFile materialFile, string gameDataPath)
+        private async Task<SceneModel> LoadMapGeometryInternal(string filePath, BinTree materialsBin, string gameDataPath)
         {
             try
             {
@@ -379,10 +334,8 @@ namespace AssetsManager.Services.Models
                 {
                     EnvironmentAsset mapGeometry = new EnvironmentAsset(stream);
                     string modelName = Path.GetFileNameWithoutExtension(filePath);
-                    var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
-
-                    _logService.LogDebug($"Loaded map geometry: {modelName}");
-                    return await CreateSceneModel(mapGeometry, loadedTextures, modelName, materialFile, gameDataPath);
+                    
+                    return await CreateSceneModel(mapGeometry, modelName, materialsBin, gameDataPath);
                 }
             }
             catch (Exception ex)
@@ -392,10 +345,11 @@ namespace AssetsManager.Services.Models
             }
         }
 
-        private async Task<SceneModel> CreateSceneModel(EnvironmentAsset mapGeometry, Dictionary<string, BitmapSource> loadedTextures, string modelName, MaterialFile materialFile, string gameDataPath)
+        private async Task<SceneModel> CreateSceneModel(EnvironmentAsset mapGeometry, string modelName, BinTree materialsBin, string gameDataPath)
         {
             _logService.LogDebug("--- Displaying Model ---");
             var sceneModel = new SceneModel { Name = modelName };
+            var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
             var availableTextureNames = new ObservableCollection<string>();
             string skinName = modelName.Split('.')[0];
 
@@ -435,27 +389,51 @@ namespace AssetsManager.Services.Models
                     string textureNameKey = null;
                     string fullTexturePath = null;
 
-                    if (materialFile?.Objects != null)
+                    if (materialsBin != null)
                     {
-                        // Perform a case-insensitive lookup to find the material definition.
-                        var foundEntry = materialFile.Objects.FirstOrDefault(kvp => kvp.Key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
-                        var materialDef = foundEntry.Value;
+                        // Now that the resolver is primed, we can look up the material by its resolved key hash.
+                        var foundMaterialKvp = materialsBin.Objects.FirstOrDefault(kvp => 
+                            _hashResolverService.ResolveBinHashGeneral(kvp.Key).Equals(materialName, StringComparison.OrdinalIgnoreCase)
+                        );
 
-                        if (materialDef?.SamplerValues != null)
+                        if (foundMaterialKvp.Value != null)
                         {
-                            var diffuseSampler = materialFile.Objects.FirstOrDefault(kvp => kvp.Key.Equals(materialName, StringComparison.OrdinalIgnoreCase)).Value?.SamplerValues?.FirstOrDefault(s =>
-                                "Diffuse_Texture".Equals(s.TextureName, StringComparison.OrdinalIgnoreCase) ||
-                                "DiffuseTexture".Equals(s.TextureName, StringComparison.OrdinalIgnoreCase));
+                            var samplerValuesKvp = foundMaterialKvp.Value.Properties.FirstOrDefault(propKvp => 
+                                _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("samplerValues", StringComparison.OrdinalIgnoreCase)
+                            );
 
-                            if (diffuseSampler != null && !string.IsNullOrEmpty(diffuseSampler.TexturePath))
+                            if (samplerValuesKvp.Value is BinTreeContainer samplerValuesContainer && samplerValuesContainer.Elements.Any())
                             {
-                                fullTexturePath = diffuseSampler.TexturePath;
-                                textureNameKey = Path.GetFileNameWithoutExtension(fullTexturePath);
+                                foreach (var samplerElement in samplerValuesContainer.Elements)
+                                {
+                                    if (samplerElement is BinTreeStruct samplerStruct)
+                                    {
+                                        var textureNamePropKvp = samplerStruct.Properties.FirstOrDefault(propKvp => 
+                                            _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("TextureName", StringComparison.OrdinalIgnoreCase)
+                                        );
+
+                                        if (textureNamePropKvp.Value is BinTreeString textureNameString &&
+                                            (textureNameString.Value.Equals("Diffuse_Texture", StringComparison.OrdinalIgnoreCase) ||
+                                             textureNameString.Value.Equals("DiffuseTexture", StringComparison.OrdinalIgnoreCase)))
+                                        {
+                                            var texturePathKvp = samplerStruct.Properties.FirstOrDefault(propKvp => 
+                                                _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("texturePath", StringComparison.OrdinalIgnoreCase)
+                                            );
+
+                                            if (texturePathKvp.Value is BinTreeString texturePathString && !string.IsNullOrEmpty(texturePathString.Value))
+                                            {
+                                                fullTexturePath = texturePathString.Value;
+                                                textureNameKey = Path.GetFileNameWithoutExtension(fullTexturePath);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         else
                         {
-                            _logService.Log($"Material '{materialName}' not found in processed material file.");
+                             _logService.Log($"Material '{materialName}' not found in materials.bin.objects.");
                         }
                     }
 
@@ -477,13 +455,8 @@ namespace AssetsManager.Services.Models
                                         {
                                             availableTextureNames.Add(textureNameKey);
                                         }
-                                        _logService.LogDebug($"Successfully loaded texture '{textureNameKey}' from '{normalizedTexturePath}' using WadExtractionService.");
                                     }
                                 }
-                            }
-                            else
-                            {
-                                _logService.LogWarning($"WadExtractionService returned no bytes for texture '{normalizedTexturePath}'.");
                             }
                         }
                         catch (Exception ex)
@@ -499,7 +472,7 @@ namespace AssetsManager.Services.Models
                     }
                     else
                     {
-                         _logService.LogWarning($"Could not find or load texture for material '{materialName}' using key '{textureNameKey}' from materials.bin.");
+                         _logService.LogWarning($"Could not find or load texture for material '{materialName}'.");
                     }
 
                     var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Magenta)));
@@ -519,11 +492,15 @@ namespace AssetsManager.Services.Models
 
                     sceneModel.Parts.Add(modelPart);
                     sceneModel.RootVisual.Children.Add(modelPart.Visual);
-                }
-            }
+                } 
+            }       
             _logService.LogDebug("--- Finished displaying model ---");
             return sceneModel;
         }
+
+        #endregion Map Geometry Loading
+
+        #region Shared Texture Loading
 
         private string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey)
         {
@@ -608,5 +585,9 @@ namespace AssetsManager.Services.Models
             _logService.LogDebug($"No texture found. Falling back to default: '{defaultTextureKey}'");
             return defaultTextureKey;
         }
+
+        #endregion SKN Model Loading
+
+        #region Map Geometry Loading
     }
 }
