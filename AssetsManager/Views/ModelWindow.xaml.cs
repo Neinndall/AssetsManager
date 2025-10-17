@@ -12,7 +12,8 @@ namespace AssetsManager.Views
 {
     public partial class ModelWindow : UserControl
     {
-        private readonly ModelLoadingService _modelLoadingService;
+        private readonly SknModelLoadingService _sknModelLoadingService;
+        private readonly MapGeometryLoadingService _mapGeometryLoadingService;
         private readonly LogService _logService;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly CustomCameraController _cameraController;
@@ -20,17 +21,19 @@ namespace AssetsManager.Views
         private ModelVisual3D _groundVisual;
         private ModelVisual3D _skyVisual;
 
-        public ModelWindow(ModelLoadingService modelLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService)
+        public ModelWindow(SknModelLoadingService sknModelLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService)
         {
             InitializeComponent();
-            _modelLoadingService = modelLoadingService;
+            _sknModelLoadingService = sknModelLoadingService;
+            _mapGeometryLoadingService = mapGeometryLoadingService;
             _logService = logService;
             _customMessageBoxService = customMessageBoxService;
             _cameraController = new CustomCameraController(ViewportControl.Viewport);
 
             // Inject services into controls
             ViewportControl.LogService = _logService;
-            PanelControl.ModelLoadingService = _modelLoadingService;
+            PanelControl.SknModelLoadingService = _sknModelLoadingService;
+            PanelControl.MapGeometryLoadingService = _mapGeometryLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = _customMessageBoxService;
 
@@ -66,8 +69,8 @@ namespace AssetsManager.Views
             }
 
             // Otherwise, create and add them
-            _groundVisual = SceneElements.CreateGroundPlane(path => _modelLoadingService.LoadTexture(path), _logService.LogError);
-            _skyVisual = SceneElements.CreateSidePlanes(path => _modelLoadingService.LoadTexture(path), _logService.LogError);
+            _groundVisual = SceneElements.CreateGroundPlane(path => _sknModelLoadingService.LoadTexture(path), _logService.LogError);
+            _skyVisual = SceneElements.CreateSidePlanes(path => _sknModelLoadingService.LoadTexture(path), _logService.LogError);
 
             ViewportControl.Viewport.Children.Add(_groundVisual);
             ViewportControl.Viewport.Children.Add(_skyVisual);

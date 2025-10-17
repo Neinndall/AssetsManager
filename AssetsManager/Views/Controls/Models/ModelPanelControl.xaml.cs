@@ -20,7 +20,8 @@ namespace AssetsManager.Views.Controls.Models
     /// </summary>
     public partial class ModelPanelControl : UserControl
     {
-        public ModelLoadingService ModelLoadingService { get; set; }
+        public SknModelLoadingService SknModelLoadingService { get; set; }
+        public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         
@@ -115,7 +116,7 @@ namespace AssetsManager.Views.Controls.Models
                 }
             }
             
-            _sceneModel = ModelLoadingService.LoadModel(filePath);
+            _sceneModel = SknModelLoadingService.LoadModel(filePath);
             if (_sceneModel != null)
             {
                 if (isInitialLoad)
@@ -187,11 +188,11 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (!string.IsNullOrEmpty(materialsPath))
             {
-                _sceneModel = await ModelLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
+                _sceneModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
             }
             else
             {
-                _sceneModel = await ModelLoadingService.LoadMapGeometry(filePath, gameDataPath);
+                _sceneModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, gameDataPath);
             }
 
             if (_sceneModel != null)

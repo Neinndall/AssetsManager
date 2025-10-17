@@ -105,7 +105,8 @@ namespace AssetsManager
             services.AddSingleton<WadExtractionService>();
 
             // Model Viewer Services
-            services.AddSingleton<ModelLoadingService>();
+            services.AddSingleton<SknModelLoadingService>();
+            services.AddSingleton<MapGeometryLoadingService>();
 
             // Audio Services
             services.AddSingleton<AudioBankService>();

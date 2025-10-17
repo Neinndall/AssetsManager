@@ -4,19 +4,15 @@ using AssetsManager.Views.Models;
 using System.Threading.Tasks;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
-using AssetsManager.Services.Models;
 using System.IO;
 using System;
 using System.Windows.Media.Imaging;
-using LeagueToolkit.Core.Renderer;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp;
-using System.Windows.Media;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using AssetsManager.Services.Parsers;
 using System.Linq;
 using LeagueToolkit.Toolkit;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -28,7 +24,6 @@ namespace AssetsManager.Services.Explorer
         private readonly AudioBankService _audioBankService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
         private readonly WemConversionService _wemConversionService;
-        private readonly ModelLoadingService _modelLoadingService;
 
         public WadSavingService(
             LogService logService,
@@ -36,8 +31,7 @@ namespace AssetsManager.Services.Explorer
             ContentFormatterService contentFormatterService,
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
-            WemConversionService wemConversionService,
-            ModelLoadingService modelLoadingService)
+            WemConversionService wemConversionService)
         {
             _logService = logService;
             _wadExtractionService = wadExtractionService;
@@ -45,7 +39,6 @@ namespace AssetsManager.Services.Explorer
             _audioBankService = audioBankService;
             _audioBankLinkerService = audioBankLinkerService;
             _wemConversionService = wemConversionService;
-            _modelLoadingService = modelLoadingService;
         }
 
         public async Task ProcessAndSaveDiffAsync(SerializableChunkDiff diff, string destinationPath, string oldLolPath, string newLolPath)
@@ -203,26 +196,9 @@ namespace AssetsManager.Services.Explorer
 
             using (var memoryStream = new MemoryStream(fileBytes))
             {
-                Texture tex = Texture.Load(memoryStream);
-                if (tex.Mips.Length > 0)
+                var bitmapSource = TextureUtils.LoadTexture(memoryStream, Path.GetExtension(node.Name));
+                if (bitmapSource != null)
                 {
-                    Image<Rgba32> imageSharp = tex.Mips[0].ToImage();
-
-                    var pixelBuffer = new byte[imageSharp.Width * imageSharp.Height * 4];
-                    imageSharp.CopyPixelDataTo(pixelBuffer);
-
-                    for (int i = 0; i < pixelBuffer.Length; i += 4)
-                    {
-                        var r = pixelBuffer[i];
-                        var b = pixelBuffer[i + 2];
-                        pixelBuffer[i] = b;
-                        pixelBuffer[i + 2] = r;
-                    }
-
-                    int stride = imageSharp.Width * 4;
-                    var bitmapSource = BitmapSource.Create(imageSharp.Width, imageSharp.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
-                    bitmapSource.Freeze();
-
                     BitmapEncoder encoder = new PngBitmapEncoder();
                     encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
 
