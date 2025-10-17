@@ -16,6 +16,9 @@ namespace AssetsManager.Views
         private readonly LogService _logService;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly CustomCameraController _cameraController;
+        private bool _isMapGeometry = false;
+        private ModelVisual3D _groundVisual;
+        private ModelVisual3D _skyVisual;
 
         public ModelWindow(ModelLoadingService modelLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService)
         {
@@ -56,15 +59,23 @@ namespace AssetsManager.Views
 
         private void SetupScene()
         {
-            var ground = SceneElements.CreateGroundPlane(path => _modelLoadingService.LoadTexture(path), _logService.LogError);
-            var sky = SceneElements.CreateSidePlanes(path => _modelLoadingService.LoadTexture(path), _logService.LogError);
+            // If we are loading a map, stop here.
+            if (_isMapGeometry)
+            {
+                return;
+            }
 
-            ViewportControl.Viewport.Children.Add(ground);
-            ViewportControl.Viewport.Children.Add(sky);
+            // Otherwise, create and add them
+            _groundVisual = SceneElements.CreateGroundPlane(path => _modelLoadingService.LoadTexture(path), _logService.LogError);
+            _skyVisual = SceneElements.CreateSidePlanes(path => _modelLoadingService.LoadTexture(path), _logService.LogError);
+
+            ViewportControl.Viewport.Children.Add(_groundVisual);
+            ViewportControl.Viewport.Children.Add(_skyVisual);
         }
 
         private void OpenFile_Click(object sender, RoutedEventArgs e)
         {
+            _isMapGeometry = false;
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl"), new CommonFileDialogFilter("All Files", "*.*") }
@@ -80,6 +91,46 @@ namespace AssetsManager.Views
                 else if (extension == ".skn")
                 {
                     PanelControl.LoadInitialModel(openFileDialog.FileName);
+                }
+            }
+        }
+
+        private async void OpenGeometryFile_Click(object sender, RoutedEventArgs e)
+        {
+            _isMapGeometry = true;
+            var openMapGeoDialog = new CommonOpenFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("Map Geometry Files", "*.mapgeo"), new CommonFileDialogFilter("All Files", "*.*") }
+            };
+
+            if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                var openMaterialsBinDialog = new CommonOpenFileDialog
+                {
+                    Filters = { new CommonFileDialogFilter("Materials files", "*.materials.bin"), new CommonFileDialogFilter("All files", "*.*") },
+                    Title = "Select a materials.bin File"
+                };
+
+                if (openMaterialsBinDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    var openGameDataDialog = new CommonOpenFileDialog
+                    {
+                        IsFolderPicker = true,
+                        Title = "Select Map Root for Textures"
+                    };
+
+                    if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                    {
+                        await PanelControl.LoadMapGeometry(openMapGeoDialog.FileName, openMaterialsBinDialog.FileName, openGameDataDialog.FileName);
+                    }
+                    else
+                    {
+                        _customMessageBoxService.ShowWarning("Game Data Path Not Selected", "Map geometry cannot be loaded without the game data root folder.");
+                    }
+                }
+                else
+                {
+                    _customMessageBoxService.ShowWarning("Materials.bin Not Selected", "Map geometry cannot be loaded without the materials.bin file.");
                 }
             }
         }

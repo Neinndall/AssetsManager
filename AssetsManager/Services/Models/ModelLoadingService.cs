@@ -1,3 +1,9 @@
+using System.Reflection;
+using LeagueToolkit.Hashing;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
+using AssetsManager.Services.Hashes;
+using LeagueToolkit.Core.Environment;
 using LeagueToolkit.Core.Mesh;
 using AssetsManager.Views.Models;
 using System;
@@ -15,16 +21,50 @@ using SixLabors.ImageSharp.PixelFormats;
 using System.Windows;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
+using System.Threading.Tasks;
+using AssetsManager.Services.Explorer;
+
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AssetsManager.Services.Models
 {
+    // Helper classes for deserializing the resolved materials.json
+    public class MaterialFile
+    {
+        [JsonPropertyName("objects")]
+        public Dictionary<string, MaterialDef> Objects { get; set; }
+    }
+
+    public class MaterialDef
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+        [JsonPropertyName("samplerValues")]
+        public List<SamplerValue> SamplerValues { get; set; }
+    }
+
+    public class SamplerValue
+    {
+        [JsonPropertyName("TextureName")]
+        public string TextureName { get; set; }
+        [JsonPropertyName("texturePath")]
+        public string TexturePath { get; set; }
+    }
+
     public class ModelLoadingService
     {
         private readonly LogService _logService;
+        private readonly HashResolverService _hashResolverService;
+        private readonly WadExtractionService _wadExtractionService;
+        private readonly WadNodeLoaderService _wadNodeLoaderService;
 
-        public ModelLoadingService(LogService logService)
+        public ModelLoadingService(LogService logService, HashResolverService hashResolverService, WadExtractionService wadExtractionService, WadNodeLoaderService wadNodeLoaderService)
         {
             _logService = logService;
+            _hashResolverService = hashResolverService;
+            _wadExtractionService = wadExtractionService;
+            _wadNodeLoaderService = wadNodeLoaderService;
         }
 
         public SceneModel LoadModel(string filePath)
@@ -189,6 +229,300 @@ namespace AssetsManager.Services.Models
                 _logService.LogError(ex, "Failed to load texture");
                 return null;
             }
+        }
+
+        private BitmapSource LoadTextureFromStream(Stream textureStream, string extension)
+        {
+            try
+            {
+                if (textureStream == null) { return null; }
+
+                if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) || extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    Texture tex = Texture.Load(textureStream);
+                    if (tex.Mips.Length > 0)
+                    {
+                        Image<Rgba32> imageSharp = tex.Mips[0].ToImage();
+
+                        var pixelBuffer = new byte[imageSharp.Width * imageSharp.Height * 4];
+                        imageSharp.CopyPixelDataTo(pixelBuffer);
+
+                        for (int i = 0; i < pixelBuffer.Length; i += 4)
+                        {
+                            var r = pixelBuffer[i];
+                            var b = pixelBuffer[i + 2];
+                            pixelBuffer[i] = b;
+                            pixelBuffer[i + 2] = r;
+                        }
+
+                        int stride = imageSharp.Width * 4;
+                        var bitmapSource = BitmapSource.Create(imageSharp.Width, imageSharp.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
+                        bitmapSource.Freeze();
+
+                        return bitmapSource;
+                    }
+                    return null;
+                }
+                else
+                {
+                    BitmapImage bitmapImage = new BitmapImage();
+                    bitmapImage.BeginInit();
+                    bitmapImage.StreamSource = textureStream;
+                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmapImage.EndInit();
+                    bitmapImage.Freeze();
+                    return bitmapImage;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to load texture from stream");
+                return null;
+            }
+        }
+
+        private async Task<byte[]> GetTextureBytesFromWadAsync(string texturePath, string gameDataPath)
+        {
+            try
+            {
+                // Strategy 1: Attempt to load from a direct file path, for extracted game clients.
+                string absoluteFilePath = Path.Combine(gameDataPath, texturePath);
+
+                _logService.Log($"Attempting to load texture from direct file path: {absoluteFilePath}");
+
+                if (File.Exists(absoluteFilePath))
+                {
+                    return await File.ReadAllBytesAsync(absoluteFilePath);
+                }
+
+                _logService.LogWarning($"Direct file not found at '{absoluteFilePath}'. Falling back to WAD virtual path search.");
+
+                // Strategy 2: Fallback to WAD virtual path search.
+                string mapName = new DirectoryInfo(gameDataPath).Name;
+                string prefixedPath = $"maps/{mapName.ToLower()}/{texturePath}".Replace('\\', '/');
+
+                _logService.Log($"Attempting to find texture using prefixed virtual path: {prefixedPath}");
+                FileSystemNodeModel textureNode = await _wadNodeLoaderService.FindNodeByVirtualPathAsync(prefixedPath, gameDataPath);
+
+                if (textureNode == null)
+                {
+                    _logService.LogWarning($"Prefixed virtual path not found. Falling back to original virtual path: {texturePath}");
+                    textureNode = await _wadNodeLoaderService.FindNodeByVirtualPathAsync(texturePath, gameDataPath);
+                }
+
+                if (textureNode != null)
+                {
+                    return await _wadExtractionService.GetVirtualFileBytesAsync(textureNode);
+                }
+
+                _logService.LogError($"Texture not found either as a direct file or within WAD archives for path: {texturePath}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to get texture bytes for path: {texturePath}");
+                return null;
+            }
+        }
+
+        public async Task<SceneModel> LoadMapGeometry(string filePath, string gameDataPath)
+        {
+            return await LoadMapGeometryInternal(filePath, null, gameDataPath);
+        }
+
+        public async Task<SceneModel> LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
+        {
+            try
+            {
+                // This new implementation no longer passes the raw BinTree.
+                // Instead, it fully resolves it to a JSON using BinUtils, then deserializes it
+                // into a strongly-typed dictionary, which is much easier and more reliable to work with.
+                MaterialFile materialFile = null;
+                if (!string.IsNullOrEmpty(materialsPath))
+                {
+                    // Ensure the necessary BIN hash dictionaries are loaded before processing.
+                    await _hashResolverService.LoadBinHashesAsync();
+
+                    using (var binStream = File.OpenRead(materialsPath))
+                    {
+                        var materialsBin = new BinTree(binStream);
+                        using (var memoryStream = new MemoryStream())
+                        {
+                            await BinUtils.WriteBinTreeAsJsonAsync(memoryStream, materialsBin, _hashResolverService);
+                            memoryStream.Position = 0;
+                            using (var reader = new StreamReader(memoryStream))
+                            {
+                                string jsonContent = await reader.ReadToEndAsync();
+
+                                materialFile = JsonSerializer.Deserialize<MaterialFile>(jsonContent, new JsonSerializerOptions
+                                {
+                                    PropertyNameCaseInsensitive = true
+                                });
+                            }
+                        }
+                    }
+                }
+                return await LoadMapGeometryInternal(filePath, materialFile, gameDataPath);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to load and process materials.bin");
+                return null;
+            }
+        }
+
+        private async Task<SceneModel> LoadMapGeometryInternal(string filePath, MaterialFile materialFile, string gameDataPath)
+        {
+            try
+            {
+                using (var stream = File.OpenRead(filePath))
+                {
+                    EnvironmentAsset mapGeometry = new EnvironmentAsset(stream);
+                    string modelName = Path.GetFileNameWithoutExtension(filePath);
+                    var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
+
+                    _logService.LogDebug($"Loaded map geometry: {modelName}");
+                    return await CreateSceneModel(mapGeometry, loadedTextures, modelName, materialFile, gameDataPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to load map geometry");
+                return null;
+            }
+        }
+
+        private async Task<SceneModel> CreateSceneModel(EnvironmentAsset mapGeometry, Dictionary<string, BitmapSource> loadedTextures, string modelName, MaterialFile materialFile, string gameDataPath)
+        {
+            _logService.LogDebug("--- Displaying Model ---");
+            var sceneModel = new SceneModel { Name = modelName };
+            var availableTextureNames = new ObservableCollection<string>();
+            string skinName = modelName.Split('.')[0];
+
+            foreach (var mesh in mapGeometry.Meshes)
+            {
+                foreach (var submesh in mesh.Submeshes)
+                {
+                    string materialName = submesh.Material.TrimEnd('\0');
+                    MeshGeometry3D meshGeometry = new MeshGeometry3D();
+
+                    var positions = mesh.VerticesView.GetAccessor(LeagueToolkit.Core.Memory.VertexElement.POSITION.Name).AsVector3Array();
+                    var subPositions = new Point3D[submesh.VertexCount];
+                    for (int i = 0; i < submesh.VertexCount; i++)
+                    {
+                        var p = positions[submesh.MinVertex + i];
+                        subPositions[i] = new Point3D(p.X, p.Y, p.Z);
+                    }
+                    meshGeometry.Positions = new Point3DCollection(subPositions);
+
+                    Int32Collection triangleIndices = new Int32Collection();
+                    var indices = mesh.Indices.Slice(submesh.StartIndex, submesh.IndexCount);
+                    foreach (var index in indices)
+                    {
+                        triangleIndices.Add((int)index - submesh.MinVertex);
+                    }
+                    meshGeometry.TriangleIndices = triangleIndices;
+
+                    var texCoords = mesh.VerticesView.GetAccessor(LeagueToolkit.Core.Memory.VertexElement.TEXCOORD_0.Name).AsVector2Array();
+                    var subTexCoords = new System.Windows.Point[submesh.VertexCount];
+                    for (int i = 0; i < submesh.VertexCount; i++)
+                    {
+                        var uv = texCoords[submesh.MinVertex + i];
+                        subTexCoords[i] = new System.Windows.Point(uv.X, uv.Y);
+                    }
+                    meshGeometry.TextureCoordinates = new PointCollection(subTexCoords);
+
+                    string textureNameKey = null;
+                    string fullTexturePath = null;
+
+                    if (materialFile?.Objects != null)
+                    {
+                        // Perform a case-insensitive lookup to find the material definition.
+                        var foundEntry = materialFile.Objects.FirstOrDefault(kvp => kvp.Key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
+                        var materialDef = foundEntry.Value;
+
+                        if (materialDef?.SamplerValues != null)
+                        {
+                            var diffuseSampler = materialFile.Objects.FirstOrDefault(kvp => kvp.Key.Equals(materialName, StringComparison.OrdinalIgnoreCase)).Value?.SamplerValues?.FirstOrDefault(s =>
+                                "Diffuse_Texture".Equals(s.TextureName, StringComparison.OrdinalIgnoreCase) ||
+                                "DiffuseTexture".Equals(s.TextureName, StringComparison.OrdinalIgnoreCase));
+
+                            if (diffuseSampler != null && !string.IsNullOrEmpty(diffuseSampler.TexturePath))
+                            {
+                                fullTexturePath = diffuseSampler.TexturePath;
+                                textureNameKey = Path.GetFileNameWithoutExtension(fullTexturePath);
+                            }
+                        }
+                        else
+                        {
+                            _logService.Log($"Material '{materialName}' not found in processed material file.");
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(fullTexturePath) && !loadedTextures.ContainsKey(textureNameKey))
+                    {
+                        string normalizedTexturePath = fullTexturePath.Replace('\\', '/').ToLower();
+                        try
+                        {
+                            byte[] textureBytes = await GetTextureBytesFromWadAsync(normalizedTexturePath, gameDataPath);
+                            if (textureBytes != null && textureBytes.Length > 0)
+                            {
+                                using (MemoryStream ms = new MemoryStream(textureBytes))
+                                {
+                                    BitmapSource loadedTex = LoadTextureFromStream(ms, Path.GetExtension(normalizedTexturePath));
+                                    if (loadedTex != null)
+                                    {
+                                        loadedTextures[textureNameKey] = loadedTex;
+                                        if (!availableTextureNames.Contains(textureNameKey))
+                                        {
+                                            availableTextureNames.Add(textureNameKey);
+                                        }
+                                        _logService.LogDebug($"Successfully loaded texture '{textureNameKey}' from '{normalizedTexturePath}' using WadExtractionService.");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                _logService.LogWarning($"WadExtractionService returned no bytes for texture '{normalizedTexturePath}'.");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logService.LogError(ex, $"Failed to load texture '{fullTexturePath}' (normalized: '{normalizedTexturePath}') using WadExtractionService.");
+                        }
+                    }
+
+                    string initialMatchingKey = null;
+                    if (!string.IsNullOrEmpty(textureNameKey) && loadedTextures.ContainsKey(textureNameKey))
+                    {
+                        initialMatchingKey = textureNameKey;
+                    }
+                    else
+                    {
+                         _logService.LogWarning($"Could not find or load texture for material '{materialName}' using key '{textureNameKey}' from materials.bin.");
+                    }
+
+                    var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Magenta)));
+
+                    var modelPart = new ModelPart
+                    {
+                        Name = string.IsNullOrEmpty(materialName) ? "Default" : materialName,
+                        Visual = new ModelVisual3D(),
+                        AllTextures = loadedTextures,
+                        AvailableTextureNames = availableTextureNames,
+                        SelectedTextureName = initialMatchingKey,
+                        Geometry = geometryModel
+                    };
+
+                    modelPart.Visual.Content = geometryModel;
+                    modelPart.UpdateMaterial();
+
+                    sceneModel.Parts.Add(modelPart);
+                    sceneModel.RootVisual.Children.Add(modelPart.Visual);
+                }
+            }
+            _logService.LogDebug("--- Finished displaying model ---");
+            return sceneModel;
         }
 
         private string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey)

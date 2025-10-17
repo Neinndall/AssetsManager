@@ -82,6 +82,11 @@
                         Style="{StaticResource SecondaryButton}"
                         Click="OpenFile_Click"
                         HorizontalAlignment="Center"/>
+                <Button Content="Load Geometry"
+                        Style="{StaticResource SecondaryButton}"
+                        Click="OpenGeometryFile_Click"
+                        Margin="10,0,0,0"
+                        HorizontalAlignment="Center"/>
             </StackPanel>
 
             <!-- Main Content Grid (initially collapsed) -->

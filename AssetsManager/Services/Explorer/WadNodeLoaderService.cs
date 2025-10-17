@@ -9,16 +9,19 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Explorer
 {
     public class WadNodeLoaderService
     {
         private readonly HashResolverService _hashResolverService;
+        private readonly LogService _logService;
 
-        public WadNodeLoaderService(HashResolverService hashResolverService)
+        public WadNodeLoaderService(HashResolverService hashResolverService, LogService logService)
         {
             _hashResolverService = hashResolverService;
+            _logService = logService;
         }
 
         public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath)
@@ -287,6 +290,49 @@ namespace AssetsManager.Services.Explorer
                 var fileNode = new FileSystemNodeModel(file);
                 parentNode.Children.Add(fileNode);
             }
+        }
+
+        public async Task<FileSystemNodeModel> FindNodeByVirtualPathAsync(string virtualPath, string gameDataPath)
+        {
+            return await Task.Run(() =>
+            {
+                string normalizedVirtualPath = virtualPath.Replace('\\', '/').ToUpperInvariant();
+
+                var wadFiles = Directory.GetFiles(gameDataPath, "*.wad", SearchOption.AllDirectories)
+                                        .Concat(Directory.GetFiles(gameDataPath, "*.wad.client", SearchOption.AllDirectories))
+                                        .ToList();
+
+                foreach (var wadPath in wadFiles)
+                {
+                    try
+                    {
+                        using (var wadFile = new WadFile(wadPath))
+                        {
+                            foreach (var chunk in wadFile.Chunks.Values)
+                            {
+                                string resolvedChunkPath = _hashResolverService.ResolveHash(chunk.PathHash);
+                                string normalizedResolvedChunkPath = resolvedChunkPath.Replace('\\', '/').ToUpperInvariant();
+
+                                if (normalizedResolvedChunkPath.Equals(normalizedVirtualPath, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    return new FileSystemNodeModel(Path.GetFileName(resolvedChunkPath), false, resolvedChunkPath, wadPath)
+                                    {
+                                        SourceChunkPathHash = chunk.PathHash,
+                                        SourceWadPath = wadPath,
+                                        Type = NodeType.VirtualFile
+                                    };
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogWarning($"Error processing WAD file {wadPath}: {ex.Message}");
+                    }
+                }
+
+                return null;
+            });
         }
     }
 }

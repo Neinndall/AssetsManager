@@ -10,6 +10,8 @@ using LeagueToolkit.Core.Mesh;
 using AssetsManager.Views.Models;
 using AssetsManager.Services.Models;
 using AssetsManager.Services.Core;
+using System.Threading.Tasks;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Controls.Models
 {
@@ -178,6 +180,35 @@ namespace AssetsManager.Views.Controls.Models
             {
                 AnimationsListBox.SelectedItem = animationName;
                 AnimationReadyForDisplay?.Invoke(this, animationAsset);
+            }
+        }
+
+        public async Task LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
+        {
+            if (!string.IsNullOrEmpty(materialsPath))
+            {
+                _sceneModel = await ModelLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
+            }
+            else
+            {
+                _sceneModel = await ModelLoadingService.LoadMapGeometry(filePath, gameDataPath);
+            }
+
+            if (_sceneModel != null)
+            {
+                SceneSetupRequested?.Invoke();
+                EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
+                MainContentVisibilityChanged?.Invoke(Visibility.Visible);
+
+                ModelReadyForViewport?.Invoke(_sceneModel);
+                MeshesListBox.ItemsSource = _sceneModel.Parts;
+
+                _loadedModels.Clear();
+                _loadedModels.Add(_sceneModel);
+
+                CameraResetRequested?.Invoke();
+
+                LoadModelButton.IsEnabled = false;
             }
         }
 
