@@ -5,7 +5,7 @@
 ## ✅ APP Reliability
 You can review and check the sha-256 in github and virustotal for checking if both numbers matches.
 
-*   **Latest Version v2.4.1.0:** **[VirusTotal details and scans](https://www.virustotal.com/gui/file/3f87d108f8ba0a426460d57ba028e157919af38b15c87a6dbda898353d9d7992/details)** 
+*   **Latest Version v2.4.2.0:** **[VirusTotal details and scans](https://www.virustotal.com/gui/file/f1a29e45d056ce8c4989b512073f942365a811ced018379c27b047e1ff41a2f3/details)** 
 
 ## 🛠️ AssetsManager
 
