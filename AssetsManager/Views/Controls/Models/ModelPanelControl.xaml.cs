@@ -129,6 +129,7 @@ namespace AssetsManager.Views.Controls.Models
         private void LoadModel(string filePath, bool isInitialLoad)
         {
             _currentMode = ModelType.Skn;
+            LoadModelButton.Content = "Load Model";
             string sklFilePath = Path.ChangeExtension(filePath, ".skl");
             if (File.Exists(sklFilePath))
             {
@@ -211,6 +212,7 @@ namespace AssetsManager.Views.Controls.Models
         public async Task LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
         {
             _currentMode = ModelType.MapGeometry;
+            LoadModelButton.Content = "Load MapGeometry";
             if (!string.IsNullOrEmpty(materialsPath))
             {
                 _sceneModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
