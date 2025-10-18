@@ -12,7 +12,7 @@ namespace AssetsManager.Views.Helpers
         public static ModelVisual3D CreateSidePlanes(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc)
         {
             Model3DGroup finalGroup = new Model3DGroup();
-            double size = 10000; // A large size for the skybox planes
+            double size = 5000; // A large size for the skybox planes
 
             // 1. Load individual textures for each side and create their materials
             string frontTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_front.dds";

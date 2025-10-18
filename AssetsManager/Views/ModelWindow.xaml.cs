@@ -9,6 +9,7 @@ using AssetsManager.Services.Models;
 using AssetsManager.Views.Helpers;
 using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
+using System.Threading.Tasks;
 
 namespace AssetsManager.Views
 {
@@ -102,7 +103,7 @@ namespace AssetsManager.Views
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl"), new CommonFileDialogFilter("All Files", "*.*") },
-                Title = "Select a .skn file"
+                Title = "Select a SKN File"
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -122,15 +123,13 @@ namespace AssetsManager.Views
         private async void OpenGeometryFile_Click(object sender, RoutedEventArgs e)
         {
             _isMapGeometry = true;
-            DefaultEmptyStateContent.Visibility = Visibility.Collapsed;
-            LoadingStateContent.Visibility = Visibility.Visible;
 
             try
             {
                 var openMapGeoDialog = new CommonOpenFileDialog
                 {
                     Filters = { new CommonFileDialogFilter("MapGeometry Files", "*.mapgeo"), new CommonFileDialogFilter("All Files", "*.*") },
-                    Title = "Select a .mapgeo file"
+                    Title = "Select a MAPGEO File"
                 };
 
                 if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -166,6 +165,8 @@ namespace AssetsManager.Views
 
                     if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
                     {
+                        DefaultEmptyStateContent.Visibility = Visibility.Collapsed;
+                        LoadingStateContent.Visibility = Visibility.Visible;
                         await PanelControl.LoadMapGeometry(mapGeoPath, materialsBinPath, openGameDataDialog.FileName);
                     }
                     else

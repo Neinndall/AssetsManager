@@ -44,7 +44,7 @@
                                    FontWeight="Bold"
                                    Foreground="{StaticResource AccentBrush}"
                                    Margin="0,2,0,0"/>
-                        <TextBlock Text="Visualize .skn models and animations."
+                        <TextBlock Text="Visualize 3D Models with their animations and MapGeometry"
                                    FontSize="12" 
                                    Foreground="{StaticResource TextMuted}"
                                    Margin="0,2,0,0"/>

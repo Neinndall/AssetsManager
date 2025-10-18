@@ -71,6 +71,7 @@ namespace AssetsManager.Views.Controls.Models
                     SceneClearRequested?.Invoke(this, EventArgs.Empty);
 
                     LoadModelButton.IsEnabled = true;
+                    LoadAnimationButton.IsEnabled = true;
                 }
             }
         }
@@ -135,6 +136,7 @@ namespace AssetsManager.Views.Controls.Models
                 CameraResetRequested?.Invoke();
 
                 LoadModelButton.IsEnabled = false;
+                LoadAnimationButton.IsEnabled = true;
             }
         }
 
@@ -210,6 +212,7 @@ namespace AssetsManager.Views.Controls.Models
                 CameraResetRequested?.Invoke();
 
                 LoadModelButton.IsEnabled = false;
+                LoadAnimationButton.IsEnabled = false;
             }
         }
 
