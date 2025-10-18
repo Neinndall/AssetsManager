@@ -20,6 +20,9 @@ namespace AssetsManager.Views.Controls.Models
     /// </summary>
     public partial class ModelPanelControl : UserControl
     {
+        private enum ModelType { Skn, MapGeometry }
+        private ModelType _currentMode;
+
         public SknModelLoadingService SknModelLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public LogService LogService { get; set; }
@@ -29,6 +32,7 @@ namespace AssetsManager.Views.Controls.Models
         public event Action<SceneModel> ModelRemovedFromViewport;
         public event EventHandler<IAnimationAsset> AnimationStopRequested;
         public event EventHandler SceneClearRequested;
+        public event EventHandler MapGeometryLoadRequested;
 
         public event Action<SceneModel> ModelReadyForViewport;
         public event Action<RigResource> SkeletonReadyForViewport;
@@ -71,22 +75,39 @@ namespace AssetsManager.Views.Controls.Models
                     SceneClearRequested?.Invoke(this, EventArgs.Empty);
 
                     LoadModelButton.IsEnabled = true;
-                    LoadAnimationButton.IsEnabled = true;
+
+                    if (_currentMode == ModelType.MapGeometry)
+                    {
+                        LoadModelButton.Content = "Load MapGeometry";
+                        LoadAnimationButton.IsEnabled = false;
+                    }
+                    else
+                    {
+                        LoadModelButton.Content = "Load Model";
+                        LoadAnimationButton.IsEnabled = true;
+                    }
                 }
             }
         }
 
         private void LoadModelButton_Click(object sender, RoutedEventArgs e)
         {
-            var openFileDialog = new CommonOpenFileDialog
+            if (_currentMode == ModelType.Skn)
             {
-                Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
-                Title = "Select a SKN File"
-            };
+                var openFileDialog = new CommonOpenFileDialog
+                {
+                    Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
+                    Title = "Select a SKN File"
+                };
 
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    LoadModel(openFileDialog.FileName, false);
+                }
+            }
+            else
             {
-                LoadModel(openFileDialog.FileName, false);
+                MapGeometryLoadRequested?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -107,6 +128,7 @@ namespace AssetsManager.Views.Controls.Models
 
         private void LoadModel(string filePath, bool isInitialLoad)
         {
+            _currentMode = ModelType.Skn;
             string sklFilePath = Path.ChangeExtension(filePath, ".skl");
             if (File.Exists(sklFilePath))
             {
@@ -188,6 +210,7 @@ namespace AssetsManager.Views.Controls.Models
 
         public async Task LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
         {
+            _currentMode = ModelType.MapGeometry;
             if (!string.IsNullOrEmpty(materialsPath))
             {
                 _sceneModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);

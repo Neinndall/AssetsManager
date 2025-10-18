@@ -51,6 +51,7 @@ namespace AssetsManager.Views
             PanelControl.ModelReadyForViewport += (model) => ViewportControl.SetModel(model);
             PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.Viewport.Children.Remove(model.RootVisual);
             PanelControl.SkeletonReadyForViewport += (skeleton) => ViewportControl.SetSkeleton(skeleton);
+            PanelControl.MapGeometryLoadRequested += (s, e) => OpenGeometryFile_Click(s, null);
 
             // Animation events
             PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
