@@ -10,7 +10,7 @@
         <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Height" Value="10"/>
+        <Setter Property="Height" Value="5"/>
     </Style>
 
 </ResourceDictionary>

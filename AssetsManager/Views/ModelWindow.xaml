@@ -95,7 +95,8 @@
                 <StackPanel x:Name="LoadingStateContent" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Border CornerRadius="5"
                             Width="100"
-                            Margin="0,0,0,8"
+                            Height="5"
+                            Margin="-8,0,0,8"
                             Background="{StaticResource DarkBackground}" 
                             BorderBrush="{StaticResource BorderColor}"
                             BorderThickness="1"
@@ -103,16 +104,14 @@
                             ClipToBounds="True">
                         <ProgressBar IsIndeterminate="True"
                                      Style="{StaticResource ModernProgressBar}"
-                                     Margin="-1"
                                      BorderThickness="0"
-                                     Background="Transparent"/>
+                                     Background="{StaticResource TextPrimary}"/>
                     </Border>
-                    <TextBlock x:Name="LoadingMessageTextBlock"
-                               Text="Loading MapGeometry..."
-                               FontSize="18"
-                               FontWeight="SemiBold"
+                    <TextBlock Text="Loading Map..."
+                               FontSize="12"
+                               FontWeight="Medium"
                                Foreground="{StaticResource TextMuted}"
-                               HorizontalAlignment="Center"/>
+                               HorizontalAlignment="Center" />
                 </StackPanel>
             </StackPanel>
 

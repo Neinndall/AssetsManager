@@ -106,8 +106,6 @@
                                 </TextBlock.Text>
                             </TextBlock>
 
-
-
                             <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -172,15 +170,28 @@
                         Margin="0,20,0,0"
                         ToolTip="Choose your League of Legends installation to browse its WAD files."/>
             </StackPanel>
-            <StackPanel x:Name="LoadingIndicator"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Visibility="Collapsed">
-                <ProgressBar IsIndeterminate="True" Width="100" Foreground="{StaticResource AccentBrush}" />
+            
+            <!-- Loading Indicator para la carga del Arbol -->
+            <StackPanel x:Name="LoadingIndicator" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                <Border CornerRadius="5"
+                        Width="100"
+                        Height="5"
+                        Margin="-8,0,0,8"
+                        Background="{StaticResource DarkBackground}" 
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1"
+                        SnapsToDevicePixels="True"
+                        ClipToBounds="True">
+                    <ProgressBar IsIndeterminate="True" 
+                                 Style="{StaticResource ModernProgressBar}" 
+                                 BorderThickness="0"
+                                 Background="{StaticResource TextPrimary}"/>
+                </Border>
                 <TextBlock Text="Loading Files..."
+                           FontSize="12"
+                           FontWeight="Medium"
                            Foreground="{StaticResource TextMuted}"
-                           HorizontalAlignment="Center"
-                           Margin="0,10,0,0" />
+                           HorizontalAlignment="Center" />
             </StackPanel>
         </Grid>
     </Grid>
