@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://github.com/Neinndall/AssetsManager/blob/main/AssetsManager/Resources/Img/logo.ico" alt="AssetsManager Logo" width="150">
+  <img src="https://github.com/Neinndall/AssetsManager/blob/main/AssetsManager/Resources/Img/logo.ico" alt="Logo" width="150">
 </div>
 
 ## ✅ APP Reliability
@@ -16,7 +16,7 @@ AssetsManager is a tool for League of Legends enthusiasts who need to analyze, m
 *   **Download automatically new assets**: Automatically detects and downloads new assets from PBE updates.
 *   **Advanced WAD Comparator**: Compares WAD files between different versions to identify new, modified, or deleted assets.
 *   **Powerful File Explorer**: Explore WAD with powerful tools with archives with a file tree interface and previews dozens of formats.
-*   **3D Model Viewer**: Inspects 3D models (.skn), skeletons (.skl), and animations (.anm) with a built-in viewer.
+*   **3D Model Viewer**: Visualize 3D Models of champions with their animations and MapGeometry Environments with a built-in viewer.
 *   **Asset Monitoring**: Tracks remote assets, JSON files, and the PBE server status for real-time updates.
 *   **Version Management**: Manages and downloads diferentes versiones de LoL Game Client or Plugins.
 *   **Audio Bank**: Explores audio banks (.wpk, .bnk), visualizes the event hierarchy with their names, and plays the associated sounds.
@@ -34,9 +34,9 @@ AssetsManager now includes a powerful suite of tools to automatically track chan
 
 ### 3D Model Viewer (`ModelWindow`)
 
-Explore League of Legends 3D assets like never before.
+Explore League of Legends 3D Models like never before.
 
-*   **Model & Skeleton Loading:** Load `.skn` (mesh) and `.skl` (skeleton) files to view character and environment models.
+*   **3D Models & MapGeometry:** Inspect 3D models of champions `.skn` with their animations `.anm` and MapGeometry Environments `.mapgeo`.
 *   **Animation Playback:** Apply `.anm` (animation) files to a loaded skeleton to see the model come to life with full skinning support.
 *   **Scene Control:** Manipulate the 3D camera, manage loaded parts, and inspect model geometry.
 
