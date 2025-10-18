@@ -39,7 +39,7 @@
                                FontWeight="Bold"
                                Foreground="{StaticResource AccentBrush}"
                                Margin="0,2,0,0"/>
-                    <TextBlock Text="Monitor remote files and asset updates."
+                    <TextBlock Text="Monitor remote files and asset updates"
                                FontSize="12" 
                                Foreground="{StaticResource TextMuted}"
                                Margin="0,2,0,0"/>
