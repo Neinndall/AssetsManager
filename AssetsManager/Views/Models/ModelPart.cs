@@ -96,7 +96,27 @@ namespace AssetsManager.Views.Models
                 !string.IsNullOrEmpty(SelectedTextureName) &&
                 AllTextures.TryGetValue(SelectedTextureName, out BitmapSource texture))
             {
-                Geometry.Material = new DiffuseMaterial(new ImageBrush(texture));
+                var materialGroup = new MaterialGroup();
+                
+                // Material difuso con la textura
+                var imageBrush = new ImageBrush(texture)
+                {
+                    ViewportUnits = BrushMappingMode.Absolute,
+                    TileMode = TileMode.Tile,
+                    Stretch = Stretch.Fill
+                };
+                materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
+                
+                // Componente especular para dar brillo/reflejo
+                materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 15));
+                
+                // Componente emisivo suave para mejor visibilidad
+                materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromArgb(10, 255, 255, 255))));
+                
+                Geometry.Material = materialGroup;
+                
+                // IMPORTANTE: También aplicar al BackMaterial para ver ambas caras
+                Geometry.BackMaterial = materialGroup;
             }
         }
     }

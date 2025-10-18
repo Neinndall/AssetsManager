@@ -122,7 +122,7 @@ namespace AssetsManager.Services.Models
 
                 string initialMatchingKey = FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey);
 
-                var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Magenta)));
+                var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
 
                 var modelPart = new ModelPart
                 {
