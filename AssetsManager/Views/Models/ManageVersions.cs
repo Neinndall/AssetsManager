@@ -127,11 +127,29 @@ namespace AssetsManager.Views.Models
                 var gameClientCategories = new[] { "lol-game-client" };
                 _allLoLGameClientVersions = allFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
 
-                LeagueClientCurrentPage = 1;
-                LoLGameClientCurrentPage = 1;
+                var newLeagueClientTotalPages = (int)Math.Ceiling(_allLeagueClientVersions.Count / (double)PageSize);
+                if (newLeagueClientTotalPages == 0) newLeagueClientTotalPages = 1;
 
-                UpdateLeagueClientPagedView();
-                UpdateLoLGameClientPagedView();
+                if (LeagueClientCurrentPage > newLeagueClientTotalPages)
+                {
+                    LeagueClientCurrentPage = newLeagueClientTotalPages;
+                }
+                else
+                {
+                    UpdateLeagueClientPagedView();
+                }
+
+                var newLoLGameClientTotalPages = (int)Math.Ceiling(_allLoLGameClientVersions.Count / (double)PageSize);
+                if (newLoLGameClientTotalPages == 0) newLoLGameClientTotalPages = 1;
+
+                if (LoLGameClientCurrentPage > newLoLGameClientTotalPages)
+                {
+                    LoLGameClientCurrentPage = newLoLGameClientTotalPages;
+                }
+                else
+                {
+                    UpdateLoLGameClientPagedView();
+                }
             }
         }
 
