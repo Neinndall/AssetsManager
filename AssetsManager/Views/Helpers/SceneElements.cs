@@ -41,6 +41,12 @@ namespace AssetsManager.Views.Helpers
             Material3D skyUpMaterial = (skyUpTexture != null) ? new DiffuseMaterial(new ImageBrush(skyUpTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.LightBlue)); // Fallback color
             if (skyUpTexture == null) logErrorFunc($"Failed to load sky_up texture from {skyUpTexturePath}. Using solid color fallback.");
 
+            // Load sky_down texture
+            string skyDownTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_down.dds";
+            BitmapSource skyDownTexture = loadTextureFunc(skyDownTexturePath);
+            Material3D skyDownMaterial = (skyDownTexture != null) ? new DiffuseMaterial(new ImageBrush(skyDownTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.DarkGray)); // Fallback color
+            if (skyDownTexture == null) logErrorFunc($"Failed to load sky_down texture from {skyDownTexturePath}. Using solid color fallback.");
+
             // 2. Create a single, canonical plane geometry. By default, its front face points towards +Z.
             var planeMesh = new MeshGeometry3D
             {
@@ -97,6 +103,14 @@ namespace AssetsManager.Views.Helpers
             var topPlane = new GeometryModel3D(planeMesh, skyUpMaterial);
             topPlane.Transform = topTransform;
             finalGroup.Children.Add(topPlane);
+
+            // Bottom Plane (at y=-size, needs to face origin at +Y)
+            var bottomTransform = new Transform3DGroup();
+            bottomTransform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), -90))); // Rotate to face up
+            bottomTransform.Children.Add(new TranslateTransform3D(new Vector3D(0, -size, 0))); // Move to bottom
+            var bottomPlane = new GeometryModel3D(planeMesh, skyDownMaterial);
+            bottomPlane.Transform = bottomTransform;
+            finalGroup.Children.Add(bottomPlane);
 
             return new ModelVisual3D { Content = finalGroup };
         }

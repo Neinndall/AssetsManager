@@ -7,6 +7,8 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Models;
 using AssetsManager.Views.Helpers;
+using System.Windows.Media.Imaging;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views
 {
@@ -69,11 +71,27 @@ namespace AssetsManager.Views
             }
 
             // Otherwise, create and add them
-            _groundVisual = SceneElements.CreateGroundPlane(path => _sknModelLoadingService.LoadTexture(path), _logService.LogError);
-            _skyVisual = SceneElements.CreateSidePlanes(path => _sknModelLoadingService.LoadTexture(path), _logService.LogError);
+            _groundVisual = SceneElements.CreateGroundPlane(path => LoadSceneTexture(path), _logService.LogError);
+            _skyVisual = SceneElements.CreateSidePlanes(path => LoadSceneTexture(path), _logService.LogError);
 
             ViewportControl.Viewport.Children.Add(_groundVisual);
             ViewportControl.Viewport.Children.Add(_skyVisual);
+        }
+
+        private BitmapSource LoadSceneTexture(string uri)
+        {
+            try
+            {
+                using (Stream resourceStream = Application.GetResourceStream(new Uri(uri)).Stream)
+                {
+                    return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(uri));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to load scene texture: {uri}");
+                return null;
+            }
         }
 
         private void OpenFile_Click(object sender, RoutedEventArgs e)

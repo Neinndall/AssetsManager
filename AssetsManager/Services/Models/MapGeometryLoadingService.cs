@@ -10,6 +10,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Environment;
 using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;

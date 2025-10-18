@@ -47,11 +47,21 @@ namespace AssetsManager.Services.Models
 
                 foreach (string texPath in textureFiles)
                 {
-                    BitmapSource loadedTex = LoadTexture(texPath);
-                    if (loadedTex != null)
+                    try
                     {
-                        string textureKey = Path.GetFileName(texPath).Split('.')[0];
-                        loadedTextures[textureKey] = loadedTex;
+                        using (Stream fileStream = File.OpenRead(texPath))
+                        {
+                            BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(texPath));
+                            if (loadedTex != null)
+                            {
+                                string textureKey = Path.GetFileName(texPath).Split('.')[0];
+                                loadedTextures[textureKey] = loadedTex;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, $"Failed to load texture file: {texPath}");
                     }
                 }
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
@@ -132,24 +142,6 @@ namespace AssetsManager.Services.Models
             }
             _logService.LogDebug("--- Finished displaying model ---");
             return sceneModel;
-        }
-
-        public BitmapSource LoadTexture(string textureFilePath)
-        {
-            try
-            {
-                using (Stream resourceStream = textureFilePath.StartsWith("pack://application:")
-                    ? Application.GetResourceStream(new Uri(textureFilePath)).Stream
-                    : File.OpenRead(textureFilePath))
-                {
-                    return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(textureFilePath));
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to load texture");
-                return null;
-            }
         }
 
         private string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey)
