@@ -112,7 +112,7 @@
                                Margin="6,0,0,0">
                         <Run Text="• 3D Model Viewer"/>
                     </TextBlock>
-                    <TextBlock Text="Inspects 3D models (.skn), skeletons (.skl), and animations (.anm) with a built-in viewer."
+                    <TextBlock Text="Inspects 3D champion models with their animations and MapGeometry Environments with a built-in viewer."
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"

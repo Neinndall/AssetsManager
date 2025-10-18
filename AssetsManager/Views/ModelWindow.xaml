@@ -39,7 +39,7 @@
                                                  Foreground="{StaticResource AccentBrush}"
                                                  Grid.Column="0"/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Model Viewer" 
+                        <TextBlock Text="3D Model Viewer" 
                                    FontSize="26" 
                                    FontWeight="Bold"
                                    Foreground="{StaticResource AccentBrush}"
