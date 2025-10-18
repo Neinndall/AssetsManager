@@ -15,5 +15,10 @@ namespace AssetsManager.Views.Controls
         {
             InitializeComponent();
         }
+
+        private void ClearLogs_Click(object sender, RoutedEventArgs e)
+        {
+            richTextBoxLogs.Document.Blocks.Clear();
+        }
     }
 }

@@ -13,21 +13,37 @@
 
         <!-- Header -->
         <Border Grid.Row="0" Style="{StaticResource LogHeaderBorderStyle}">
-            <StackPanel Orientation="Horizontal">
-                <materialIcons:MaterialIcon Kind="Console" 
-                                            Width="16" 
-                                            Height="16" 
-                                            Foreground="{StaticResource TextPrimary}" 
-                                            VerticalAlignment="Center"
-                                            Margin="4,0,0,0"/>
-                <TextBlock Text="Logger" 
-                           FontWeight="Medium" 
-                           FontSize="13" 
-                           Foreground="{StaticResource TextPrimary}" 
-                           VerticalAlignment="Center" 
-                           Margin="6,0,0,0"
-                           FontFamily="Consolas, Courier New"/>
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" Grid.Column="0">
+                    <materialIcons:MaterialIcon Kind="Console" 
+                                                Width="16" 
+                                                Height="16" 
+                                                Foreground="{StaticResource TextPrimary}" 
+                                                VerticalAlignment="Center"
+                                                Margin="4,0,0,0"/>
+                    <TextBlock Text="Logger" 
+                               FontWeight="Medium" 
+                               FontSize="13" 
+                               Foreground="{StaticResource TextPrimary}" 
+                               VerticalAlignment="Center" 
+                               Margin="6,0,0,0"
+                               FontFamily="Consolas, Courier New"/>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Style="{StaticResource TransparentIconButton}"
+                        Click="ClearLogs_Click"
+                        ToolTip="Clear Logger">
+                    <materialIcons:MaterialIcon Kind="TrashCan" 
+                                                Width="15" 
+                                                Height="15"/>
+                </Button>
+            </Grid>
         </Border>
 
         <!-- Logs Content -->
