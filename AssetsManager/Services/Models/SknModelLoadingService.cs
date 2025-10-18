@@ -1,5 +1,6 @@
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -135,7 +136,7 @@ namespace AssetsManager.Services.Models
                 };
 
                 modelPart.Visual.Content = geometryModel;
-                modelPart.UpdateMaterial();
+                TextureUtils.UpdateMaterial(modelPart);
 
                 sceneModel.Parts.Add(modelPart);
                 sceneModel.RootVisual.Children.Add(modelPart.Visual);
@@ -155,7 +156,7 @@ namespace AssetsManager.Services.Models
                 return exactMatch;
             }
 
-            var genericMaterialNames = new List<string> { "body", "face", "head", "eyes" };
+            var genericMaterialNames = new List<string> { "body", "face", "head", "eyes", "leg" };
             if (genericMaterialNames.Contains(materialName.ToLower()))
             {
                 string mainTextureCandidate = $"{skinName}_tx_cm";
@@ -167,8 +168,25 @@ namespace AssetsManager.Services.Models
                 }
             }
 
-            _logService.LogDebug("No exact or generic match found. Trying keyword-based scoring...");
-            var materialKeywords = materialName.ToLower().Split('_', '-', ' ').Where(k => k != "mat").ToList();
+            string propTexture = availableTextureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
+            if (propTexture != null)
+            {
+                if (!genericMaterialNames.Contains(materialName.ToLower()))
+                {
+                    _logService.LogDebug($"Material '{materialName}' is not a generic body part, assigning generic prop texture '{propTexture}'.");
+                    return propTexture;
+                }
+            }
+
+            _logService.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
+            var separatorChars = new[] { '_', '-', ' ' };
+            var initialSplit = materialName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
+
+            var materialKeywords = initialSplit
+                .SelectMany(word => Regex.Split(word, @"(?<!^)(?=[A-Z])")) // Splits PascalCase
+                .Where(k => !k.Equals("mat", StringComparison.OrdinalIgnoreCase))
+                .Select(k => k.ToLower())
+                .ToList();
 
             string bestScoringMatch = null;
             int bestScore = 0;

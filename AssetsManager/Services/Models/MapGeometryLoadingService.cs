@@ -218,7 +218,7 @@ namespace AssetsManager.Services.Models
                     };
 
                     modelPart.Visual.Content = geometryModel;
-                    modelPart.UpdateMaterial();
+                    TextureUtils.UpdateMaterial(modelPart);
 
                     sceneModel.Parts.Add(modelPart);
                     sceneModel.RootVisual.Children.Add(modelPart.Visual);
