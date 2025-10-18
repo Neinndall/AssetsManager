@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -7,16 +8,15 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Core.Renderer;
+using LeagueToolkit.Core.Memory;
 using LeagueToolkit.Toolkit;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models;
-using LeagueToolkit.Core.Memory;
 
 namespace AssetsManager.Services.Models
 {

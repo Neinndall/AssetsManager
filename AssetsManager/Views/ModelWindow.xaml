@@ -74,7 +74,7 @@
                             Foreground="{StaticResource TextMuted}"
                             HorizontalAlignment="Center"
                             Margin="0,0,0,8"/>
-                    <TextBlock Text="Load a .skn or .mapgeo file to visualize it in 3D."
+                    <TextBlock Text="Load a skn or mapgeo file to visualize it in 3D."
                             FontSize="16"
                             Foreground="{StaticResource TextMuted}"
                             HorizontalAlignment="Center"
@@ -84,13 +84,13 @@
                         <Button Style="{StaticResource SecondaryButton}"
                                 Click="OpenFile_Click"
                                 ToolTip="Load Model">
-                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24"/>
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="20" Height="20"/>
                         </Button>
                         <Button Style="{StaticResource SecondaryButton}"
                                 Click="OpenGeometryFile_Click"
                                 ToolTip="Load MapGeometry"
                                 Margin="10,0,0,0">
-                            <materialIcons:MaterialIcon Kind="Map" Width="24" Height="24"/>
+                            <materialIcons:MaterialIcon Kind="Map" Width="20" Height="20"/>
                         </Button>
                     </StackPanel>
                 </StackPanel>

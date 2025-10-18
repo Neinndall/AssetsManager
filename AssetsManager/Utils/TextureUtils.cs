@@ -1,8 +1,3 @@
-using AssetsManager.Views.Models;
-using LeagueToolkit.Core.Renderer;
-using LeagueToolkit.Toolkit;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,6 +5,11 @@ using System.Linq;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
+using LeagueToolkit.Core.Renderer;
+using LeagueToolkit.Toolkit;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Utils
 {
