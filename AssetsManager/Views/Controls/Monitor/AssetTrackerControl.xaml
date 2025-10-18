@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
-             xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <DockPanel Margin="15">
@@ -14,7 +14,7 @@
                 Style="{StaticResource SettingsCard}"
                 Margin="0,0,0,16">
             <StackPanel Orientation="Horizontal">
-                <materialDesign:MaterialIcon Kind="ImageSearchOutline" 
+                <materialIcons:MaterialIcon Kind="ImageSearchOutline" 
                                            FontSize="20" 
                                            Foreground="{StaticResource AccentBrush}"
                                            Margin="0,0,12,0"
@@ -101,9 +101,9 @@
                                         </StackPanel.Style>
 
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <materialDesign:MaterialIcon Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,5,0">
-                                                <materialDesign:MaterialIcon.Style>
-                                                    <Style TargetType="materialDesign:MaterialIcon">
+                                            <materialIcons:MaterialIcon Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,5,0">
+                                                <materialIcons:MaterialIcon.Style>
+                                                    <Style TargetType="materialIcons:MaterialIcon">
                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding Status}" Value="Pending">
@@ -123,8 +123,8 @@
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
-                                                </materialDesign:MaterialIcon.Style>
-                                            </materialDesign:MaterialIcon>
+                                                </materialIcons:MaterialIcon.Style>
+                                            </materialIcons:MaterialIcon>
 
                                             <TextBlock Text="{Binding Status}" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" />
                                         </StackPanel>
@@ -145,7 +145,7 @@
                                             <Setter Property="Foreground" Value="White"/>
                                         </Style>
                                     </Button.Style>
-                                    <materialDesign:MaterialIcon Kind="ContentSave" Width="14" Height="14"/>
+                                    <materialIcons:MaterialIcon Kind="ContentSave" Width="14" Height="14"/>
                                 </Button>
                                 <Button Name="RemoveAssetButton"
                                         Click="RemoveAssetButton_Click"
@@ -158,7 +158,7 @@
                                             <Setter Property="Foreground" Value="White"/>
                                         </Style>
                                     </Button.Style>
-                                    <materialDesign:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14"/>
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14"/>
                                 </Button>
                             </StackPanel>
                         </StackPanel>

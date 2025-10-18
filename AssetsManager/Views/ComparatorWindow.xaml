@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AssetsManager.Views"
-             xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:comparator="clr-namespace:AssetsManager.Views.Controls.Comparator"
              mc:Ignorable="d"
              FontFamily="Consolas, Courier New">
@@ -26,7 +26,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <materialDesign:MaterialIcon Kind="Compare"
+                <materialIcons:MaterialIcon Kind="Compare"
                                              Height="54"
                                              Width="54"
                                              Margin="0,0,10,0"
@@ -57,7 +57,7 @@
                 <!-- Header Card -->
                 <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,15">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:MaterialIcon Kind="ToolboxOutline" 
+                        <materialIcons:MaterialIcon Kind="ToolboxOutline" 
                                                    FontSize="20" 
                                                    Foreground="{StaticResource AccentBrush}"
                                                    Margin="0,0,12,0"

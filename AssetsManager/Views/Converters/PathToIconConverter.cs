@@ -1,12 +1,11 @@
-using AssetsManager.Views.Models;
-using Material.Icons;
-using Material.Icons.WPF;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using Material.Icons;
 using System.Windows.Data;
 using AssetsManager.Views.Dialogs;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Views.Converters
 {

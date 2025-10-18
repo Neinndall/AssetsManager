@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <StackPanel>
@@ -31,7 +31,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialDesign:MaterialIcon Grid.Column="0" Kind="FolderPlus" Foreground="{StaticResource AccentGreen}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderPlus" Foreground="{StaticResource AccentGreen}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="New Hash Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Location where new hash files will be stored" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
@@ -54,7 +54,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialDesign:MaterialIcon Grid.Column="0" Kind="FolderMinus" Foreground="{StaticResource AccentOrange}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderMinus" Foreground="{StaticResource AccentOrange}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Old Hash Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Location where existing hash files are located" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
@@ -77,7 +77,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialDesign:MaterialIcon Grid.Column="0" Kind="FolderSearch" Foreground="{StaticResource AccentBrush}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderSearch" Foreground="{StaticResource AccentBrush}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="LoL Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Directory where League of Legends is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
@@ -100,7 +100,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialDesign:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Foreground="{StaticResource AccentPurple}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Foreground="{StaticResource AccentPurple}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Default Extracted Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Default directory for extracted files from Explorer" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>

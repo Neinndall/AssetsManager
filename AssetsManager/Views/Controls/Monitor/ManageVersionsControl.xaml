@@ -4,14 +4,14 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
-             xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <StackPanel Margin="15">
         <!-- Header -->
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel Orientation="Horizontal">
-                <materialDesign:MaterialIcon Kind="CloudDownloadOutline" 
+                <materialIcons:MaterialIcon Kind="CloudDownloadOutline" 
                                            FontSize="20" 
                                            Foreground="{StaticResource AccentBrush}"
                                            Margin="0,0,12,0"
@@ -32,7 +32,7 @@
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                    <materialDesign:MaterialIcon Kind="PackageDown"
+                    <materialIcons:MaterialIcon Kind="PackageDown"
                                                    Foreground="{StaticResource AccentOrange}"
                                                    FontSize="20"
                                                    Margin="0,0,12,0"
@@ -77,7 +77,7 @@
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                    <materialDesign:MaterialIcon Kind="Translate"
+                    <materialIcons:MaterialIcon Kind="Translate"
                                                    Foreground="{StaticResource AccentOrange}"
                                                    FontSize="20"
                                                    Margin="0,0,12,0"
@@ -113,7 +113,7 @@
             <StackPanel>
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <materialDesign:MaterialIcon Kind="DesktopClassic" 
+                        <materialIcons:MaterialIcon Kind="DesktopClassic" 
                                                        Foreground="{StaticResource AccentBrush}"
                                                        FontSize="20" 
                                                        Margin="0,0,12,0" 
@@ -148,19 +148,19 @@
                                 </Grid.ColumnDefinitions>
                                 <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialDesign:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
+                                        <materialIcons:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
                                         <TextBlock Text="File Name" Style="{StaticResource HeaderTextStyle}"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Grid.Column="1" Style="{StaticResource HalfModernGridViewColumnHeader}">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialDesign:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
+                                        <materialIcons:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
                                         <TextBlock Text="Date" Style="{StaticResource HeaderTextStyle}"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Grid.Column="2" Style="{StaticResource LastModernGridViewColumnHeader}">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialDesign:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
+                                        <materialIcons:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
                                         <TextBlock Text="Manifest URL" Style="{StaticResource HeaderTextStyle}"/>
                                     </StackPanel>
                                 </Border>
@@ -223,7 +223,7 @@
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="PrevLeagueClientPage_Click"
                             IsEnabled="{Binding CanGoToPrevLeagueClientPage}">
-                        <materialDesign:MaterialIcon Kind="ChevronLeft" />
+                        <materialIcons:MaterialIcon Kind="ChevronLeft" />
                     </Button>
 
                     <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
@@ -235,7 +235,7 @@
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="NextLeagueClientPage_Click"
                             IsEnabled="{Binding CanGoToNextLeagueClientPage}">
-                        <materialDesign:MaterialIcon Kind="ChevronRight" />
+                        <materialIcons:MaterialIcon Kind="ChevronRight" />
                     </Button>
                 </StackPanel>
             </StackPanel>
@@ -246,7 +246,7 @@
             <StackPanel>
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <materialDesign:MaterialIcon Kind="FolderMultipleOutline" 
+                        <materialIcons:MaterialIcon Kind="FolderMultipleOutline" 
                                                        Foreground="{StaticResource AccentBrush}"
                                                        FontSize="20" 
                                                        Margin="0,0,12,0" 
@@ -281,19 +281,19 @@
                                 </Grid.ColumnDefinitions>
                                 <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialDesign:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
+                                        <materialIcons:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
                                         <TextBlock Text="File Name" Style="{StaticResource HeaderTextStyle}"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Grid.Column="1" Style="{StaticResource HalfModernGridViewColumnHeader}">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialDesign:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
+                                        <materialIcons:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
                                         <TextBlock Text="Date" Style="{StaticResource HeaderTextStyle}"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Grid.Column="2" Style="{StaticResource LastModernGridViewColumnHeader}">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialDesign:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
+                                        <materialIcons:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
                                         <TextBlock Text="Manifest URL" Style="{StaticResource HeaderTextStyle}"/>
                                     </StackPanel>
                                 </Border>
@@ -356,7 +356,7 @@
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="PrevLoLGameClientPage_Click"
                             IsEnabled="{Binding CanGoToPrevLoLGameClientPage}">
-                        <materialDesign:MaterialIcon Kind="ChevronLeft" />
+                        <materialIcons:MaterialIcon Kind="ChevronLeft" />
                     </Button>
 
                     <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
@@ -368,7 +368,7 @@
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="NextLoLGameClientPage_Click"
                             IsEnabled="{Binding CanGoToNextLoLGameClientPage}">
-                        <materialDesign:MaterialIcon Kind="ChevronRight" />
+                        <materialIcons:MaterialIcon Kind="ChevronRight" />
                     </Button>
                 </StackPanel>
             </StackPanel>

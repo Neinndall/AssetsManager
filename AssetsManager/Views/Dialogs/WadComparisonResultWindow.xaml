@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:AssetsManager.Views.Dialogs"
         xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
-        xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d"
         Title="WAD Comparison Results" Height="800" Width="1400"
         Background="{StaticResource SidebarBackground}"
@@ -30,7 +30,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialDesign:MaterialIcon Kind="Compare" FontSize="24" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}"/>
+                    <materialIcons:MaterialIcon Kind="Compare" FontSize="24" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}"/>
                     <StackPanel>
                         <TextBlock Text="WAD COMPARISON RESULTS" 
                                    FontSize="24" 

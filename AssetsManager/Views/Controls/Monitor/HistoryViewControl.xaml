@@ -4,7 +4,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid Margin="15">
@@ -20,7 +20,7 @@
                 Style="{StaticResource SettingsCard}"
                 Margin="0,0,0,16">
             <StackPanel Orientation="Horizontal">
-                <materialDesign:MaterialIcon Kind="History" 
+                <materialIcons:MaterialIcon Kind="History" 
                                            FontSize="20" 
                                            Foreground="{StaticResource AccentBrush}"
                                            Margin="0,0,12,0"
@@ -46,7 +46,7 @@
 
             <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <materialDesign:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
+                    <materialIcons:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
                     <TextBlock Text="FileName" Style="{StaticResource HeaderTextStyle}"/>
                 </StackPanel>
             </Border>
@@ -55,7 +55,7 @@
                     BorderBrush="{StaticResource BorderColor}"
                     BorderThickness="1,1,1,1">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <materialDesign:MaterialIcon Kind="Clock" Style="{StaticResource HeaderIconStyle}"/>
+                    <materialIcons:MaterialIcon Kind="Clock" Style="{StaticResource HeaderIconStyle}"/>
                     <TextBlock Text="Date" Style="{StaticResource HeaderTextStyle}"/>
                 </StackPanel>
             </Border>
@@ -112,7 +112,7 @@
                 <Button Style="{StaticResource TransparentIconButton}"
                         Click="PrevPage_Click"
                         IsEnabled="{Binding CanGoToPrevPage}">
-                    <materialDesign:MaterialIcon Kind="ChevronLeft" />
+                    <materialIcons:MaterialIcon Kind="ChevronLeft" />
                 </Button>
 
                 <TextBlock VerticalAlignment="Center" Margin="5,0" Foreground="{StaticResource TextPrimary}">
@@ -121,11 +121,10 @@
                     <Run Text="{Binding TotalPages, Mode=OneWay}" />
                 </TextBlock>
 
-                <Button Style="{StaticResource TransparentIconButton}"
-                        Click="NextPage_Click"
-                        IsEnabled="{Binding CanGoToNextPage}">
-                    <materialDesign:MaterialIcon Kind="ChevronRight" />
-                </Button>
+                                    <Button Style="{StaticResource TransparentIconButton}"
+                                            Click="NextPage_Click"
+                                            IsEnabled="{Binding CanGoToNextPage}">
+                                        <materialIcons:MaterialIcon Kind="ChevronRight" />                </Button>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Grid.Column="1">

@@ -2,7 +2,7 @@ using System.Windows.Controls;
 using System.Windows;
 using Material.Icons;
 using System;
-using Material.Icons.WPF;
+
 using System.Windows.Media.Animation;
 
 namespace AssetsManager.Views.Controls

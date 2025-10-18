@@ -1,7 +1,7 @@
 ﻿<Window x:Class="AssetsManager.Views.HelpWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         Title="Help" Height="750" Width="950"
         MinHeight="750" MinWidth="950"
         WindowStartupLocation="CenterOwner"
@@ -92,7 +92,7 @@
                 <Grid>
                     <StackPanel Orientation="Horizontal" 
                               HorizontalAlignment="Left">
-                        <materialDesign:MaterialIcon Kind="LightbulbOn" 
+                        <materialIcons:MaterialIcon Kind="LightbulbOn" 
                                                      FontSize="12" 
                                                      Margin="0,0,8,0" 
                                                      VerticalAlignment="Center"

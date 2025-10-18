@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:AssetsManager.Views.Dialogs.Controls"
-             xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="400">
     <Border Style="{StaticResource SettingsCard}">
@@ -14,7 +14,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
-                <materialDesign:MaterialIcon Kind="FileDocumentOutline" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                <materialIcons:MaterialIcon Kind="FileDocumentOutline" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                 <TextBlock Text="Difference Details" 
                              FontSize="16" 
                              FontWeight="SemiBold"
@@ -37,7 +37,7 @@
                     </Grid.ColumnDefinitions>
                     <!-- No Selection Message -->
                     <StackPanel x:Name="noSelectionPanel" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Row="0" Grid.Column="0">
-                        <materialDesign:MaterialIcon Kind="FileSearchOutline" Foreground="{StaticResource TextMuted}" Height="36" Width="36" HorizontalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="FileSearchOutline" Foreground="{StaticResource TextMuted}" Height="36" Width="36" HorizontalAlignment="Center"/>
                         <TextBlock Text="Select a difference from the list to view its details." Foreground="{StaticResource TextMuted}" Margin="0,10,0,0"/>
                     </StackPanel>
 

@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:models="clr-namespace:AssetsManager.Views.Models"
              xmlns:services="clr-namespace:AssetsManager.Services"
-             xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="800"
              d:DataContext="{d:DesignInstance Type=services:MonitorService, IsDesignTimeCreatable=True}">
@@ -22,7 +22,7 @@
                 Style="{StaticResource SettingsCard}"
                 Margin="0,0,0,16">
             <StackPanel Orientation="Horizontal">
-                <materialDesign:MaterialIcon Kind="FileFind" 
+                <materialIcons:MaterialIcon Kind="FileFind" 
                                            FontSize="20" 
                                            Foreground="{StaticResource AccentBrush}"
                                            Margin="0,0,12,0"
@@ -84,9 +84,9 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- Row 1: Status, Alias, Actions -->
-                            <materialDesign:MaterialIcon Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="{Binding StatusText}">
-                                <materialDesign:MaterialIcon.Style>
-                                    <Style TargetType="materialDesign:MaterialIcon" BasedOn="{StaticResource {x:Type materialDesign:MaterialIcon}}">
+                            <materialIcons:MaterialIcon Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="{Binding StatusText}">
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
                                         <Setter Property="FontSize" Value="13" />
                                         <Setter Property="Kind" Value="HelpCircleOutline" />
                                         <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
@@ -109,8 +109,8 @@
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </materialDesign:MaterialIcon.Style>
-                            </materialDesign:MaterialIcon>
+                                </materialIcons:MaterialIcon.Style>
+                            </materialIcons:MaterialIcon>
 
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Alias, StringFormat='Name: {0}'}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
 

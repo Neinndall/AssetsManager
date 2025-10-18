@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:materialDesign="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="500" d:DesignWidth="850">
     <StackPanel>
@@ -26,7 +26,7 @@
                 <!-- Asset Tracker Section -->
                 <StackPanel Margin="0,0,0,24">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                        <materialDesign:MaterialIcon Kind="TimerCogOutline" 
+                        <materialIcons:MaterialIcon Kind="TimerCogOutline" 
                                                    Foreground="{StaticResource AccentOrange}"
                                                    FontSize="20" 
                                                    Margin="0,0,12,0" 
@@ -90,7 +90,7 @@
                 <!-- PBE Status Checker Section -->
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                        <materialDesign:MaterialIcon Kind="LanPending"
+                        <materialIcons:MaterialIcon Kind="LanPending"
                                                    Foreground="{StaticResource AccentPurple}"
                                                    FontSize="20"
                                                    Margin="0,0,12,0"
@@ -154,7 +154,7 @@
                 <!-- Application Behavior Section -->
                 <StackPanel Margin="0,24,0,0">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                        <materialDesign:MaterialIcon Kind="ApplicationCog" 
+                        <materialIcons:MaterialIcon Kind="ApplicationCog" 
                                                    Foreground="{StaticResource AccentBlue}"
                                                    FontSize="20" 
                                                    Margin="0,0,12,0" 

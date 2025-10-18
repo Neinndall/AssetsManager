@@ -10,6 +10,7 @@ using LeagueToolkit.Core.Mesh;
 using AssetsManager.Views.Models;
 using AssetsManager.Services.Models;
 using AssetsManager.Services.Core;
+using Material.Icons;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
 
@@ -78,12 +79,14 @@ namespace AssetsManager.Views.Controls.Models
 
                     if (_currentMode == ModelType.MapGeometry)
                     {
-                        LoadModelButton.Content = "Load MapGeometry";
+                        LoadModelIcon.Kind = MaterialIconKind.Map;
+                        LoadModelButton.ToolTip = "Load MapGeometry";
                         LoadAnimationButton.IsEnabled = false;
                     }
                     else
                     {
-                        LoadModelButton.Content = "Load Model";
+                        LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
+                        LoadModelButton.ToolTip = "Load Model";
                         LoadAnimationButton.IsEnabled = true;
                     }
                 }
@@ -129,7 +132,8 @@ namespace AssetsManager.Views.Controls.Models
         private void LoadModel(string filePath, bool isInitialLoad)
         {
             _currentMode = ModelType.Skn;
-            LoadModelButton.Content = "Load Model";
+            LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
+            LoadModelButton.ToolTip = "Load Model";
             string sklFilePath = Path.ChangeExtension(filePath, ".skl");
             if (File.Exists(sklFilePath))
             {
@@ -212,7 +216,8 @@ namespace AssetsManager.Views.Controls.Models
         public async Task LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
         {
             _currentMode = ModelType.MapGeometry;
-            LoadModelButton.Content = "Load MapGeometry";
+            LoadModelIcon.Kind = MaterialIconKind.Map;
+            LoadModelButton.ToolTip = "Load MapGeometry";
             if (!string.IsNullOrEmpty(materialsPath))
             {
                 _sceneModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
