@@ -5,8 +5,6 @@
 ## ✅ APP Reliability
 You can review and check the sha-256 in github and virustotal for checking if both numbers matches.
 
-*   **Latest Version v2.4.2.0:** **[VirusTotal details and scans](https://www.virustotal.com/gui/file/f1a29e45d056ce8c4989b512073f942365a811ced018379c27b047e1ff41a2f3/details)** 
-
 ## 🛠️ AssetsManager
 
 AssetsManager is a tool for League of Legends enthusiasts who need to analyze, manage, and track changes to game assets from PBE server updates. It goes beyond simple downloading, offering a powerful suite of features for deep asset analysis, a 3D model viewer, exploration, and monitoring for changes.
