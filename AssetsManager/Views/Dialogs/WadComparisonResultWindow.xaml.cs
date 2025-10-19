@@ -88,8 +88,7 @@ namespace AssetsManager.Views.Dialogs
                 OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
                 NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
             }).ToList();
-            TryResolveHashes();
-            PopulateResults(_serializableDiffs);
+            Loaded += WadComparisonResultWindow_Loaded;
         }
 
         public WadComparisonResultWindow(List<SerializableChunkDiff> serializableDiffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, AppSettings appSettings, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
@@ -109,6 +108,14 @@ namespace AssetsManager.Views.Dialogs
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath; // Store the path of the loaded file
+            Loaded += WadComparisonResultWindow_Loaded;
+        }
+
+        private async void WadComparisonResultWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            await _hashResolverService.LoadHashesAsync();
+            await _hashResolverService.LoadBinHashesAsync();
+            await _hashResolverService.LoadRstHashesAsync();
             TryResolveHashes();
             PopulateResults(_serializableDiffs);
         }

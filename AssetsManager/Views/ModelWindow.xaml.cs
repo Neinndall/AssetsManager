@@ -91,7 +91,8 @@ namespace AssetsManager.Views
             {
                 using (Stream resourceStream = Application.GetResourceStream(new Uri(uri)).Stream)
                 {
-                    return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(uri));
+                    // Resize scene textures to a maximum of 1024x1024 for a balance of quality and memory.
+                    return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(uri), 1024);
                 }
             }
             catch (Exception ex)

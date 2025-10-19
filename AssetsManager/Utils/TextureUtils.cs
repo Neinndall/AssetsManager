@@ -10,6 +10,7 @@ using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Toolkit;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models;
 
@@ -141,7 +142,7 @@ namespace AssetsManager.Utils
             }
         }
 
-        public static BitmapSource LoadTexture(Stream textureStream, string extension)
+        public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
         {
             try
             {
@@ -153,16 +154,27 @@ namespace AssetsManager.Utils
                     if (tex.Mips.Length > 0)
                     {
                         using (Image<Rgba32> imageSharp = tex.Mips[0].ToImage())
-                        using (Image<Bgra32> bgra32Image = imageSharp.CloneAs<Bgra32>())
                         {
-                            var pixelBuffer = new byte[bgra32Image.Width * bgra32Image.Height * 4];
-                            bgra32Image.CopyPixelDataTo(pixelBuffer);
+                            if (maxWidth.HasValue && (imageSharp.Width > maxWidth.Value || imageSharp.Height > maxWidth.Value))
+                            {
+                                imageSharp.Mutate(x => x.Resize(new ResizeOptions
+                                {
+                                    Size = new Size(maxWidth.Value, maxWidth.Value),
+                                    Mode = ResizeMode.Max
+                                }));
+                            }
 
-                            int stride = bgra32Image.Width * 4;
-                            var bitmapSource = BitmapSource.Create(bgra32Image.Width, bgra32Image.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
-                            bitmapSource.Freeze();
+                            using (Image<Bgra32> bgra32Image = imageSharp.CloneAs<Bgra32>())
+                            {
+                                var pixelBuffer = new byte[bgra32Image.Width * bgra32Image.Height * 4];
+                                bgra32Image.CopyPixelDataTo(pixelBuffer);
 
-                            return bitmapSource;
+                                int stride = bgra32Image.Width * 4;
+                                var bitmapSource = BitmapSource.Create(bgra32Image.Width, bgra32Image.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
+                                bitmapSource.Freeze();
+
+                                return bitmapSource;
+                            }
                         }
                     }
                     return null;
@@ -173,6 +185,10 @@ namespace AssetsManager.Utils
                     bitmapImage.BeginInit();
                     bitmapImage.StreamSource = textureStream;
                     bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                    if (maxWidth.HasValue)
+                    {
+                        bitmapImage.DecodePixelWidth = maxWidth.Value;
+                    }
                     bitmapImage.EndInit();
                     bitmapImage.Freeze();
                     return bitmapImage;
@@ -180,9 +196,13 @@ namespace AssetsManager.Utils
             }
             catch (Exception)
             {
-                // Logged by the calling service
                 return null;
             }
+        }
+
+        public static BitmapSource LoadTexture(Stream textureStream, string extension)
+        {
+            return LoadTexture(textureStream, extension, null, null);
         }
     }
 }

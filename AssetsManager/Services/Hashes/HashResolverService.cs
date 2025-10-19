@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using LeagueToolkit.Hashing;
 using AssetsManager.Utils;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Hashes
 {
@@ -25,56 +26,62 @@ namespace AssetsManager.Services.Hashes
         public IReadOnlyDictionary<ulong, string> RstXxh64Hashes => _rstXxh64HashesMap;
 
         private readonly DirectoriesCreator _directoriesCreator;
+        private readonly LogService _logService;
 
-        public HashResolverService(DirectoriesCreator directoriesCreator)
+        public HashResolverService(DirectoriesCreator directoriesCreator, LogService logService)
         {
             _directoriesCreator = directoriesCreator;
+            _logService = logService;
         }
 
-        private bool _hashesLoaded = false;
+        private bool _gameLcuHashesLoaded = false;
+        private bool _binHashesLoaded = false;
+        private bool _rstHashesLoaded = false;
 
         public async Task LoadHashesAsync()
         {
-            if (_hashesLoaded) return;
+            if (_gameLcuHashesLoaded)
+            {
+                return;
+            }
 
             _hashToPathMap.Clear();
-
             var newHashesDir = _directoriesCreator.HashesNewPath;
-
             var gameHashesFile = Path.Combine(newHashesDir, "hashes.game.txt");
             var lcuHashesFile = Path.Combine(newHashesDir, "hashes.lcu.txt");
-
             await LoadHashesFromFile(gameHashesFile, _hashToPathMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
             await LoadHashesFromFile(lcuHashesFile, _hashToPathMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
-
-            _hashesLoaded = true;
+            _gameLcuHashesLoaded = true;
         }
 
         public async Task LoadBinHashesAsync()
         {
-            if (_hashesLoaded) return;
+            if (_binHashesLoaded)
+            {
+                return;
+            }
 
             _binHashesMap.Clear();
             _binEntriesMap.Clear();
             _binFieldsMap.Clear();
             _binTypesMap.Clear();
-
             var binHashesDir = _directoriesCreator.HashesNewPath;
             var binHashesFile = Path.Combine(binHashesDir, "hashes.binhashes.txt");
             var binEntriesFile = Path.Combine(binHashesDir, "hashes.binentries.txt");
             var binFieldsFile = Path.Combine(binHashesDir, "hashes.binfields.txt");
             var binTypesFile = Path.Combine(binHashesDir, "hashes.bintypes.txt");
-
             await LoadHashesFromFile(binHashesFile, _binHashesMap, text => (uint.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out uint hash), hash));
             await LoadHashesFromFile(binEntriesFile, _binEntriesMap, text => (uint.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out uint hash), hash));
             await LoadHashesFromFile(binFieldsFile, _binFieldsMap, text => (uint.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out uint hash), hash));
             await LoadHashesFromFile(binTypesFile, _binTypesMap, text => (uint.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out uint hash), hash));
+            _binHashesLoaded = true;
         }
 
         private async Task LoadHashesFromFile<T>(string filePath, IDictionary<T, string> map, Func<string, (bool, T)> parser)
         {
             if (!File.Exists(filePath))
             {
+                _logService.LogWarning($"Hash file not found, skipping: {filePath}");
                 return;
             }
 
@@ -135,10 +142,14 @@ namespace AssetsManager.Services.Hashes
 
         public async Task LoadRstHashesAsync()
         {
-            if (_hashesLoaded) return;
+            if (_rstHashesLoaded)
+            {
+                return;
+            }
 
             await LoadRstXxh3HashesAsync();
             await LoadRstXxh64HashesAsync();
+            _rstHashesLoaded = true;
         }
 
         public async Task LoadRstXxh3HashesAsync()
@@ -158,7 +169,9 @@ namespace AssetsManager.Services.Hashes
         }
         public async Task ForceReloadHashesAsync()
         {
-            _hashesLoaded = false;
+            _gameLcuHashesLoaded = false;
+            _binHashesLoaded = false;
+            _rstHashesLoaded = false;
             await LoadHashesAsync();
             await LoadBinHashesAsync();
             await LoadRstHashesAsync();
