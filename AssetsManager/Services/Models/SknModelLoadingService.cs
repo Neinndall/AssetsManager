@@ -121,7 +121,7 @@ namespace AssetsManager.Services.Models
                 }
                 meshGeometry.TextureCoordinates = new PointCollection(subTexCoords);
 
-                string initialMatchingKey = FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey);
+                string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey, _logService);
 
                 var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
 
@@ -145,98 +145,6 @@ namespace AssetsManager.Services.Models
             return sceneModel;
         }
 
-        private string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey)
-        {
-            _logService.LogDebug($"Finding texture for material: '{materialName}'");
 
-            string exactMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
-            if (exactMatch != null)
-            {
-                _logService.LogDebug($"Found texture '{exactMatch}' via exact name match.");
-                return exactMatch;
-            }
-
-            var genericMaterialNames = new List<string> { "body", "face", "head", "eyes", "leg" };
-            if (genericMaterialNames.Contains(materialName.ToLower()))
-            {
-                string mainTextureCandidate = $"{skinName}_tx_cm";
-                string genericMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(mainTextureCandidate, StringComparison.OrdinalIgnoreCase));
-                if (genericMatch != null)
-                {
-                    _logService.LogDebug($"Found main texture '{genericMatch}' for generic material '{materialName}'.");
-                    return genericMatch;
-                }
-            }
-
-            string propTexture = availableTextureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
-            if (propTexture != null)
-            {
-                if (!genericMaterialNames.Contains(materialName.ToLower()))
-                {
-                    _logService.LogDebug($"Material '{materialName}' is not a generic body part, assigning generic prop texture '{propTexture}'.");
-                    return propTexture;
-                }
-            }
-
-            _logService.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
-            var separatorChars = new[] { '_', '-', ' ' };
-            var initialSplit = materialName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
-
-            var materialKeywords = initialSplit
-                .SelectMany(word => Regex.Split(word, @"(?<!^)(?=[A-Z])")) // Splits PascalCase
-                .Where(k => !k.Equals("mat", StringComparison.OrdinalIgnoreCase))
-                .Select(k => k.ToLower())
-                .ToList();
-
-            string bestScoringMatch = null;
-            int bestScore = 0;
-
-            foreach (string key in availableTextureKeys)
-            {
-                string lowerKey = key.ToLower();
-                int currentScore = 0;
-
-                foreach (string keyword in materialKeywords)
-                {
-                    if (string.IsNullOrWhiteSpace(keyword)) continue;
-                    if (lowerKey.Contains(keyword))
-                    {
-                        currentScore++;
-                    }
-                }
-
-                if (currentScore > bestScore)
-                {
-                    bestScore = currentScore;
-                    bestScoringMatch = key;
-                }
-                else if (currentScore > 0 && currentScore == bestScore)
-                {
-                    bool bestIsTxCm = bestScoringMatch?.ToLower().Contains("_tx_cm") ?? false;
-                    bool currentIsTxCm = lowerKey.Contains("_tx_cm");
-
-                    if (currentIsTxCm && !bestIsTxCm)
-                    {
-                        bestScoringMatch = key;
-                    }
-                    else if (!currentIsTxCm && bestIsTxCm)
-                    {
-                    }
-                    else if (bestScoringMatch == null || key.Length < bestScoringMatch.Length)
-                    {
-                        bestScoringMatch = key;
-                    }
-                }
-            }
-
-            if (bestScoringMatch != null)
-            {
-                _logService.LogDebug($"Found texture '{bestScoringMatch}' with score {bestScore} via keyword matching.");
-                return bestScoringMatch;
-            }
-
-            _logService.LogDebug($"No texture found. Falling back to default: '{defaultTextureKey}'");
-            return defaultTextureKey;
-        }
     }
 }

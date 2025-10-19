@@ -62,6 +62,35 @@ namespace AssetsManager.Views.Controls.Models
             _animationPlayer = null;
         }
 
+        public void SetAnimation(IAnimationAsset animation)
+        {
+            _currentAnimation = animation;
+            _stopwatch.Restart();
+            IsAnimationPaused = false;
+        }
+
+        public void TogglePauseResume(IAnimationAsset animationToToggle)
+        {
+            if (_currentAnimation != animationToToggle) return;
+
+            IsAnimationPaused = !IsAnimationPaused;
+            if (IsAnimationPaused)
+            {
+                _stopwatch.Stop();
+            }
+            else
+            {
+                _stopwatch.Start();
+            }
+        }
+
+        public void StopAnimation()
+        {
+            _currentAnimation = null;
+            _stopwatch.Stop();
+            IsAnimationPaused = false;
+        }
+
         public void ResetScene()
         {
             StopAnimation();
