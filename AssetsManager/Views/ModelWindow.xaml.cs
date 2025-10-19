@@ -56,11 +56,16 @@ namespace AssetsManager.Views
             // Animation events
             PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
             PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
+
+            Unloaded += (s, e) => {
+                PanelControl.Cleanup();
+                ViewportControl.Cleanup();
+            };
         }
 
         private void OnSceneClearRequested(object sender, EventArgs e)
         {
-            ViewportControl.StopAnimation();
+            ViewportControl.ResetScene();
             ViewportControl.ResetCamera();
         }
 

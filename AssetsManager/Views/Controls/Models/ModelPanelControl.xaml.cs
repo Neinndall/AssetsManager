@@ -57,6 +57,38 @@ namespace AssetsManager.Views.Controls.Models
             InitializeComponent();
             AnimationsListBoxControl.ItemsSource = _animationNames;
             ModelsListBoxControl.ItemsSource = _loadedModels;
+
+            Unloaded += (s, e) => Cleanup();
+        }
+
+        public void Cleanup()
+        {
+            ResetScene();
+        }
+
+        public void ResetScene()
+        {
+            _sceneModel = null;
+            _skeleton = null;
+            _animations.Clear();
+            _animationNames.Clear();
+            _loadedModels.Clear();
+            MeshesListBox.ItemsSource = null;
+
+            LoadModelButton.IsEnabled = true;
+
+            if (_currentMode == ModelType.MapGeometry)
+            {
+                LoadModelIcon.Kind = MaterialIconKind.Map;
+                LoadModelButton.ToolTip = "Load MapGeometry";
+                LoadAnimationButton.IsEnabled = false;
+            }
+            else
+            {
+                LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
+                LoadModelButton.ToolTip = "Load Model";
+                LoadAnimationButton.IsEnabled = true;
+            }
         }
 
         private void DeleteModelButton_Click(object sender, RoutedEventArgs e)
@@ -68,27 +100,8 @@ namespace AssetsManager.Views.Controls.Models
 
                 if (_loadedModels.Count == 0)
                 {
-                    _sceneModel = null;
-                    _skeleton = null;
-                    _animations.Clear();
-                    _animationNames.Clear();
-                    MeshesListBox.ItemsSource = null;
+                    ResetScene();
                     SceneClearRequested?.Invoke(this, EventArgs.Empty);
-
-                    LoadModelButton.IsEnabled = true;
-
-                    if (_currentMode == ModelType.MapGeometry)
-                    {
-                        LoadModelIcon.Kind = MaterialIconKind.Map;
-                        LoadModelButton.ToolTip = "Load MapGeometry";
-                        LoadAnimationButton.IsEnabled = false;
-                    }
-                    else
-                    {
-                        LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
-                        LoadModelButton.ToolTip = "Load Model";
-                        LoadAnimationButton.IsEnabled = true;
-                    }
                 }
             }
         }

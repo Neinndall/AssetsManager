@@ -45,6 +45,8 @@ namespace AssetsManager.Views.Controls.Models
                 _animationPlayer = new AnimationPlayer(LogService);
             };
 
+            Unloaded += (s, e) => Cleanup();
+
             Viewport.Children.Add(_skeletonVisual);
             Viewport.Children.Add(_jointsVisual);
 
@@ -52,33 +54,27 @@ namespace AssetsManager.Views.Controls.Models
             _stopwatch.Start();
         }
 
-        public void SetAnimation(IAnimationAsset animation)
+        public void Cleanup()
         {
-            _currentAnimation = animation;
-            _stopwatch.Restart();
-            IsAnimationPaused = false;
+            CompositionTarget.Rendering -= CompositionTarget_Rendering;
+            ResetScene();
+            Viewport.Children.Clear(); // Nuke everything including floor and sky
+            _animationPlayer = null;
         }
 
-        public void TogglePauseResume(IAnimationAsset animationToToggle)
+        public void ResetScene()
         {
-            if (_currentAnimation != animationToToggle) return;
+            StopAnimation();
 
-            IsAnimationPaused = !IsAnimationPaused;
-            if (IsAnimationPaused)
+            if (_sceneModel != null)
             {
-                _stopwatch.Stop();
+                Viewport.Children.Remove(_sceneModel.RootVisual);
+                _sceneModel = null;
             }
-            else
-            {
-                _stopwatch.Start();
-            }
-        }
 
-        public void StopAnimation()
-        {
-            _currentAnimation = null;
-            _stopwatch.Stop();
-            IsAnimationPaused = false;
+            _skeletonVisual.Points.Clear();
+            _jointsVisual.Points.Clear();
+            _skeleton = null;
         }
 
         public void SetSkeleton(RigResource skeleton)
