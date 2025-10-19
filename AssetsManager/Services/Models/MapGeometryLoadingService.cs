@@ -78,21 +78,19 @@ namespace AssetsManager.Services.Models
             }
         }
 
-        private Task<SceneModel> CreateSceneModel(EnvironmentAsset mapGeometry, string modelName, BinTree materialsBin, string gameDataPath)
-        {
-            return Task.Run(() =>
-            {
-                _logService.LogDebug("--- Displaying Model ---");
-                var sceneModel = new SceneModel { Name = modelName };
-                var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
-                var availableTextureNames = new ObservableCollection<string>();
 
+        private async Task<SceneModel> CreateSceneModel(EnvironmentAsset mapGeometry, string modelName, BinTree materialsBin, string gameDataPath)
+        {
+            var sceneModel = new SceneModel { Name = modelName };
+
+            var processingResult = await Task.Run(() =>
+            {
+                var dataList = new List<SubmeshData>();
                 foreach (var mesh in mapGeometry.Meshes)
                 {
                     foreach (var submesh in mesh.Submeshes)
                     {
                         string materialName = submesh.Material.TrimEnd('\0');
-                        MeshGeometry3D meshGeometry = new MeshGeometry3D();
 
                         var positions = mesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
                         var subPositions = new Point3D[submesh.VertexCount];
@@ -101,26 +99,23 @@ namespace AssetsManager.Services.Models
                             var p = positions[submesh.MinVertex + i];
                             subPositions[i] = new Point3D(p.X, p.Y, p.Z);
                         }
-                        meshGeometry.Positions = new Point3DCollection(subPositions);
 
-                        Int32Collection triangleIndices = new Int32Collection();
                         var indices = mesh.Indices.Slice(submesh.StartIndex, submesh.IndexCount);
-                        foreach (var index in indices)
+                        var triangleIndices = new int[submesh.IndexCount];
+                        for (int i = 0; i < submesh.IndexCount; i++)
                         {
-                            triangleIndices.Add((int)index - submesh.MinVertex);
+                            triangleIndices[i] = (int)indices[i] - submesh.MinVertex;
                         }
-                        meshGeometry.TriangleIndices = triangleIndices;
 
                         var texCoordAccessor = mesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
-                        var subTexCoords = new System.Windows.Point[submesh.VertexCount];
-
+                        var subTexCoords = new Point[submesh.VertexCount];
                         if (texCoordAccessor.Element.Format == ElementFormat.XY_Packed1616)
                         {
                             var texCoords = texCoordAccessor.AsXyF16Array();
                             for (int i = 0; i < submesh.VertexCount; i++)
                             {
                                 var uv = texCoords[submesh.MinVertex + i];
-                                subTexCoords[i] = new System.Windows.Point((float)uv.Item1, (float)uv.Item2);
+                                subTexCoords[i] = new Point((float)uv.Item1, (float)uv.Item2);
                             }
                         }
                         else
@@ -129,23 +124,20 @@ namespace AssetsManager.Services.Models
                             for (int i = 0; i < submesh.VertexCount; i++)
                             {
                                 var uv = texCoords[submesh.MinVertex + i];
-                                subTexCoords[i] = new System.Windows.Point(uv.X, uv.Y);
+                                subTexCoords[i] = new Point(uv.X, uv.Y);
                             }
                         }
-                        meshGeometry.TextureCoordinates = new PointCollection(subTexCoords);
 
-                        string textureNameKey = null;
                         string fullTexturePath = null;
-
                         if (materialsBin != null)
                         {
-                            var foundMaterialKvp = materialsBin.Objects.FirstOrDefault(kvp => 
+                            var foundMaterialKvp = materialsBin.Objects.FirstOrDefault(kvp =>
                                 _hashResolverService.ResolveBinHashGeneral(kvp.Key).Equals(materialName, StringComparison.OrdinalIgnoreCase)
                             );
 
                             if (foundMaterialKvp.Value != null)
                             {
-                                var samplerValuesKvp = foundMaterialKvp.Value.Properties.FirstOrDefault(propKvp => 
+                                var samplerValuesKvp = foundMaterialKvp.Value.Properties.FirstOrDefault(propKvp =>
                                     _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("samplerValues", StringComparison.OrdinalIgnoreCase)
                                 );
 
@@ -153,9 +145,9 @@ namespace AssetsManager.Services.Models
                                 {
                                     foreach (var samplerElement in samplerValuesContainer.Elements)
                                     {
-                                        if (samplerElement is BinTreeStruct samplerStruct)
+                                        if (samplerElement is BinTreeStruct samplerObject)
                                         {
-                                            var textureNamePropKvp = samplerStruct.Properties.FirstOrDefault(propKvp => 
+                                            var textureNamePropKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
                                                 _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("TextureName", StringComparison.OrdinalIgnoreCase)
                                             );
 
@@ -164,14 +156,13 @@ namespace AssetsManager.Services.Models
                                                  textureNameString.Value.Equals("DiffuseTexture", StringComparison.OrdinalIgnoreCase) ||
                                                  textureNameString.Value.Equals("ColorTexture", StringComparison.OrdinalIgnoreCase)))
                                             {
-                                                var texturePathKvp = samplerStruct.Properties.FirstOrDefault(propKvp => 
+                                                var texturePathKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
                                                     _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("texturePath", StringComparison.OrdinalIgnoreCase)
                                                 );
 
-                                                if (texturePathKvp.Value is BinTreeString texturePathString && !string.IsNullOrEmpty(texturePathString.Value))
+                                                if (texturePathKvp.Value is BinTreeString tps && !string.IsNullOrEmpty(tps.Value))
                                                 {
-                                                    fullTexturePath = texturePathString.Value;
-                                                    textureNameKey = Path.GetFileNameWithoutExtension(fullTexturePath);
+                                                    fullTexturePath = tps.Value;
                                                     break;
                                                 }
                                             }
@@ -179,30 +170,32 @@ namespace AssetsManager.Services.Models
                                     }
                                 }
                             }
-                            else
-                            {
-                                 _logService.Log($"Material '{materialName}' not found in materials.bin.objects.");
-                            }
                         }
+                        dataList.Add(new SubmeshData(materialName, subPositions, triangleIndices, subTexCoords, fullTexturePath));
+                    }
+                }
 
-                        if (!string.IsNullOrEmpty(fullTexturePath) && !loadedTextures.ContainsKey(textureNameKey))
+                var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
+                foreach (var data in dataList)
+                {
+                    if (!string.IsNullOrEmpty(data.TexturePath))
+                    {
+                        string textureNameKey = Path.GetFileNameWithoutExtension(data.TexturePath);
+                        if (!loadedTextures.ContainsKey(textureNameKey))
                         {
-                            string absoluteFilePath = Path.Combine(gameDataPath, fullTexturePath.Replace('\\', '/'));
+                            string absoluteFilePath = Path.Combine(gameDataPath, data.TexturePath.Replace('\\', '/'));
                             if (File.Exists(absoluteFilePath))
                             {
                                 try
                                 {
-                                    var bitmap = new BitmapImage();
-                                    bitmap.BeginInit();
-                                    bitmap.UriSource = new Uri(absoluteFilePath);
-                                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                                    bitmap.EndInit();
-                                    bitmap.Freeze();
-
-                                    loadedTextures[textureNameKey] = bitmap;
-                                    if (!availableTextureNames.Contains(textureNameKey))
+                                    using (Stream fileStream = File.OpenRead(absoluteFilePath))
                                     {
-                                        availableTextureNames.Add(textureNameKey);
+                                        BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(absoluteFilePath));
+                                        if (loadedTex != null)
+                                        {
+                                            loadedTex.Freeze(); // Freeze the texture to make it thread-safe
+                                            loadedTextures[textureNameKey] = loadedTex;
+                                        }
                                     }
                                 }
                                 catch (Exception ex)
@@ -211,43 +204,53 @@ namespace AssetsManager.Services.Models
                                 }
                             }
                         }
-
-                        string initialMatchingKey = null;
-                        if (!string.IsNullOrEmpty(textureNameKey) && loadedTextures.ContainsKey(textureNameKey))
-                        {
-                            initialMatchingKey = textureNameKey;
-                        }
-                        else
-                        {
-                             _logService.LogWarning($"Could not find or load texture for material '{materialName}'.");
-                        }
-
-                        var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Magenta)));
-
-                        var modelPart = new ModelPart
-                        {
-                            Name = string.IsNullOrEmpty(materialName) ? "Default" : materialName,
-                            Visual = new ModelVisual3D(),
-                            AllTextures = loadedTextures,
-                            AvailableTextureNames = availableTextureNames,
-                            SelectedTextureName = initialMatchingKey,
-                            Geometry = geometryModel
-                        };
-
-                        modelPart.Visual.Content = geometryModel;
-                        TextureUtils.UpdateMaterial(modelPart);
-
-                        sceneModel.Parts.Add(modelPart);
-                        sceneModel.RootVisual.Children.Add(modelPart.Visual);
                     }
                 }
 
-                _logService.LogDebug("--- Finished displaying model ---");
-                return sceneModel;
+                return new { SubmeshDataList = dataList, LoadedTextures = loadedTextures };
             });
+
+            var submeshDataList = processingResult.SubmeshDataList;
+            var loadedTextures = processingResult.LoadedTextures;
+            var availableTextureNames = new ObservableCollection<string>(loadedTextures.Keys);
+
+            foreach (var data in submeshDataList)
+            {
+                var meshGeometry = new MeshGeometry3D
+                {
+                    Positions = new Point3DCollection(data.Positions),
+                    TriangleIndices = new Int32Collection(data.TriangleIndices),
+                    TextureCoordinates = new PointCollection(data.TextureCoordinates)
+                };
+
+                string textureNameKey = string.IsNullOrEmpty(data.TexturePath) ? null : Path.GetFileNameWithoutExtension(data.TexturePath);
+                
+                if (string.IsNullOrEmpty(textureNameKey) || !loadedTextures.ContainsKey(textureNameKey))
+                {
+                    _logService.LogWarning($"Could not find or load texture for material '{data.MaterialName}'.");
+                }
+
+                var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Magenta)));
+
+                var modelPart = new ModelPart
+                {
+                    Name = string.IsNullOrEmpty(data.MaterialName) ? "Default" : data.MaterialName,
+                    Visual = new ModelVisual3D(),
+                    AllTextures = loadedTextures,
+                    AvailableTextureNames = availableTextureNames,
+                    SelectedTextureName = textureNameKey,
+                    Geometry = geometryModel
+                };
+
+                modelPart.Visual.Content = geometryModel;
+                TextureUtils.UpdateMaterial(modelPart);
+
+                sceneModel.Parts.Add(modelPart);
+                sceneModel.RootVisual.Children.Add(modelPart.Visual);
+            }
+
+            _logService.LogDebug("--- Finished displaying model ---");
+            return sceneModel;
         }
-
-
-
     }
 }
