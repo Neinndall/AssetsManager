@@ -11,6 +11,7 @@ using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Environment;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
+using LeagueToolkit.Core.Memory;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
@@ -91,7 +92,7 @@ namespace AssetsManager.Services.Models
                     string materialName = submesh.Material.TrimEnd('\0');
                     MeshGeometry3D meshGeometry = new MeshGeometry3D();
 
-                    var positions = mesh.VerticesView.GetAccessor(LeagueToolkit.Core.Memory.VertexElement.POSITION.Name).AsVector3Array();
+                    var positions = mesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
                     var subPositions = new Point3D[submesh.VertexCount];
                     for (int i = 0; i < submesh.VertexCount; i++)
                     {
@@ -108,12 +109,26 @@ namespace AssetsManager.Services.Models
                     }
                     meshGeometry.TriangleIndices = triangleIndices;
 
-                    var texCoords = mesh.VerticesView.GetAccessor(LeagueToolkit.Core.Memory.VertexElement.TEXCOORD_0.Name).AsVector2Array();
+                    var texCoordAccessor = mesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
                     var subTexCoords = new System.Windows.Point[submesh.VertexCount];
-                    for (int i = 0; i < submesh.VertexCount; i++)
+
+                    if (texCoordAccessor.Element.Format == ElementFormat.XY_Packed1616)
                     {
-                        var uv = texCoords[submesh.MinVertex + i];
-                        subTexCoords[i] = new System.Windows.Point(uv.X, uv.Y);
+                        var texCoords = texCoordAccessor.AsXyF16Array();
+                        for (int i = 0; i < submesh.VertexCount; i++)
+                        {
+                            var uv = texCoords[submesh.MinVertex + i];
+                            subTexCoords[i] = new System.Windows.Point((float)uv.Item1, (float)uv.Item2);
+                        }
+                    }
+                    else
+                    {
+                        var texCoords = texCoordAccessor.AsVector2Array();
+                        for (int i = 0; i < submesh.VertexCount; i++)
+                        {
+                            var uv = texCoords[submesh.MinVertex + i];
+                            subTexCoords[i] = new System.Windows.Point(uv.X, uv.Y);
+                        }
                     }
                     meshGeometry.TextureCoordinates = new PointCollection(subTexCoords);
 
