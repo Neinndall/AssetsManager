@@ -31,8 +31,12 @@ namespace AssetsManager.Services.Hashes
             _directoriesCreator = directoriesCreator;
         }
 
+        private bool _hashesLoaded = false;
+
         public async Task LoadHashesAsync()
         {
+            if (_hashesLoaded) return;
+
             _hashToPathMap.Clear();
 
             var newHashesDir = _directoriesCreator.HashesNewPath;
@@ -42,10 +46,14 @@ namespace AssetsManager.Services.Hashes
 
             await LoadHashesFromFile(gameHashesFile, _hashToPathMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
             await LoadHashesFromFile(lcuHashesFile, _hashToPathMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
+
+            _hashesLoaded = true;
         }
 
         public async Task LoadBinHashesAsync()
         {
+            if (_hashesLoaded) return;
+
             _binHashesMap.Clear();
             _binEntriesMap.Clear();
             _binFieldsMap.Clear();
@@ -127,6 +135,8 @@ namespace AssetsManager.Services.Hashes
 
         public async Task LoadRstHashesAsync()
         {
+            if (_hashesLoaded) return;
+
             await LoadRstXxh3HashesAsync();
             await LoadRstXxh64HashesAsync();
         }
@@ -145,6 +155,13 @@ namespace AssetsManager.Services.Hashes
             var rstHashesDir = _directoriesCreator.HashesNewPath;
             var rstXxh64HashesFile = Path.Combine(rstHashesDir, "hashes.rst.xxh64.txt");
             await LoadHashesFromFile(rstXxh64HashesFile, _rstXxh64HashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
+        }
+        public async Task ForceReloadHashesAsync()
+        {
+            _hashesLoaded = false;
+            await LoadHashesAsync();
+            await LoadBinHashesAsync();
+            await LoadRstHashesAsync();
         }
     }
 }

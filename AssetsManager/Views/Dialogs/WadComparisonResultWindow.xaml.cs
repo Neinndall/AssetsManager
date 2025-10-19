@@ -88,6 +88,7 @@ namespace AssetsManager.Views.Dialogs
                 OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
                 NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
             }).ToList();
+            TryResolveHashes();
             PopulateResults(_serializableDiffs);
         }
 
@@ -108,6 +109,7 @@ namespace AssetsManager.Views.Dialogs
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath; // Store the path of the loaded file
+            TryResolveHashes();
             PopulateResults(_serializableDiffs);
         }
 
@@ -124,6 +126,21 @@ namespace AssetsManager.Views.Dialogs
                     .Where(d => d.FileName.IndexOf(searchTextBox.Text, StringComparison.OrdinalIgnoreCase) >= 0)
                     .ToList();
                 PopulateResults(filteredDiffs);
+            }
+        }
+
+        private void TryResolveHashes()
+        {
+            foreach (var diff in _serializableDiffs)
+            {
+                if (diff.OldPathHash != 0)
+                {
+                    diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
+                }
+                if (diff.NewPathHash != 0)
+                {
+                    diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
+                }
             }
         }
 
@@ -205,9 +222,7 @@ namespace AssetsManager.Views.Dialogs
         {
             try
             {
-                await _hashResolverService.LoadHashesAsync();
-                await _hashResolverService.LoadBinHashesAsync();
-                await _hashResolverService.LoadRstHashesAsync();
+                await _hashResolverService.ForceReloadHashesAsync();
 
                 foreach (var diff in _serializableDiffs)
                 {
