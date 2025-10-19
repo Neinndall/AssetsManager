@@ -51,13 +51,12 @@ namespace AssetsManager.Views.Models
             {
                 _allTextures = value;
                 AvailableTextureNames.Clear();
-                foreach (var name in _allTextures.Keys)
+                if (_allTextures != null)
                 {
-                    AvailableTextureNames.Add(name);
-                }
-                if (SelectedTextureName == null && AvailableTextureNames.Count > 0)
-                {
-                    SelectedTextureName = TextureUtils.FindBestTextureMatch(Name, AvailableTextureNames);
+                    foreach (var name in _allTextures.Keys)
+                    {
+                        AvailableTextureNames.Add(name);
+                    }
                 }
             }
         }
