@@ -27,9 +27,9 @@ namespace AssetsManager.Services.Explorer.Tree
             var rootNodes = new ObservableCollection<FileSystemNodeModel>();
 
             // Llamamos antes de la carga del arbol para que carguen los hashes necesarios para resolver algunos archivos
-            await _hashResolverService.LoadHashesAsync();
-            await _hashResolverService.LoadBinHashesAsync();
-            await _hashResolverService.LoadRstHashesAsync();
+            //await _hashResolverService.LoadHashesAsync();
+            //await _hashResolverService.LoadBinHashesAsync();
+            //await _hashResolverService.LoadRstHashesAsync();
 
             string gamePath = Path.Combine(rootPath, "Game");
             if (Directory.Exists(gamePath))
