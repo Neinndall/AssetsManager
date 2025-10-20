@@ -64,8 +64,8 @@ namespace AssetsManager.Services.Models
             try
             {
                 using (var stream = File.OpenRead(filePath))
+                using (var mapGeometry = new EnvironmentAsset(stream))
                 {
-                    EnvironmentAsset mapGeometry = new EnvironmentAsset(stream);
                     string modelName = Path.GetFileNameWithoutExtension(filePath);
                     
                     return await CreateSceneModel(mapGeometry, modelName, materialsBin, gameDataPath);
