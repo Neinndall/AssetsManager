@@ -36,8 +36,6 @@ namespace AssetsManager.Views.Controls.Explorer
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         }
 
-
-
         private void FilePreviewerControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
@@ -192,7 +190,5 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.PinnedFiles.Add(newDetailsPin);
             }
         }
-
-
     }
 }

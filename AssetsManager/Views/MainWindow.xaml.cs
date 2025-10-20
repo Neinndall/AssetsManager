@@ -126,9 +126,27 @@ namespace AssetsManager.Views
             _updateCheckService.Start();
             _ = _updateCheckService.CheckForAllUpdatesAsync();
 
+            _ = LoadAllHashesOnStartupAsync(); // DEBUG
+
             InitializeNotifyIcon();
             Closing += MainWindow_Closing;
             StateChanged += MainWindow_StateChanged;
+        }
+        
+        // DEBUG
+        private async Task LoadAllHashesOnStartupAsync()
+        {
+            _logService.Log("--- Measuring Hash Cache Memory ---");
+            long memoryBefore = GC.GetTotalMemory(true);
+
+            await _hashResolverService.LoadHashesAsync();
+            await _hashResolverService.LoadBinHashesAsync();
+            await _hashResolverService.LoadRstHashesAsync();
+
+            long memoryAfter = GC.GetTotalMemory(true);
+            double memoryUsed = (memoryAfter - memoryBefore) / 1024.0 / 1024.0;
+            _logService.Log($"All hashes loaded. Memory used by cache: {memoryUsed:F2} MB");
+            _logService.Log("------------------------------------");
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -276,8 +294,12 @@ namespace AssetsManager.Views
 
         private void OnSidebarNavigationRequested(string viewTag)
         {
-            // Limpiar vista de Models si estamos saliendo de ella
-            if (MainContentArea.Content is ModelWindow modelWindow)
+            // Limpiar vista actual antes de cambiar
+            if (MainContentArea.Content is ExplorerWindow explorerWindow)
+            {
+                explorerWindow.CleanupResources();
+            }
+            else if (MainContentArea.Content is ModelWindow modelWindow)
             {
                 modelWindow.CleanupResources();
             }
@@ -291,6 +313,17 @@ namespace AssetsManager.Views
                 case "Monitor": LoadMonitorWindow(); break;
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
+            }
+
+            // DEBUG: Verificar limpieza de memoria después de salir del Explorer
+            if (viewTag != "Explorer" && viewTag != "Models")
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                
+                long memoryAfter = GC.GetTotalMemory(false);
+                _logService.Log($"[DEBUG] Memory after leaving view: {memoryAfter / 1024.0 / 1024.0:F2} MB");
             }
         }
 

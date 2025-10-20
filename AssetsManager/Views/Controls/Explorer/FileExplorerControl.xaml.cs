@@ -63,6 +63,52 @@ namespace AssetsManager.Views.Controls.Explorer
             _searchTimer.Interval = TimeSpan.FromMilliseconds(300);
             _searchTimer.Tick += SearchTimer_Tick;
         }
+        
+        public void CleanupResources()
+        {
+            // 1. Detener el timer PRIMERO
+            if (_searchTimer != null)
+            {
+                _searchTimer.Stop();
+                _searchTimer.Tick -= SearchTimer_Tick;
+            }
+
+            // 2. Desuscribir eventos del Toolbar
+            if (Toolbar != null)
+            {
+                Toolbar.SearchTextChanged -= Toolbar_SearchTextChanged;
+                Toolbar.CollapseToContainerClicked -= Toolbar_CollapseToContainerClicked;
+                Toolbar.LoadComparisonClicked -= Toolbar_LoadComparisonClicked;
+                Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
+            }
+
+            // 3. Desuscribir eventos propios
+            this.Loaded -= FileExplorerControl_Loaded;
+
+            // 4. Limpiar el TreeView
+            if (FileTreeView != null)
+            {
+                FileTreeView.SelectedItemChanged -= FileTreeView_SelectedItemChanged;
+                FileTreeView.ItemsSource = null; // ← IMPORTANTE: Desvincular binding
+            }
+
+            // 5. CRÍTICO: Limpiar recursivamente todos los nodos
+            if (RootNodes != null)
+            {
+                foreach (var rootNode in RootNodes.ToList())
+                {
+                    rootNode.Dispose(); // ← Usa el nuevo método Dispose
+                }
+                RootNodes.Clear();
+                RootNodes = null;
+            }
+
+            // 6. Romper referencias cruzadas
+            FilePreviewer = null;
+
+            // 8. Limpiar paths
+            _currentRootPath = null;
+        }
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
