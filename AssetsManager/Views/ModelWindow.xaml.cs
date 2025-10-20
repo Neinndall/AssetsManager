@@ -69,6 +69,33 @@ namespace AssetsManager.Views
             ViewportControl.ResetCamera();
         }
 
+        public void CleanupResources()
+        {
+            // Limpiar viewport
+            ViewportControl?.Cleanup();
+            
+            // Limpiar ground y sky
+            if (_groundVisual != null)
+            {
+                ViewportControl.Viewport.Children.Remove(_groundVisual);
+                _groundVisual = null;
+            }
+            
+            if (_skyVisual != null)
+            {
+                ViewportControl.Viewport.Children.Remove(_skyVisual);
+                _skyVisual = null;
+            }
+            
+            // Limpiar panel
+            PanelControl?.Cleanup();
+            
+            // FORZAR limpieza de memoria (solo para DEBUG)
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+
         private void SetupScene()
         {
             // If we are loading a map, stop here.

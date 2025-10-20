@@ -276,6 +276,12 @@ namespace AssetsManager.Views
 
         private void OnSidebarNavigationRequested(string viewTag)
         {
+            // Limpiar vista de Models si estamos saliendo de ella
+            if (MainContentArea.Content is ModelWindow modelWindow)
+            {
+                modelWindow.CleanupResources();
+            }
+            
             switch (viewTag)
             {
                 case "Home": LoadHomeWindow(); break;

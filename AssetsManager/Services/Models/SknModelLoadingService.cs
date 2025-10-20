@@ -144,7 +144,5 @@ namespace AssetsManager.Services.Models
             _logService.LogDebug("--- Finished displaying model ---");
             return sceneModel;
         }
-
-
     }
 }

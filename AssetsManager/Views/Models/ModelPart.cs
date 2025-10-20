@@ -1,4 +1,5 @@
 using AssetsManager.Utils;
+using System;
 using System.ComponentModel;
 using System.Windows.Media.Media3D;
 using System.Windows.Media.Imaging;
@@ -9,7 +10,7 @@ using System.Linq;
 
 namespace AssetsManager.Views.Models
 {
-    public class ModelPart : INotifyPropertyChanged
+    public class ModelPart : INotifyPropertyChanged, IDisposable
     {
         public string Name { get; set; }
 
@@ -80,5 +81,26 @@ namespace AssetsManager.Views.Models
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        public void Dispose()
+        {
+            IsVisible = false;
+            if (Visual != null)
+            {
+                Visual.Content = null;
+                Visual = null;
+            }
+
+            if (Geometry != null)
+            {
+                Geometry.Material = null;
+                Geometry.Geometry = null;
+                Geometry = null;
+            }
+
+            AllTextures?.Clear();
+            AllTextures = null;
+            AvailableTextureNames?.Clear();
+        }
     }
 }

@@ -16,9 +16,6 @@ using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Controls.Models
 {
-    /// <summary>
-    /// Interaction logic for ModelPanelControl.xaml
-    /// </summary>
     public partial class ModelPanelControl : UserControl
     {
         private enum ModelType { Skn, MapGeometry }
@@ -68,12 +65,26 @@ namespace AssetsManager.Views.Controls.Models
 
         public void ResetScene()
         {
-            _sceneModel = null;
-            _skeleton = null;
+            // 1. Limpiar animaciones
             _animations.Clear();
             _animationNames.Clear();
+            
+            // 2. 🆕 CRÍTICO: Liberar recursos de TODOS los modelos
+            foreach (var model in _loadedModels)
+            {
+                model?.Dispose();  // 🔥 Libera texturas, geometrías y materiales
+            }
             _loadedModels.Clear();
+            
+            // 3. Limpiar referencias
+            _sceneModel?.Dispose();
+            _sceneModel = null;
+            _skeleton = null;
+            
+            // 4. Limpiar UI
             MeshesListBox.ItemsSource = null;
+            AnimationsListBox.SelectedItem = null;
+            ModelsListBox.SelectedItem = null;
 
             LoadModelButton.IsEnabled = true;
 
@@ -95,6 +106,9 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (sender is Button button && button.Tag is SceneModel modelToDelete)
             {
+                // 🆕 Liberar recursos del modelo antes de eliminarlo
+                modelToDelete?.Dispose();
+                
                 _loadedModels.Remove(modelToDelete);
                 ModelRemovedFromViewport?.Invoke(modelToDelete);
 
@@ -147,6 +161,7 @@ namespace AssetsManager.Views.Controls.Models
             _currentMode = ModelType.Skn;
             LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
             LoadModelButton.ToolTip = "Load Model";
+            
             string sklFilePath = Path.ChangeExtension(filePath, ".skl");
             if (File.Exists(sklFilePath))
             {
@@ -156,8 +171,11 @@ namespace AssetsManager.Views.Controls.Models
                     SkeletonReadyForViewport?.Invoke(_skeleton);
                 }
             }
-            
+
+            // 🆕 Dispose del modelo anterior antes de cargar uno nuevo
+            _sceneModel?.Dispose();
             _sceneModel = SknModelLoadingService.LoadModel(filePath);
+
             if (_sceneModel != null)
             {
                 if (isInitialLoad)
@@ -169,7 +187,12 @@ namespace AssetsManager.Views.Controls.Models
                 
                 ModelReadyForViewport?.Invoke(_sceneModel);
                 MeshesListBox.ItemsSource = _sceneModel.Parts;
-                
+
+                // 🆕 Limpiar y disponer modelos antiguos en la colección
+                foreach (var model in _loadedModels)
+                {
+                    model?.Dispose();
+                }
                 _loadedModels.Clear();
                 _loadedModels.Add(_sceneModel);
 
@@ -217,9 +240,11 @@ namespace AssetsManager.Views.Controls.Models
                 }
             }
         }
+
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is string animationName && _animations.TryGetValue(animationName, out var animationAsset))
+            if (sender is Button button && button.Tag is string animationName && 
+                _animations.TryGetValue(animationName, out var animationAsset))
             {
                 AnimationsListBox.SelectedItem = animationName;
                 AnimationReadyForDisplay?.Invoke(this, animationAsset);
@@ -231,6 +256,10 @@ namespace AssetsManager.Views.Controls.Models
             _currentMode = ModelType.MapGeometry;
             LoadModelIcon.Kind = MaterialIconKind.Map;
             LoadModelButton.ToolTip = "Load MapGeometry";
+
+            // 🆕 Dispose del modelo anterior
+            _sceneModel?.Dispose();
+
             if (!string.IsNullOrEmpty(materialsPath))
             {
                 _sceneModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
@@ -249,6 +278,11 @@ namespace AssetsManager.Views.Controls.Models
                 ModelReadyForViewport?.Invoke(_sceneModel);
                 MeshesListBox.ItemsSource = _sceneModel.Parts;
 
+                // 🆕 Limpiar y disponer modelos antiguos en la colección
+                foreach (var model in _loadedModels)
+                {
+                    model?.Dispose();
+                }
                 _loadedModels.Clear();
                 _loadedModels.Add(_sceneModel);
 
@@ -261,7 +295,8 @@ namespace AssetsManager.Views.Controls.Models
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is string animationName && _animations.TryGetValue(animationName, out var animationAsset))
+            if (sender is Button button && button.Tag is string animationName && 
+                _animations.TryGetValue(animationName, out var animationAsset))
             {
                 AnimationStopRequested?.Invoke(this, animationAsset);
             }
