@@ -87,7 +87,7 @@ namespace AssetsManager.Services.Hashes
 
             await Task.Run(() =>
             {
-                var lines = File.ReadAllLines(filePath);
+                var lines = File.ReadLines(filePath);
                 foreach (var line in lines)
                 {
                     var parts = line.Trim().Split(' ');
