@@ -252,5 +252,23 @@ namespace AssetsManager.Services.Models
             _logService.LogDebug("--- Finished displaying model ---");
             return sceneModel;
         }
+
+        private readonly struct SubmeshData
+        {
+            public readonly string MaterialName;
+            public readonly Point3D[] Positions;
+            public readonly int[] TriangleIndices;
+            public readonly Point[] TextureCoordinates;
+            public readonly string TexturePath;
+
+            public SubmeshData(string materialName, Point3D[] positions, int[] triangleIndices, Point[] textureCoordinates, string texturePath)
+            {
+                MaterialName = materialName;
+                Positions = positions;
+                TriangleIndices = triangleIndices;
+                TextureCoordinates = textureCoordinates;
+                TexturePath = texturePath;
+            }
+        }
     }
 }

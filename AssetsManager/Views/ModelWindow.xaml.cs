@@ -71,6 +71,9 @@ namespace AssetsManager.Views
 
         public void CleanupResources()
         {
+            // Limpiar el controlador de la cámara para desuscribir eventos
+            _cameraController?.Dispose();
+
             // Limpiar viewport
             ViewportControl?.Cleanup();
             
@@ -89,11 +92,6 @@ namespace AssetsManager.Views
             
             // Limpiar panel
             PanelControl?.Cleanup();
-            
-            // FORZAR limpieza de memoria (solo para DEBUG)
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
         }
 
         private void SetupScene()

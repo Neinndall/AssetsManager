@@ -23,7 +23,7 @@ using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
-    public partial class JsonDiffControl : UserControl
+    public partial class JsonDiffControl : UserControl, IDisposable
     {
         private SideBySideDiffModel _originalDiffModel;
         private bool _isWordLevelDiff = false;
@@ -38,6 +38,39 @@ namespace AssetsManager.Views.Dialogs.Controls
             LoadJsonSyntaxHighlighting();
             SetupScrollSync();
         }
+
+        public void Dispose()
+        {
+            // Desuscribir todos los eventos
+            if (DiffNavigationPanel != null)
+            {
+                DiffNavigationPanel.ScrollRequested -= ScrollToLine;
+            }
+            if (OldJsonContent?.TextArea?.TextView != null)
+            {
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= (s, e) => DiffNavigationPanel?.UpdateViewportGuide();
+            }
+            if (NewJsonContent?.TextArea?.TextView != null)
+            {
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= (s, e) => DiffNavigationPanel?.UpdateViewportGuide();
+            }
+
+            // Limpiar renderers y documentos de AvalonEdit
+            OldJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
+            NewJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
+            OldJsonContent.Document = null;
+            NewJsonContent.Document = null;
+
+            // Anular referencias a objetos pesados
+            _originalDiffModel = null;
+
+            // Anular referencias a otros controles y servicios
+            DiffNavigationPanel = null;
+            CustomMessageBoxService = null;
+        }
+
 
         public void FocusFirstDifference()
         {

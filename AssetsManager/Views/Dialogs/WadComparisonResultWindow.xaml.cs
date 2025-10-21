@@ -109,13 +109,18 @@ namespace AssetsManager.Views.Dialogs
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath; // Store the path of the loaded file
             Loaded += WadComparisonResultWindow_Loaded;
+            Closed += OnWindowClosed;
         }
 
-        private async void WadComparisonResultWindow_Loaded(object sender, RoutedEventArgs e)
+        private void OnWindowClosed(object sender, System.EventArgs e)
         {
-            await _hashResolverService.LoadHashesAsync();
-            await _hashResolverService.LoadBinHashesAsync();
-            await _hashResolverService.LoadRstHashesAsync();
+            _serializableDiffs?.Clear();
+            ResultsTree.ItemsSource = null;
+            ResultsTree.Cleanup();
+        }
+
+        private void WadComparisonResultWindow_Loaded(object sender, RoutedEventArgs e)
+        {
             TryResolveHashes();
             PopulateResults(_serializableDiffs);
         }

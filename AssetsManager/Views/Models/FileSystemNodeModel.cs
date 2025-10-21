@@ -212,15 +212,6 @@ namespace AssetsManager.Views.Models
         
         public void Dispose()
         {
-            // Desuscribir TODOS los listeners del PropertyChanged
-            if (PropertyChanged != null)
-            {
-                foreach (var d in PropertyChanged.GetInvocationList())
-                {
-                    PropertyChanged -= (PropertyChangedEventHandler)d;
-                }
-            }
-
             // Limpiar hijos recursivamente
             if (Children != null)
             {
