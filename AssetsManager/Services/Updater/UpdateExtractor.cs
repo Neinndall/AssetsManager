@@ -31,16 +31,14 @@ namespace AssetsManager.Services.Updater
             {
                 _logService.Log("Starting update extraction process...");
 
+                _directoriesCreator.GenerateUpdateFilePaths();
                 string executablePath = Process.GetCurrentProcess().MainModule.FileName;
                 string appDirectory = Path.GetDirectoryName(executablePath)!;
-                string updaterCachePath = Path.Combine(_directoriesCreator.UpdateCachePath, "Updater");
-                string updaterExePath = Path.Combine(updaterCachePath, "Updater.exe");
+                string updaterCachePath = _directoriesCreator.UpdaterDirectoryPath;
+                string updaterExePath = _directoriesCreator.UpdaterExePath;
 
                 var assembly = Assembly.GetExecutingAssembly();
                 var resourcePrefix = "AssetsManager.Resources.Updater.";
-
-                // Ensure the updater cache directory exists
-                Directory.CreateDirectory(updaterCachePath);
 
                 foreach (var resource in assembly.GetManifestResourceNames())
                 {

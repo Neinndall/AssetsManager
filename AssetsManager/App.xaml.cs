@@ -24,7 +24,6 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Versions;
 using AssetsManager.Services.Audio;
-using System.Linq;
 
 namespace AssetsManager
 {
