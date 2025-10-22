@@ -84,10 +84,5 @@
     <Delete Files="@(DocFilesToDelete)" />
     <Delete Files="@(DocFilesToDeletePublish)" />
   </Target>
-
-  <ItemGroup>
-    <Compile Remove="Updater\**" />
-    <EmbeddedResource Remove="Updater\**" />
-    <None Remove="Updater\**" />
-  </ItemGroup>
+  
 </Project>
