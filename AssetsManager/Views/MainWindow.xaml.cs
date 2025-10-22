@@ -48,7 +48,6 @@ namespace AssetsManager.Views
         private readonly MonitorService _monitorService;
         private readonly VersionService _versionService;
 
-
         private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
         private readonly List<string> _notificationMessages = new List<string>();
@@ -125,10 +124,19 @@ namespace AssetsManager.Views
 
             _updateCheckService.Start();
             _ = _updateCheckService.CheckForAllUpdatesAsync();
+            _ = LoadAllHashesOnStartupAsync();
 
             InitializeNotifyIcon();
             Closing += MainWindow_Closing;
             StateChanged += MainWindow_StateChanged;
+        }
+
+        private async Task LoadAllHashesOnStartupAsync()
+        {
+            await _hashResolverService.LoadHashesAsync();
+            await _hashResolverService.LoadBinHashesAsync();
+            await _hashResolverService.LoadRstHashesAsync();
+            _logService.Log("Hashes loaded on startup.");
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -276,6 +284,26 @@ namespace AssetsManager.Views
 
         private void OnSidebarNavigationRequested(string viewTag)
         {
+            // Limpiar vista actual antes de cambiar
+            if (MainContentArea.Content is ExplorerWindow explorerWindow)
+            {
+                explorerWindow.CleanupResources();
+                // GC.Collect();
+                // GC.WaitForPendingFinalizers();
+                // GC.Collect();
+                // long memoryAfter = GC.GetTotalMemory(true);
+                // _logService.LogDebug($"[DEBUG] Memory after leaving Explorer: {memoryAfter / 1024.0 / 1024.0:F2} MB");
+            }
+            else if (MainContentArea.Content is ModelWindow modelWindow)
+            {
+                modelWindow.CleanupResources();
+                // GC.Collect();
+                // GC.WaitForPendingFinalizers();
+                // GC.Collect();
+                // long memoryAfter = GC.GetTotalMemory(true);
+                // _logService.LogDebug($"[DEBUG] Memory after leaving Models: {memoryAfter / 1024.0 / 1024.0:F2} MB");
+            }
+            
             switch (viewTag)
             {
                 case "Home": LoadHomeWindow(); break;

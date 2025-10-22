@@ -22,6 +22,12 @@ namespace AssetsManager.Views.Dialogs
             // Start invisible to prevent visual jump
             Visibility = Visibility.Hidden;
             Loaded += JsonDiffWindow_Loaded;
+            Closed += OnWindowClosed;
+        }
+
+        private void OnWindowClosed(object sender, EventArgs e)
+        {
+            JsonDiffControl.Dispose();
         }
 
         private void JsonDiffWindow_Loaded(object sender, RoutedEventArgs e)

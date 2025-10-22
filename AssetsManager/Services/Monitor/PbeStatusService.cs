@@ -27,9 +27,9 @@ namespace AssetsManager.Services.Monitor
             // Add more as needed
         };
 
-        public PbeStatusService(LogService logService, AppSettings appSettings)
+        public PbeStatusService(HttpClient httpClient, LogService logService, AppSettings appSettings)
         {
-            _httpClient = new HttpClient();
+            _httpClient = httpClient;
             _logService = logService;
             _appSettings = appSettings;
         }

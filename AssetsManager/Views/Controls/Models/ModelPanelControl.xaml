@@ -135,6 +135,14 @@
                     <materialIcons:MaterialIcon x:Name="LoadModelIcon" Kind="CubeOutline" Width="18" Height="18"/>
                 </Button>
 
+                <Button x:Name="LoadChromaModelButton"
+                        Style="{StaticResource SecondaryButton}"
+                        Click="LoadChromaModelButton_Click"
+                        ToolTip="Load Chroma Model"
+                        Margin="10,0,0,0">
+                    <materialIcons:MaterialIcon x:Name="LoadChromaModelIcon" Kind="Palette" Width="18" Height="18"/>
+                </Button>
+
                 <Button x:Name="LoadAnimationButton"
                         Style="{StaticResource SecondaryButton}"
                         Click="LoadAnimationButton_Click"

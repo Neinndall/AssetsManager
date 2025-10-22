@@ -24,6 +24,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             InitializeComponent();
             this.Loaded += HistoryViewControl_Loaded;
+            this.Unloaded += HistoryViewControl_Unloaded;
         }
 
         private void HistoryViewControl_Loaded(object sender, RoutedEventArgs e)
@@ -98,6 +99,12 @@ namespace AssetsManager.Views.Controls.Monitor
         private void NextPage_Click(object sender, RoutedEventArgs e)
         {
             _viewModel.NextPage();
+        }
+
+        private void HistoryViewControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            this.DataContext = null;
+            _viewModel = null;
         }
     }
 }

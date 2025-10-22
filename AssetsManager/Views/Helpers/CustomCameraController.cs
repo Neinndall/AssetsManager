@@ -1,15 +1,18 @@
 using HelixToolkit.Wpf;
+using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Media3D;
 
 namespace AssetsManager.Views.Helpers
 {
-    public class CustomCameraController
+    public class CustomCameraController : IDisposable
     {
-        private readonly HelixViewport3D _viewport;
+        private HelixViewport3D _viewport;
         private bool _isRotating;
         private System.Windows.Point _lastMousePosition;
+
+        public double ZoomSensitivity { get; set; } = 2.0;
 
         public CustomCameraController(HelixViewport3D viewport)
         {
@@ -19,6 +22,19 @@ namespace AssetsManager.Views.Helpers
             _viewport.MouseMove += OnMouseMove;
             _viewport.MouseWheel += OnMouseWheel;
         }
+
+        public void Dispose()
+        {
+            if (_viewport != null)
+            {
+                _viewport.PreviewMouseDown -= OnPreviewMouseDown;
+                _viewport.MouseUp -= OnMouseUp;
+                _viewport.MouseMove -= OnMouseMove;
+                _viewport.MouseWheel -= OnMouseWheel;
+                _viewport = null;
+            }
+        }
+
 
         private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -67,7 +83,7 @@ namespace AssetsManager.Views.Helpers
             var lookDir = camera.LookDirection;
             lookDir.Normalize();
 
-            camera.Position += lookDir * delta * 10; // Adjust sensitivity
+            camera.Position += lookDir * delta * ZoomSensitivity; // Adjust sensitivity
         }
 
         private void Rotate(Vector3D delta)

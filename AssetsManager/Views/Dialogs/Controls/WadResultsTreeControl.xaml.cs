@@ -31,10 +31,30 @@ namespace AssetsManager.Views.Dialogs.Controls
             set => resultsTreeView.ItemsSource = value;
         }
 
+        private Button _clearTextButton;
+        private RoutedEventHandler _clearTextButtonClickHandler;
+
         public WadResultsTreeControl()
         {
             InitializeComponent();
             Loaded += WadResultsTreeControl_Loaded;
+            Unloaded += WadResultsTreeControl_Unloaded;
+        }
+
+        public void Cleanup()
+        {
+            // Desuscribir eventos
+            resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
+            searchTextBox.TextChanged -= SearchTextBox_TextChanged;
+            if (_clearTextButton != null && _clearTextButtonClickHandler != null)
+            {
+                _clearTextButton.Click -= _clearTextButtonClickHandler;
+            }
+
+            // Anular referencias
+            resultsTreeView.ItemsSource = null;
+            _clearTextButton = null;
+            _clearTextButtonClickHandler = null;
         }
 
         private void WadResultsTreeControl_Loaded(object sender, RoutedEventArgs e)
@@ -42,11 +62,20 @@ namespace AssetsManager.Views.Dialogs.Controls
             searchTextBox.ApplyTemplate();
             if (searchTextBox.Template.FindName("ClearTextButton", searchTextBox) is Button clearButton)
             {
-                clearButton.Click += (s, args) =>
+                _clearTextButton = clearButton;
+                _clearTextButtonClickHandler = (s, args) =>
                 {
                     searchTextBox.Text = string.Empty;
                 };
+                _clearTextButton.Click += _clearTextButtonClickHandler;
             }
+            resultsTreeView.SelectedItemChanged += ResultsTreeView_SelectedItemChanged;
+            searchTextBox.TextChanged += SearchTextBox_TextChanged;
+        }
+
+        private void WadResultsTreeControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)

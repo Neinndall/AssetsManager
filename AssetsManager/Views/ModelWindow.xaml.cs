@@ -56,12 +56,42 @@ namespace AssetsManager.Views
             // Animation events
             PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
             PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
+
+            Unloaded += (s, e) => {
+                PanelControl.Cleanup();
+                ViewportControl.Cleanup();
+            };
         }
 
         private void OnSceneClearRequested(object sender, EventArgs e)
         {
-            ViewportControl.StopAnimation();
+            ViewportControl.ResetScene();
             ViewportControl.ResetCamera();
+        }
+
+        public void CleanupResources()
+        {
+            // Limpiar el controlador de la cámara para desuscribir eventos
+            _cameraController?.Dispose();
+
+            // Limpiar viewport
+            ViewportControl?.Cleanup();
+            
+            // Limpiar ground y sky
+            if (_groundVisual != null)
+            {
+                ViewportControl.Viewport.Children.Remove(_groundVisual);
+                _groundVisual = null;
+            }
+            
+            if (_skyVisual != null)
+            {
+                ViewportControl.Viewport.Children.Remove(_skyVisual);
+                _skyVisual = null;
+            }
+            
+            // Limpiar panel
+            PanelControl?.Cleanup();
         }
 
         private void SetupScene()
@@ -86,7 +116,8 @@ namespace AssetsManager.Views
             {
                 using (Stream resourceStream = Application.GetResourceStream(new Uri(uri)).Stream)
                 {
-                    return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(uri));
+                    // Resize scene textures to a maximum of 1024x1024 for a balance of quality and memory.
+                    return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(uri), 1024);
                 }
             }
             catch (Exception ex)
@@ -104,7 +135,7 @@ namespace AssetsManager.Views
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl"), new CommonFileDialogFilter("All Files", "*.*") },
-                Title = "Select a SKN File"
+                Title = "Select a skn file"
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -121,6 +152,33 @@ namespace AssetsManager.Views
             }
         }
 
+        private void OpenChromaFile_Click(object sender, RoutedEventArgs e)
+        {
+            _isMapGeometry = false;
+            DefaultEmptyStateContent.Visibility = Visibility.Visible;
+            LoadingStateContent.Visibility = Visibility.Collapsed;
+
+            var openFileDialog = new CommonOpenFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
+                Title = "Select a skn file for the chroma"
+            };
+
+            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                var folderBrowserDialog = new CommonOpenFileDialog
+                {
+                    IsFolderPicker = true,
+                    Title = "Select the texture folder for the chroma"
+                };
+
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    PanelControl.ProcessModelLoading(openFileDialog.FileName, folderBrowserDialog.FileName, true);
+                }
+            }
+        }
+
         private async void OpenGeometryFile_Click(object sender, RoutedEventArgs e)
         {
             _isMapGeometry = true;
@@ -130,7 +188,7 @@ namespace AssetsManager.Views
                 var openMapGeoDialog = new CommonOpenFileDialog
                 {
                     Filters = { new CommonFileDialogFilter("MapGeometry Files", "*.mapgeo"), new CommonFileDialogFilter("All Files", "*.*") },
-                    Title = "Select a MAPGEO File"
+                    Title = "Select a mapgeo file"
                 };
 
                 if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -143,7 +201,7 @@ namespace AssetsManager.Views
                         var openMaterialsBinDialog = new CommonOpenFileDialog
                         {
                             Filters = { new CommonFileDialogFilter("Materials files", "*.materials.bin"), new CommonFileDialogFilter("All files", "*.*") },
-                            Title = "Select a materials.bin File",
+                            Title = "Select a materials.bin file",
                             InitialDirectory = Path.GetDirectoryName(mapGeoPath)
                         };
 
@@ -161,7 +219,7 @@ namespace AssetsManager.Views
                     var openGameDataDialog = new CommonOpenFileDialog
                     {
                         IsFolderPicker = true,
-                        Title = "Select Map Root for Textures"
+                        Title = "Select map root for textures"
                     };
 
                     if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)

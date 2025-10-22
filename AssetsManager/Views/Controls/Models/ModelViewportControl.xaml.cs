@@ -19,9 +19,6 @@ using System.Windows;
 
 namespace AssetsManager.Views.Controls.Models
 {
-    /// <summary>
-    /// Interaction logic for ModelViewportControl.xaml
-    /// </summary>
     public partial class ModelViewportControl : UserControl
     {
         public HelixViewport3D Viewport => Viewport3D;
@@ -45,11 +42,41 @@ namespace AssetsManager.Views.Controls.Models
                 _animationPlayer = new AnimationPlayer(LogService);
             };
 
+            Unloaded += (s, e) => Cleanup();
+
             Viewport.Children.Add(_skeletonVisual);
             Viewport.Children.Add(_jointsVisual);
 
             CompositionTarget.Rendering += CompositionTarget_Rendering;
             _stopwatch.Start();
+        }
+
+        public void Cleanup()
+        {
+            // 1. Desuscribir eventos
+            CompositionTarget.Rendering -= CompositionTarget_Rendering;
+            _stopwatch.Stop();
+            
+            // 2. Limpiar escena y animaciones (ahora con Dispose)
+            ResetScene();
+            
+            // 3. Limpiar visuales de esqueleto
+            _skeletonVisual.Points?.Clear();
+            _jointsVisual.Points?.Clear();
+            
+            // 4. Remover visuales del viewport
+            if (Viewport.Children.Contains(_skeletonVisual))
+                Viewport.Children.Remove(_skeletonVisual);
+            if (Viewport.Children.Contains(_jointsVisual))
+                Viewport.Children.Remove(_jointsVisual);
+            
+            // 5. Limpiar todo el viewport
+            Viewport.Children.Clear();
+            
+            // 6. Limpiar referencias
+            _animationPlayer = null;
+            _currentAnimation = null;
+            _skeleton = null;
         }
 
         public void SetAnimation(IAnimationAsset animation)
@@ -81,6 +108,26 @@ namespace AssetsManager.Views.Controls.Models
             IsAnimationPaused = false;
         }
 
+        public void ResetScene()
+        {
+            StopAnimation();
+
+            if (_sceneModel != null)
+            {
+                // 🆕 Remover del viewport ANTES de Dispose
+                if (Viewport.Children.Contains(_sceneModel.RootVisual))
+                    Viewport.Children.Remove(_sceneModel.RootVisual);
+                
+                // 🆕 CRÍTICO: Llamar a Dispose para liberar recursos
+                _sceneModel.Dispose();
+                _sceneModel = null;
+            }
+
+            _skeletonVisual.Points?.Clear();
+            _jointsVisual.Points?.Clear();
+            _skeleton = null;
+        }
+
         public void SetSkeleton(RigResource skeleton)
         {
             _skeleton = skeleton;
@@ -88,15 +135,30 @@ namespace AssetsManager.Views.Controls.Models
 
         public void SetModel(SceneModel model)
         {
+            // 🆕 Si ya hay un modelo, limpiarlo antes de reemplazar
+            if (_sceneModel != null && _sceneModel != model)
+            {
+                ResetScene();
+            }
+            
             _sceneModel = model;
             Viewport.Children.Add(model.RootVisual);
         }
 
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {
-            if (_animationPlayer != null && _currentAnimation != null && _skeleton != null && _sceneModel != null && _sceneModel.SkinnedMesh != null)
+            if (_animationPlayer != null && _currentAnimation != null && _skeleton != null && 
+                _sceneModel != null && _sceneModel.SkinnedMesh != null)
             {
-                _animationPlayer.Update((float)_stopwatch.Elapsed.TotalSeconds, _currentAnimation, _skeleton, _sceneModel.SkinnedMesh, _sceneModel.Parts.ToList(), _skeletonVisual, _jointsVisual);
+                _animationPlayer.Update(
+                    (float)_stopwatch.Elapsed.TotalSeconds, 
+                    _currentAnimation, 
+                    _skeleton, 
+                    _sceneModel.SkinnedMesh, 
+                    _sceneModel.Parts.ToList(), 
+                    _skeletonVisual, 
+                    _jointsVisual
+                );
             }
         }
 
@@ -116,14 +178,17 @@ namespace AssetsManager.Views.Controls.Models
 
         public void TakeScreenshot(string filePath)
         {
-            var renderBitmap = new RenderTargetBitmap((int)Viewport3D.ActualWidth, (int)Viewport3D.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            var renderBitmap = new RenderTargetBitmap(
+                (int)Viewport3D.ActualWidth, 
+                (int)Viewport3D.ActualHeight, 
+                96, 96, 
+                PixelFormats.Pbgra32
+            );
             renderBitmap.Render(Viewport3D);
 
-            // Always use PngBitmapEncoder
             BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
             bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
 
-            // Ensure the file path has a .png extension
             string finalFilePath = filePath;
             if (Path.GetExtension(finalFilePath).ToLower() != ".png")
             {
