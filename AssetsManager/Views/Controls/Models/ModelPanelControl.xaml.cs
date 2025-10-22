@@ -16,9 +16,6 @@ using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Controls.Models
 {
-    /// <summary>
-    /// Interaction logic for ModelPanelControl.xaml
-    /// </summary>
     public partial class ModelPanelControl : UserControl
     {
         private enum ModelType { Skn, MapGeometry }
@@ -57,38 +54,70 @@ namespace AssetsManager.Views.Controls.Models
             InitializeComponent();
             AnimationsListBoxControl.ItemsSource = _animationNames;
             ModelsListBoxControl.ItemsSource = _loadedModels;
+
+            Unloaded += (s, e) => Cleanup();
+        }
+
+        public void Cleanup()
+        {
+            ResetScene();
+        }
+
+        public void ResetScene()
+        {
+            // 1. Limpiar animaciones
+            _animations.Clear();
+            _animationNames.Clear();
+            
+            // 2. CRÍTICO: Liberar recursos de TODOS los modelos
+            foreach (var model in _loadedModels)
+            {
+                model?.Dispose();  // Libera texturas, geometrías y materiales
+            }
+            _loadedModels.Clear();
+            
+            // 3. Limpiar referencias
+            _sceneModel?.Dispose();
+            _sceneModel = null;
+            _skeleton = null;
+            
+            // 4. Limpiar UI
+            MeshesListBox.ItemsSource = null;
+            AnimationsListBox.SelectedItem = null;
+            ModelsListBox.SelectedItem = null;
+
+            LoadModelButton.IsEnabled = true;
+            LoadChromaModelButton.IsEnabled = true;
+
+            if (_currentMode == ModelType.MapGeometry)
+            {
+                LoadModelIcon.Kind = MaterialIconKind.Map;
+                LoadModelButton.ToolTip = "Load MapGeometry";
+                LoadAnimationButton.IsEnabled = false;
+                LoadChromaModelButton.IsEnabled = false;
+            }
+            else
+            {
+                LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
+                LoadModelButton.ToolTip = "Load Model";
+                LoadAnimationButton.IsEnabled = true;
+            }
         }
 
         private void DeleteModelButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is SceneModel modelToDelete)
             {
+                // Liberar recursos del modelo antes de eliminarlo
+                modelToDelete?.Dispose();
+                
                 _loadedModels.Remove(modelToDelete);
                 ModelRemovedFromViewport?.Invoke(modelToDelete);
 
                 if (_loadedModels.Count == 0)
                 {
-                    _sceneModel = null;
-                    _skeleton = null;
-                    _animations.Clear();
-                    _animationNames.Clear();
-                    MeshesListBox.ItemsSource = null;
+                    ResetScene();
                     SceneClearRequested?.Invoke(this, EventArgs.Empty);
-
-                    LoadModelButton.IsEnabled = true;
-
-                    if (_currentMode == ModelType.MapGeometry)
-                    {
-                        LoadModelIcon.Kind = MaterialIconKind.Map;
-                        LoadModelButton.ToolTip = "Load MapGeometry";
-                        LoadAnimationButton.IsEnabled = false;
-                    }
-                    else
-                    {
-                        LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
-                        LoadModelButton.ToolTip = "Load Model";
-                        LoadAnimationButton.IsEnabled = true;
-                    }
                 }
             }
         }
@@ -100,12 +129,12 @@ namespace AssetsManager.Views.Controls.Models
                 var openFileDialog = new CommonOpenFileDialog
                 {
                     Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
-                    Title = "Select a SKN File"
+                    Title = "Select a skn file"
                 };
 
                 if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    LoadModel(openFileDialog.FileName, false);
+                    ProcessModelLoading(openFileDialog.FileName, null, false);
                 }
             }
             else
@@ -114,9 +143,32 @@ namespace AssetsManager.Views.Controls.Models
             }
         }
 
+        private void LoadChromaModelButton_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new CommonOpenFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
+                Title = "Select a skn file for the chroma"
+            };
+
+            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                var folderBrowserDialog = new CommonOpenFileDialog
+                {
+                    IsFolderPicker = true,
+                    Title = "Select the Texture Folder for the Chroma"
+                };
+
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    ProcessModelLoading(openFileDialog.FileName, folderBrowserDialog.FileName, false);
+                }
+            }
+        }
+
         public void LoadInitialModel(string filePath)
         {
-            LoadModel(filePath, true);
+            ProcessModelLoading(filePath, null, true);
         }
 
         public void LoadSkeleton(string filePath)
@@ -129,12 +181,13 @@ namespace AssetsManager.Views.Controls.Models
             LogService.LogDebug($"Loaded skeleton: {Path.GetFileName(filePath)}");
         }
 
-        private void LoadModel(string filePath, bool isInitialLoad)
+        public void ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
         {
             _currentMode = ModelType.Skn;
             LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
             LoadModelButton.ToolTip = "Load Model";
-            string sklFilePath = Path.ChangeExtension(filePath, ".skl");
+
+            string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
             if (File.Exists(sklFilePath))
             {
                 using (var stream = File.OpenRead(sklFilePath))
@@ -143,8 +196,18 @@ namespace AssetsManager.Views.Controls.Models
                     SkeletonReadyForViewport?.Invoke(_skeleton);
                 }
             }
-            
-            _sceneModel = SknModelLoadingService.LoadModel(filePath);
+
+            _sceneModel?.Dispose();
+
+            if (string.IsNullOrEmpty(texturePath))
+            {
+                _sceneModel = SknModelLoadingService.LoadModel(modelPath);
+            }
+            else
+            {
+                _sceneModel = SknModelLoadingService.LoadModel(modelPath, texturePath);
+            }
+
             if (_sceneModel != null)
             {
                 if (isInitialLoad)
@@ -153,16 +216,21 @@ namespace AssetsManager.Views.Controls.Models
                     EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
                     MainContentVisibilityChanged?.Invoke(Visibility.Visible);
                 }
-                
+
                 ModelReadyForViewport?.Invoke(_sceneModel);
                 MeshesListBox.ItemsSource = _sceneModel.Parts;
-                
+
+                foreach (var model in _loadedModels)
+                {
+                    model?.Dispose();
+                }
                 _loadedModels.Clear();
                 _loadedModels.Add(_sceneModel);
 
                 CameraResetRequested?.Invoke();
 
                 LoadModelButton.IsEnabled = false;
+                LoadChromaModelButton.IsEnabled = false;
                 LoadAnimationButton.IsEnabled = true;
             }
         }
@@ -172,7 +240,7 @@ namespace AssetsManager.Views.Controls.Models
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("Animation files", "*.anm"), new CommonFileDialogFilter("All files", "*.*") },
-                Title = "Select Animation Files",
+                Title = "Select animation files",
                 Multiselect = true
             };
 
@@ -204,9 +272,11 @@ namespace AssetsManager.Views.Controls.Models
                 }
             }
         }
+
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is string animationName && _animations.TryGetValue(animationName, out var animationAsset))
+            if (sender is Button button && button.Tag is string animationName && 
+                _animations.TryGetValue(animationName, out var animationAsset))
             {
                 AnimationsListBox.SelectedItem = animationName;
                 AnimationReadyForDisplay?.Invoke(this, animationAsset);
@@ -218,6 +288,10 @@ namespace AssetsManager.Views.Controls.Models
             _currentMode = ModelType.MapGeometry;
             LoadModelIcon.Kind = MaterialIconKind.Map;
             LoadModelButton.ToolTip = "Load MapGeometry";
+
+            // 🆕 Dispose del modelo anterior
+            _sceneModel?.Dispose();
+
             if (!string.IsNullOrEmpty(materialsPath))
             {
                 _sceneModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
@@ -236,6 +310,11 @@ namespace AssetsManager.Views.Controls.Models
                 ModelReadyForViewport?.Invoke(_sceneModel);
                 MeshesListBox.ItemsSource = _sceneModel.Parts;
 
+                // Limpiar y disponer modelos antiguos en la colección
+                foreach (var model in _loadedModels)
+                {
+                    model?.Dispose();
+                }
                 _loadedModels.Clear();
                 _loadedModels.Add(_sceneModel);
 
@@ -243,12 +322,14 @@ namespace AssetsManager.Views.Controls.Models
 
                 LoadModelButton.IsEnabled = false;
                 LoadAnimationButton.IsEnabled = false;
+                LoadChromaModelButton.IsEnabled = false;
             }
         }
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is string animationName && _animations.TryGetValue(animationName, out var animationAsset))
+            if (sender is Button button && button.Tag is string animationName && 
+                _animations.TryGetValue(animationName, out var animationAsset))
             {
                 AnimationStopRequested?.Invoke(this, animationAsset);
             }

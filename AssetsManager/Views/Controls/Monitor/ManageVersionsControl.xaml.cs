@@ -23,6 +23,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             InitializeComponent();
             this.Loaded += ManageVersionsControl_Loaded;
+            this.Unloaded += ManageVersionsControl_Unloaded;
             LeagueClientVersionsListView.SelectionChanged += ListView_SelectionChanged;
             LoLGameClientVersionsListView.SelectionChanged += ListView_SelectionChanged;
         }
@@ -202,6 +203,14 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 }
 
+
+                private void ManageVersionsControl_Unloaded(object sender, RoutedEventArgs e)
+                {
+                    LeagueClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
+                    LoLGameClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
+                    this.DataContext = null;
+                    _viewModel = null;
+                }
             }
 
         }

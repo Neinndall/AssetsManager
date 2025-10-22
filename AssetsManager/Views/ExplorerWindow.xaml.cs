@@ -54,6 +54,7 @@ namespace AssetsManager.Views
             FileExplorer.FilePreviewer = FilePreviewer; // Set the dependency
         }
 
+
         private async void FileExplorer_FileSelected(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
@@ -66,6 +67,24 @@ namespace AssetsManager.Views
 
                 // Always show the preview for the selected node.
                 await FilePreviewer.ShowPreviewAsync(selectedNode);
+            }
+        }
+        
+        public void CleanupResources()
+        {
+            // Desuscribir evento
+            if (FileExplorer != null)
+            {
+                FileExplorer.FileSelected -= FileExplorer_FileSelected;
+            }
+            
+            // Limpiar controles hijo
+            FileExplorer?.CleanupResources();
+            
+            // Romper referencia cruzada
+            if (FileExplorer != null)
+            {
+                FileExplorer.FilePreviewer = null;
             }
         }
     }

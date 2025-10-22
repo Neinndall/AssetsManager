@@ -209,5 +209,26 @@ namespace AssetsManager.Views.Models
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+        
+        public void Dispose()
+        {
+            // Limpiar hijos recursivamente
+            if (Children != null)
+            {
+                foreach (var child in Children)
+                {
+                    child.Dispose();
+                }
+                Children.Clear();
+            }
+
+            // Limpiar referencias
+            ChunkDiff = null;
+            SourceWadPath = null;
+            BackupChunkPath = null;
+            FullPath = null;
+            OldPath = null;
+            Name = null;
+        }
     }
 }

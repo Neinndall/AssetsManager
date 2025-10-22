@@ -33,6 +33,7 @@ namespace AssetsManager.Views.Controls.Shared
             searchTimer.Tick += SearchTimer_Tick;
 
             Loaded += SearchBoxControl_Loaded;
+            Unloaded += SearchBoxControl_Unloaded;
         }
 
         private void SearchBoxControl_Loaded(object sender, RoutedEventArgs e)
@@ -62,6 +63,15 @@ namespace AssetsManager.Views.Controls.Shared
         {
             searchTimer.Stop();
             RaiseEvent(new RoutedEventArgs(SearchTextChangedEvent, SearchTextBox.Text));
+        }
+
+        private void SearchBoxControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (searchTimer != null)
+            {
+                searchTimer.Stop();
+                searchTimer.Tick -= SearchTimer_Tick;
+            }
         }
     }
 }

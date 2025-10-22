@@ -87,6 +87,12 @@
                             <materialIcons:MaterialIcon Kind="CubeOutline" Width="20" Height="20"/>
                         </Button>
                         <Button Style="{StaticResource SecondaryButton}"
+                                Click="OpenChromaFile_Click"
+                                ToolTip="Load Chroma Model"
+                                Margin="10,0,0,0">
+                            <materialIcons:MaterialIcon Kind="Palette" Width="20" Height="20"/>
+                        </Button>
+                        <Button Style="{StaticResource SecondaryButton}"
                                 Click="OpenGeometryFile_Click"
                                 ToolTip="Load MapGeometry"
                                 Margin="10,0,0,0">

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
@@ -9,19 +10,114 @@ using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Toolkit;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using AssetsManager.Services.Core;
 using AssetsManager.Views.Models;
 
 namespace AssetsManager.Utils
 {
     public static class TextureUtils
     {
-        public static string FindBestTextureMatch(string materialName, IEnumerable<string> availableTextureKeys)
+        private static string NormalizeName(string name)
         {
-            if (materialName == null) return availableTextureKeys.FirstOrDefault();
+            return Regex.Replace(name, @"(skin|_)(\d+)", "", RegexOptions.IgnoreCase);
+        }
 
-            return availableTextureKeys.FirstOrDefault(key => key.Equals(materialName, System.StringComparison.OrdinalIgnoreCase))
-                ?? availableTextureKeys.FirstOrDefault(key => key.StartsWith(materialName, System.StringComparison.OrdinalIgnoreCase))
-                ?? availableTextureKeys.FirstOrDefault();
+        public static string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey, LogService logService)
+        {
+            logService.LogDebug($"Finding texture for material: '{materialName}'");
+
+            string exactMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch != null)
+            {
+                logService.LogDebug($"Found texture '{exactMatch}' via exact name match.");
+                return exactMatch;
+            }
+
+            var genericMaterialNames = new List<string> { "body", "face", "head", "eyes", "leg" };
+            if (genericMaterialNames.Contains(materialName.ToLower()))
+            {
+                string mainTextureCandidate = $"{skinName}_tx_cm";
+                string genericMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(mainTextureCandidate, StringComparison.OrdinalIgnoreCase));
+                if (genericMatch != null)
+                {
+                    logService.LogDebug($"Found main texture '{genericMatch}' for generic material '{materialName}'.");
+                    return genericMatch;
+                }
+            }
+
+            string propTexture = availableTextureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
+            if (propTexture != null)
+            {
+                if (!genericMaterialNames.Contains(materialName.ToLower()))
+                {
+                    logService.LogDebug($"Material '{materialName}' is not a generic body part, assigning generic prop texture '{propTexture}'.");
+                    return propTexture;
+                }
+            }
+
+            logService.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
+            var separatorChars = new[] { '_', '-', ' ' };
+
+            string normalizedMaterialName = NormalizeName(materialName);
+            var initialSplit = normalizedMaterialName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
+
+            var materialKeywords = initialSplit
+                .SelectMany(word => Regex.Split(word, @"(?<!^)(?=[A-Z])")) // Splits PascalCase
+                .Where(k => !k.Equals("mat", StringComparison.OrdinalIgnoreCase))
+                .Select(k => k.ToLower())
+                .ToList();
+
+            string bestScoringMatch = null;
+            int bestScore = 0;
+
+            foreach (string key in availableTextureKeys)
+            {
+                string normalizedKey = NormalizeName(key);
+                string lowerKey = normalizedKey.ToLower();
+                int currentScore = 0;
+
+                foreach (string keyword in materialKeywords)
+                {
+                    if (string.IsNullOrWhiteSpace(keyword)) continue;
+                    if (lowerKey.Contains(keyword))
+                    {
+                        currentScore++;
+                    }
+                }
+
+                if (currentScore > bestScore)
+                {
+                    bestScore = currentScore;
+                    bestScoringMatch = key;
+                }
+                else if (currentScore > 0 && currentScore == bestScore)
+                {
+                    bool bestIsTxCm = bestScoringMatch?.ToLower().Contains("_tx_cm") ?? false;
+                    bool currentIsTxCm = lowerKey.Contains("_tx_cm");
+
+                    if (currentIsTxCm && !bestIsTxCm)
+                    {
+                        bestScoringMatch = key;
+                    }
+                    else if (!currentIsTxCm && bestIsTxCm)
+                    {
+                    }
+                    else if (bestScoringMatch == null || key.Length < bestScoringMatch.Length)
+                    {
+                        bestScoringMatch = key;
+                    }
+                }
+            }
+
+            if (bestScoringMatch != null)
+            {
+                logService.LogDebug($"Found texture '{bestScoringMatch}' with score {bestScore} via keyword matching.");
+                return bestScoringMatch;
+            }
+
+            logService.LogDebug($"No texture found. Falling back to default: '{defaultTextureKey}'");
+            return defaultTextureKey;
         }
 
         public static void UpdateMaterial(ModelPart modelPart)
@@ -54,7 +150,7 @@ namespace AssetsManager.Utils
             }
         }
 
-        public static BitmapSource LoadTexture(Stream textureStream, string extension)
+        public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
         {
             try
             {
@@ -65,24 +161,29 @@ namespace AssetsManager.Utils
                     Texture tex = Texture.Load(textureStream);
                     if (tex.Mips.Length > 0)
                     {
-                        Image<Rgba32> imageSharp = tex.Mips[0].ToImage();
-
-                        var pixelBuffer = new byte[imageSharp.Width * imageSharp.Height * 4];
-                        imageSharp.CopyPixelDataTo(pixelBuffer);
-
-                        for (int i = 0; i < pixelBuffer.Length; i += 4)
+                        using (Image<Rgba32> imageSharp = tex.Mips[0].ToImage())
                         {
-                            var r = pixelBuffer[i];
-                            var b = pixelBuffer[i + 2];
-                            pixelBuffer[i] = b;
-                            pixelBuffer[i + 2] = r;
+                            if (maxWidth.HasValue && (imageSharp.Width > maxWidth.Value || imageSharp.Height > maxWidth.Value))
+                            {
+                                imageSharp.Mutate(x => x.Resize(new ResizeOptions
+                                {
+                                    Size = new Size(maxWidth.Value, maxWidth.Value),
+                                    Mode = ResizeMode.Max
+                                }));
+                            }
+
+                            using (Image<Bgra32> bgra32Image = imageSharp.CloneAs<Bgra32>())
+                            {
+                                var pixelBuffer = new byte[bgra32Image.Width * bgra32Image.Height * 4];
+                                bgra32Image.CopyPixelDataTo(pixelBuffer);
+
+                                int stride = bgra32Image.Width * 4;
+                                var bitmapSource = BitmapSource.Create(bgra32Image.Width, bgra32Image.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
+                                bitmapSource.Freeze();
+
+                                return bitmapSource;
+                            }
                         }
-
-                        int stride = imageSharp.Width * 4;
-                        var bitmapSource = BitmapSource.Create(imageSharp.Width, imageSharp.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
-                        bitmapSource.Freeze();
-
-                        return bitmapSource;
                     }
                     return null;
                 }
@@ -92,6 +193,10 @@ namespace AssetsManager.Utils
                     bitmapImage.BeginInit();
                     bitmapImage.StreamSource = textureStream;
                     bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                    if (maxWidth.HasValue)
+                    {
+                        bitmapImage.DecodePixelWidth = maxWidth.Value;
+                    }
                     bitmapImage.EndInit();
                     bitmapImage.Freeze();
                     return bitmapImage;
@@ -99,9 +204,13 @@ namespace AssetsManager.Utils
             }
             catch (Exception)
             {
-                // Logged by the calling service
                 return null;
             }
+        }
+
+        public static BitmapSource LoadTexture(Stream textureStream, string extension)
+        {
+            return LoadTexture(textureStream, extension, null, null);
         }
     }
 }

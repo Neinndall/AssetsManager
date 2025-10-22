@@ -101,22 +101,44 @@
             </materialIcons:MaterialIcon.Effect>
         </materialIcons:MaterialIcon>
 
-        <!-- Progress Icon -->
-        <Button x:Name="ProgressSummaryButton"
-                Style="{StaticResource TransparentIconButton}"
-                HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                Background="Transparent" BorderThickness="0"
-                Visibility="Collapsed"
-                Margin="0,0,26,10"
-                ToolTip="">
-            <materialIcons:MaterialIcon x:Name="ProgressIcon" Kind="Sync"
-                                        Width="20" Height="20"
-                                        Foreground="{StaticResource AccentBrush}"
-                                        VerticalAlignment="Center">
-                <materialIcons:MaterialIcon.RenderTransform>
-                    <RotateTransform CenterX="10" CenterY="10"/>
-                </materialIcons:MaterialIcon.RenderTransform>
-            </materialIcons:MaterialIcon>
-        </Button>
-    </Grid>
-</Window>
+                        <!-- Progress Icon -->
+
+                        <Button x:Name="ProgressSummaryButton"
+
+                                Style="{StaticResource TransparentIconButton}"
+
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+
+                                Background="Transparent" BorderThickness="0"
+
+                                Visibility="Collapsed"
+
+                                Margin="0,0,26,10"
+
+                                ToolTip="">
+
+                            <materialIcons:MaterialIcon x:Name="ProgressIcon" Kind="Sync"
+
+                                                        Width="20" Height="20"
+
+                                                        Foreground="{StaticResource AccentBrush}"
+
+                                                        VerticalAlignment="Center">
+
+                                <materialIcons:MaterialIcon.RenderTransform>
+
+                                    <RotateTransform CenterX="10" CenterY="10"/>
+
+                                </materialIcons:MaterialIcon.RenderTransform>
+
+                            </materialIcons:MaterialIcon>
+
+                        </Button>
+
+                    </Grid>
+
+                </Window>
+
+                
+
+        

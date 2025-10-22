@@ -29,10 +29,10 @@ namespace AssetsManager.Services.Versions
         private static readonly string[] VersionSets = { "PBE1" };
         private static readonly Dictionary<string, string> RegionMap = new Dictionary<string, string> { { "PBE", "PBE1" } };
 
-        public VersionService(LogService logService, DirectoriesCreator directoriesCreator)
+        public VersionService(LogService logService, HttpClient httpClient, DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
-            _httpClient = new HttpClient();
+            _httpClient = httpClient;
             _directoriesCreator = directoriesCreator;
         }
 

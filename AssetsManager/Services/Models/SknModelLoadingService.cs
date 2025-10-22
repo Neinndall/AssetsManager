@@ -29,6 +29,31 @@ namespace AssetsManager.Services.Models
             _logService = logService;
         }
 
+        // Este método carga un modelo SKN y sus texturas desde una ruta de directorio de texturas personalizada (para chromas).
+        public SceneModel LoadModel(string filePath, string textureDirectoryPath)
+        {
+            try
+            {
+                SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
+                if (string.IsNullOrEmpty(textureDirectoryPath) || !Directory.Exists(textureDirectoryPath))
+                {
+                    _logService.LogError("Invalid texture directory provided for chroma model.");
+                    return null;
+                }
+
+                var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath);
+
+                _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
+                return CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to load model with custom textures");
+                return null;
+            }
+        }
+
+        // Este método carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estándar).
         public SceneModel LoadModel(string filePath)
         {
             try
@@ -42,29 +67,8 @@ namespace AssetsManager.Services.Models
                     return null;
                 }
 
-                var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
-                string[] textureFiles = Directory.GetFiles(modelDirectory, "*.tex", SearchOption.TopDirectoryOnly);
-                textureFiles = textureFiles.Concat(Directory.GetFiles(modelDirectory, "*.dds", SearchOption.TopDirectoryOnly)).ToArray();
+                var loadedTextures = LoadTexturesFromDirectory(modelDirectory);
 
-                foreach (string texPath in textureFiles)
-                {
-                    try
-                    {
-                        using (Stream fileStream = File.OpenRead(texPath))
-                        {
-                            BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(texPath));
-                            if (loadedTex != null)
-                            {
-                                string textureKey = Path.GetFileName(texPath).Split('.')[0];
-                                loadedTextures[textureKey] = loadedTex;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, $"Failed to load texture file: {texPath}");
-                    }
-                }
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
                 return CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
             }
@@ -73,6 +77,33 @@ namespace AssetsManager.Services.Models
                 _logService.LogError(ex, "Failed to load model");
                 return null;
             }
+        }
+
+        private Dictionary<string, BitmapSource> LoadTexturesFromDirectory(string directoryPath)
+        {
+            var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
+            string[] textureFiles = Directory.GetFiles(directoryPath, "*.tex", SearchOption.TopDirectoryOnly);
+
+            foreach (string texPath in textureFiles)
+            {
+                try
+                {
+                    using (Stream fileStream = File.OpenRead(texPath))
+                    {
+                        BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(texPath));
+                        if (loadedTex != null)
+                        {
+                            string textureKey = Path.GetFileName(texPath).Split('.')[0];
+                            loadedTextures[textureKey] = loadedTex;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to load texture file: {texPath}");
+                }
+            }
+            return loadedTextures;
         }
 
         private SceneModel CreateSceneModel(SkinnedMesh skinnedMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)
@@ -121,7 +152,7 @@ namespace AssetsManager.Services.Models
                 }
                 meshGeometry.TextureCoordinates = new PointCollection(subTexCoords);
 
-                string initialMatchingKey = FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey);
+                string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey, _logService);
 
                 var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
 
@@ -143,100 +174,6 @@ namespace AssetsManager.Services.Models
             }
             _logService.LogDebug("--- Finished displaying model ---");
             return sceneModel;
-        }
-
-        private string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey)
-        {
-            _logService.LogDebug($"Finding texture for material: '{materialName}'");
-
-            string exactMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
-            if (exactMatch != null)
-            {
-                _logService.LogDebug($"Found texture '{exactMatch}' via exact name match.");
-                return exactMatch;
-            }
-
-            var genericMaterialNames = new List<string> { "body", "face", "head", "eyes", "leg" };
-            if (genericMaterialNames.Contains(materialName.ToLower()))
-            {
-                string mainTextureCandidate = $"{skinName}_tx_cm";
-                string genericMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(mainTextureCandidate, StringComparison.OrdinalIgnoreCase));
-                if (genericMatch != null)
-                {
-                    _logService.LogDebug($"Found main texture '{genericMatch}' for generic material '{materialName}'.");
-                    return genericMatch;
-                }
-            }
-
-            string propTexture = availableTextureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
-            if (propTexture != null)
-            {
-                if (!genericMaterialNames.Contains(materialName.ToLower()))
-                {
-                    _logService.LogDebug($"Material '{materialName}' is not a generic body part, assigning generic prop texture '{propTexture}'.");
-                    return propTexture;
-                }
-            }
-
-            _logService.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
-            var separatorChars = new[] { '_', '-', ' ' };
-            var initialSplit = materialName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
-
-            var materialKeywords = initialSplit
-                .SelectMany(word => Regex.Split(word, @"(?<!^)(?=[A-Z])")) // Splits PascalCase
-                .Where(k => !k.Equals("mat", StringComparison.OrdinalIgnoreCase))
-                .Select(k => k.ToLower())
-                .ToList();
-
-            string bestScoringMatch = null;
-            int bestScore = 0;
-
-            foreach (string key in availableTextureKeys)
-            {
-                string lowerKey = key.ToLower();
-                int currentScore = 0;
-
-                foreach (string keyword in materialKeywords)
-                {
-                    if (string.IsNullOrWhiteSpace(keyword)) continue;
-                    if (lowerKey.Contains(keyword))
-                    {
-                        currentScore++;
-                    }
-                }
-
-                if (currentScore > bestScore)
-                {
-                    bestScore = currentScore;
-                    bestScoringMatch = key;
-                }
-                else if (currentScore > 0 && currentScore == bestScore)
-                {
-                    bool bestIsTxCm = bestScoringMatch?.ToLower().Contains("_tx_cm") ?? false;
-                    bool currentIsTxCm = lowerKey.Contains("_tx_cm");
-
-                    if (currentIsTxCm && !bestIsTxCm)
-                    {
-                        bestScoringMatch = key;
-                    }
-                    else if (!currentIsTxCm && bestIsTxCm)
-                    {
-                    }
-                    else if (bestScoringMatch == null || key.Length < bestScoringMatch.Length)
-                    {
-                        bestScoringMatch = key;
-                    }
-                }
-            }
-
-            if (bestScoringMatch != null)
-            {
-                _logService.LogDebug($"Found texture '{bestScoringMatch}' with score {bestScore} via keyword matching.");
-                return bestScoringMatch;
-            }
-
-            _logService.LogDebug($"No texture found. Falling back to default: '{defaultTextureKey}'");
-            return defaultTextureKey;
         }
     }
 }

@@ -33,6 +33,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             InitializeComponent();
             this.Loaded += FileWatcherControl_Loaded;
+            this.Unloaded += FileWatcherControl_Unloaded;
         }
 
         private void FileWatcherControl_Loaded(object sender, RoutedEventArgs e)
@@ -189,6 +190,14 @@ namespace AssetsManager.Views.Controls.Monitor
             if (txtSearch.Template.FindName("ClearTextButton", txtSearch) is Button clearButton)
             {
                 clearButton.Visibility = string.IsNullOrEmpty(txtSearch.Text) ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        private void FileWatcherControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (MonitorService != null)
+            {
+                MonitorService.MonitoredItems.CollectionChanged -= MonitoredItems_CollectionChanged;
             }
         }
     }

@@ -12,6 +12,14 @@ namespace AssetsManager.Views.Dialogs
             NewImage.Source = newImage;
             OldFileNameLabel.Text = oldFileName;
             NewFileNameLabel.Text = newFileName;
+
+            this.Closed += OnWindowClosed;
+        }
+
+        private void OnWindowClosed(object sender, System.EventArgs e)
+        {
+            OldImage.Source = null;
+            NewImage.Source = null;
         }
     }
 }

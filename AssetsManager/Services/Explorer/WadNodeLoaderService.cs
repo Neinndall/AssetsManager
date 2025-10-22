@@ -176,10 +176,12 @@ namespace AssetsManager.Services.Explorer
 
                         if (isUnresolved || noExtension)
                         {
-                            using (var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk))
+                            using (var stream = wadFile.OpenChunk(chunk))
                             {
-                                var decompressedData = decompressedDataOwner.Memory.Span;
-                                string extension = FileTypeDetector.GuessExtension(decompressedData);
+                                var buffer = new byte[256];
+                                var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                                var data = new Span<byte>(buffer, 0, bytesRead);
+                                string extension = FileTypeDetector.GuessExtension(data);
                                 if (!string.IsNullOrEmpty(extension))
                                 {
                                     virtualPath = virtualPath + "." + extension;
