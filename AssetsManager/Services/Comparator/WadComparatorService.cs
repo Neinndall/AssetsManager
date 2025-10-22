@@ -51,8 +51,6 @@ namespace AssetsManager.Services.Comparator
             try
             {
                 _logService.Log($"Starting WAD comparison for a single file: {Path.GetFileName(oldWadFile)}");
-                await _hashResolverService.LoadHashesAsync();
-
                 NotifyComparisonStarted(1);
 
                 bool success = true;
@@ -102,9 +100,6 @@ namespace AssetsManager.Services.Comparator
             try
             {
                 _logService.Log("Starting WADs comparison...");
-
-                await _hashResolverService.LoadHashesAsync();
-
                 var searchPatterns = new[] { "*.wad.client", "*.wad" };
                 var oldWadFiles = searchPatterns
                     .SelectMany(pattern => Directory.GetFiles(oldDir, pattern, SearchOption.AllDirectories))
