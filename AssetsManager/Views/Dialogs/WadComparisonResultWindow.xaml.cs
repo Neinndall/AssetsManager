@@ -20,6 +20,7 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Explorer;
+using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -143,15 +144,90 @@ namespace AssetsManager.Views.Dialogs
 
         private void TryResolveHashes()
         {
-            foreach (var diff in _serializableDiffs)
+            var wadFileCache = new Dictionary<string, WadFile>();
+
+            try
             {
-                if (diff.OldPathHash != 0)
+                foreach (var diff in _serializableDiffs)
                 {
-                    diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
+                    if (diff.OldPathHash != 0)
+                    {
+                        string resolvedPath = _hashResolverService.ResolveHash(diff.OldPathHash);
+                        bool isUnresolved = resolvedPath == diff.OldPathHash.ToString("x16");
+                        bool noExtension = !Path.HasExtension(resolvedPath);
+
+                        if ((isUnresolved || noExtension) && diff.Type != ChunkDiffType.New)
+                        {
+                            string wadPath = Path.Combine(_oldPbePath, diff.SourceWadFile);
+                            if (!wadFileCache.TryGetValue(wadPath, out var wadFile))
+                            {
+                                if (File.Exists(wadPath))
+                                {
+                                    wadFile = new WadFile(wadPath);
+                                    wadFileCache[wadPath] = wadFile;
+                                }
+                            }
+
+                            if (wadFile != null && wadFile.Chunks.TryGetValue(diff.OldPathHash, out var chunk))
+                            {
+                                using (var stream = wadFile.OpenChunk(chunk))
+                                {
+                                    var buffer = new byte[256];
+                                    var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                                    var data = new Span<byte>(buffer, 0, bytesRead);
+                                    string extension = FileTypeDetector.GuessExtension(data);
+                                    if (!string.IsNullOrEmpty(extension))
+                                    {
+                                        resolvedPath += "." + extension;
+                                    }
+                                }
+                            }
+                        }
+                        diff.OldPath = resolvedPath;
+                    }
+
+                    if (diff.NewPathHash != 0)
+                    {
+                        string resolvedPath = _hashResolverService.ResolveHash(diff.NewPathHash);
+                        bool isUnresolved = resolvedPath == diff.NewPathHash.ToString("x16");
+                        bool noExtension = !Path.HasExtension(resolvedPath);
+
+                        if ((isUnresolved || noExtension) && diff.Type != ChunkDiffType.Removed)
+                        {
+                            string wadPath = Path.Combine(_newPbePath, diff.SourceWadFile);
+                            if (!wadFileCache.TryGetValue(wadPath, out var wadFile))
+                            {
+                                if (File.Exists(wadPath))
+                                {
+                                    wadFile = new WadFile(wadPath);
+                                    wadFileCache[wadPath] = wadFile;
+                                }
+                            }
+
+                            if (wadFile != null && wadFile.Chunks.TryGetValue(diff.NewPathHash, out var chunk))
+                            {
+                                using (var stream = wadFile.OpenChunk(chunk))
+                                {
+                                    var buffer = new byte[256];
+                                    var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                                    var data = new Span<byte>(buffer, 0, bytesRead);
+                                    string extension = FileTypeDetector.GuessExtension(data);
+                                    if (!string.IsNullOrEmpty(extension))
+                                    {
+                                        resolvedPath += "." + extension;
+                                    }
+                                }
+                            }
+                        }
+                        diff.NewPath = resolvedPath;
+                    }
                 }
-                if (diff.NewPathHash != 0)
+            }
+            finally
+            {
+                foreach (var wadFile in wadFileCache.Values)
                 {
-                    diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
+                    wadFile.Dispose();
                 }
             }
         }
