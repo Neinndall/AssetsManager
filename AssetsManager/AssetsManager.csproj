@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
     <ApplicationIcon>Resources\Img\logo.ico</ApplicationIcon>
-    <Version>2.4.2.1</Version>
+    <Version>2.4.2.0</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PlatformTarget>x64</PlatformTarget>
     <UseWPF>true</UseWPF>
@@ -42,6 +42,7 @@
     <EmbeddedResource Include="Resources\JsonSyntaxHighlighting.xshd" />
     <EmbeddedResource Include="Resources\ManifestDownloader\ManifestDownloader.exe" />
     <EmbeddedResource Include="Resources\Vgmstream\**" />
+    <EmbeddedResource Include="Resources\Updater\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -83,4 +84,10 @@
     <Delete Files="@(DocFilesToDelete)" />
     <Delete Files="@(DocFilesToDeletePublish)" />
   </Target>
+
+  <ItemGroup>
+    <Compile Remove="Updater\**" />
+    <EmbeddedResource Remove="Updater\**" />
+    <None Remove="Updater\**" />
+  </ItemGroup>
 </Project>
