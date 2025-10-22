@@ -48,7 +48,6 @@ namespace AssetsManager.Views
         private readonly MonitorService _monitorService;
         private readonly VersionService _versionService;
 
-
         private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
         private readonly List<string> _notificationMessages = new List<string>();
@@ -132,7 +131,6 @@ namespace AssetsManager.Views
             StateChanged += MainWindow_StateChanged;
         }
 
-        
         private async Task LoadAllHashesOnStartupAsync()
         {
             await _hashResolverService.LoadHashesAsync();
