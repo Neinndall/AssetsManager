@@ -322,6 +322,7 @@ namespace AssetsManager.Views.Controls.Models
 
                 LoadModelButton.IsEnabled = false;
                 LoadAnimationButton.IsEnabled = false;
+                LoadChromaModelButton.IsEnabled = false;
             }
         }
 
