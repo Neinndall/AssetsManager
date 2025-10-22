@@ -29,6 +29,31 @@ namespace AssetsManager.Services.Models
             _logService = logService;
         }
 
+        // Este método carga un modelo SKN y sus texturas desde una ruta de directorio de texturas personalizada (para chromas).
+        public SceneModel LoadModel(string filePath, string textureDirectoryPath)
+        {
+            try
+            {
+                SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
+                if (string.IsNullOrEmpty(textureDirectoryPath) || !Directory.Exists(textureDirectoryPath))
+                {
+                    _logService.LogError("Invalid texture directory provided for chroma model.");
+                    return null;
+                }
+
+                var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath);
+
+                _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
+                return CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to load model with custom textures");
+                return null;
+            }
+        }
+
+        // Este método carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estándar).
         public SceneModel LoadModel(string filePath)
         {
             try
@@ -42,29 +67,8 @@ namespace AssetsManager.Services.Models
                     return null;
                 }
 
-                var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
-                string[] textureFiles = Directory.GetFiles(modelDirectory, "*.tex", SearchOption.TopDirectoryOnly);
-                textureFiles = textureFiles.Concat(Directory.GetFiles(modelDirectory, "*.dds", SearchOption.TopDirectoryOnly)).ToArray();
+                var loadedTextures = LoadTexturesFromDirectory(modelDirectory);
 
-                foreach (string texPath in textureFiles)
-                {
-                    try
-                    {
-                        using (Stream fileStream = File.OpenRead(texPath))
-                        {
-                            BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(texPath));
-                            if (loadedTex != null)
-                            {
-                                string textureKey = Path.GetFileName(texPath).Split('.')[0];
-                                loadedTextures[textureKey] = loadedTex;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, $"Failed to load texture file: {texPath}");
-                    }
-                }
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
                 return CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
             }
@@ -73,6 +77,33 @@ namespace AssetsManager.Services.Models
                 _logService.LogError(ex, "Failed to load model");
                 return null;
             }
+        }
+
+        private Dictionary<string, BitmapSource> LoadTexturesFromDirectory(string directoryPath)
+        {
+            var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
+            string[] textureFiles = Directory.GetFiles(directoryPath, "*.tex", SearchOption.TopDirectoryOnly);
+
+            foreach (string texPath in textureFiles)
+            {
+                try
+                {
+                    using (Stream fileStream = File.OpenRead(texPath))
+                    {
+                        BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(texPath));
+                        if (loadedTex != null)
+                        {
+                            string textureKey = Path.GetFileName(texPath).Split('.')[0];
+                            loadedTextures[textureKey] = loadedTex;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to load texture file: {texPath}");
+                }
+            }
+            return loadedTextures;
         }
 
         private SceneModel CreateSceneModel(SkinnedMesh skinnedMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)

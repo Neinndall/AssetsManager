@@ -135,7 +135,7 @@ namespace AssetsManager.Views
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl"), new CommonFileDialogFilter("All Files", "*.*") },
-                Title = "Select a SKN File"
+                Title = "Select a skn file"
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -152,6 +152,33 @@ namespace AssetsManager.Views
             }
         }
 
+        private void OpenChromaFile_Click(object sender, RoutedEventArgs e)
+        {
+            _isMapGeometry = false;
+            DefaultEmptyStateContent.Visibility = Visibility.Visible;
+            LoadingStateContent.Visibility = Visibility.Collapsed;
+
+            var openFileDialog = new CommonOpenFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
+                Title = "Select a skn file for the chroma"
+            };
+
+            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                var folderBrowserDialog = new CommonOpenFileDialog
+                {
+                    IsFolderPicker = true,
+                    Title = "Select the texture folder for the chroma"
+                };
+
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    PanelControl.ProcessModelLoading(openFileDialog.FileName, folderBrowserDialog.FileName, true);
+                }
+            }
+        }
+
         private async void OpenGeometryFile_Click(object sender, RoutedEventArgs e)
         {
             _isMapGeometry = true;
@@ -161,7 +188,7 @@ namespace AssetsManager.Views
                 var openMapGeoDialog = new CommonOpenFileDialog
                 {
                     Filters = { new CommonFileDialogFilter("MapGeometry Files", "*.mapgeo"), new CommonFileDialogFilter("All Files", "*.*") },
-                    Title = "Select a MAPGEO File"
+                    Title = "Select a mapgeo file"
                 };
 
                 if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -174,7 +201,7 @@ namespace AssetsManager.Views
                         var openMaterialsBinDialog = new CommonOpenFileDialog
                         {
                             Filters = { new CommonFileDialogFilter("Materials files", "*.materials.bin"), new CommonFileDialogFilter("All files", "*.*") },
-                            Title = "Select a materials.bin File",
+                            Title = "Select a materials.bin file",
                             InitialDirectory = Path.GetDirectoryName(mapGeoPath)
                         };
 
@@ -192,7 +219,7 @@ namespace AssetsManager.Views
                     var openGameDataDialog = new CommonOpenFileDialog
                     {
                         IsFolderPicker = true,
-                        Title = "Select Map Root for Textures"
+                        Title = "Select map root for textures"
                     };
 
                     if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)

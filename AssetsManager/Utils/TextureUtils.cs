@@ -18,6 +18,11 @@ namespace AssetsManager.Utils
 {
     public static class TextureUtils
     {
+        private static string NormalizeName(string name)
+        {
+            return Regex.Replace(name, @"(skin|_)(\d+)", "", RegexOptions.IgnoreCase);
+        }
+
         public static string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey, LogService logService)
         {
             logService.LogDebug($"Finding texture for material: '{materialName}'");
@@ -53,7 +58,9 @@ namespace AssetsManager.Utils
 
             logService.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
             var separatorChars = new[] { '_', '-', ' ' };
-            var initialSplit = materialName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
+
+            string normalizedMaterialName = NormalizeName(materialName);
+            var initialSplit = normalizedMaterialName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
 
             var materialKeywords = initialSplit
                 .SelectMany(word => Regex.Split(word, @"(?<!^)(?=[A-Z])")) // Splits PascalCase
@@ -66,7 +73,8 @@ namespace AssetsManager.Utils
 
             foreach (string key in availableTextureKeys)
             {
-                string lowerKey = key.ToLower();
+                string normalizedKey = NormalizeName(key);
+                string lowerKey = normalizedKey.ToLower();
                 int currentScore = 0;
 
                 foreach (string keyword in materialKeywords)
