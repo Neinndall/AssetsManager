@@ -31,12 +31,7 @@
     <PackageReference Include="WindowsAPICodePack" Version="8.0.6" />
     <PackageReference Include="WindowsAPICodePackShell" Version="8.0.6" />
   </ItemGroup>
-  <ItemGroup>
-    <None Update="hashes\**\*.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-    </None>
-  </ItemGroup>
+  
   <ItemGroup>
     <EmbeddedResource Include="changelogs.txt" />
     <EmbeddedResource Include="Resources\JsonSyntaxHighlighting.xshd" />

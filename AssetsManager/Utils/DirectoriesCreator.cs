@@ -12,7 +12,7 @@ namespace AssetsManager.Utils
 
         public string ResourcesPath { get; private set; }
         public string HashesNewPath { get; private set; }
-        public string HashesOldsPaths { get; private set; }
+        public string HashesOldsPath { get; private set; }
         public string JsonCacheNewPath { get; private set; }
         public string JsonCacheOldPath { get; private set; }
         public string JsonCacheHistoryPath { get; private set; }
@@ -46,7 +46,7 @@ namespace AssetsManager.Utils
             _logService = logService;
 
             HashesNewPath = Path.Combine("hashes", "new");
-            HashesOldsPaths = Path.Combine("hashes", "olds");
+            HashesOldsPath = Path.Combine("hashes", "olds");
 
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
@@ -114,6 +114,13 @@ namespace AssetsManager.Utils
         public Task CreateDirVersionsAsync() => CreateDirectoryInternal(VersionsPath, false); 
         public Task CreateDirTempPreviewAsync() => CreateDirectoryInternal(TempPreviewPath, false);                                                                                 
         public Task CreateDirWebView2DataAsync() => CreateDirectoryInternal(WebView2DataPath, false);                                                                                 
+
+        public Task CreateHashesDirectories()
+        {
+            CreateDirectoryInternal(HashesNewPath, false);
+            CreateDirectoryInternal(HashesOldPath, false);
+            return Task.CompletedTask;
+        }                                                                                 
  
         public string CreateAssetDirectoryPath(string url, string downloadDirectory) 
         {

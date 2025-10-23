@@ -123,12 +123,17 @@ namespace AssetsManager.Views
             }
 
             _updateCheckService.Start();
-            _ = _updateCheckService.CheckForAllUpdatesAsync();
-            _ = LoadAllHashesOnStartupAsync();
+            InitializeApplicationAsync();
 
             InitializeNotifyIcon();
-            Closing += MainWindow_Closing;
+            
             StateChanged += MainWindow_StateChanged;
+        }
+
+        private async void InitializeApplicationAsync()
+        {
+            await _updateCheckService.CheckForAllUpdatesAsync();
+            await LoadAllHashesOnStartupAsync();
         }
 
         private async Task LoadAllHashesOnStartupAsync()
@@ -136,7 +141,7 @@ namespace AssetsManager.Views
             await _hashResolverService.LoadHashesAsync();
             await _hashResolverService.LoadBinHashesAsync();
             await _hashResolverService.LoadRstHashesAsync();
-            _logService.Log("Hashes loaded on startup.");
+            _logService.LogSuccess("Hashes loaded on startup.");
         }
 
         protected override void OnSourceInitialized(EventArgs e)
