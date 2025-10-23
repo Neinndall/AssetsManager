@@ -118,7 +118,7 @@ namespace AssetsManager.Utils
         public Task CreateHashesDirectories()
         {
             CreateDirectoryInternal(HashesNewPath, false);
-            CreateDirectoryInternal(HashesOldPath, false);
+            CreateDirectoryInternal(HashesOldsPath, false);
             return Task.CompletedTask;
         }                                                                                 
  
