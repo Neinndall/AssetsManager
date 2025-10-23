@@ -176,39 +176,52 @@ namespace AssetsManager.Views.Controls.Models
             camera.FieldOfView = 45;
         }
 
-        public void TakeScreenshot(string filePath)
-        {
-            var renderBitmap = new RenderTargetBitmap(
-                (int)Viewport3D.ActualWidth, 
-                (int)Viewport3D.ActualHeight, 
-                96, 96, 
-                PixelFormats.Pbgra32
-            );
-            renderBitmap.Render(Viewport3D);
-
-            BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
-            bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
-
-            string finalFilePath = filePath;
-            if (Path.GetExtension(finalFilePath).ToLower() != ".png")
-            {
-                finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
-            }
-
-            try
-            {
-                using (var stream = File.Create(finalFilePath))
+                public void TakeScreenshot(string filePath)
                 {
-                    bitmapEncoder.Save(stream);
+                    string finalFilePath = filePath;
+                    if (Path.GetExtension(finalFilePath).ToLower() != ".png")
+                    {
+                        finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
+                    }
+        
+                    try
+                    {
+                        Viewport3D.ShowFrameRate = false;
+        
+                        double scalingFactor = 4.0;
+                        int width = (int)(Viewport3D.ActualWidth * scalingFactor);
+                        int height = (int)(Viewport3D.ActualHeight * scalingFactor);
+        
+                        var renderBitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        
+                        var visual = new DrawingVisual();
+                        using (var context = visual.RenderOpen())
+                        {
+                            var brush = new VisualBrush(Viewport3D);
+                            context.DrawRectangle(brush, null, new Rect(0, 0, Viewport3D.ActualWidth, Viewport3D.ActualHeight));
+                        }
+        
+                        visual.Transform = new ScaleTransform(scalingFactor, scalingFactor);
+                        renderBitmap.Render(visual);
+        
+                        BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
+                        bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
+        
+                        using (var stream = File.Create(finalFilePath))
+                        {
+                            bitmapEncoder.Save(stream);
+                        }
+                        LogService.LogInteractiveSuccess($"Screenshot saved to {finalFilePath}", finalFilePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
+                    }
+                    finally
+                    {
+                        Viewport3D.ShowFrameRate = true;
+                    }
                 }
-                LogService.LogInteractiveSuccess($"Screenshot saved to {finalFilePath}", finalFilePath);
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
-            }
-        }
-
         private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             ResetCamera();
