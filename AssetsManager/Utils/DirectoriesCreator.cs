@@ -21,14 +21,12 @@ namespace AssetsManager.Utils
         public string BackUpOldHashesPath { get; private set; }
         public string WadComparisonSavePath { get; private set; }
         public string VersionsPath { get; private set; } // Add this
-
         public string AppDirectory { get; private set; }
-        public string CurrentConfigFilePath { get; private set; }
+
         public string UpdateCachePath { get; private set; }
-        public string UpdateTempExtractionPath { get; private set; }
-        public string UpdateBatchFilePath { get; private set; }
         public string UpdateLogFilePath { get; private set; }
-        public string UpdateTempBackupConfigFilePath { get; private set; }
+        public string UpdaterDirectoryPath { get; private set; }
+        public string UpdaterExePath { get; private set; }
 
         public string WadNewAssetsPath { get; private set; }
         public string WadModifiedAssetsPath { get; private set; }
@@ -60,12 +58,9 @@ namespace AssetsManager.Utils
             JsonCacheHistoryPath = Path.Combine(appFolderPath, "json_cache", "history");
 
             AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            CurrentConfigFilePath = Path.Combine(AppDirectory, "config.json");
+
             UpdateCachePath = Path.Combine(appFolderPath, "update_cache");
-            UpdateTempExtractionPath = Path.Combine(UpdateCachePath, "extracted");
-            UpdateBatchFilePath = Path.Combine(UpdateCachePath, "update_script.bat");
-            UpdateLogFilePath = Path.Combine(UpdateCachePath, "update_log.txt");
-            UpdateTempBackupConfigFilePath = Path.Combine(UpdateCachePath, "config.backup.json");
+            UpdateLogFilePath = Path.Combine(UpdateCachePath, "update_log.log");
 
             WebView2DataPath = Path.Combine(appFolderPath, "WebView2Data");
             TempPreviewPath = Path.Combine(WebView2DataPath, "TempPreview");
@@ -105,6 +100,13 @@ namespace AssetsManager.Utils
 
             CreateDirectoryInternal(OldChunksPath, false);
             CreateDirectoryInternal(NewChunksPath, false);
+        }
+
+        public void GenerateUpdateFilePaths()
+        {
+            UpdaterDirectoryPath = Path.Combine(UpdateCachePath, "Updater");
+            UpdaterExePath = Path.Combine(UpdaterDirectoryPath, "Updater.exe");
+            CreateDirectoryInternal(UpdaterDirectoryPath, false);
         }
                                                                                                                                                                                                                           
         public Task CreateDirJsonCacheNewAsync() => CreateDirectoryInternal(JsonCacheNewPath, false);                                                                                 

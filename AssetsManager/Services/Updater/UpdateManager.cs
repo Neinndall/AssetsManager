@@ -76,76 +76,85 @@ namespace AssetsManager.Services.Updater
 
                     if (result == true)
                     {
-                        UpdateProgressWindow progressWindow = null;
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            progressWindow = _serviceProvider.GetRequiredService<UpdateProgressWindow>();
-                            progressWindow.Show();
-                            progressWindow.UpdateLayout();
-                        });
-
                         string fileName = $"PBE_AssetsDownloader_{latestVersionRaw}.zip";
                         string downloadPath = Path.Combine(_directoriesCreator.UpdateCachePath, fileName);
-                        string downloadSize = $"{(totalBytes / 1024.0 / 1024.0):0.00} MB";
 
-                        progressWindow.Dispatcher.Invoke(() =>
+                        // Check if the file already exists and has the correct size
+                        if (File.Exists(downloadPath) && new FileInfo(downloadPath).Length == totalBytes)
                         {
-                            progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
-                        });
-                        await Task.Delay(500);
-
-                        using (var responseDownload = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
+                            _logService.Log("Update package already exists and has the correct size. Skipping download.");
+                        }
+                        else
                         {
-                            responseDownload.EnsureSuccessStatusCode();
-                            long bytesDownloaded = 0;
-
-                            using (var fs = new FileStream(downloadPath, FileMode.Create))
+                            UpdateProgressWindow progressWindow = null;
+                            Application.Current.Dispatcher.Invoke(() =>
                             {
-                                byte[] buffer = new byte[8192];
-                                int bytesRead;
+                                progressWindow = _serviceProvider.GetRequiredService<UpdateProgressWindow>();
+                                progressWindow.Show();
+                                progressWindow.UpdateLayout();
+                            });
 
-                                using (var stream = await responseDownload.Content.ReadAsStreamAsync())
+                            string downloadSize = $"{(totalBytes / 1024.0 / 1024.0):0.00} MB";
+
+                            progressWindow.Dispatcher.Invoke(() =>
+                            {
+                                progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
+                            });
+                            await Task.Delay(500);
+
+                            using (var responseDownload = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
+                            {
+                                responseDownload.EnsureSuccessStatusCode();
+                                long bytesDownloaded = 0;
+
+                                using (var fs = new FileStream(downloadPath, FileMode.Create))
                                 {
-                                    while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                                    {
-                                        await fs.WriteAsync(buffer, 0, bytesRead);
-                                        bytesDownloaded += bytesRead;
+                                    byte[] buffer = new byte[8192];
+                                    int bytesRead;
 
-                                        if (totalBytes > 0)
+                                    using (var stream = await responseDownload.Content.ReadAsStreamAsync())
+                                    {
+                                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                                         {
-                                            int progressPercentage = (int)((bytesDownloaded * 100.0) / totalBytes);
-                                            progressWindow.Dispatcher.Invoke(() =>
+                                            await fs.WriteAsync(buffer, 0, bytesRead);
+                                            bytesDownloaded += bytesRead;
+
+                                            if (totalBytes > 0)
                                             {
-                                                progressWindow.SetProgress(progressPercentage,
-                                                    $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
-                                            });
+                                                int progressPercentage = (int)((bytesDownloaded * 100.0) / totalBytes);
+                                                progressWindow.Dispatcher.Invoke(() =>
+                                                {
+                                                    progressWindow.SetProgress(progressPercentage,
+                                                        $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
+                                                });
+                                            }
                                         }
                                     }
                                 }
+                                await Task.Delay(1200);
+
+                                progressWindow.Dispatcher.Invoke(() => { progressWindow.Close(); });
                             }
-                            await Task.Delay(1200);
+                        }
 
-                            progressWindow.Dispatcher.Invoke(() => { progressWindow.Close(); });
+                        var dialog = _serviceProvider.GetRequiredService<UpdateModeDialog>();
+                        dialog.Owner = owner;
+                        bool? dialogResult = dialog.ShowDialog();
 
-                            var dialog = _serviceProvider.GetRequiredService<UpdateModeDialog>();
-                            dialog.Owner = owner;
-                            bool? dialogResult = dialog.ShowDialog();
-
-                            if (dialogResult == true)
+                        if (dialogResult == true)
+                        {
+                            if (dialog.SelectedMode == UpdateMode.CleanWithSaving)
                             {
-                                if (dialog.SelectedMode == UpdateMode.CleanWithSaving)
-                                {
-                                    _updateExtractor.ExtractAndRestart(downloadPath, true);
-                                }
-                                else if (dialog.SelectedMode == UpdateMode.CleanWithoutSaving)
-                                {
-                                    _updateExtractor.ExtractAndRestart(downloadPath, false);
-                                }
+                                _updateExtractor.ExtractAndRestart(downloadPath, true);
                             }
-                            else
+                            else if (dialog.SelectedMode == UpdateMode.CleanWithoutSaving)
                             {
-                                _customMessageBoxService.ShowInfo("Update Ready", $"Update downloaded to:\n{downloadPath}\n\nYou can install it manually later.", owner);
+                                _updateExtractor.ExtractAndRestart(downloadPath, false);
                             }
+                        }
+                        else
+                        {
+                            _customMessageBoxService.ShowInfo("Update Ready", $"Update downloaded to:\n{downloadPath}\n\nYou can install it manually later.", owner);
                         }
                     }
                 }
