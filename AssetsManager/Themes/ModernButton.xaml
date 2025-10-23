@@ -281,6 +281,37 @@
         </Setter>
     </Style>
 
+    <!-- Estilo para iconos, se usará togles buttons (ej: hide/show fps del ModelViewportControl) -->
+    <Style x:Key="IconToggleButton" TargetType="ToggleButton">
+        <Setter Property="Width" Value="21"/>
+        <Setter Property="Height" Value="21"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="border" 
+                            Background="{TemplateBinding Background}" 
+                            CornerRadius="12">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="{StaticResource TextSecondary}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Estilo para iconos, se usará para iconos planos (ej: ToolBar del Explorer) -->
     <Style x:Key="TransparentIconButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>

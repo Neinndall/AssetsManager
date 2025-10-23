@@ -176,52 +176,54 @@ namespace AssetsManager.Views.Controls.Models
             camera.FieldOfView = 45;
         }
 
-                public void TakeScreenshot(string filePath)
+        public void TakeScreenshot(string filePath)
+        {
+            string finalFilePath = filePath;
+            if (Path.GetExtension(finalFilePath).ToLower() != ".png")
+            {
+                finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
+            }
+
+            var originalShowFrameRate = Viewport3D.ShowFrameRate;
+            try
+            {
+                Viewport3D.ShowFrameRate = false;
+
+                double scalingFactor = 4.0;
+                int width = (int)(Viewport3D.ActualWidth * scalingFactor);
+                int height = (int)(Viewport3D.ActualHeight * scalingFactor);
+
+                var renderBitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+
+                var visual = new DrawingVisual();
+                using (var context = visual.RenderOpen())
                 {
-                    string finalFilePath = filePath;
-                    if (Path.GetExtension(finalFilePath).ToLower() != ".png")
-                    {
-                        finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
-                    }
-        
-                    try
-                    {
-                        Viewport3D.ShowFrameRate = false;
-        
-                        double scalingFactor = 4.0;
-                        int width = (int)(Viewport3D.ActualWidth * scalingFactor);
-                        int height = (int)(Viewport3D.ActualHeight * scalingFactor);
-        
-                        var renderBitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        
-                        var visual = new DrawingVisual();
-                        using (var context = visual.RenderOpen())
-                        {
-                            var brush = new VisualBrush(Viewport3D);
-                            context.DrawRectangle(brush, null, new Rect(0, 0, Viewport3D.ActualWidth, Viewport3D.ActualHeight));
-                        }
-        
-                        visual.Transform = new ScaleTransform(scalingFactor, scalingFactor);
-                        renderBitmap.Render(visual);
-        
-                        BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
-                        bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
-        
-                        using (var stream = File.Create(finalFilePath))
-                        {
-                            bitmapEncoder.Save(stream);
-                        }
-                        LogService.LogInteractiveSuccess($"Screenshot saved to {finalFilePath}", finalFilePath);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
-                    }
-                    finally
-                    {
-                        Viewport3D.ShowFrameRate = true;
-                    }
+                    var brush = new VisualBrush(Viewport3D);
+                    context.DrawRectangle(brush, null, new Rect(0, 0, Viewport3D.ActualWidth, Viewport3D.ActualHeight));
                 }
+
+                visual.Transform = new ScaleTransform(scalingFactor, scalingFactor);
+                renderBitmap.Render(visual);
+
+                BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
+                bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
+
+                using (var stream = File.Create(finalFilePath))
+                {
+                    bitmapEncoder.Save(stream);
+                }
+                LogService.LogInteractiveSuccess($"Screenshot saved to {finalFilePath}", finalFilePath);
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
+            }
+            finally
+            {
+                Viewport3D.ShowFrameRate = originalShowFrameRate;
+            }
+        }
+        
         private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             ResetCamera();
@@ -239,6 +241,14 @@ namespace AssetsManager.Views.Controls.Models
             if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 TakeScreenshot(saveFileDialog.FileName);
+            }
+        }
+
+        private void FpsToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                Viewport3D.ShowFrameRate = toggleButton.IsChecked ?? false;
             }
         }
     }

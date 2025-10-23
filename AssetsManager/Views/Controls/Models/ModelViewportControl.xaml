@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:helix="http://helix-toolkit.org/wpf"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
@@ -15,7 +16,7 @@
         <Grid>
             <helix:HelixViewport3D x:Name="Viewport3D" 
                                    Background="Transparent"
-                                   ShowFrameRate="True"
+                                   ShowFrameRate="False"
                                    ShowCameraInfo="False"
                                    ShowViewCube="False"
                                    IsRotationEnabled="False"
@@ -34,6 +35,14 @@
                         VerticalAlignment="Bottom" 
                         Orientation="Horizontal"
                         Margin="0,0,15,15">
+                <ToggleButton Style="{StaticResource IconToggleButton}"
+                              x:Name="FpsToggleButton"
+                              ToolTip="Show/Hide FPS"
+                              Click="FpsToggleButton_Click"
+                              Margin="0,0,5,0"
+                              IsChecked="False">
+                    <materialIcons:MaterialIcon Kind="Speedometer" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
+                </ToggleButton>
                 <Button Style="{StaticResource IconButton}"
                         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
                         ToolTip="Take Screenshot"
