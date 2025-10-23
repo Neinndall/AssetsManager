@@ -231,11 +231,22 @@ namespace AssetsManager.Views.Controls.Models
 
         private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_sceneModel == null || string.IsNullOrEmpty(_sceneModel.Name))
+            {
+                LogService.LogWarning("No model loaded to name the screenshot automatically. Please load a model first.");
+                return;
+            }
+
+            string modelName = _sceneModel.Name;
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string defaultFileName = $"{modelName}_{timestamp}.png";
+
             var saveFileDialog = new CommonSaveFileDialog
             {
                 Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
                 Title = "Save Screenshot File",
-                DefaultExtension = ".png"
+                DefaultExtension = ".png",
+                DefaultFileName = defaultFileName // Pre-populate with the generated name
             };
 
             if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
