@@ -94,6 +94,22 @@ namespace AssetsManager.Views
             PanelControl?.Cleanup();
         }
 
+        private void ViewportControl_MaximizeClicked(object sender, bool isMaximized)
+        {
+            if (isMaximized)
+            {
+                MainGridSplitter.Visibility = Visibility.Collapsed;
+                PanelControl.Visibility = Visibility.Collapsed;
+                Grid.SetColumnSpan(ViewportControl, 3);
+            }
+            else
+            {
+                MainGridSplitter.Visibility = Visibility.Visible;
+                PanelControl.Visibility = Visibility.Visible;
+                Grid.SetColumnSpan(ViewportControl, 1);
+            }
+        }
+
         private void SetupScene()
         {
             // If we are loading a map, stop here.

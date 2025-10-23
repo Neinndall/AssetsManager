@@ -12,7 +12,7 @@
             BorderBrush="{StaticResource BorderColor}"
             BorderThickness="1"
             Padding="10"
-            Margin="5,5,0,5">
+            Margin="5">
         <Grid>
             <helix:HelixViewport3D x:Name="Viewport3D" 
                                    Background="Transparent"
@@ -43,15 +43,21 @@
                               IsChecked="False">
                     <materialIcons:MaterialIcon Kind="Speedometer" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
                 </ToggleButton>
+                <ToggleButton Style="{StaticResource IconToggleButton}"
+                              x:Name="MaximizeToggleButton"
+                              ToolTip="Maximize/Restore Viewport"
+                              Click="MaximizeToggleButton_Click"
+                              Margin="0,0,5,0"
+                              IsChecked="False">
+                    <materialIcons:MaterialIcon Kind="AspectRatio" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
+                </ToggleButton>
                 <Button Style="{StaticResource IconButton}"
-                        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
                         ToolTip="Take Screenshot"
                         Click="ScreenshotButton_Click"
                         Margin="0,0,5,0">
                     <materialIcons:MaterialIcon Kind="Camera" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
                 </Button>
                 <Button Style="{StaticResource IconButton}"
-                        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
                         ToolTip="Reset Camera"
                         Click="ResetCameraButton_Click">
                     <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />

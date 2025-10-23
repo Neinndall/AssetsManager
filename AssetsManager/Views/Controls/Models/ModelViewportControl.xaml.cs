@@ -23,6 +23,7 @@ namespace AssetsManager.Views.Controls.Models
     {
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
+        public event EventHandler<bool> MaximizeClicked;
 
         private readonly Stopwatch _stopwatch = new Stopwatch();
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
@@ -260,6 +261,14 @@ namespace AssetsManager.Views.Controls.Models
             if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
             {
                 Viewport3D.ShowFrameRate = toggleButton.IsChecked ?? false;
+            }
+        }
+
+        private void MaximizeToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                MaximizeClicked?.Invoke(this, toggleButton.IsChecked ?? false);
             }
         }
     }
