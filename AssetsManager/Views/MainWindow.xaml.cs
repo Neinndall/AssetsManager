@@ -191,10 +191,15 @@ namespace AssetsManager.Views
             {
                 Hide();
                 _notifyIcon.Visible = true;
-                new ToastContentBuilder()
-                    .AddText("AssetsManager")
-                    .AddText("ℹ️ The application has been minimized to the tray.")
-                    .Show();
+
+                // Use Dispatcher to avoid COMException when showing toast on state change
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    new ToastContentBuilder()
+                        .AddText("AssetsManager")
+                        .AddText("ℹ️ The application has been minimized to the tray.")
+                        .Show();
+                }));
             }
         }
 
