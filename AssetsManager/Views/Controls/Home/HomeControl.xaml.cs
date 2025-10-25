@@ -23,6 +23,13 @@ namespace AssetsManager.Views.Controls.Home
         {
             InitializeComponent();
             this.Loaded += DirectorySelectionControl_Loaded;
+            this.Unloaded += DirectorySelectionControl_Unloaded;
+        }
+
+        private void DirectorySelectionControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            this.Loaded -= DirectorySelectionControl_Loaded;
+            this.Unloaded -= DirectorySelectionControl_Unloaded;
         }
 
         private void DirectorySelectionControl_Loaded(object sender, RoutedEventArgs e)

@@ -43,7 +43,7 @@ namespace AssetsManager.Views.Controls.Monitor
             if (VersionService != null && LogService != null)
             {
                 await VersionService.FetchAllVersionsAsync();
-                if (_viewModel != null)
+                if (_viewModel != null)
                 {
                     await _viewModel.LoadVersionFilesAsync();
                 }
@@ -108,7 +108,7 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.");
                 return;
-            }
+            }
             var locales = _viewModel.AvailableLocales
                 .Where(l => l.IsSelected)
                 .Select(l => l.Code)
@@ -206,6 +206,8 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 private void ManageVersionsControl_Unloaded(object sender, RoutedEventArgs e)
                 {
+                    this.Loaded -= ManageVersionsControl_Loaded;
+                    this.Unloaded -= ManageVersionsControl_Unloaded;
                     LeagueClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
                     LoLGameClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
                     this.DataContext = null;

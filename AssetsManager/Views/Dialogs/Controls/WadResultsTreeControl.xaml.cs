@@ -44,6 +44,8 @@ namespace AssetsManager.Views.Dialogs.Controls
         public void Cleanup()
         {
             // Desuscribir eventos
+            Loaded -= WadResultsTreeControl_Loaded;
+            Unloaded -= WadResultsTreeControl_Unloaded;
             resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
             searchTextBox.TextChanged -= SearchTextBox_TextChanged;
             if (_clearTextButton != null && _clearTextButtonClickHandler != null)

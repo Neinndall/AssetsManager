@@ -45,7 +45,7 @@ namespace AssetsManager.Services.Core
                 if (_updateTimer == null)
                 {
                     _updateTimer = new Timer();
-                    _updateTimer.Elapsed += async (sender, e) => await CheckForGeneralUpdatesAsync(true);
+                    _updateTimer.Elapsed += UpdateTimer_Elapsed;
                     _updateTimer.AutoReset = true;
                 }
                 _updateTimer.Interval = _appSettings.UpdateCheckFrequency * 60 * 1000;
@@ -59,7 +59,7 @@ namespace AssetsManager.Services.Core
                 if (_assetTrackerTimer == null)
                 {
                     _assetTrackerTimer = new Timer();
-                    _assetTrackerTimer.Elapsed += async (sender, e) => await CheckForAssetsAsync();
+                    _assetTrackerTimer.Elapsed += AssetTrackerTimer_Elapsed;
                     _assetTrackerTimer.AutoReset = true;
                 }
                 _assetTrackerTimer.Interval = _appSettings.AssetTrackerFrequency * 60 * 1000;
@@ -73,7 +73,7 @@ namespace AssetsManager.Services.Core
                 if (_pbeStatusTimer == null)
                 {
                     _pbeStatusTimer = new Timer();
-                    _pbeStatusTimer.Elapsed += async (sender, e) => await CheckForPbeStatusAsync();
+                    _pbeStatusTimer.Elapsed += PbeStatusTimer_Elapsed;
                     _pbeStatusTimer.AutoReset = true;
                 }
                 _pbeStatusTimer.Interval = _appSettings.PbeStatusFrequency * 60 * 1000;
@@ -82,21 +82,45 @@ namespace AssetsManager.Services.Core
             }
         }
 
+        private async void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            await CheckForGeneralUpdatesAsync(true);
+        }
+
+        private async void AssetTrackerTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            await CheckForAssetsAsync();
+        }
+
+        private async void PbeStatusTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            await CheckForPbeStatusAsync();
+        }
+
         public void Stop()
         {
             if (_updateTimer != null)
             {
                 _updateTimer.Enabled = false;
+                _updateTimer.Elapsed -= UpdateTimer_Elapsed;
+                _updateTimer.Dispose();
+                _updateTimer = null;
                 _logService.LogDebug("Background update timer stopped.");
             }
             if (_assetTrackerTimer != null)
             {
                 _assetTrackerTimer.Enabled = false;
+                _assetTrackerTimer.Elapsed -= AssetTrackerTimer_Elapsed;
+                _assetTrackerTimer.Dispose();
+                _assetTrackerTimer = null;
                 _logService.LogDebug("Asset Tracker timer stopped.");
             }
             if (_pbeStatusTimer != null)
             {
                 _pbeStatusTimer.Enabled = false;
+                _pbeStatusTimer.Elapsed -= PbeStatusTimer_Elapsed;
+                _pbeStatusTimer.Dispose();
+                _pbeStatusTimer = null;
                 _logService.LogDebug("PBE Status timer stopped.");
             }
         }

@@ -237,6 +237,7 @@ namespace AssetsManager.Services.Core
                     link.Foreground = Application.Current.FindResource("AccentBrush") as SolidColorBrush;
                     link.NavigateUri = new Uri(Path.GetFullPath(logEntry.ClickablePath));
                     link.RequestNavigate += (sender, e) => {
+                        
                         try
                         {
                             Process.Start("explorer.exe", $"\"{e.Uri.LocalPath}\"");

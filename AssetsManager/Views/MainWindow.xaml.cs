@@ -128,6 +128,7 @@ namespace AssetsManager.Views
             InitializeNotifyIcon();
             
             StateChanged += MainWindow_StateChanged;
+            Closing += MainWindow_Closing;
         }
 
         private async void InitializeApplicationAsync()
@@ -165,22 +166,24 @@ namespace AssetsManager.Views
             var iconUri = new Uri("pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico", UriKind.RelativeOrAbsolute);
             _notifyIcon.Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(iconUri).Stream);
             _notifyIcon.Text = "AssetsManager";
-            _notifyIcon.DoubleClick += (s, args) =>
-            {
-                Show();
-                WindowState = WindowState.Normal;
-                _notifyIcon.Visible = false;
-            };
+            _notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
 
             var contextMenu = new ContextMenuStrip();
             var exitMenuItem = new ToolStripMenuItem("Exit");
-            exitMenuItem.Click += ExitApplication_Click;
+            exitMenuItem.Click += ExitMenuItem_Click;
             contextMenu.Items.Add(exitMenuItem);
 
             _notifyIcon.ContextMenuStrip = contextMenu;
         }
 
-        private void ExitApplication_Click(object sender, EventArgs e)
+        private void NotifyIcon_DoubleClick(object sender, EventArgs e)
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            _notifyIcon.Visible = false;
+        }
+
+        private void ExitMenuItem_Click(object sender, EventArgs e)
         {
             System.Windows.Application.Current.Shutdown();
         }
@@ -378,6 +381,12 @@ namespace AssetsManager.Views
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
+            _notifyIcon.DoubleClick -= NotifyIcon_DoubleClick;
+            if (_notifyIcon.ContextMenuStrip != null && _notifyIcon.ContextMenuStrip.Items.Count > 0)
+            {
+                _notifyIcon.ContextMenuStrip.Items[0].Click -= ExitMenuItem_Click;
+            }
+            StateChanged -= MainWindow_StateChanged;
             _notifyIcon?.Dispose();
         }
     }

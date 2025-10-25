@@ -48,11 +48,13 @@ namespace AssetsManager.Views.Controls.Monitor
             txtSearch.ApplyTemplate();
             if (txtSearch.Template.FindName("ClearTextButton", txtSearch) is Button clearButton)
             {
-                clearButton.Click += (s, args) =>
-                {
-                    txtSearch.Text = string.Empty;
-                };
+                clearButton.Click += ClearTextButton_Click;
             }
+        }
+
+        private void ClearTextButton_Click(object sender, RoutedEventArgs e)
+        {
+            txtSearch.Text = string.Empty;
         }
 
         private void MonitoredItems_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -198,6 +200,10 @@ namespace AssetsManager.Views.Controls.Monitor
             if (MonitorService != null)
             {
                 MonitorService.MonitoredItems.CollectionChanged -= MonitoredItems_CollectionChanged;
+            }
+            if (txtSearch.Template.FindName("ClearTextButton", txtSearch) is Button clearButton)
+            {
+                clearButton.Click -= ClearTextButton_Click;
             }
         }
     }

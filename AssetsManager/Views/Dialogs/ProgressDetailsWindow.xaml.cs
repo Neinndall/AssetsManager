@@ -101,6 +101,7 @@ namespace AssetsManager.Views.Dialogs
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             _timer?.Stop();
+            _timer.Tick -= Timer_Tick; // Unsubscribe to prevent memory leaks
             base.OnClosing(e);
         }
     }

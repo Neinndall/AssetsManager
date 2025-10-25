@@ -53,14 +53,36 @@ namespace AssetsManager.Views
 
         private void SetupNavigation()
         {
-            NavGeneral.Checked += (s, e) => NavigateToView(_generalSettingsView);
-            NavHashes.Checked += (s, e) => NavigateToView(_hashPathsSettingsView);
-            NavAdvanced.Checked += (s, e) => NavigateToView(_advancedSettingsView);
+            NavGeneral.Checked += NavGeneral_Checked;
+            NavHashes.Checked += NavHashes_Checked;
+            NavAdvanced.Checked += NavAdvanced_Checked;
+        }
+
+        private void NavGeneral_Checked(object sender, RoutedEventArgs e)
+        {
+            NavigateToView(_generalSettingsView);
+        }
+
+        private void NavHashes_Checked(object sender, RoutedEventArgs e)
+        {
+            NavigateToView(_hashPathsSettingsView);
+        }
+
+        private void NavAdvanced_Checked(object sender, RoutedEventArgs e)
+        {
+            NavigateToView(_advancedSettingsView);
         }
 
         private void NavigateToView(object view)
         {
             SettingsContentArea.Content = view;
+        }
+
+        private void SettingsWindow_Closed(object sender, EventArgs e)
+        {
+            NavGeneral.Checked -= NavGeneral_Checked;
+            NavHashes.Checked -= NavHashes_Checked;
+            NavAdvanced.Checked -= NavAdvanced_Checked;
         }
 
         private void BtnResetDefaults_Click(object sender, RoutedEventArgs e)

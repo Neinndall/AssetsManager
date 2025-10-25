@@ -9,11 +9,10 @@ using NUglify.JavaScript;
 
 namespace AssetsManager.Services.Formatting
 {
-    public sealed class JsBeautifierService : IDisposable
+    public sealed class JsBeautifierService
     {
         private readonly CodeSettings _beautifySettings;
         private readonly CodeSettings _fallbackSettings;
-        private bool _disposed = false;
 
         public JsBeautifierService()
         {
@@ -282,15 +281,6 @@ namespace AssetsManager.Services.Formatting
             };
 
             return openingPatterns.Any(pattern => Regex.IsMatch(line, pattern));
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                _disposed = true;
-                GC.SuppressFinalize(this);
-            }
         }
     }
 }

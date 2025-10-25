@@ -103,6 +103,8 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void HistoryViewControl_Unloaded(object sender, RoutedEventArgs e)
         {
+            this.Loaded -= HistoryViewControl_Loaded;
+            this.Unloaded -= HistoryViewControl_Unloaded;
             this.DataContext = null;
             _viewModel = null;
         }
