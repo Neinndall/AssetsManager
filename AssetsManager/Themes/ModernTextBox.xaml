@@ -53,7 +53,7 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="Padding" Value="12,4"/>
+        <Setter Property="Padding" Value="8,2"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -66,10 +66,11 @@
                         <Grid>
                             <ScrollViewer x:Name="PART_ContentHost"
                                           Focusable="False"
+                                          Margin="5,2,25,2"
                                           VerticalAlignment="Center"
                                           HorizontalScrollBarVisibility="Hidden"
-                                          VerticalScrollBarVisibility="Hidden"
-                                          Margin="8,4,30,4"/>
+                                          VerticalScrollBarVisibility="Hidden"/>
+
                             <Button x:Name="ClearTextButton" 
                                     Style="{StaticResource TransparentIconButton}"
                                     HorizontalAlignment="Right"
@@ -111,64 +112,65 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="CaretBrush" Value="White"/>
-        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Padding" Value="8,4"/>
         <Setter Property="Template">
             <Setter.Value>
-                                                <ControlTemplate TargetType="TextBox">
-                                                    <Border x:Name="border" 
-                                                            Background="{TemplateBinding Background}"
-                                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                                            CornerRadius="6" 
-                                                            SnapsToDevicePixels="True">
-                                                        <Grid>
-                                                            <ScrollViewer x:Name="PART_ContentHost" 
-                                                                          Margin="{TemplateBinding Padding}"
-                                                                          VerticalAlignment="Center"/>
-                                                            <StackPanel Orientation="Horizontal"
-                                                                        IsHitTestVisible="False"
-                                                                        VerticalAlignment="Center"
-                                                                        HorizontalAlignment="Left"
-                                                                        Margin="8,0,0,0">
-                                                                <StackPanel.Style>
-                                                                    <Style TargetType="StackPanel">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                                        <Style.Triggers>
-                                                                            <MultiDataTrigger>
-                                                                                <MultiDataTrigger.Conditions>
-                                                                                    <Condition Binding="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}" Value=""/>
-                                                                                    <Condition Binding="{Binding IsFocused, RelativeSource={RelativeSource TemplatedParent}}" Value="False"/>
-                                                                                </MultiDataTrigger.Conditions>
-                                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                            </MultiDataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </StackPanel.Style>
-                                                                <materialIcons:MaterialIcon Kind="Magnify"
-                                                                                            Width="14"
-                                                                                            Height="14"
-                                                                                            Foreground="{StaticResource TextMuted}"
-                                                                                            Margin="0,0,5,0"
-                                                                                            VerticalAlignment="Center"/>
-                                                                <TextBlock Text="Search..."
-                                                                           Foreground="{StaticResource TextMuted}"
-                                                                           FontSize="{TemplateBinding FontSize}"
-                                                                           VerticalAlignment="Center"/>
-                                                            </StackPanel>
-                                                            <Button x:Name="ClearTextButton" 
-                                                                    Style="{StaticResource TransparentIconButton}"
-                                                                    HorizontalAlignment="Right"
-                                                                    VerticalAlignment="Center"
-                                                                    Margin="0,0,8,0"
-                                                                    Visibility="Collapsed"
-                                                                    Focusable="False">
-                                                                <materialIcons:MaterialIcon Kind="Close" 
-                                                                                            Width="14" 
-                                                                                            Height="14" 
-                                                                                            Foreground="{StaticResource TextSecondary}"/>
-                                                            </Button>
-                                                        </Grid>
-                                                    </Border>                    <ControlTemplate.Triggers>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="border" 
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6" 
+                            SnapsToDevicePixels="True">
+                        <Grid>
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="5,2,25,2"
+                                          VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal"
+                                        IsHitTestVisible="False"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left"
+                                        Margin="8,0,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}" Value=""/>
+                                                    <Condition Binding="{Binding IsFocused, RelativeSource={RelativeSource TemplatedParent}}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <materialIcons:MaterialIcon Kind="Magnify"
+                                                            Width="14"
+                                                            Height="14"
+                                                            Foreground="{StaticResource TextMuted}"
+                                                            Margin="0,0,5,0"
+                                                            VerticalAlignment="Center"/>
+                                <TextBlock Text="Search..."
+                                           Foreground="{StaticResource TextMuted}"
+                                           FontSize="{TemplateBinding FontSize}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Button x:Name="ClearTextButton" 
+                                    Style="{StaticResource TransparentIconButton}"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,0"
+                                    Visibility="Collapsed"
+                                    Focusable="False">
+                                <materialIcons:MaterialIcon Kind="Close" 
+                                                            Width="14" 
+                                                            Height="14" 
+                                                            Foreground="{StaticResource TextSecondary}"/>
+                            </Button>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                         </Trigger>
