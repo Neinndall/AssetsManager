@@ -68,7 +68,8 @@
                                           Focusable="False"
                                           VerticalAlignment="Center"
                                           HorizontalScrollBarVisibility="Hidden"
-                                          VerticalScrollBarVisibility="Hidden"/>
+                                          VerticalScrollBarVisibility="Hidden"
+                                          Margin="8,4,30,4"/>
                             <Button x:Name="ClearTextButton" 
                                     Style="{StaticResource TransparentIconButton}"
                                     HorizontalAlignment="Right"
