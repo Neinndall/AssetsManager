@@ -84,6 +84,11 @@ namespace AssetsManager.Views.Dialogs.Controls
             DiffNavigationPanel?.NavigateToNextDifference(0);
         }
 
+        public void RefreshGuidePosition()
+        {
+            DiffNavigationPanel?.UpdateViewportGuide();
+        }
+
         public async Task LoadAndDisplayDiffAsync(string oldText, string newText, string oldFileName, string newFileName)
         {
             try

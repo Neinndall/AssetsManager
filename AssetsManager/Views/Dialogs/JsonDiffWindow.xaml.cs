@@ -37,15 +37,18 @@ namespace AssetsManager.Views.Dialogs
         {
             Loaded -= JsonDiffWindow_Loaded;
 
-            // Make the window visible first.
+            // Scroll to the first difference while the window is still invisible.
+            JsonDiffControl.FocusFirstDifference();
+
+            // Now make the window visible. It will appear already scrolled.
             Visibility = Visibility.Visible;
 
-            // Defer focusing the first difference until after the layout has been updated.
-            // This ensures all controls have their correct sizes for calculation.
+            // Defer the guide refresh until after this rendering pass is complete.
+            // This ensures the panel has its final dimensions to calculate the guide position correctly.
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                JsonDiffControl.FocusFirstDifference();
-            }), System.Windows.Threading.DispatcherPriority.Loaded);
+                JsonDiffControl.RefreshGuidePosition();
+            }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
         // Used by DiffViewService when the file content is already processed and available in memory.
