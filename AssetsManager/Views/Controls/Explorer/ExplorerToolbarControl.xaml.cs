@@ -9,6 +9,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public event RoutedEventHandler CollapseToContainerClicked;
         public event RoutedEventHandler LoadComparisonClicked;
         public event RoutedEventHandler SwitchModeClicked;
+        public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
 
         public string SearchText => SearchTextBox.Text;
 
@@ -53,6 +54,14 @@ namespace AssetsManager.Views.Controls.Explorer
         private void SwitchModeButton_Click(object sender, RoutedEventArgs e)
         {
             SwitchModeClicked?.Invoke(this, e);
+        }
+
+        private void BreadcrumbToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                BreadcrumbVisibilityChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
+            }
         }
     }
 }

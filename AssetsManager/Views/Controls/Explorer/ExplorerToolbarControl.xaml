@@ -30,9 +30,17 @@
                     Click="SwitchModeButton_Click">
                 <materialIcons:MaterialIcon Kind="Sync" Width="18" Height="18"/>
             </Button>
+            <ToggleButton x:Name="BreadcrumbToggleButton"
+                          Style="{StaticResource TransparentIconToggleButton}"
+                          Click="BreadcrumbToggleButton_Click"
+                          ToolTip="Show Breadcrumb"
+                          Margin="5,0"
+                          IsChecked="False">
+                <materialIcons:MaterialIcon Kind="CodeTags" Width="18" Height="18"/>
+            </ToggleButton>
             <ToggleButton x:Name="SearchToggleButton" 
                           Style="{StaticResource SearchToggleStyle}" 
-                          Margin="0,0,5,0"
+                          Margin="5,0"
                           ToolTip="Filter/Searcher"/>
 
             <!-- Search controls now appear next to the toggle button -->

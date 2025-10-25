@@ -31,6 +31,26 @@ namespace AssetsManager.Views.Models
 
         public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();
 
+        public string DisplayName
+        {
+            get
+            {
+                if (Type == NodeType.WadFile)
+                {
+                    string lowerName = Name.ToLowerInvariant();
+                    if (lowerName.EndsWith(".wad.client"))
+                    {
+                        return Name.Substring(0, Name.Length - ".wad.client".Length);
+                    }
+                    else if (lowerName.EndsWith(".wad"))
+                    {
+                        return Name.Substring(0, Name.Length - ".wad".Length);
+                    }
+                }
+                return Name;
+            }
+        }
+
         
 
         private bool _isExpanded;

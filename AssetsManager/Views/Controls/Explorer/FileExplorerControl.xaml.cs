@@ -80,6 +80,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.CollapseToContainerClicked -= Toolbar_CollapseToContainerClicked;
                 Toolbar.LoadComparisonClicked -= Toolbar_LoadComparisonClicked;
                 Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
+                Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
             }
 
             // 3. Desuscribir eventos propios
@@ -116,6 +117,7 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.CollapseToContainerClicked += Toolbar_CollapseToContainerClicked;
             Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;
             Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
+            Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
 
             if (_isWadMode && !string.IsNullOrEmpty(AppSettings.LolDirectory) && Directory.Exists(AppSettings.LolDirectory))
             {
@@ -131,6 +133,11 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             _isWadMode = !_isWadMode;
             await ReloadTreeAsync();
+        }
+
+        private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        {
+            Breadcrumbs.Visibility = e.NewValue ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public async Task ReloadTreeAsync()
@@ -493,6 +500,8 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
+                UpdateBreadcrumbs(selectedNode);
+
                 if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
                     await HandleAudioBankExpansion(selectedNode);
@@ -502,6 +511,38 @@ namespace AssetsManager.Views.Controls.Explorer
                     FileSelected?.Invoke(this, e);
                 }
             }
+        }
+
+        private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)
+        {
+            Breadcrumbs.Nodes.Clear();
+            if (selectedNode == null) return;
+
+            var path = TreeUIManager.FindNodePath(RootNodes, selectedNode);
+            if (path == null) return;
+
+            // If the selected node is a file, show the path to its parent
+            if (selectedNode.Type == NodeType.RealFile || 
+                selectedNode.Type == NodeType.VirtualFile || 
+                selectedNode.Type == NodeType.WemFile ||
+                selectedNode.Type == NodeType.AudioEvent)
+            {
+                if (path.Count > 0)
+                {
+                    path.RemoveAt(path.Count - 1);
+                }
+            }
+
+            foreach (var node in path)
+            {
+                Breadcrumbs.Nodes.Add(node);
+            }
+        }
+
+        private void Breadcrumbs_NodeClicked(object sender, NodeClickedEventArgs e)
+        {
+            if (e.Node == null) return;
+            TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, e.Node, false);
         }
 
         private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
