@@ -22,26 +22,6 @@ namespace AssetsManager.Utils
             using var writer = new Utf8JsonWriter(outputStream, options);
 
             writer.WriteStartObject();
-
-            writer.WriteBoolean("isOverride", binTree.IsOverride);
-
-            writer.WritePropertyName("dependencies");
-            writer.WriteStartArray();
-            foreach (var depHashString in binTree.Dependencies)
-            {
-                if (uint.TryParse(depHashString, System.Globalization.NumberStyles.HexNumber, null, out uint depHashUint))
-                {
-                    writer.WriteStringValue(hashResolver.ResolveBinHashGeneral(depHashUint));
-                }
-                else
-                {
-                    writer.WriteStringValue(depHashString);
-                }
-            }
-            writer.WriteEndArray();
-
-            writer.WritePropertyName("objects");
-            writer.WriteStartObject();
             foreach (var kvp in binTree.Objects)
             {
                 writer.WritePropertyName(hashResolver.ResolveBinHashGeneral(kvp.Key));
@@ -54,8 +34,6 @@ namespace AssetsManager.Utils
                 }
                 writer.WriteEndObject();
             }
-            writer.WriteEndObject();
-
             writer.WriteEndObject();
             writer.Flush();
         }
