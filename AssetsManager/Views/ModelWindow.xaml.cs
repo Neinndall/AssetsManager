@@ -58,8 +58,7 @@ namespace AssetsManager.Views
             PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
 
             Unloaded += (s, e) => {
-                PanelControl.Cleanup();
-                ViewportControl.Cleanup();
+                CleanupResources();
             };
         }
 

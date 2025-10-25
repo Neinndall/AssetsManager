@@ -83,6 +83,12 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
             }
 
+            // Desuscribir eventos del Breadcrumbs
+            if (Breadcrumbs != null)
+            {
+                Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
+            }
+
             // 3. Desuscribir eventos propios
             this.Loaded -= FileExplorerControl_Loaded;
 
