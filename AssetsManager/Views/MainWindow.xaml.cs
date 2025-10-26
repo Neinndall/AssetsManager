@@ -229,7 +229,7 @@ namespace AssetsManager.Views
         {
             Dispatcher.Invoke(() =>
             {
-                if (allDiffs != null)
+                if (allDiffs != null && allDiffs.Any())
                 {
                     var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
                     {
