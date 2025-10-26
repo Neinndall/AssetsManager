@@ -45,19 +45,15 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button x:Name="reloadHashesButton"
                             Content="Reload Hashes" 
-                            Height="36"
-                            Padding="16,0"
                             Style="{StaticResource ModernButton}"
                             Click="ReloadHashesButton_Click"
                             ToolTip="Reloads hashes from the default application path to resolve unknown paths and refresh the tree."/>
                     <Button x:Name="saveButton"
-                            Content="Save Results" 
-                            Height="36"
-                            Padding="16,0"
+                            Content="Save Results"
                             Margin="12,0,0,0"
                             Style="{StaticResource ModernButton}"
                             Click="SaveButton_Click"
-                            ToolTip="Save the full list of differences to a JSON file"/>
+                            ToolTip="Save the full list of differences to a json file"/>
                 </StackPanel>
             </Grid>
         </Border>

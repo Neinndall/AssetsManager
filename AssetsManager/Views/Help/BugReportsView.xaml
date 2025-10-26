@@ -48,8 +48,6 @@
                 
                 <Button x:Name="buttonReportBug" 
                         Content="Report Bug"
-                        Height="36"
-                        Width="140"
                         HorizontalAlignment="Left"
                         Click="buttonReportBug_Click"
                         Style="{StaticResource ModernButton}"/>
