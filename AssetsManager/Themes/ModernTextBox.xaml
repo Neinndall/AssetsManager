@@ -112,7 +112,8 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="CaretBrush" Value="White"/>
-        <Setter Property="Padding" Value="8,4"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
