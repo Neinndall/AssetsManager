@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://github.com/Neinndall/AssetsManager/blob/main/AssetsManager/Resources/Img/logo.ico" alt="Logo" width="150">
+  <img src="https://github.com/Neinndall/AssetsManager/blob/main/AssetsManager/Resources/Img/logo.ico" alt="Logo" width="100">
 </div>
 
 ## 🛠️ AssetsManager
