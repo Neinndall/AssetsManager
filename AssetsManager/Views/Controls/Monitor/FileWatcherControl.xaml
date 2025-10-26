@@ -41,13 +41,14 @@
 
         <!-- Toolbar -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
-            <Button Content="+ Add URLs" Style="{StaticResource ModernButton}" Width="100" Click="AddUrl_Click" Padding="10,5"/>
+            <Button Content="+ Add URLs" 
+                    Click="AddUrl_Click"
+                    Style="{StaticResource ModernButton}"/>
             <TextBox x:Name="txtSearch"
                      Style="{StaticResource StandardSearchBoxStyle}"
-                     Width="200"
+                     Width="180"
                      Margin="10,0,0,0"
-                     TextChanged="TxtSearch_TextChanged"
-                     Padding="10,5"/>
+                     TextChanged="TxtSearch_TextChanged"/>
         </StackPanel>
 
         <!-- Cards List -->

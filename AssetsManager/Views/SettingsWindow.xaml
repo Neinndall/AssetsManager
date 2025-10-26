@@ -86,8 +86,8 @@
                   BorderThickness="0,1,0,0"
                   Padding="32,16">
                 <Grid>
-                    <StackPanel Orientation="Horizontal" 
-                              HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    
                         <materialIcons:MaterialIcon Kind="LightbulbOn" 
                                                      FontSize="12" 
                                                      Margin="0,0,8,0" 
@@ -99,20 +99,16 @@
                                  VerticalAlignment="Center"/>
                     </StackPanel>
                     
-                    <StackPanel Orientation="Horizontal" 
-                              HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    
                         <Button x:Name="BtnResetDefaults" 
-                              Content="Reset to Defaults" 
-                              Height="36" 
-                              Width="154"
+                              Content="Reset to Defaults"
+                              Margin="0,0,12,0"
                               Click="BtnResetDefaults_Click"
-                              Style="{StaticResource SecondaryButton}" 
-                              Margin="0,0,12,0"/>
+                              Style="{StaticResource SecondaryButton}"/>
                         
                         <Button x:Name="btnSave" 
-                              Content="Save Changes" 
-                              Height="36" 
-                              Width="120"
+                              Content="Save Changes"
                               Click="btnSave_Click"
                               Style="{StaticResource ModernButton}"/>
                     </StackPanel>

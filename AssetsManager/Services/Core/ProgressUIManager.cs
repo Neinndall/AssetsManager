@@ -60,6 +60,25 @@ namespace AssetsManager.Services.Core
             _progressSummaryButton.Click += ProgressSummaryButton_Click;
         }
 
+        public void Cleanup()
+        {
+            if (_progressSummaryButton != null)
+            {
+                _progressSummaryButton.Click -= ProgressSummaryButton_Click;
+            }
+            if (_progressDetailsWindow != null)
+            {
+                _progressDetailsWindow.Closed -= ProgressDetailsWindow_Closed;
+            }
+            _spinningIconAnimationStoryboard?.Stop();
+            _spinningIconAnimationStoryboard = null;
+            _progressDetailsWindow?.Close();
+            _progressDetailsWindow = null;
+            _progressSummaryButton = null;
+            _progressIcon = null;
+            _owner = null;
+        }
+
         public void OnDownloadStarted(int totalFiles)
         {
             _owner.Dispatcher.Invoke(() =>
@@ -81,9 +100,14 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.OperationVerb = "Downloading";
                 _progressDetailsWindow.HeaderIconKind = "Download";
                 _progressDetailsWindow.HeaderText = "Downloading Assets";
-                _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.Closed += ProgressDetailsWindow_Closed;
                 _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
             });
+        }
+
+        private void ProgressDetailsWindow_Closed(object sender, EventArgs e)
+        {
+            _progressDetailsWindow = null;
         }
 
         public void OnDownloadProgressChanged(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage)

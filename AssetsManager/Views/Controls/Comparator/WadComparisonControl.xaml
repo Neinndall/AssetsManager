@@ -19,11 +19,11 @@
                                                  VerticalAlignment="Center"
                                                  Foreground="{StaticResource AccentBrush}"/>
                     <StackPanel>
-                        <TextBlock Text="WADs Comparator" 
+                        <TextBlock Text="Wad Comparator" 
                                    FontSize="15" 
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Compare WAD files to identify differences" 
+                        <TextBlock Text="Compare wad files to identify differences" 
                                    FontSize="12" 
                                    Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
@@ -138,11 +138,11 @@
                                                              VerticalAlignment="Top"
                                                              Foreground="{StaticResource AccentGreen}"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                                    <TextBlock Text="New WAD File" 
+                                    <TextBlock Text="New Wad File" 
                                                FontWeight="SemiBold"
                                                FontSize="15"
                                                Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Select the new WAD file to compare" 
+                                    <TextBlock Text="Select the new wad file to compare" 
                                                FontSize="12" 
                                                Foreground="{StaticResource TextMuted}"
                                                Margin="0,2,0,0"/>
@@ -158,7 +158,7 @@
                                                  Height="36"
                                                  IsReadOnly="True"
                                                  Style="{StaticResource ModernTextBox}"
-                                                 ToolTip="Select the new WAD file"/>
+                                                 ToolTip="Select the new wad file"/>
                                     <Button Grid.Column="2"
                                                 Content="Browse"
                                                 Padding="16,0"
@@ -182,11 +182,11 @@
                                                              VerticalAlignment="Top"
                                                              Foreground="{StaticResource AccentOrange}"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                                    <TextBlock Text="Old WAD File" 
+                                    <TextBlock Text="Old Wad File" 
                                                FontWeight="SemiBold"
                                                FontSize="15"
                                                Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Select the old WAD file to compare" 
+                                    <TextBlock Text="Select the old wad file to compare" 
                                                FontSize="12" 
                                                Foreground="{StaticResource TextMuted}"
                                                Margin="0,2,0,0"/>
@@ -234,7 +234,7 @@
                                    FontSize="15" 
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Compare WAD files" 
+                        <TextBlock Text="Create a backup or compare wad files" 
                                    FontSize="12" 
                                    Foreground="{StaticResource TextMuted}"
                                    Margin="0,2,0,12"/>
@@ -242,19 +242,15 @@
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="createLolBackupButton" 
                                 Content="Create LoL Backup"
-                                Height="36"
-                                Padding="16,0"
                                 Style="{StaticResource SecondaryButton}"
                                 Click="createLolBackupButton_Click"
                                 ToolTip="Create a backup of the current LoL directory"
                                 Margin="0,0,12,0"/>
                             <Button x:Name="compareWadButton" 
-                                Content="Compare" 
-                                Height="36"
-                                Padding="36,0"
+                                Content="Comparison" 
                                 Style="{StaticResource ModernButton}"
                                 Click="compareWadButton_Click"
-                                ToolTip="Compare WAD files"/>
+                                ToolTip="Compare the wad files selected"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>

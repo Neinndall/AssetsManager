@@ -99,8 +99,8 @@
         <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="14,8"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
@@ -131,6 +131,9 @@
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -155,15 +158,15 @@
 
     <!-- Destructive Button Style -->
     <Style x:Key="DestructiveButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-        <Setter Property="Padding" Value="14,9"/>
         <Setter Property="Background" Value="{StaticResource AccentRed}"/>
         <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Padding" Value="12,10"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border Background="{TemplateBinding Background}"
-                            CornerRadius="4"
-                            Padding="{TemplateBinding Padding}">
+                            Padding="{TemplateBinding Padding}"
+                            CornerRadius="4">
                         <ContentPresenter HorizontalAlignment="Center" 
                                         VerticalAlignment="Center"/>
                     </Border>
@@ -281,6 +284,37 @@
         </Setter>
     </Style>
 
+    <!-- Estilo para iconos, se usará togles buttons (ej: hide/show fps del ModelViewportControl) -->
+    <Style x:Key="IconToggleButton" TargetType="ToggleButton">
+        <Setter Property="Width" Value="21"/>
+        <Setter Property="Height" Value="21"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="border" 
+                            Background="{TemplateBinding Background}" 
+                            CornerRadius="12">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="{StaticResource TextSecondary}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Estilo para iconos, se usará para iconos planos (ej: ToolBar del Explorer) -->
     <Style x:Key="TransparentIconButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
@@ -298,6 +332,31 @@
         </Setter>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Estilo para ToggleButtons que deben parecer iconos planos, sin borde y con fondo transparente -->
+    <Style x:Key="TransparentIconToggleButton" TargetType="ToggleButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border Background="Transparent" Padding="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
                 <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
             </Trigger>
         </Style.Triggers>

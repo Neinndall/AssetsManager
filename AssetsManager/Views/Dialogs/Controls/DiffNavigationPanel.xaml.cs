@@ -46,6 +46,40 @@ namespace AssetsManager.Views.Dialogs.Controls
             _modifiedBrush.Freeze();
             _imaginaryBrush.Freeze();
             _viewportBrush.Freeze();
+
+            this.Unloaded += DiffNavigationPanel_Unloaded;
+        }
+
+        private void DiffNavigationPanel_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
+
+        public void Cleanup()
+        {
+            // Unsubscribe events
+            OldDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
+            OldDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
+            OldDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
+            OldDiffMapHost.SizeChanged -= OldDiffMapHost_SizeChanged;
+
+            NewDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
+            NewDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
+            NewDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
+            NewDiffMapHost.SizeChanged -= NewDiffMapHost_SizeChanged;
+
+            // Clear visuals
+            OldDiffMapHost.ClearVisuals();
+            NewDiffMapHost.ClearVisuals();
+
+            // Clear references
+            _oldEditor = null;
+            _newEditor = null;
+            _diffModel = null;
+            _originalDiffModel = null;
+            _diffLines.Clear();
+            _oldViewportGuide = null;
+            _newViewportGuide = null;
         }
 
         public void Initialize(TextEditor oldEditor, TextEditor newEditor, SideBySideDiffModel diffModel, SideBySideDiffModel originalDiffModel = null)
@@ -66,12 +100,24 @@ namespace AssetsManager.Views.Dialogs.Controls
             OldDiffMapHost.MouseLeftButtonDown += NavigationPanel_MouseLeftButtonDown;
             OldDiffMapHost.MouseMove += NavigationPanel_MouseMove;
             OldDiffMapHost.MouseLeftButtonUp += NavigationPanel_MouseLeftButtonUp;
-            OldDiffMapHost.SizeChanged += (s, e) => { InitializeDiffMarkers(); UpdateViewportGuide(); };
+            OldDiffMapHost.SizeChanged += OldDiffMapHost_SizeChanged;
 
             NewDiffMapHost.MouseLeftButtonDown += NavigationPanel_MouseLeftButtonDown;
             NewDiffMapHost.MouseMove += NavigationPanel_MouseMove;
             NewDiffMapHost.MouseLeftButtonUp += NavigationPanel_MouseLeftButtonUp;
-            NewDiffMapHost.SizeChanged += (s, e) => { InitializeDiffMarkers(); UpdateViewportGuide(); };
+            NewDiffMapHost.SizeChanged += NewDiffMapHost_SizeChanged;
+        }
+
+        private void OldDiffMapHost_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            InitializeDiffMarkers();
+            UpdateViewportGuide();
+        }
+
+        private void NewDiffMapHost_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            InitializeDiffMarkers();
+            UpdateViewportGuide();
         }
 
         public void InitializeDiffMarkers()

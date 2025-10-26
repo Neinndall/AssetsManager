@@ -23,7 +23,7 @@
                                    FontSize="15" 
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Select two JSON files to compare" 
+                        <TextBlock Text="Select two json files to compare" 
                                    FontSize="12" 
                                    Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
@@ -47,7 +47,7 @@
                                    FontWeight="SemiBold"
                                    FontSize="15"
                                    Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Select the new JSON file to compare" 
+                        <TextBlock Text="Select the new json file to compare" 
                                    FontSize="12" 
                                    Foreground="{StaticResource TextMuted}"
                                    Margin="0,2,0,0"/>
@@ -91,7 +91,7 @@
                                    FontWeight="SemiBold"
                                    FontSize="15"
                                    Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Select the old JSON file to compare" 
+                        <TextBlock Text="Select the old json file to compare" 
                                    FontSize="12" 
                                    Foreground="{StaticResource TextMuted}"
                                    Margin="0,2,0,0"/>
@@ -141,9 +141,7 @@
                                    Margin="0,2,0,12"/>
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="compareButton" 
-                                Content="Compare" 
-                                Height="36"
-                                Padding="36,0"
+                                Content="Comparison"
                                 Style="{StaticResource ModernButton}"
                                 Click="btnCompare_Click"/>
                         </StackPanel>

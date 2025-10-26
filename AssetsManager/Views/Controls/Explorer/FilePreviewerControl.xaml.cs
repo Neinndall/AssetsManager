@@ -137,6 +137,7 @@ namespace AssetsManager.Views.Controls.Explorer
             try
             {
                 await ExplorerPreviewService.ResetPreviewAsync();
+                ViewModel.PropertyChanged -= ViewModel_PropertyChanged; // Unsubscribe to prevent memory leaks
             }
             catch (Exception ex)
             {

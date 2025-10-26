@@ -29,6 +29,8 @@ namespace AssetsManager.Views.Dialogs
             {
                 Owner.Effect = null;
             }
+            Loaded -= OnLoaded;
+            Closing -= OnClosing;
         }
     }
 }

@@ -55,8 +55,7 @@ namespace AssetsManager.Services.Explorer
                     foreach (var file in newFiles)
                     {
                         string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");
-                        string resolvedPath = _hashResolverService.ResolveHash(file.NewPathHash);
-                        var node = AddNodeToVirtualTree(newFilesNode, resolvedPath, wadGroup.Key, file.NewPathHash, DiffStatus.New);
+                        var node = AddNodeToVirtualTree(newFilesNode, file.NewPath, wadGroup.Key, file.NewPathHash, DiffStatus.New);
                         node.BackupChunkPath = chunkPath;
                         node.ChunkDiff = file;
                     }
@@ -70,8 +69,7 @@ namespace AssetsManager.Services.Explorer
                     foreach (var file in modifiedFiles)
                     {
                         string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");
-                        string resolvedPath = _hashResolverService.ResolveHash(file.NewPathHash);
-                        var node = AddNodeToVirtualTree(modifiedFilesNode, resolvedPath, wadGroup.Key, file.NewPathHash, DiffStatus.Modified);
+                        var node = AddNodeToVirtualTree(modifiedFilesNode, file.NewPath, wadGroup.Key, file.NewPathHash, DiffStatus.Modified);
                         node.BackupChunkPath = chunkPath;
                         node.ChunkDiff = file;
                     }
@@ -85,10 +83,9 @@ namespace AssetsManager.Services.Explorer
                     foreach (var file in renamedFiles)
                     {
                         string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");
-                        string resolvedPath = _hashResolverService.ResolveHash(file.NewPathHash);
-                        var node = AddNodeToVirtualTree(renamedFilesNode, resolvedPath, wadGroup.Key, file.NewPathHash, DiffStatus.Renamed);
+                        var node = AddNodeToVirtualTree(renamedFilesNode, file.NewPath, wadGroup.Key, file.NewPathHash, DiffStatus.Renamed);
                         node.BackupChunkPath = chunkPath;
-                        node.OldPath = _hashResolverService.ResolveHash(file.OldPathHash);
+                        node.OldPath = file.OldPath;
                         node.ChunkDiff = file;
                     }
                     wadNode.Children.Add(renamedFilesNode);
@@ -101,8 +98,7 @@ namespace AssetsManager.Services.Explorer
                     foreach (var file in deletedFiles)
                     {
                         string chunkPath = Path.Combine(backupRoot, "wad_chunks", "old", $"{file.OldPathHash:X16}.chunk");
-                        string resolvedPath = _hashResolverService.ResolveHash(file.OldPathHash);
-                        var node = AddNodeToVirtualTree(deletedFilesNode, resolvedPath, wadGroup.Key, file.OldPathHash, DiffStatus.Deleted);
+                        var node = AddNodeToVirtualTree(deletedFilesNode, file.OldPath, wadGroup.Key, file.OldPathHash, DiffStatus.Deleted);
                         node.BackupChunkPath = chunkPath;
                         node.ChunkDiff = file;
                     }
@@ -338,3 +334,4 @@ namespace AssetsManager.Services.Explorer
         }
     }
 }
+

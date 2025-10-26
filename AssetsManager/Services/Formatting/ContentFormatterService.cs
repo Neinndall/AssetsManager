@@ -34,11 +34,9 @@ namespace AssetsManager.Services.Formatting
             switch (dataType)
             {
                 case "bin":
-                    await _hashResolverService.LoadBinHashesAsync();
                     formattedContent = await GetBinJsonStringAsync(data);
                     break;
                 case "stringtable":
-                    await _hashResolverService.LoadRstHashesAsync();
                     formattedContent = await GetStringTableJsonStringAsync(data);
                     break;
                 case "css":

@@ -9,11 +9,10 @@ using NUglify.JavaScript;
 
 namespace AssetsManager.Services.Formatting
 {
-    public sealed class JsBeautifierService : IDisposable
+    public sealed class JsBeautifierService
     {
         private readonly CodeSettings _beautifySettings;
         private readonly CodeSettings _fallbackSettings;
-        private bool _disposed = false;
 
         public JsBeautifierService()
         {
@@ -72,21 +71,18 @@ namespace AssetsManager.Services.Formatting
         {
             try
             {
-                // Preprocesamiento para archivos complejos
-                var preprocessed = PreprocessComplexJs(jsContent);
-                
-                // Paso 1: Intentar con configuración principal
-                var result = Uglify.Js(preprocessed, _beautifySettings);
+                // Paso 1: Intentar con NUglify SIN preprocesamiento (más seguro)
+                var result = Uglify.Js(jsContent, _beautifySettings);
                 
                 if (!result.HasErrors && !string.IsNullOrEmpty(result.Code))
                 {
                     return PostprocessBeautified(result.Code);
                 }
                 
-                // Paso 2: Intentar con configuración más permisiva, ignorando errores
+                // Paso 2: Intentar con configuración más permisiva
                 try
                 {
-                    result = Uglify.Js(preprocessed, _fallbackSettings);
+                    result = Uglify.Js(jsContent, _fallbackSettings);
                     
                     // Incluso si hay errores menores, intentar usar el resultado si tiene código
                     if (!string.IsNullOrEmpty(result.Code))
@@ -107,26 +103,6 @@ namespace AssetsManager.Services.Formatting
                 // Fallback final
                 return ApplyAdvancedBeautification(jsContent);
             }
-        }
-
-        /// <summary>
-        /// Preprocesa JavaScript complejo (como el de League of Legends)
-        /// </summary>
-        private string PreprocessComplexJs(string jsContent)
-        {
-            var result = jsContent;
-            
-            // Manejar strings con caracteres especiales comunes en juegos
-            result = Regex.Replace(result, @"\\x([0-9A-Fa-f]{2})", m => 
-                char.ConvertFromUtf32(Convert.ToInt32(m.Groups[1].Value, 16)));
-            
-            // Manejar comentarios problemáticos
-            result = Regex.Replace(result, @"//.*?(?=\r|\n|$)", "", RegexOptions.Multiline);
-            
-            // Limpiar espacios excesivos
-            result = Regex.Replace(result, @"\s{3,}", " ");
-            
-            return result;
         }
 
         /// <summary>
@@ -182,8 +158,8 @@ namespace AssetsManager.Services.Formatting
             // Mejorar cierre de bloques (evitar dentro de strings)
             result = Regex.Replace(result, @"(?<![""])\}(?!\s*[,;""\]])", "\n}\n");
             
-            // Mejorar separación de elementos en arrays/objetos
-            result = Regex.Replace(result, @",(?=\s*[a-zA-Z_$""\[])", ",\n");
+            // Mejorar separación de elementos en arrays/objetos (evitar strings largas base64)
+            result = Regex.Replace(result, @",(?=\s*[a-zA-Z_$""\[])(?!.{100,})", ",\n");
             
             // Espaciado en operadores (evitar dentro de strings)
             result = Regex.Replace(result, @"(?<![""])([=!<>+\-*/%])(?![""])", " $1 ");
@@ -191,6 +167,9 @@ namespace AssetsManager.Services.Formatting
             // Funciones
             result = Regex.Replace(result, @"(\w+)\s*=\s*function\s*\(", "$1 = function(");
             result = Regex.Replace(result, @"function\s*\(", "function (");
+            
+            // Clases
+            result = Regex.Replace(result, @"\bclass\s+(\w+)\s*\{", "class $1 {\n");
             
             return result;
         }
@@ -205,7 +184,7 @@ namespace AssetsManager.Services.Formatting
             var indentStack = new Stack<int>();
             var currentIndent = 0;
             const int INDENT_SIZE = 2;
-            const int MAX_INDENT = 18; // Máximo 20 espacios
+            const int MAX_INDENT = 40; // Aumentado para estructuras profundas de LOL
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -271,7 +250,9 @@ namespace AssetsManager.Services.Formatting
             {
                 @"\{\s*$",
                 @"\[\s*$",
+                @"class\s+\w+\s*\{\s*$", // Clases
                 @"function\s*\([^)]*\)\s*\{\s*$",
+                @"\w+\s*\([^)]*\)\s*\{\s*$", // Métodos de clase
                 @"=>\s*\{\s*$",
                 @"if\s*\([^)]*\)\s*\{\s*$",
                 @"for\s*\([^)]*\)\s*\{\s*$",
@@ -282,15 +263,6 @@ namespace AssetsManager.Services.Formatting
             };
 
             return openingPatterns.Any(pattern => Regex.IsMatch(line, pattern));
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                _disposed = true;
-                GC.SuppressFinalize(this);
-            }
         }
     }
 }

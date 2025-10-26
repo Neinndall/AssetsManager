@@ -64,7 +64,19 @@ namespace AssetsManager.Services.Downloads
 
                 if (syncHashesWithCDTB)
                 {
+                    await _directoriesCreator.CreateHashesDirectories();
                     await _requests.DownloadSpecificHashesAsync(outdatedFiles);
+
+                    var filesToCopyToOld = new[] { GAME_HASHES_FILENAME, LCU_HASHES_FILENAME };
+                    foreach (var fileName in filesToCopyToOld)
+                    {
+                        var sourceFile = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
+                        var destFile = Path.Combine(_directoriesCreator.HashesOldsPath, fileName);
+                        if (File.Exists(sourceFile))
+                        {
+                            File.Copy(sourceFile, destFile, true);
+                        }
+                    }
                 }
 
                 UpdateConfigWithLocalFileSizes();
@@ -110,15 +122,15 @@ namespace AssetsManager.Services.Downloads
             var configSizes = _appSettings.HashesSizes;
             var newHashesPath = _directoriesCreator.HashesNewPath;
 
-            if (configSizes == null || configSizes.Count == 0)
-            {
-                return outdatedFiles; // Nothing in config to check against.
-            }
-
             if (string.IsNullOrEmpty(newHashesPath) || !Directory.Exists(newHashesPath))
             {
-                _logService.LogWarning($"Skipping local file sync check: Hashes/new directory path is invalid or not found ('{newHashesPath}').");
-                return outdatedFiles; // Path is not valid, cannot check.
+                _logService.Log($"Hashes not found. Forcing Sync.");
+                return AllKnownHashFiles.ToList();
+            }
+
+            if (configSizes == null || configSizes.Count == 0)
+            {
+                return AllKnownHashFiles.ToList(); // Nothing in config to check against, sync all.
             }
 
             foreach (var entry in configSizes)

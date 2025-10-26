@@ -15,7 +15,7 @@ using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Monitor
 {
-    public class MonitorService
+    public class MonitorService : IDisposable
     {
         private readonly AppSettings _appSettings;
         private readonly JsonDataService _jsonDataService;
@@ -37,6 +37,11 @@ namespace AssetsManager.Services.Monitor
             LoadMonitoredUrls();
 
             _jsonDataService.FileUpdated += OnFileUpdated;
+        }
+
+        public void Dispose()
+        {
+            _jsonDataService.FileUpdated -= OnFileUpdated;
         }
 
         public void LoadMonitoredUrls()

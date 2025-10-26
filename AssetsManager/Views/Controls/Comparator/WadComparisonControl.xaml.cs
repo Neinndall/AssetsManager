@@ -81,17 +81,16 @@ namespace AssetsManager.Views.Controls.Comparator
             try
             {
                 await BackupManager.CreateLolDirectoryBackupAsync(sourceLolPath, destinationBackupPath);
-                CustomMessageBoxService.ShowInfo("Info", "LoL directory backup completed successfully.", Window.GetWindow(this));
-                LogService.LogSuccess("LoL directory backup completed successfully.");
+                CustomMessageBoxService.ShowInfo("Info", "LoL backup completed successfully.", Window.GetWindow(this));
             }
             catch (DirectoryNotFoundException ex)
             {
-                LogService.LogError(ex, "Error creating LoL directory backup");
+                LogService.LogError(ex, "Error creating LoL backup");
                 CustomMessageBoxService.ShowError("Error", ex.Message, Window.GetWindow(this));
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, "Error creating LoL directory backup");
+                LogService.LogError(ex, "Error creating LoL backup");
                 CustomMessageBoxService.ShowError("Error", $"An unexpected error occurred while creating the backup: {ex.Message}", Window.GetWindow(this));
             }
             finally
@@ -105,7 +104,7 @@ namespace AssetsManager.Views.Controls.Comparator
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select Old Directory"
+                Title = "Select old directory"
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -121,7 +120,7 @@ namespace AssetsManager.Views.Controls.Comparator
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select New Directory"
+                Title = "Select new directory"
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -137,7 +136,7 @@ namespace AssetsManager.Views.Controls.Comparator
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
-                Title = "Select Old WAD File"
+                Title = "Select old wad file"
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -151,7 +150,7 @@ namespace AssetsManager.Views.Controls.Comparator
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
-                Title = "Select New WAD File"
+                Title = "Select new wad file"
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)

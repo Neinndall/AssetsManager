@@ -23,6 +23,7 @@ namespace AssetsManager.Views.Controls.Models
     {
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
+        public event EventHandler<bool> MaximizeClicked;
 
         private readonly Stopwatch _stopwatch = new Stopwatch();
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
@@ -178,25 +179,36 @@ namespace AssetsManager.Views.Controls.Models
 
         public void TakeScreenshot(string filePath)
         {
-            var renderBitmap = new RenderTargetBitmap(
-                (int)Viewport3D.ActualWidth, 
-                (int)Viewport3D.ActualHeight, 
-                96, 96, 
-                PixelFormats.Pbgra32
-            );
-            renderBitmap.Render(Viewport3D);
-
-            BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
-            bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
-
             string finalFilePath = filePath;
             if (Path.GetExtension(finalFilePath).ToLower() != ".png")
             {
                 finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
             }
 
+            var originalShowFrameRate = Viewport3D.ShowFrameRate;
             try
             {
+                Viewport3D.ShowFrameRate = false;
+
+                double scalingFactor = 4.0;
+                int width = (int)(Viewport3D.ActualWidth * scalingFactor);
+                int height = (int)(Viewport3D.ActualHeight * scalingFactor);
+
+                var renderBitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+
+                var visual = new DrawingVisual();
+                using (var context = visual.RenderOpen())
+                {
+                    var brush = new VisualBrush(Viewport3D);
+                    context.DrawRectangle(brush, null, new Rect(0, 0, Viewport3D.ActualWidth, Viewport3D.ActualHeight));
+                }
+
+                visual.Transform = new ScaleTransform(scalingFactor, scalingFactor);
+                renderBitmap.Render(visual);
+
+                BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
+                bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
+
                 using (var stream = File.Create(finalFilePath))
                 {
                     bitmapEncoder.Save(stream);
@@ -207,8 +219,12 @@ namespace AssetsManager.Views.Controls.Models
             {
                 LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
             }
+            finally
+            {
+                Viewport3D.ShowFrameRate = originalShowFrameRate;
+            }
         }
-
+        
         private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             ResetCamera();
@@ -216,16 +232,43 @@ namespace AssetsManager.Views.Controls.Models
 
         private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_sceneModel == null || string.IsNullOrEmpty(_sceneModel.Name))
+            {
+                LogService.LogWarning("No model loaded to name the screenshot automatically. Please load a model first.");
+                return;
+            }
+
+            string modelName = _sceneModel.Name;
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string defaultFileName = $"{modelName}_{timestamp}.png";
+
             var saveFileDialog = new CommonSaveFileDialog
             {
                 Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
                 Title = "Save Screenshot File",
-                DefaultExtension = ".png"
+                DefaultExtension = ".png",
+                DefaultFileName = defaultFileName // Pre-populate with the generated name
             };
 
             if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 TakeScreenshot(saveFileDialog.FileName);
+            }
+        }
+
+        private void FpsToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                Viewport3D.ShowFrameRate = toggleButton.IsChecked ?? false;
+            }
+        }
+
+        private void MaximizeToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                MaximizeClicked?.Invoke(this, toggleButton.IsChecked ?? false);
             }
         }
     }

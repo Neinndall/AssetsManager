@@ -116,6 +116,9 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnWindowClosed(object sender, System.EventArgs e)
         {
+            Loaded -= WadComparisonResultWindow_Loaded;
+            ResultsTree.SelectedItemChanged -= ResultsTree_SelectedItemChanged;
+            ResultsTree.ContextMenuOpening -= ResultsTree_ContextMenuOpening;
             _serializableDiffs?.Clear();
             ResultsTree.ItemsSource = null;
             ResultsTree.Cleanup();

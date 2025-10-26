@@ -42,8 +42,8 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxNewHashPath" Grid.Column="0" Height="34" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
-                        <Button x:Name="btnBrowseNew" Grid.Column="1" Content="Browse" Height="34" Width="100" Click="btnBrowseNew_Click" Style="{StaticResource SecondaryButton}"/>
+                        <TextBox x:Name="textBoxNewHashPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
+                        <Button x:Name="btnBrowseNew" Grid.Column="1" Content="Browse" Click="btnBrowseNew_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
 
@@ -65,8 +65,8 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxOldHashPath" Grid.Column="0" Height="34" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
-                        <Button x:Name="btnBrowseOld" Grid.Column="1" Content="Browse" Height="34" Width="100" Click="btnBrowseOld_Click" Style="{StaticResource SecondaryButton}"/>
+                        <TextBox x:Name="textBoxOldHashPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
+                        <Button x:Name="btnBrowseOld" Grid.Column="1" Content="Browse" Click="btnBrowseOld_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
 
@@ -88,8 +88,8 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxLolPath" Grid.Column="0" Height="34" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
-                        <Button x:Name="btnBrowseLol" Grid.Column="1" Content="Browse" Height="34" Width="100" Click="btnBrowseLol_Click" Style="{StaticResource SecondaryButton}"/>
+                        <TextBox x:Name="textBoxLolPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
+                        <Button x:Name="btnBrowseLol" Grid.Column="1" Content="Browse" Click="btnBrowseLol_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
 
@@ -111,8 +111,8 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxDefaultExtractedPath" Grid.Column="0" Height="34" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
-                        <Button x:Name="btnBrowseDefaultExtracted" Grid.Column="1" Content="Browse" Height="34" Width="100" Click="btnBrowseDefaultExtracted_Click" Style="{StaticResource SecondaryButton}"/>
+                        <TextBox x:Name="textBoxDefaultExtractedPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
+                        <Button x:Name="btnBrowseDefaultExtracted" Grid.Column="1" Content="Browse" Click="btnBrowseDefaultExtracted_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
 

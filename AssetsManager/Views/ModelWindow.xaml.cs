@@ -58,8 +58,7 @@ namespace AssetsManager.Views
             PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
 
             Unloaded += (s, e) => {
-                PanelControl.Cleanup();
-                ViewportControl.Cleanup();
+                CleanupResources();
             };
         }
 
@@ -92,6 +91,22 @@ namespace AssetsManager.Views
             
             // Limpiar panel
             PanelControl?.Cleanup();
+        }
+
+        private void ViewportControl_MaximizeClicked(object sender, bool isMaximized)
+        {
+            if (isMaximized)
+            {
+                MainGridSplitter.Visibility = Visibility.Collapsed;
+                PanelControl.Visibility = Visibility.Collapsed;
+                Grid.SetColumnSpan(ViewportControl, 3);
+            }
+            else
+            {
+                MainGridSplitter.Visibility = Visibility.Visible;
+                PanelControl.Visibility = Visibility.Visible;
+                Grid.SetColumnSpan(ViewportControl, 1);
+            }
         }
 
         private void SetupScene()

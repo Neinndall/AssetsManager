@@ -133,9 +133,10 @@
                     <ColumnDefinition Width="320" MinWidth="320" MaxWidth="400"/>
                 </Grid.ColumnDefinitions>
 
-                <models:ModelViewportControl Grid.Column="0" x:Name="ViewportControl"/>
+                <models:ModelViewportControl Grid.Column="0" x:Name="ViewportControl" MaximizeClicked="ViewportControl_MaximizeClicked"/>
 
                 <GridSplitter Grid.Column="1"
+                              x:Name="MainGridSplitter"
                               HorizontalAlignment="Center"
                               VerticalAlignment="Stretch"
                               Width="4"

@@ -47,9 +47,7 @@
                            Margin="0,0,0,20"/>
                 
                 <Button x:Name="buttonCheckUpdates" 
-                        Content="Check for Updates"
-                        Height="36"
-                        Width="160"
+                        Content="Check Updates"
                         HorizontalAlignment="Left"
                         Click="buttonCheckUpdates_Click"
                         Style="{StaticResource ModernButton}"/>

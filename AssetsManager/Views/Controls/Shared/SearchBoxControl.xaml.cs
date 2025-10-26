@@ -41,11 +41,13 @@ namespace AssetsManager.Views.Controls.Shared
             SearchTextBox.ApplyTemplate();
             if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
             {
-                clearButton.Click += (s, args) =>
-                {
-                    SearchTextBox.Text = string.Empty;
-                };
+                clearButton.Click += ClearTextButton_Click;
             }
+        }
+
+        private void ClearTextButton_Click(object sender, RoutedEventArgs e)
+        {
+            SearchTextBox.Text = string.Empty;
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -71,6 +73,10 @@ namespace AssetsManager.Views.Controls.Shared
             {
                 searchTimer.Stop();
                 searchTimer.Tick -= SearchTimer_Tick;
+            }
+            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
+            {
+                clearButton.Click -= ClearTextButton_Click;
             }
         }
     }

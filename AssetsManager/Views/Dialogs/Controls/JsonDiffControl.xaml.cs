@@ -46,15 +46,22 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 DiffNavigationPanel.ScrollRequested -= ScrollToLine;
             }
-            if (OldJsonContent?.TextArea?.TextView != null)
+            if (OldJsonContent != null)
             {
-                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
-                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= (s, e) => DiffNavigationPanel?.UpdateViewportGuide();
+                OldJsonContent.Loaded -= OldJsonContent_Loaded;
+                if (OldJsonContent.TextArea?.TextView != null)
+                {
+                    OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
+                    OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_UpdateViewportGuide;
+                }
             }
-            if (NewJsonContent?.TextArea?.TextView != null)
+            if (NewJsonContent != null)
             {
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= (s, e) => DiffNavigationPanel?.UpdateViewportGuide();
+                if (NewJsonContent.TextArea?.TextView != null)
+                {
+                    NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
+                    NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_UpdateViewportGuide;
+                }
             }
 
             // Limpiar renderers y documentos de AvalonEdit
@@ -75,6 +82,11 @@ namespace AssetsManager.Views.Dialogs.Controls
         public void FocusFirstDifference()
         {
             DiffNavigationPanel?.NavigateToNextDifference(0);
+        }
+
+        public void RefreshGuidePosition()
+        {
+            DiffNavigationPanel?.UpdateViewportGuide();
         }
 
         public async Task LoadAndDisplayDiffAsync(string oldText, string newText, string oldFileName, string newFileName)
@@ -238,7 +250,12 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void SetupScrollSync()
         {
-            OldJsonContent.Loaded += (_, _) => SetupScrollSyncAfterLoaded();
+            OldJsonContent.Loaded += OldJsonContent_Loaded;
+        }
+
+        private void OldJsonContent_Loaded(object sender, RoutedEventArgs e)
+        {
+            SetupScrollSyncAfterLoaded();
         }
 
         private void SetupScrollSyncAfterLoaded()
@@ -247,8 +264,18 @@ namespace AssetsManager.Views.Dialogs.Controls
             NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
 
             // This is the main optimization: only update the viewport guide on scroll
-            OldJsonContent.TextArea.TextView.ScrollOffsetChanged += (s, e) => DiffNavigationPanel?.UpdateViewportGuide();
-            NewJsonContent.TextArea.TextView.ScrollOffsetChanged += (s, e) => DiffNavigationPanel?.UpdateViewportGuide();
+            OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_UpdateViewportGuide;
+            NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_UpdateViewportGuide;
+        }
+
+        private void OldEditor_UpdateViewportGuide(object sender, EventArgs e)
+        {
+            DiffNavigationPanel?.UpdateViewportGuide();
+        }
+
+        private void NewEditor_UpdateViewportGuide(object sender, EventArgs e)
+        {
+            DiffNavigationPanel?.UpdateViewportGuide();
         }
 
         private void OldEditor_ScrollChanged(object sender, EventArgs e)

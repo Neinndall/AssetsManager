@@ -123,12 +123,18 @@ namespace AssetsManager.Views
             }
 
             _updateCheckService.Start();
-            _ = _updateCheckService.CheckForAllUpdatesAsync();
-            _ = LoadAllHashesOnStartupAsync();
+            InitializeApplicationAsync();
 
             InitializeNotifyIcon();
-            Closing += MainWindow_Closing;
+            
             StateChanged += MainWindow_StateChanged;
+            Closing += MainWindow_Closing;
+        }
+
+        private async void InitializeApplicationAsync()
+        {
+            await _updateCheckService.CheckForAllUpdatesAsync();
+            await LoadAllHashesOnStartupAsync();
         }
 
         private async Task LoadAllHashesOnStartupAsync()
@@ -136,7 +142,7 @@ namespace AssetsManager.Views
             await _hashResolverService.LoadHashesAsync();
             await _hashResolverService.LoadBinHashesAsync();
             await _hashResolverService.LoadRstHashesAsync();
-            _logService.Log("Hashes loaded on startup.");
+            _logService.LogSuccess("Hashes loaded on startup.");
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -160,22 +166,24 @@ namespace AssetsManager.Views
             var iconUri = new Uri("pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico", UriKind.RelativeOrAbsolute);
             _notifyIcon.Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(iconUri).Stream);
             _notifyIcon.Text = "AssetsManager";
-            _notifyIcon.DoubleClick += (s, args) =>
-            {
-                Show();
-                WindowState = WindowState.Normal;
-                _notifyIcon.Visible = false;
-            };
+            _notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
 
             var contextMenu = new ContextMenuStrip();
             var exitMenuItem = new ToolStripMenuItem("Exit");
-            exitMenuItem.Click += ExitApplication_Click;
+            exitMenuItem.Click += ExitMenuItem_Click;
             contextMenu.Items.Add(exitMenuItem);
 
             _notifyIcon.ContextMenuStrip = contextMenu;
         }
 
-        private void ExitApplication_Click(object sender, EventArgs e)
+        private void NotifyIcon_DoubleClick(object sender, EventArgs e)
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            _notifyIcon.Visible = false;
+        }
+
+        private void ExitMenuItem_Click(object sender, EventArgs e)
         {
             System.Windows.Application.Current.Shutdown();
         }
@@ -186,10 +194,15 @@ namespace AssetsManager.Views
             {
                 Hide();
                 _notifyIcon.Visible = true;
-                new ToastContentBuilder()
-                    .AddText("AssetsManager")
-                    .AddText("ℹ️ The application has been minimized to the tray.")
-                    .Show();
+
+                // Use Dispatcher to avoid COMException when showing toast on state change
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    new ToastContentBuilder()
+                        .AddText("AssetsManager")
+                        .AddText("ℹ️ The application has been minimized to the tray.")
+                        .Show();
+                }));
             }
         }
 
@@ -216,7 +229,7 @@ namespace AssetsManager.Views
         {
             Dispatcher.Invoke(() =>
             {
-                if (allDiffs != null)
+                if (allDiffs != null && allDiffs.Any())
                 {
                     var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
                     {
@@ -368,6 +381,12 @@ namespace AssetsManager.Views
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
+            _notifyIcon.DoubleClick -= NotifyIcon_DoubleClick;
+            if (_notifyIcon.ContextMenuStrip != null && _notifyIcon.ContextMenuStrip.Items.Count > 0)
+            {
+                _notifyIcon.ContextMenuStrip.Items[0].Click -= ExitMenuItem_Click;
+            }
+            StateChanged -= MainWindow_StateChanged;
             _notifyIcon?.Dispose();
         }
     }

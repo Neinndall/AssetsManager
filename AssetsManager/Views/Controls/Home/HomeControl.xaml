@@ -41,18 +41,18 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="newHashesTextBox" 
-                                                 Grid.Column="0"
-                                                 Height="36"
-                                                 IsReadOnly="True"
-                                                 Style="{StaticResource ModernTextBox}"
-                                                 ToolTip="Select the directory containing new hash files"/>
+                                 Grid.Column="0"
+                                 Height="36"
+                                 IsReadOnly="True"
+                                 Style="{StaticResource ModernTextBox}"
+                                 ToolTip="Select the directory containing new hash files"/>
                         <Button Grid.Column="2"
-                                                Content="Browse"
-                                                Width="80" 
-                                                Height="36"
-                                                Style="{StaticResource SecondaryButton}"
-                                                Click="btnSelectNewHashesDirectory_Click"
-                                                ToolTip="Browse for directory"/>
+                                Content="Browse"
+                                Width="80" 
+                                Height="36"
+                                Style="{StaticResource SecondaryButton}"
+                                Click="btnSelectNewHashesDirectory_Click"
+                                ToolTip="Browse for directory"/>
                     </Grid>
                 </Grid>
 
@@ -65,10 +65,10 @@
 
                     <!-- Icono -->
                     <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderMinus" 
-                                                                 FontSize="20" 
-                                                                 Margin="0,0,12,0" 
-                                                                 VerticalAlignment="Top"
-                                                                 Foreground="{StaticResource AccentOrange}"/>
+                                                FontSize="20" 
+                                                Margin="0,0,12,0" 
+                                                VerticalAlignment="Top"
+                                                Foreground="{StaticResource AccentOrange}"/>
                     <!-- Textos -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Top">
                         <TextBlock Text="Old Hash Directory" 
@@ -88,18 +88,18 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="oldHashesTextBox" 
-                                                 Grid.Column="0"
-                                                 Height="36"
-                                                 IsReadOnly="True"
-                                                 Style="{StaticResource ModernTextBox}"
-                                                 ToolTip="Select the directory containing old hash files"/>
+                                 Grid.Column="0"
+                                 Height="36"
+                                 IsReadOnly="True"
+                                 Style="{StaticResource ModernTextBox}"
+                                 ToolTip="Select the directory containing old hash files"/>
                         <Button Grid.Column="2"
-                                                Content="Browse"
-                                                Width="80" 
-                                                Height="36"
-                                                Style="{StaticResource SecondaryButton}"
-                                                Click="btnSelectOldHashesDirectory_Click"
-                                                ToolTip="Browse for directory"/>
+                                Content="Browse"
+                                Width="80" 
+                                Height="36"
+                                Style="{StaticResource SecondaryButton}"
+                                Click="btnSelectOldHashesDirectory_Click"
+                                ToolTip="Browse for directory"/>
                     </Grid>
                 </Grid>
 
@@ -128,8 +128,7 @@
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="startButton" 
                                     Content="▶️ Start Download" 
-                                    Height="36"
-                                    Width="150"
+
                                     Style="{StaticResource ModernButton}"
                                     Click="startButton_Click"
                                     ToolTip="Start the download process"/>

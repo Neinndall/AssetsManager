@@ -127,7 +127,7 @@
                         <CheckBox x:Name="checkBoxCheckJsonData" 
                                   Content="Check for files updates" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Check for updates to JSON files and their differences"
+                        <TextBlock Text="Check for updates to json files and their differences"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
                                      Margin="27,0,0,8" 
@@ -203,8 +203,6 @@
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
-
-
             </StackPanel>
         </Border>
     </StackPanel>

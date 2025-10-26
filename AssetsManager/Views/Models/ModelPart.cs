@@ -101,6 +101,9 @@ namespace AssetsManager.Views.Models
             AllTextures?.Clear();
             AllTextures = null;
             AvailableTextureNames?.Clear();
+
+            // Desuscribir todos los eventos
+            PropertyChanged = null;
         }
     }
 }

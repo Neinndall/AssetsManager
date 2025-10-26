@@ -1,4 +1,3 @@
-
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
 using System.Windows;
@@ -19,6 +18,13 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _loadingAnimation = originalStoryboard.Clone();
                 Storyboard.SetTarget(_loadingAnimation, ProgressIcon);
             }
+
+            this.Unloaded += LoadingDiffControl_Unloaded;
+        }
+
+        private void LoadingDiffControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _loadingAnimation?.Stop();
         }
 
         public void ShowLoading(bool show)

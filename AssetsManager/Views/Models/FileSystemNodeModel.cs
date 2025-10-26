@@ -1,4 +1,5 @@
 using AssetsManager.Utils;
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -9,7 +10,7 @@ namespace AssetsManager.Views.Models
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted }
     public enum AudioSourceType { Wpk, Bnk }
 
-    public class FileSystemNodeModel : INotifyPropertyChanged
+    public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable
     {
         public string Name { get; set; }
         public NodeType Type { get; set; }
@@ -30,6 +31,26 @@ namespace AssetsManager.Views.Models
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
         public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();
+
+        public string DisplayName
+        {
+            get
+            {
+                if (Type == NodeType.WadFile)
+                {
+                    string lowerName = Name.ToLowerInvariant();
+                    if (lowerName.EndsWith(".wad.client"))
+                    {
+                        return Name.Substring(0, Name.Length - ".wad.client".Length);
+                    }
+                    else if (lowerName.EndsWith(".wad"))
+                    {
+                        return Name.Substring(0, Name.Length - ".wad".Length);
+                    }
+                }
+                return Name;
+            }
+        }
 
         
 
@@ -229,6 +250,9 @@ namespace AssetsManager.Views.Models
             FullPath = null;
             OldPath = null;
             Name = null;
+
+            // Desuscribir todos los eventos
+            PropertyChanged = null;
         }
     }
 }
