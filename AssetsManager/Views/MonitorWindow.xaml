@@ -26,7 +26,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <materialIcons:MaterialIcon Kind="Monitor"
+                <materialIcons:MaterialIcon Kind="Radar"
                                              Height="54"
                                              Width="54"
                                              Margin="0,0,10,0"
