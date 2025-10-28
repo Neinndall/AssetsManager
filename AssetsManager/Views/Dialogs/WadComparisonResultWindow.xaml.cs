@@ -357,9 +357,5 @@ namespace AssetsManager.Views.Dialogs
                 }
             }
         }
-
-
-
-
     }
 }

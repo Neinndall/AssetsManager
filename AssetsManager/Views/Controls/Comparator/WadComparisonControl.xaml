@@ -62,14 +62,11 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox x:Name="newLolDirectoryTextBox" 
                                                  Grid.Column="0"
-                                                 Height="36"
                                                  IsReadOnly="True"
                                                  Style="{StaticResource ModernTextBox}"
                                                  ToolTip="Select the new directory"/>
                                     <Button Grid.Column="2"
                                                 Content="Browse"
-                                                Padding="16,0"
-                                                Height="36"
                                                 Style="{StaticResource SecondaryButton}"
                                                 Click="btnSelectNewLolDirectory_Click"
                                                 ToolTip="Browse for directory"/>
@@ -106,14 +103,11 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox x:Name="oldLolDirectoryTextBox" 
                                                  Grid.Column="0"
-                                                 Height="36"
                                                  IsReadOnly="True"
                                                  Style="{StaticResource ModernTextBox}"
                                                  ToolTip="Select the old directory"/>
                                     <Button Grid.Column="2"
                                                 Content="Browse"
-                                                Padding="16,0"
-                                                Height="36"
                                                 Style="{StaticResource SecondaryButton}"
                                                 Click="btnSelectOldLolDirectory_Click"
                                                 ToolTip="Browse for directory"/>
@@ -155,14 +149,11 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox x:Name="newWadFileTextBox" 
                                                  Grid.Column="0"
-                                                 Height="36"
                                                  IsReadOnly="True"
                                                  Style="{StaticResource ModernTextBox}"
                                                  ToolTip="Select the new wad file"/>
                                     <Button Grid.Column="2"
                                                 Content="Browse"
-                                                Padding="16,0"
-                                                Height="36"
                                                 Style="{StaticResource SecondaryButton}"
                                                 Click="btnSelectNewWadFile_Click"
                                                 ToolTip="Browse for file"/>
@@ -199,14 +190,11 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox x:Name="oldWadFileTextBox" 
                                                  Grid.Column="0"
-                                                 Height="36"
                                                  IsReadOnly="True"
                                                  Style="{StaticResource ModernTextBox}"
                                                  ToolTip="Select the old WAD file"/>
                                     <Button Grid.Column="2"
                                                 Content="Browse"
-                                                Padding="16,0"
-                                                Height="36"
                                                 Style="{StaticResource SecondaryButton}"
                                                 Click="btnSelectOldWadFile_Click"
                                                 ToolTip="Browse for file"/>

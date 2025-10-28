@@ -51,8 +51,8 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Padding" Value="10,2"/>
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="Padding" Value="8,2"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -72,10 +72,7 @@
                                     Margin="0,0,8,0"
                                     Visibility="Collapsed"
                                     Focusable="False">
-                                <materialIcons:MaterialIcon Kind="Close" 
-                                                            Width="12" 
-                                                            Height="12" 
-                                                            Foreground="{StaticResource TextSecondary}"/>
+                                <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12" Foreground="{StaticResource TextSecondary}"/>
                             </Button>
                         </Grid>
                     </Border>
@@ -141,12 +138,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
-                                <materialIcons:MaterialIcon Kind="Magnify"
-                                                            Width="14"
-                                                            Height="14"
-                                                            Foreground="{StaticResource TextMuted}"
-                                                            Margin="0,0,5,0"
-                                                            VerticalAlignment="Center"/>
+                                <materialIcons:MaterialIcon Kind="Magnify" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,5,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="Search..."
                                            Foreground="{StaticResource TextMuted}"
                                            FontSize="{TemplateBinding FontSize}"
@@ -159,10 +151,7 @@
                                     Margin="0,0,8,0"
                                     Visibility="Collapsed"
                                     Focusable="False">
-                                <materialIcons:MaterialIcon Kind="Close" 
-                                                            Width="14" 
-                                                            Height="14" 
-                                                            Foreground="{StaticResource TextSecondary}"/>
+                                <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
                             </Button>
                         </Grid>
                     </Border>
@@ -178,5 +167,4 @@
             </Setter.Value>
         </Setter>
     </Style>
-
 </ResourceDictionary>
