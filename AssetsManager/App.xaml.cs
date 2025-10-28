@@ -78,6 +78,7 @@ namespace AssetsManager
             services.AddSingleton<HashCopier>();
             services.AddSingleton<UpdateCheckService>();
             services.AddSingleton<ProgressUIManager>();
+            services.AddSingleton<NotificationHistoryService>();
             services.AddTransient<ExplorerPreviewService>();
             services.AddTransient<TreeBuilderService>();
             services.AddTransient<TreeUIManager>();

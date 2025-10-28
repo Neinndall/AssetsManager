@@ -19,6 +19,7 @@ namespace AssetsManager.Services.Core
         private readonly LogService _logService;
         private readonly MonitorService _monitorService;
         private readonly PbeStatusService _pbeStatusService;
+        private readonly NotificationHistoryService _notificationHistoryService;
         private Timer _updateTimer;
         private Timer _assetTrackerTimer;
         private Timer _pbeStatusTimer;
@@ -26,7 +27,7 @@ namespace AssetsManager.Services.Core
 
         public event Action<string, string> UpdatesFound;
         
-        public UpdateCheckService(AppSettings appSettings, Status status, JsonDataService jsonDataService, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService)
+        public UpdateCheckService(AppSettings appSettings, Status status, JsonDataService jsonDataService, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService, NotificationHistoryService notificationHistoryService)
         {
             _appSettings = appSettings;
             _status = status;
@@ -35,6 +36,7 @@ namespace AssetsManager.Services.Core
             _logService = logService;
             _monitorService = monitorService;
             _pbeStatusService = pbeStatusService;
+            _notificationHistoryService = notificationHistoryService;
         }
 
         public void Start()
@@ -154,12 +156,15 @@ namespace AssetsManager.Services.Core
                 {
                     if (updatedCategoryNames.Count == 1)
                     {
-                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category!", null);
+                        var message = $"New assets have been found in {updatedCategoryNames[0]} category!";
+                        UpdatesFound?.Invoke(message, null);
+                        _notificationHistoryService.AddNotification(message);
                     }
                     else
                     {
-                        string categories = string.Join(", ", updatedCategoryNames);
-                        UpdatesFound?.Invoke($"New assets found in categories: {categories}!", null);
+                        var message = $"New assets found in categories: {string.Join(", ", updatedCategoryNames)}!";
+                        UpdatesFound?.Invoke(message, null);
+                        _notificationHistoryService.AddNotification(message);
                     }
                 }
             }
@@ -180,6 +185,7 @@ namespace AssetsManager.Services.Core
             if (!string.IsNullOrEmpty(pbeStatusMessage))
             {
                 UpdatesFound?.Invoke(pbeStatusMessage, null);
+                _notificationHistoryService.AddNotification(pbeStatusMessage);
             }
         }
 
@@ -194,7 +200,9 @@ namespace AssetsManager.Services.Core
 
             if (appUpdateAvailable)
             {
-                UpdatesFound?.Invoke($"Version {newVersion} is available!", newVersion);
+                var message = $"Version {newVersion} is available!";
+                UpdatesFound?.Invoke(message, newVersion);
+                _notificationHistoryService.AddNotification(message);
             }
             
             if (_appSettings.SyncHashesWithCDTB)
@@ -203,14 +211,21 @@ namespace AssetsManager.Services.Core
                 {
                     if (silent)
                     {
-                        UpdatesFound?.Invoke("New hashes are available!", null);
+                        const string message = "New hashes are available!";
+                        UpdatesFound?.Invoke(message, null);
+                        _notificationHistoryService.AddNotification(message);
                     }
                 });
             }
 
             if (_appSettings.CheckJsonDataUpdates)
             {
-                await _jsonDataService.CheckJsonDataUpdatesAsync(silent, () => { UpdatesFound?.Invoke("JSON files have been updated!", null); });
+                await _jsonDataService.CheckJsonDataUpdatesAsync(silent, () => 
+                {
+                    const string message = "JSON files have been updated!";
+                    UpdatesFound?.Invoke(message, null);
+                    _notificationHistoryService.AddNotification(message);
+                });
             }
         }
 

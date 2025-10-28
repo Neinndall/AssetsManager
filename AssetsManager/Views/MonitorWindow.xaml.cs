@@ -22,7 +22,8 @@ namespace AssetsManager.Views
             CustomMessageBoxService customMessageBoxService,
             JsonDataService jsonDataService,
             VersionService versionService,
-            DirectoriesCreator directoriesCreator)
+            DirectoriesCreator directoriesCreator,
+            NotificationHistoryService notificationHistoryService)
         {
             InitializeComponent();
 
@@ -52,6 +53,9 @@ namespace AssetsManager.Views
             ManageVersionsControl.LogService = logService;
             ManageVersionsControl.AppSettings = appSettings; // Add this
             ManageVersionsControl.CustomMessageBoxService = customMessageBoxService; // Add this
+
+            // Setup and inject dependencies for NotificationControl
+            NotificationControl.NotificationHistoryService = notificationHistoryService;
         }
     }
 }
