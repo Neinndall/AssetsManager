@@ -67,7 +67,7 @@
                     <monitorControls:ManageVersionsControl x:Name="ManageVersionsControl"/>
                 </TabItem>
                 <TabItem Header="Notifications" Style="{StaticResource CustomTabItemStyle}">
-                    <monitorControls:NotificationControl x:Name="NotificationControl"/>
+                    <monitorControls:NotificationsControl x:Name="NotificationsControl"/>
                 </TabItem>
             </TabControl>
         </ScrollViewer>

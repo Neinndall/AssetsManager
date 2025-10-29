@@ -78,7 +78,7 @@ namespace AssetsManager
             services.AddSingleton<HashCopier>();
             services.AddSingleton<UpdateCheckService>();
             services.AddSingleton<ProgressUIManager>();
-            services.AddSingleton<NotificationHistoryService>();
+            services.AddSingleton<NotificationsHistoryService>();
             services.AddTransient<ExplorerPreviewService>();
             services.AddTransient<TreeBuilderService>();
             services.AddTransient<TreeUIManager>();
@@ -165,6 +165,8 @@ namespace AssetsManager
 
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             mainWindow.Show();
+
+            
         }
 
         private void SetupGlobalExceptionHandling(LogService logService, CustomMessageBoxService customMessageBoxService)

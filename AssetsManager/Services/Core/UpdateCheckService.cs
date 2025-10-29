@@ -19,7 +19,7 @@ namespace AssetsManager.Services.Core
         private readonly LogService _logService;
         private readonly MonitorService _monitorService;
         private readonly PbeStatusService _pbeStatusService;
-        private readonly NotificationHistoryService _notificationHistoryService;
+        private readonly NotificationsHistoryService _notificationsHistoryService;
         private Timer _updateTimer;
         private Timer _assetTrackerTimer;
         private Timer _pbeStatusTimer;
@@ -27,7 +27,7 @@ namespace AssetsManager.Services.Core
 
         public event Action<string, string> UpdatesFound;
         
-        public UpdateCheckService(AppSettings appSettings, Status status, JsonDataService jsonDataService, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService, NotificationHistoryService notificationHistoryService)
+        public UpdateCheckService(AppSettings appSettings, Status status, JsonDataService jsonDataService, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService, NotificationsHistoryService notificationsHistoryService)
         {
             _appSettings = appSettings;
             _status = status;
@@ -36,7 +36,7 @@ namespace AssetsManager.Services.Core
             _logService = logService;
             _monitorService = monitorService;
             _pbeStatusService = pbeStatusService;
-            _notificationHistoryService = notificationHistoryService;
+            _notificationsHistoryService = notificationsHistoryService;
         }
 
         public void Start()
@@ -158,13 +158,13 @@ namespace AssetsManager.Services.Core
                     {
                         var message = $"New assets have been found in {updatedCategoryNames[0]} category!";
                         UpdatesFound?.Invoke(message, null);
-                        _notificationHistoryService.AddNotification(message);
+                        _notificationsHistoryService.AddNotification(message);
                     }
                     else
                     {
                         var message = $"New assets found in categories: {string.Join(", ", updatedCategoryNames)}!";
                         UpdatesFound?.Invoke(message, null);
-                        _notificationHistoryService.AddNotification(message);
+                        _notificationsHistoryService.AddNotification(message);
                     }
                 }
             }
@@ -185,7 +185,7 @@ namespace AssetsManager.Services.Core
             if (!string.IsNullOrEmpty(pbeStatusMessage))
             {
                 UpdatesFound?.Invoke(pbeStatusMessage, null);
-                _notificationHistoryService.AddNotification(pbeStatusMessage);
+                _notificationsHistoryService.AddNotification(pbeStatusMessage);
             }
         }
 
@@ -202,7 +202,7 @@ namespace AssetsManager.Services.Core
             {
                 var message = $"Version {newVersion} is available!";
                 UpdatesFound?.Invoke(message, newVersion);
-                _notificationHistoryService.AddNotification(message);
+                _notificationsHistoryService.AddNotification(message);
             }
             
             if (_appSettings.SyncHashesWithCDTB)
@@ -213,7 +213,7 @@ namespace AssetsManager.Services.Core
                     {
                         const string message = "New hashes are available!";
                         UpdatesFound?.Invoke(message, null);
-                        _notificationHistoryService.AddNotification(message);
+                        _notificationsHistoryService.AddNotification(message);
                     }
                 });
             }
@@ -224,7 +224,7 @@ namespace AssetsManager.Services.Core
                 {
                     const string message = "JSON files have been updated!";
                     UpdatesFound?.Invoke(message, null);
-                    _notificationHistoryService.AddNotification(message);
+                    _notificationsHistoryService.AddNotification(message);
                 });
             }
         }

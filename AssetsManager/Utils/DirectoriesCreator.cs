@@ -44,7 +44,8 @@ namespace AssetsManager.Utils
         public DirectoriesCreator(LogService logService)
         {
             _logService = logService;
-
+            AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
+            
             HashesNewPath = Path.Combine("hashes", "new");
             HashesOldsPath = Path.Combine("hashes", "olds");
 
@@ -56,8 +57,6 @@ namespace AssetsManager.Utils
             JsonCacheNewPath = Path.Combine(appFolderPath, "json_cache", "new");
             JsonCacheOldPath = Path.Combine(appFolderPath, "json_cache", "old");
             JsonCacheHistoryPath = Path.Combine(appFolderPath, "json_cache", "history");
-
-            AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
             UpdateCachePath = Path.Combine(appFolderPath, "update_cache");
             UpdateLogFilePath = Path.Combine(UpdateCachePath, "update_log.log");
