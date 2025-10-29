@@ -1,8 +1,8 @@
-using AssetsManager.Utils;
 using System;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
+using System.ComponentModel;
+using System.Collections.ObjectModel;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models
 {
