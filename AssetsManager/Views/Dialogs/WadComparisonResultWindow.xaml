@@ -30,7 +30,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="Compare" FontSize="24" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}"/>
+                                        <materialIcons:MaterialIcon Kind="Compare" Width="32" Height="32" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}"/>
                     <StackPanel>
                         <TextBlock Text="WAD COMPARISON RESULTS" 
                                    FontSize="24" 
