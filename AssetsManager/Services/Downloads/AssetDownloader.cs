@@ -41,7 +41,7 @@ namespace AssetsManager.Services.Downloads
         public void NotifyDownloadCompleted()
         {
             var downloadAssetsPath = _directoriesCreator.SubAssetsDownloadedPath;
-            _logService.LogInteractiveSuccess($"Download of new assets completed in {downloadAssetsPath}", downloadAssetsPath);
+            _logService.LogInteractiveSuccess($"Asset download completed in {downloadAssetsPath}", downloadAssetsPath);
             DownloadCompleted?.Invoke();
         }
 
