@@ -53,7 +53,7 @@ namespace AssetsManager.Utils
                     }
                 });
 
-                _logService.Log("Specified hashes copied successfully.");
+                _logService.LogSuccess("Hashes copied successfully.");
             }
             catch (Exception ex)
             {
