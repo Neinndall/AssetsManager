@@ -1,4 +1,3 @@
-
 using System;
 using System.IO;
 using System.Linq;
@@ -99,7 +98,5 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             _viewModel.NextPage();
         }
-
-        
     }
 }
