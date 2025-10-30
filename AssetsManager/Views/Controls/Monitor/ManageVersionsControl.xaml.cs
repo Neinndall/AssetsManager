@@ -129,92 +129,48 @@ namespace AssetsManager.Views.Controls.Monitor
             // The selection is bound to the IsSelected property of the VersionFileInfo model
         }
 
-                private void DeleteSelectedVersions_Click(object sender, RoutedEventArgs e)
+        private void DeleteSelectedVersions_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedVersions = _viewModel.LeagueClientVersions.Where(v => v.IsSelected).ToList();
+            selectedVersions.AddRange(_viewModel.LoLGameClientVersions.Where(v => v.IsSelected));
 
-                {
-
-                    var selectedVersions = _viewModel.LeagueClientVersions.Where(v => v.IsSelected).ToList();
-
-                    selectedVersions.AddRange(_viewModel.LoLGameClientVersions.Where(v => v.IsSelected));
-
-        
-
-                    if (!selectedVersions.Any())
-
-                    {
-
-                        CustomMessageBoxService.ShowWarning("Delete Versions", "No versions selected to delete.");
-
-                        return;
-
-                    }
-
-        
-
-                    var result = CustomMessageBoxService.ShowYesNo("Delete Selected Versions", $"Are you sure you want to delete {selectedVersions.Count} selected version file(s)?");
-
-                    if (result == true)
-
-                    {
-
-                        _viewModel.DeleteVersions(selectedVersions);
-
-                    }
-
-                }
-
-        
-
-                private void PrevLeagueClientPage_Click(object sender, RoutedEventArgs e)
-
-                {
-
-                    _viewModel.PrevLeagueClientPage();
-
-                }
-
-        
-
-                private void NextLeagueClientPage_Click(object sender, RoutedEventArgs e)
-
-                {
-
-                    _viewModel.NextLeagueClientPage();
-
-                }
-
-        
-
-                private void PrevLoLGameClientPage_Click(object sender, RoutedEventArgs e)
-
-                {
-
-                    _viewModel.PrevLoLGameClientPage();
-
-                }
-
-        
-
-                private void NextLoLGameClientPage_Click(object sender, RoutedEventArgs e)
-
-                {
-
-                    _viewModel.NextLoLGameClientPage();
-
-                }
-
-
-                private void ManageVersionsControl_Unloaded(object sender, RoutedEventArgs e)
-                {
-                    this.Loaded -= ManageVersionsControl_Loaded;
-                    this.Unloaded -= ManageVersionsControl_Unloaded;
-                    LeagueClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
-                    LoLGameClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
-                    this.DataContext = null;
-                    _viewModel = null;
-                }
+            if (!selectedVersions.Any())
+            {
+                CustomMessageBoxService.ShowWarning("Delete Versions", "No versions selected to delete.");
+                return;
             }
 
+            var result = CustomMessageBoxService.ShowYesNo("Delete Selected Versions", $"Are you sure you want to delete {selectedVersions.Count} selected version file(s)?");
+            if (result == true)
+            {
+                _viewModel.DeleteVersions(selectedVersions);
+            }
         }
 
-        
+        private void PrevLeagueClientPage_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.PrevLeagueClientPage();
+        }
+
+        private void NextLeagueClientPage_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.NextLeagueClientPage();
+        }
+
+        private void PrevLoLGameClientPage_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.PrevLoLGameClientPage();
+        }
+
+        private void NextLoLGameClientPage_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.NextLoLGameClientPage();
+        }
+
+        private void ManageVersionsControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            LeagueClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
+            LoLGameClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
+        }
+    }
+}

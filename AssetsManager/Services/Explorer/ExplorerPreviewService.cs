@@ -25,6 +25,8 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Comparator;
+using SharpVectors.Converters;
+using SharpVectors.Renderers.Wpf;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -75,7 +77,6 @@ namespace AssetsManager.Services.Explorer
             _detailsPreview = detailsPreview;
         }
 
-
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
             if (node != null && _currentlyDisplayedNode != null && _currentlyDisplayedNode.FullPath == node.FullPath)
@@ -105,15 +106,14 @@ namespace AssetsManager.Services.Explorer
                 // This is a special node representing a WEM sound from an audio bank.
                 else if (node.Type == NodeType.WemFile)
                 {
-                    // The AudioSource property, set during tree creation, tells us whether the WEM
-                    // is sourced from a WPK (standard VO) or a BNK (SFX or VO fallback).
-                    if (node.AudioSource == AudioSourceType.Bnk)
+                    byte[] wemData = await _wadExtractionService.GetWemFileBytesAsync(node);
+                    if (wemData != null)
                     {
-                        await PreviewWemFromBnkAsync(node);
+                        await DispatchPreview(wemData, ".wem");
                     }
                     else
                     {
-                        await PreviewWemFromWpkAsync(node);
+                        await ShowUnsupportedPreviewAsync(node.Extension);
                     }
                 }
             }
@@ -124,100 +124,11 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        /// <summary>
-        /// Extracts and previews a WEM file that is embedded inside a BNK file.
-        /// </summary>
-        private async Task PreviewWemFromBnkAsync(FileSystemNodeModel node)
-        {
-            if (string.IsNullOrEmpty(node.SourceWadPath) || node.WemSize == 0)
-            {
-                await ShowUnsupportedPreviewAsync(node.Extension);
-                return;
-            }
-
-            try
-            {
-                // 1. Get the parent BNK file's data from the WAD.
-                byte[] bnkData;
-                using (var wadFile = new WadFile(node.SourceWadPath))
-                {
-                    var chunk = wadFile.FindChunk(node.SourceChunkPathHash);
-                    using var decompressedOwner = wadFile.LoadChunkDecompressed(chunk);
-                    bnkData = decompressedOwner.Span.ToArray();
-                }
-
-                // 2. Extract the specific WEM data from the BNK data using the absolute offset and size.
-                byte[] wemData = new byte[node.WemSize];
-                Array.Copy(bnkData, node.WemOffset, wemData, 0, node.WemSize);
-
-                // 3. Dispatch for conversion and playback.
-                await DispatchPreview(wemData, ".wem");
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, $"Failed to preview audio sound from BNK: {node.Name}");
-                await ShowUnsupportedPreviewAsync(node.Extension);
-            }
-        }
-
-        private async Task PreviewWemFromWpkAsync(FileSystemNodeModel node)
-        {
-            if (string.IsNullOrEmpty(node.SourceWadPath) || node.SourceChunkPathHash == 0 || node.WemId == 0)
-            {
-                await ShowUnsupportedPreviewAsync(node.Extension);
-                return;
-            }
-
-            try
-            {
-                // Step 1: Get the parent WPK data from the WAD
-                byte[] wpkData;
-                using (var wadFile = new WadFile(node.SourceWadPath))
-                {
-                    var chunk = wadFile.FindChunk(node.SourceChunkPathHash);
-                    using var decompressedOwner = wadFile.LoadChunkDecompressed(chunk);
-                    wpkData = decompressedOwner.Span.ToArray();
-                }
-
-                // Step 2: Parse the WPK and extract the WEM data
-                byte[] wemData = null;
-                await Task.Run(() =>
-                {
-                    using var wpkStream = new MemoryStream(wpkData);
-                    var wpk = WpkParser.Parse(wpkStream, _logService);
-                    var wem = wpk.Wems.FirstOrDefault(w => w.Id == node.WemId);
-                    if (wem != null)
-                    {
-                        using var reader = new BinaryReader(wpkStream);
-                        wpkStream.Seek(wem.Offset, SeekOrigin.Begin);
-                        wemData = reader.ReadBytes((int)wem.Size);
-                    }
-                });
-
-                if (wemData != null)
-                {
-                    // Step 3: Dispatch to the media player
-                    await DispatchPreview(wemData, ".wem");
-                }
-                else
-                {
-                    _logService.LogWarning($"WEM file with ID {node.WemId} not found inside its parent WPK.");
-                    await ShowUnsupportedPreviewAsync(node.Extension);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, $"Failed to preview audio sound: {node.Name}");
-                await ShowUnsupportedPreviewAsync(node.Extension);
-            }
-        }
-
         public async Task ResetPreviewAsync()
         {
             _currentlyDisplayedNode = null;
             await SetPreviewerAsync(Previewer.Placeholder);
         }
-
 
         private async Task PreviewRealFile(FileSystemNodeModel node)
         {
@@ -480,18 +391,24 @@ namespace AssetsManager.Services.Explorer
 
         private async Task ShowSvgPreviewAsync(byte[] data)
         {
-            if (_webViewContainer == null)
-            {
-                await ShowUnsupportedPreviewAsync(".svg");
-                return;
-            }
-
             try
             {
-                string svgContent = Encoding.UTF8.GetString(data);
-                var htmlContent = $@"<!DOCTYPE html><html><head><meta charset=""UTF-8""/><style>html, body {{background-color: transparent !important;display: flex;justify-content: center;align-items: center;height: 100vh;margin: 0;padding: 20px;box-sizing: border-box;overflow: hidden;}}svg {{width: 90%;height: 90%;object-fit: contain;}}</style></head><body>{svgContent}</body></html>";
+                await using var stream = new MemoryStream(data);
 
-                await SetPreviewerAsync(Previewer.WebView, htmlContent);
+                WpfDrawingSettings settings = new WpfDrawingSettings();
+                settings.IncludeRuntime = false;
+                settings.TextAsGeometry = true;
+
+                StreamSvgConverter converter = new StreamSvgConverter(settings);
+
+                using (MemoryStream dummyOutputStream = new MemoryStream())
+                {
+                    converter.Convert(stream, dummyOutputStream);
+                }
+
+                DrawingGroup drawing = converter.Drawing;
+
+                await SetPreviewerAsync(Previewer.Image, new DrawingImage(drawing));
             }
             catch (Exception ex)
             {
@@ -566,7 +483,7 @@ namespace AssetsManager.Services.Explorer
                                 background-color: #252526;
                                 object-fit: contain;
                                 opacity: 0;
-                                transition: opacity 0.2s ease-out;
+                                transition: opacity 0.1s ease-out;
                             }}
                             
                             {tag}.loaded {{
@@ -627,8 +544,5 @@ namespace AssetsManager.Services.Explorer
         {
             await SetPreviewerAsync(Previewer.Placeholder, extension);
         }
-
-
-
     }
 }

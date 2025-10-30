@@ -297,24 +297,18 @@ namespace AssetsManager.Views
 
         private void OnSidebarNavigationRequested(string viewTag)
         {
-            // Limpiar vista actual antes de cambiar
-            if (MainContentArea.Content is ExplorerWindow explorerWindow)
+            // Only clean up the current view if we are navigating to a *main content view*
+            // Dialogs (Settings, Help) do not replace the main content, so no cleanup is needed.
+            if (viewTag != "Settings" && viewTag != "Help")
             {
-                explorerWindow.CleanupResources();
-                // GC.Collect();
-                // GC.WaitForPendingFinalizers();
-                // GC.Collect();
-                // long memoryAfter = GC.GetTotalMemory(true);
-                // _logService.LogDebug($"[DEBUG] Memory after leaving Explorer: {memoryAfter / 1024.0 / 1024.0:F2} MB");
-            }
-            else if (MainContentArea.Content is ModelWindow modelWindow)
-            {
-                modelWindow.CleanupResources();
-                // GC.Collect();
-                // GC.WaitForPendingFinalizers();
-                // GC.Collect();
-                // long memoryAfter = GC.GetTotalMemory(true);
-                // _logService.LogDebug($"[DEBUG] Memory after leaving Models: {memoryAfter / 1024.0 / 1024.0:F2} MB");
+                if (MainContentArea.Content is ExplorerWindow explorerWindow)
+                {
+                    explorerWindow.CleanupResources();
+                }
+                else if (MainContentArea.Content is ModelWindow modelWindow)
+                {
+                    modelWindow.CleanupResources();
+                }
             }
             
             switch (viewTag)

@@ -21,7 +21,7 @@ namespace AssetsManager.Views
         private readonly AppSettings _appSettings;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly GeneralSettingsView _generalSettingsView;
-        private readonly HashPathsSettingsView _hashPathsSettingsView;
+        private readonly DefaultPathsSettingsView _defaultPathsSettingsView;
         private readonly AdvancedSettingsView _advancedSettingsView;
 
         public event EventHandler<SettingsChangedEventArgs> SettingsChanged;
@@ -39,12 +39,12 @@ namespace AssetsManager.Views
 
             // Instantiate all views
             _generalSettingsView = _serviceProvider.GetRequiredService<GeneralSettingsView>();
-            _hashPathsSettingsView = _serviceProvider.GetRequiredService<HashPathsSettingsView>();
+            _defaultPathsSettingsView = _serviceProvider.GetRequiredService<DefaultPathsSettingsView>();
             _advancedSettingsView = _serviceProvider.GetRequiredService<AdvancedSettingsView>();
 
             // Apply settings to all views                        
             _generalSettingsView.ApplySettingsToUI(_appSettings);      
-            _hashPathsSettingsView.ApplySettingsToUI(_appSettings);    
+            _defaultPathsSettingsView.ApplySettingsToUI(_appSettings);    
             _advancedSettingsView.ApplySettingsToUI(_appSettings);     
 
             SetupNavigation();
@@ -54,7 +54,7 @@ namespace AssetsManager.Views
         private void SetupNavigation()
         {
             NavGeneral.Checked += NavGeneral_Checked;
-            NavHashes.Checked += NavHashes_Checked;
+            NavDefaultPaths.Checked += NavDefaultPaths_Checked;
             NavAdvanced.Checked += NavAdvanced_Checked;
         }
 
@@ -63,9 +63,9 @@ namespace AssetsManager.Views
             NavigateToView(_generalSettingsView);
         }
 
-        private void NavHashes_Checked(object sender, RoutedEventArgs e)
+        private void NavDefaultPaths_Checked(object sender, RoutedEventArgs e)
         {
-            NavigateToView(_hashPathsSettingsView);
+            NavigateToView(_defaultPathsSettingsView);
         }
 
         private void NavAdvanced_Checked(object sender, RoutedEventArgs e)
@@ -81,7 +81,7 @@ namespace AssetsManager.Views
         private void SettingsWindow_Closed(object sender, EventArgs e)
         {
             NavGeneral.Checked -= NavGeneral_Checked;
-            NavHashes.Checked -= NavHashes_Checked;
+            NavDefaultPaths.Checked -= NavDefaultPaths_Checked;
             NavAdvanced.Checked -= NavAdvanced_Checked;
         }
 
@@ -98,7 +98,7 @@ namespace AssetsManager.Views
 
                 // Apply settings to all views                         
                 _generalSettingsView.ApplySettingsToUI(_appSettings);  
-                _hashPathsSettingsView.ApplySettingsToUI(_appSettings);
+                _defaultPathsSettingsView.ApplySettingsToUI(_appSettings);
                 _advancedSettingsView.ApplySettingsToUI(_appSettings); 
 
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = true });
@@ -109,7 +109,7 @@ namespace AssetsManager.Views
         {
             // Save settings from all views
             _generalSettingsView.SaveSettings();
-            _hashPathsSettingsView.SaveSettings();
+            _defaultPathsSettingsView.SaveSettings();
             _advancedSettingsView.SaveSettings();
 
             AppSettings.SaveSettings(_appSettings);

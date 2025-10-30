@@ -30,7 +30,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="Compare" FontSize="24" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}"/>
+                                        <materialIcons:MaterialIcon Kind="Compare" Width="32" Height="32" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}"/>
                     <StackPanel>
                         <TextBlock Text="WAD COMPARISON RESULTS" 
                                    FontSize="24" 
@@ -65,17 +65,13 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="3*"/>
             </Grid.ColumnDefinitions>
-
             <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0"
-                                              SelectedItemChanged="ResultsTree_SelectedItemChanged"
-                                              SearchTextChanged="SearchTextBox_TextChanged"
-                                              WadContextMenuOpening="ResultsTree_ContextMenuOpening"
-                                              ViewDifferencesClick="ViewDifferences_Click"/>
-
+                                            SelectedItemChanged="ResultsTree_SelectedItemChanged"
+                                            SearchTextChanged="SearchTextBox_TextChanged"
+                                            WadContextMenuOpening="ResultsTree_ContextMenuOpening"
+                                            ViewDifferencesClick="ViewDifferences_Click"/>
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
-
             <controls:WadDiffDetailsControl x:Name="DiffDetails" Grid.Column="2"/>
-
         </Grid>
     </Grid>
 </Window>

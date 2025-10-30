@@ -21,6 +21,7 @@ namespace AssetsManager.Utils
         private static readonly byte[] BIN_PROP_SIGNATURE = { 0x50, 0x52, 0x4F, 0x50 }; // "PROP"
         private static readonly byte[] BIN_PTCH_SIGNATURE = { 0x50, 0x54, 0x43, 0x48 }; // "PTCH"
         private static readonly byte[] ICO_SIGNATURE = { 0x00, 0x00, 0x01, 0x00 };
+        private static readonly byte[] TEX_SIGNATURE = { 0x54, 0x45, 0x58, 0x00 }; // "TEX\0"
 
         public static string GuessExtension(Span<byte> data)
         {
@@ -28,6 +29,7 @@ namespace AssetsManager.Utils
                 return string.Empty;
 
             if (StartsWith(data, DDS_SIGNATURE)) return "dds";
+            if (StartsWith(data, TEX_SIGNATURE)) return "tex";
             if (StartsWith(data, PNG_SIGNATURE)) return "png";
             if (StartsWith(data, JPG_SIGNATURE)) return "jpg";
             if (StartsWith(data, OGG_SIGNATURE)) return "ogg";

@@ -6,12 +6,12 @@ using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Settings
 {
-    public partial class HashPathsSettingsView : UserControl
+    public partial class DefaultPathsSettingsView : UserControl
     {
         private AppSettings _appSettings;
         private readonly LogService _logService;
 
-        public HashPathsSettingsView(LogService logService)
+        public DefaultPathsSettingsView(LogService logService)
         {
             InitializeComponent();
             _logService = logService;

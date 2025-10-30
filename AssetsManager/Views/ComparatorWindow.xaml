@@ -26,7 +26,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <materialIcons:MaterialIcon Kind="Compare"
+                <materialIcons:MaterialIcon Kind="FileCompare"
                                              Height="54"
                                              Width="54"
                                              Margin="0,0,10,0"

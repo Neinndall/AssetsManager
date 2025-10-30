@@ -31,13 +31,13 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <icons:MaterialIcon Kind="CompareHorizontal" 
+                    <icons:MaterialIcon Kind="FileDocumentEditOutline" 
                                         Width="32" Height="32" 
                                         Margin="0,0,12,0" 
                                         VerticalAlignment="Center" 
                                         Foreground="{StaticResource AccentBrush}"/>
                     <StackPanel>
-                        <TextBlock Text="TEXT DIFFERENCE"
+                        <TextBlock Text="TEXT COMPARISON"
                                    FontSize="24"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource AccentBrush}"/>

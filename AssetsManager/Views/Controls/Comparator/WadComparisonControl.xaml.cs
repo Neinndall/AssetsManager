@@ -104,13 +104,16 @@ namespace AssetsManager.Views.Controls.Comparator
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select old directory"
+                Title = "Select old directory",
+                InitialDirectory = AppSettings.LolDirectory
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    oldLolDirectoryTextBox.Text = folderBrowserDialog.FileName;
-                    LogService.LogDebug($"Old Directory selected: {folderBrowserDialog.FileName}");
+                    var oldPath = folderBrowserDialog.FileName;
+                    oldLolDirectoryTextBox.Text = oldPath;
+                    newLolDirectoryTextBox.Text = oldPath.Replace("(PBE)_old", "(PBE)");
+                    LogService.LogDebug($"Old Directory selected: {oldPath}");
                 }
             }
         }
@@ -120,13 +123,16 @@ namespace AssetsManager.Views.Controls.Comparator
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select new directory"
+                Title = "Select new directory",
+                InitialDirectory = AppSettings.LolDirectory
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    newLolDirectoryTextBox.Text = folderBrowserDialog.FileName;
-                    LogService.LogDebug($"New Directory selected: {folderBrowserDialog.FileName}");
+                    var newPath = folderBrowserDialog.FileName;
+                    newLolDirectoryTextBox.Text = newPath;
+                    oldLolDirectoryTextBox.Text = newPath.Replace("(PBE)", "(PBE)_old");
+                    LogService.LogDebug($"New Directory selected: {newPath}");
                 }
             }
         }
@@ -136,12 +142,15 @@ namespace AssetsManager.Views.Controls.Comparator
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
-                Title = "Select old wad file"
+                Title = "Select old wad file",
+                InitialDirectory = AppSettings.LolDirectory
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                oldWadFileTextBox.Text = openFileDialog.FileName;
+                var oldPath = openFileDialog.FileName;
+                oldWadFileTextBox.Text = oldPath;
+                newWadFileTextBox.Text = oldPath.Replace("(PBE)_old", "(PBE)");
             }
         }
 
@@ -150,12 +159,15 @@ namespace AssetsManager.Views.Controls.Comparator
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
-                Title = "Select new wad file"
+                Title = "Select new wad file",
+                InitialDirectory = AppSettings.LolDirectory
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                newWadFileTextBox.Text = openFileDialog.FileName;
+                var newPath = openFileDialog.FileName;
+                newWadFileTextBox.Text = newPath;
+                oldWadFileTextBox.Text = newPath.Replace("(PBE)", "(PBE)_old");
             }
         }
 

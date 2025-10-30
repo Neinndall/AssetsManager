@@ -74,7 +74,7 @@
                             Foreground="{StaticResource TextMuted}"
                             HorizontalAlignment="Center"
                             Margin="0,0,0,8"/>
-                    <TextBlock Text="Load a skn or mapgeo file to visualize it in 3D."
+                    <TextBlock Text="Load a model, chroma or mapgeometry to view it in 3D"
                             FontSize="16"
                             Foreground="{StaticResource TextMuted}"
                             HorizontalAlignment="Center"

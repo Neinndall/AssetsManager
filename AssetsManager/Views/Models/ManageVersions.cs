@@ -13,7 +13,7 @@ namespace AssetsManager.Views.Models
     {
         private readonly VersionService _versionService;
         private readonly LogService _logService;
-        private const int PageSize = 10;
+        private const int PageSize = 5;
 
         private List<VersionFileInfo> _allLeagueClientVersions;
         private List<VersionFileInfo> _allLoLGameClientVersions;

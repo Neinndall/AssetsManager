@@ -42,14 +42,11 @@
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="newHashesTextBox" 
                                  Grid.Column="0"
-                                 Height="36"
                                  IsReadOnly="True"
                                  Style="{StaticResource ModernTextBox}"
                                  ToolTip="Select the directory containing new hash files"/>
                         <Button Grid.Column="2"
                                 Content="Browse"
-                                Width="80" 
-                                Height="36"
                                 Style="{StaticResource SecondaryButton}"
                                 Click="btnSelectNewHashesDirectory_Click"
                                 ToolTip="Browse for directory"/>
@@ -89,14 +86,11 @@
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="oldHashesTextBox" 
                                  Grid.Column="0"
-                                 Height="36"
                                  IsReadOnly="True"
                                  Style="{StaticResource ModernTextBox}"
                                  ToolTip="Select the directory containing old hash files"/>
                         <Button Grid.Column="2"
                                 Content="Browse"
-                                Width="80" 
-                                Height="36"
                                 Style="{StaticResource SecondaryButton}"
                                 Click="btnSelectOldHashesDirectory_Click"
                                 ToolTip="Browse for directory"/>

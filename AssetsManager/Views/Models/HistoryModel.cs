@@ -10,7 +10,7 @@ namespace AssetsManager.Views.Models
 {
     public class HistoryModel : INotifyPropertyChanged
     {
-        private const int PageSize = 10;
+        private const int PageSize = 5;
         private List<JsonDiffHistoryEntry> _allHistoryEntries;
 
         public ObservableCollection<JsonDiffHistoryEntry> PaginatedHistory { get; } = new ObservableCollection<JsonDiffHistoryEntry>();

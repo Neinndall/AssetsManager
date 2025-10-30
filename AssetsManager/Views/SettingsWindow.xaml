@@ -53,7 +53,7 @@
                                GroupName="Navigation" 
                                Style="{StaticResource NavButtonStyle}"/>
                     
-                    <RadioButton x:Name="NavHashes" 
+                    <RadioButton x:Name="NavDefaultPaths" 
                                Content="Default Paths" 
                                Tag="📁"
                                GroupName="Navigation" 

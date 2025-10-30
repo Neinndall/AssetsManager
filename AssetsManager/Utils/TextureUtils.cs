@@ -34,8 +34,12 @@ namespace AssetsManager.Utils
                 return exactMatch;
             }
 
-            var genericMaterialNames = new List<string> { "body", "face", "head", "eyes", "leg" };
-            if (genericMaterialNames.Contains(materialName.ToLower()))
+            var genericMaterialKeywords = new List<string> { "body", "face", "head", "hair", "mask", "eyes", "leg" };
+            string lowerMaterialName = materialName.ToLower();
+            if (genericMaterialKeywords.Any(keyword =>
+                lowerMaterialName.Equals(keyword) ||
+                lowerMaterialName.Equals($"{keyword}_mat")
+            ))
             {
                 string mainTextureCandidate = $"{skinName}_tx_cm";
                 string genericMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(mainTextureCandidate, StringComparison.OrdinalIgnoreCase));
@@ -46,45 +50,27 @@ namespace AssetsManager.Utils
                 }
             }
 
-            string propTexture = availableTextureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
-            if (propTexture != null)
-            {
-                if (!genericMaterialNames.Contains(materialName.ToLower()))
-                {
-                    logService.LogDebug($"Material '{materialName}' is not a generic body part, assigning generic prop texture '{propTexture}'.");
-                    return propTexture;
-                }
-            }
-
             logService.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
             var separatorChars = new[] { '_', '-', ' ' };
 
-            string normalizedMaterialName = NormalizeName(materialName);
-            var initialSplit = normalizedMaterialName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
+            Func<string, List<string>> getKeywords = (name) => {
+                string normalizedName = NormalizeName(name);
+                var initialSplit = normalizedName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
+                return initialSplit
+                    .SelectMany(word => Regex.Split(word, @"(?<!^)(?=[A-Z])")) // Splits PascalCase
+                    .Where(k => !k.Equals("mat", StringComparison.OrdinalIgnoreCase) && !k.Equals("tx", StringComparison.OrdinalIgnoreCase) && !k.Equals("cm", StringComparison.OrdinalIgnoreCase))
+                    .Select(k => k.ToLower())
+                    .ToList();
+            };
 
-            var materialKeywords = initialSplit
-                .SelectMany(word => Regex.Split(word, @"(?<!^)(?=[A-Z])")) // Splits PascalCase
-                .Where(k => !k.Equals("mat", StringComparison.OrdinalIgnoreCase))
-                .Select(k => k.ToLower())
-                .ToList();
-
+            var materialKeywords = getKeywords(materialName);
             string bestScoringMatch = null;
             int bestScore = 0;
 
             foreach (string key in availableTextureKeys)
             {
-                string normalizedKey = NormalizeName(key);
-                string lowerKey = normalizedKey.ToLower();
-                int currentScore = 0;
-
-                foreach (string keyword in materialKeywords)
-                {
-                    if (string.IsNullOrWhiteSpace(keyword)) continue;
-                    if (lowerKey.Contains(keyword))
-                    {
-                        currentScore++;
-                    }
-                }
+                var textureKeywords = getKeywords(key);
+                int currentScore = materialKeywords.Intersect(textureKeywords).Count();
 
                 if (currentScore > bestScore)
                 {
@@ -94,7 +80,7 @@ namespace AssetsManager.Utils
                 else if (currentScore > 0 && currentScore == bestScore)
                 {
                     bool bestIsTxCm = bestScoringMatch?.ToLower().Contains("_tx_cm") ?? false;
-                    bool currentIsTxCm = lowerKey.Contains("_tx_cm");
+                    bool currentIsTxCm = key.ToLower().Contains("_tx_cm");
 
                     if (currentIsTxCm && !bestIsTxCm)
                     {
@@ -103,7 +89,7 @@ namespace AssetsManager.Utils
                     else if (!currentIsTxCm && bestIsTxCm)
                     {
                     }
-                    else if (bestScoringMatch == null || key.Length < bestScoringMatch.Length)
+                    else if (bestScoringMatch == null || key.Length < bestScoringMatch.Length) // Prefer shorter name
                     {
                         bestScoringMatch = key;
                     }
@@ -114,6 +100,13 @@ namespace AssetsManager.Utils
             {
                 logService.LogDebug($"Found texture '{bestScoringMatch}' with score {bestScore} via keyword matching.");
                 return bestScoringMatch;
+            }
+
+            string propTexture = availableTextureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
+            if (propTexture != null)
+            {
+                logService.LogDebug($"Keyword matching failed. Falling back to generic prop texture '{propTexture}' for material '{materialName}'.");
+                return propTexture;
             }
 
             logService.LogDebug($"No texture found. Falling back to default: '{defaultTextureKey}'");

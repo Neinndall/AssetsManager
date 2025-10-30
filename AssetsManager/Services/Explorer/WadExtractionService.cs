@@ -13,6 +13,7 @@ using System.Windows.Media;
 using BCnEncoder.Shared;
 using System.Runtime.InteropServices;
 using LeagueToolkit.Core.Renderer;
+using AssetsManager.Services.Parsers;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -27,6 +28,7 @@ namespace AssetsManager.Services.Explorer
             _wadNodeLoaderService = wadNodeLoaderService;
         }
 
+        // Dirige el proceso de extracción al método adecuado según el tipo de nodo.
         public async Task ExtractNodeAsync(FileSystemNodeModel node, string destinationPath)
         {
             switch (node.Type)
@@ -45,6 +47,7 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        // Extrae recursivamente un directorio que existe virtualmente dentro de un archivo WAD.
         private async Task ExtractVirtualDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath)
         {
             string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
@@ -68,6 +71,7 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        // Copia recursivamente un directorio que ya existe en el disco físico (modo directorio).
         private async Task ExtractRealDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath)
         {
             string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
@@ -80,6 +84,7 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        // Extrae un único fichero virtual (desde un WAD o un backup) y lo guarda en el disco.
         private Task ExtractVirtualFileAsync(FileSystemNodeModel fileNode, string destinationPath)
         {
             return Task.Run(() =>
@@ -116,6 +121,7 @@ namespace AssetsManager.Services.Explorer
             });
         }
 
+        // Obtiene los bytes descomprimidos de un fichero virtual sin guardarlo, para usar en previsualizaciones.
         public Task<byte[]> GetVirtualFileBytesAsync(FileSystemNodeModel fileNode)
         {
             return Task.Run(() =>
@@ -158,6 +164,84 @@ namespace AssetsManager.Services.Explorer
             });
         }
 
+        // Orquesta la extracción de datos de audio .wem desde su contenedor (.bnk o .wpk).
+        public async Task<byte[]> GetWemFileBytesAsync(FileSystemNodeModel node)
+        {
+            if (node.Type != NodeType.WemFile)
+            {
+                _logService.LogWarning($"Attempted to get WEM bytes from a non-WEM file: {node.Name}");
+                return null;
+            }
+
+            try
+            {
+                byte[] containerData = await DecompressChunkByHashAsync(node.SourceWadPath, node.SourceChunkPathHash);
+                if (containerData == null)
+                {
+                    _logService.LogWarning($"Could not extract container for WEM file {node.Name}");
+                    return null;
+                }
+
+                if (node.AudioSource == AudioSourceType.Bnk)
+                {
+                    if (node.WemSize == 0) return null;
+
+                    byte[] wemData = new byte[node.WemSize];
+                    Array.Copy(containerData, node.WemOffset, wemData, 0, node.WemSize);
+                    return wemData;
+                }
+                else // Wpk
+                {
+                    if (node.WemId == 0) return null;
+
+                    return await Task.Run(() =>
+                    {
+                        using var wpkStream = new MemoryStream(containerData);
+                        var wpk = WpkParser.Parse(wpkStream, _logService);
+                        var wem = wpk.Wems.FirstOrDefault(w => w.Id == node.WemId);
+                        if (wem != null)
+                        {
+                            using var reader = new BinaryReader(wpkStream);
+                            wpkStream.Seek(wem.Offset, SeekOrigin.Begin);
+                            return reader.ReadBytes((int)wem.Size);
+                        }
+                        _logService.LogWarning($"WEM file with ID {node.WemId} not found inside its parent WPK.");
+                        return null;
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to extract WEM file '{node.FullPath}'.");
+                return null;
+            }
+        }
+
+        // Encuentra un chunk en un WAD por su hash y devuelve su contenido descomprimido.
+        private Task<byte[]> DecompressChunkByHashAsync(string wadPath, ulong chunkHash)
+        {
+            return Task.Run(() =>
+            {
+                try
+                {
+                    using var wadFile = new WadFile(wadPath);
+                    if (!wadFile.Chunks.TryGetValue(chunkHash, out var chunk))
+                    {
+                        _logService.LogWarning($"Chunk with hash {chunkHash:x16} not found in {wadPath}");
+                        return null;
+                    }
+                    using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
+                    return decompressedDataOwner.Span.ToArray();
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to get bytes for virtual file with hash: {chunkHash:x16}");
+                    return null;
+                }
+            });
+        }
+
+        // Limpia y sanea nombres de fichero para que sean compatibles con el sistema de archivos.
         public string SanitizeName(string name)
         {
             const int MaxLength = 240; // A bit less than 255 to be safe.
