@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -10,7 +9,7 @@ namespace AssetsManager.Views.Models
 {
     public class HistoryModel : INotifyPropertyChanged
     {
-        private const int PageSize = 5;
+        private const int PageSize = 10;
         private List<JsonDiffHistoryEntry> _allHistoryEntries;
 
         public ObservableCollection<JsonDiffHistoryEntry> PaginatedHistory { get; } = new ObservableCollection<JsonDiffHistoryEntry>();
