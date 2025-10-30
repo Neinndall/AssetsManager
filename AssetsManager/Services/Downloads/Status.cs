@@ -67,14 +67,21 @@ namespace AssetsManager.Services.Downloads
                     await _directoriesCreator.CreateHashesDirectories();
                     await _requests.DownloadSpecificHashesAsync(outdatedFiles);
 
-                    var filesToCopyToOld = new[] { GAME_HASHES_FILENAME, LCU_HASHES_FILENAME };
-                    foreach (var fileName in filesToCopyToOld)
+                    // Comprobamos si es una sincronización inicial.
+                    // Una forma de detectarlo es si la carpeta 'olds' está vacía.
+                    bool isInitialSync = !Directory.EnumerateFileSystemEntries(_directoriesCreator.HashesOldsPath).Any();
+
+                    if (isInitialSync)
                     {
-                        var sourceFile = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
-                        var destFile = Path.Combine(_directoriesCreator.HashesOldsPath, fileName);
-                        if (File.Exists(sourceFile))
+                        var filesToCopyToOld = new[] { GAME_HASHES_FILENAME, LCU_HASHES_FILENAME };
+                        foreach (var fileName in filesToCopyToOld)
                         {
-                            File.Copy(sourceFile, destFile, true);
+                            var sourceFile = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
+                            var destFile = Path.Combine(_directoriesCreator.HashesOldsPath, fileName);
+                            if (File.Exists(sourceFile))
+                            {
+                                File.Copy(sourceFile, destFile, true);
+                            }
                         }
                     }
                 }
