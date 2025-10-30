@@ -46,7 +46,7 @@
             <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
-                    <TextBlock Text="FileName" Style="{StaticResource HeaderTextStyle}"/>
+                    <TextBlock Text="Filename" Style="{StaticResource HeaderTextStyle}"/>
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" 

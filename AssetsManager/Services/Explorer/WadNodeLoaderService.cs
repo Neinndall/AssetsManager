@@ -79,7 +79,7 @@ namespace AssetsManager.Services.Explorer
                 var renamedFiles = wadGroup.Where(d => d.Type == ChunkDiffType.Renamed).ToList();
                 if (renamedFiles.Any())
                 {
-                    var renamedFilesNode = new FileSystemNodeModel($"[>] Renamed ({renamedFiles.Count})", true, "Renamed", wadGroup.Key) { Status = DiffStatus.Renamed };
+                    var renamedFilesNode = new FileSystemNodeModel($"[»] Renamed ({renamedFiles.Count})", true, "Renamed", wadGroup.Key) { Status = DiffStatus.Renamed };
                     foreach (var file in renamedFiles)
                     {
                         string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");

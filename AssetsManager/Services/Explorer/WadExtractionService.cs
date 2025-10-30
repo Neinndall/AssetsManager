@@ -244,15 +244,17 @@ namespace AssetsManager.Services.Explorer
         // Limpia y sanea nombres de fichero para que sean compatibles con el sistema de archivos.
         public string SanitizeName(string name)
         {
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var sanitized = new string(name.Where(c => !invalidChars.Contains(c)).ToArray()).Trim();
+
             const int MaxLength = 240; // A bit less than 255 to be safe.
-            if (name.Length > MaxLength)
+            if (sanitized.Length > MaxLength)
             {
-                var extension = Path.GetExtension(name);
+                var extension = Path.GetExtension(sanitized);
                 var newLength = MaxLength - extension.Length;
-                var sanitizedName = name.Substring(0, newLength) + extension;
-                return sanitizedName;
+                sanitized = sanitized.Substring(0, newLength) + extension;
             }
-            return name;
+            return sanitized;
         }
     }
 }
