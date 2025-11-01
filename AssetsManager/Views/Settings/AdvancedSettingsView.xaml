@@ -80,7 +80,7 @@
                                          Width="75"
                                          Style="{StaticResource ModernTextBox}"/>
                                 <ComboBox x:Name="AssetTrackerIntervalUnitComboBox"
-                                          Width="120"
+                                          Width="100"
                                           Margin="10,0,0,0"
                                           Style="{StaticResource ModernComboBox}"/>
                             </StackPanel>
@@ -145,7 +145,7 @@
                                          Width="75"
                                          Style="{StaticResource ModernTextBox}"/>
                                 <ComboBox x:Name="PbeIntervalUnitComboBox"
-                                          Width="120"
+                                          Width="100"
                                           Margin="10,0,0,0"
                                           Style="{StaticResource ModernComboBox}"/>
                             </StackPanel>
@@ -173,7 +173,7 @@
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox IsChecked="{Binding Settings.MinimizeToTrayOnClose, Mode=TwoWay}" 
-                                  Content="Close to minimize to tray" 
+                                  Content="Minimize to tray" 
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="When closing the app, the application will be minimized to the system tray"
                                      Foreground="{StaticResource TextMuted}" 
