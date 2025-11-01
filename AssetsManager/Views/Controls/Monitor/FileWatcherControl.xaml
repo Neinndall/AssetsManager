@@ -113,16 +113,15 @@
                                 </materialIcons:MaterialIcon.Style>
                             </materialIcons:MaterialIcon>
 
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Alias, StringFormat='Name: {0}'}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Alias, StringFormat='File: {0}'}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}" />
 
                             <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="View" Click="ViewChanges_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,5,0" IsEnabled="{Binding HasChanges}" Padding="8,3" FontSize="11"/>
-                                <Button Content="Remove" Style="{StaticResource DestructiveButton}" Click="Remove_Click" Padding="8,3" FontSize="11"/>
+                                <Button Content="View Changes" Click="ViewChanges_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,5,0" IsEnabled="{Binding HasChanges}" Padding="10,6"/>
+                                <Button Content="Remove" Style="{StaticResource DestructiveButton}" Click="Remove_Click" Padding="10,6"/>
                             </StackPanel>
 
-                            <!-- Row 2: URL, Last Checked -->
-                            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Text="{Binding Url}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}" />
-                            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding LastChecked}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Right" />
+                            <!-- Row 2: Combined Status and Last Checked -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Text="{Binding CombinedStatusAndDate}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0" />
                         </Grid>
                     </Border>
                 </DataTemplate>

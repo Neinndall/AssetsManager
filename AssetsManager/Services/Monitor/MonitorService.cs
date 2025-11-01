@@ -51,7 +51,7 @@ namespace AssetsManager.Services.Monitor
             {
                 _appSettings.JsonDataModificationDates.TryGetValue(url, out DateTime lastUpdated);
 
-                string statusText = "Pending check...";
+                string statusText = "Pending check";
                 string lastChecked = "N/A";
                 Brush statusColor = new SolidColorBrush(Colors.Gray);
 

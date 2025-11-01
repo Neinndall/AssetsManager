@@ -154,12 +154,12 @@ namespace AssetsManager.Services.Core
                 {
                     if (updatedCategoryNames.Count == 1)
                     {
-                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category!", null);
+                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category", null);
                     }
                     else
                     {
                         string categories = string.Join(", ", updatedCategoryNames);
-                        UpdatesFound?.Invoke($"New assets found in categories: {categories}!", null);
+                        UpdatesFound?.Invoke($"New assets found in categories: {categories}", null);
                     }
                 }
             }
@@ -194,7 +194,7 @@ namespace AssetsManager.Services.Core
 
             if (appUpdateAvailable)
             {
-                UpdatesFound?.Invoke($"Version {newVersion} is available!", newVersion);
+                UpdatesFound?.Invoke($"Version {newVersion} is available", newVersion);
             }
             
             if (_appSettings.SyncHashesWithCDTB)
@@ -203,14 +203,14 @@ namespace AssetsManager.Services.Core
                 {
                     if (silent)
                     {
-                        UpdatesFound?.Invoke("New hashes are available!", null);
+                        UpdatesFound?.Invoke("New hashes are available", null);
                     }
                 });
             }
 
             if (_appSettings.CheckJsonDataUpdates)
             {
-                await _jsonDataService.CheckJsonDataUpdatesAsync(silent, () => { UpdatesFound?.Invoke("JSON files have been updated!", null); });
+                await _jsonDataService.CheckJsonDataUpdatesAsync(silent, () => { UpdatesFound?.Invoke("Monitored files have been updated", null); });
             }
         }
 

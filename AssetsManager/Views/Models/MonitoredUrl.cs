@@ -43,6 +43,7 @@ namespace AssetsManager.Views.Models
                 {
                     _statusText = value;
                     OnPropertyChanged(nameof(StatusText));
+                    OnPropertyChanged(nameof(CombinedStatusAndDate)); // Notify CombinedStatusAndDate
                 }
             }
         }
@@ -71,9 +72,13 @@ namespace AssetsManager.Views.Models
                 {
                     _lastChecked = value;
                     OnPropertyChanged(nameof(LastChecked));
+                    OnPropertyChanged(nameof(CombinedStatusAndDate)); // Notify CombinedStatusAndDate
                 }
             }
         }
+
+        // New property to combine StatusText and LastChecked for display
+        public string CombinedStatusAndDate => $"Status: {StatusText} | {LastChecked}";
 
         private bool _hasChanges;
         public bool HasChanges
