@@ -32,7 +32,6 @@ namespace AssetsManager.Views.Models
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
         public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();
-
         public string DisplayName
         {
             get
@@ -53,7 +52,29 @@ namespace AssetsManager.Views.Models
             }
         }
 
-        
+        public string BreadcrumbDisplayName
+        {
+            get
+            {
+                var name = DisplayName;
+
+                if (name.StartsWith("[") && name.Length > 4 && name[3] == ' ')
+                {
+                    name = name.Substring(4);
+                }
+
+                int parenthesisIndex = name.LastIndexOf(" (");
+                if (parenthesisIndex > 0)
+                {
+                    string potentialNumber = name.Substring(parenthesisIndex + 2);
+                    if (potentialNumber.Length > 1 && potentialNumber.EndsWith(")") && int.TryParse(potentialNumber.Substring(0, potentialNumber.Length - 1), out _))
+                    {
+                        name = name.Substring(0, parenthesisIndex).Trim();
+                    }
+                }
+                return name;
+            }
+        }
 
         private bool _isExpanded;
         public bool IsExpanded

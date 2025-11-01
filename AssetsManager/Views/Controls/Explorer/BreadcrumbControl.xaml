@@ -14,7 +14,7 @@
         <ItemsControl.ItemTemplate>
             <DataTemplate>
                 <StackPanel Orientation="Horizontal">
-                    <Button Content="{Binding DisplayName}" Click="Button_Click">
+                    <Button Content="{Binding BreadcrumbDisplayName}" Click="Button_Click">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
                                 <Style.Triggers>
