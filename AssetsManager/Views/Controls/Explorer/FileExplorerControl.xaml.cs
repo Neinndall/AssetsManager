@@ -538,7 +538,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
             }
 
-            const int maxItems = 6; 
+            const int maxItems = 5; 
 
             if (path.Count > maxItems)
             {

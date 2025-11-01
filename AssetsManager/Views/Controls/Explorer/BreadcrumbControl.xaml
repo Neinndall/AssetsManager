@@ -25,17 +25,7 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <TextBlock Text="/" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding DisplayName}" Value="...">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                    <TextBlock Text="/" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                 </StackPanel>
             </DataTemplate>
         </ItemsControl.ItemTemplate>
