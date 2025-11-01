@@ -21,6 +21,7 @@ namespace AssetsManager.Views.Models
         public uint WemId { get; set; } // Only for WemFile
         public uint WemOffset { get; set; } // Only for WemFile from BNK
         public uint WemSize { get; set; } // Only for WemFile from BNK
+        public bool IsEnabled { get; set; } = true;
         public AudioSourceType AudioSource { get; set; } // Only for WemFile
 
         public ObservableCollection<FileSystemNodeModel> Children { get; set; }

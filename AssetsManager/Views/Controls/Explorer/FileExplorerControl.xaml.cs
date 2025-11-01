@@ -527,7 +527,6 @@ namespace AssetsManager.Views.Controls.Explorer
             var path = TreeUIManager.FindNodePath(RootNodes, selectedNode);
             if (path == null) return;
 
-            // If the selected node is a file, show the path to its parent
             if (selectedNode.Type == NodeType.RealFile || 
                 selectedNode.Type == NodeType.VirtualFile || 
                 selectedNode.Type == NodeType.WemFile ||
@@ -537,6 +536,23 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     path.RemoveAt(path.Count - 1);
                 }
+            }
+
+            const int maxItems = 6; 
+
+            if (path.Count > maxItems)
+            {
+                var truncatedPath = new List<FileSystemNodeModel>();
+                truncatedPath.Add(path[0]); 
+                truncatedPath.Add(path[1]); 
+        
+                truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
+
+                for (int i = path.Count - 2; i < path.Count; i++)
+                {
+                    truncatedPath.Add(path[i]);
+                }
+                path = truncatedPath; 
             }
 
             foreach (var node in path)

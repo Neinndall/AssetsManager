@@ -8,14 +8,34 @@
     <ItemsControl ItemsSource="{Binding Nodes}">
         <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal"/>
+                <StackPanel Orientation="Horizontal"/>
             </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate>
                 <StackPanel Orientation="Horizontal">
-                    <Button Content="{Binding DisplayName}" Click="Button_Click" Style="{StaticResource TransparentIconButton}"/>
-                    <TextBlock Text="/" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <Button Content="{Binding DisplayName}" Click="Button_Click">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                        <Setter Property="IsEnabled" Value="False"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <TextBlock Text="/" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DisplayName}" Value="...">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </StackPanel>
             </DataTemplate>
         </ItemsControl.ItemTemplate>
