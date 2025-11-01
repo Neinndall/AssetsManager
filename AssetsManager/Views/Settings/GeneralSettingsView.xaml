@@ -53,7 +53,7 @@
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
-                        <CheckBox x:Name="checkBoxSyncHashes" 
+                        <CheckBox IsChecked="{Binding Settings.SyncHashesWithCDTB, Mode=TwoWay}" 
                                   Content="Synchronization with CDTB" 
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="Automatically sync with the latest hash database from CDTB servers"
@@ -62,7 +62,7 @@
                                      Margin="27,0,0,8" 
                                      TextWrapping="Wrap"/>
 
-                        <CheckBox x:Name="checkBoxSaveDiffHistory" 
+                        <CheckBox IsChecked="{Binding Settings.SaveDiffHistory, Mode=TwoWay}" 
                                   Content="Save differences history"
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="Save a history of all JSON file differences detected during updates"
@@ -93,6 +93,7 @@
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox x:Name="checkBoxBackgroundUpdates" 
+                                  IsChecked="{Binding Settings.BackgroundUpdates, Mode=TwoWay}"
                                   Content="Background updates" 
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="Periodically check for updates while the application is running"
@@ -117,14 +118,14 @@
                                        Foreground="{StaticResource TextSecondary}" 
                                        FontSize="12" 
                                        Margin="0,0,0,4"/>
-                            <ComboBox x:Name="comboBoxUpdateFrequency" 
+                            <ComboBox SelectedItem="{Binding Settings.UpdateCheckFrequency, Mode=TwoWay}" 
                                       Width="150" 
                                       HorizontalAlignment="Left"
                                       Style="{StaticResource ModernComboBox}"
                                       ItemsSource="{StaticResource UpdateFrequencies}"/>
                         </StackPanel>
 
-                        <CheckBox x:Name="checkBoxCheckJsonData" 
+                        <CheckBox IsChecked="{Binding Settings.CheckJsonDataUpdates, Mode=TwoWay}" 
                                   Content="Check for files updates" 
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="Check for updates to json files and their differences"
@@ -154,7 +155,7 @@
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
-                        <CheckBox x:Name="checkBoxAutoCopy" 
+                        <CheckBox IsChecked="{Binding Settings.AutoCopyHashes, Mode=TwoWay}" 
                                   Content="Auto-replace outdated hashes" 
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="Automatically replace old hash files with newer versions"
@@ -163,7 +164,7 @@
                                      Margin="27,0,0,8" 
                                      TextWrapping="Wrap"/>
 
-                        <CheckBox x:Name="checkBoxCreateBackUp" 
+                        <CheckBox IsChecked="{Binding Settings.CreateBackUpOldHashes, Mode=TwoWay}" 
                                   Content="Create hashes backups" 
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="Back up hash files before updates to prevent data loss"
@@ -193,7 +194,7 @@
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
-                        <CheckBox x:Name="checkBoxOnlyCheckDifferences" 
+                        <CheckBox IsChecked="{Binding Settings.OnlyCheckDifferences, Mode=TwoWay}" 
                                   Content="Scan-only mode (no downloads)" 
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="Only identify differences without downloading or modifying files"

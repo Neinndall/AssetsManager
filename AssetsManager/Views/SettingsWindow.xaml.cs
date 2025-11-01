@@ -1,10 +1,8 @@
 using System;
 using System.Windows;
-using Serilog;
-using AssetsManager.Utils;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Dialogs;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models;
 using AssetsManager.Views.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,6 +21,7 @@ namespace AssetsManager.Views
         private readonly GeneralSettingsView _generalSettingsView;
         private readonly DefaultPathsSettingsView _defaultPathsSettingsView;
         private readonly AdvancedSettingsView _advancedSettingsView;
+        private readonly SettingsModel _settingsModel;
 
         public event EventHandler<SettingsChangedEventArgs> SettingsChanged;
 
@@ -37,15 +36,15 @@ namespace AssetsManager.Views
             _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
 
-            // Instantiate all views
+            _settingsModel = new SettingsModel { Settings = _appSettings };
+
             _generalSettingsView = _serviceProvider.GetRequiredService<GeneralSettingsView>();
             _defaultPathsSettingsView = _serviceProvider.GetRequiredService<DefaultPathsSettingsView>();
             _advancedSettingsView = _serviceProvider.GetRequiredService<AdvancedSettingsView>();
 
-            // Apply settings to all views                        
-            _generalSettingsView.ApplySettingsToUI(_appSettings);      
-            _defaultPathsSettingsView.ApplySettingsToUI(_appSettings);    
-            _advancedSettingsView.ApplySettingsToUI(_appSettings);     
+            _generalSettingsView.ApplySettingsToUI(_settingsModel);
+            _defaultPathsSettingsView.ApplySettingsToUI(_settingsModel);
+            _advancedSettingsView.ApplySettingsToUI(_settingsModel);
 
             SetupNavigation();
             NavigateToView(_generalSettingsView);
@@ -96,10 +95,7 @@ namespace AssetsManager.Views
                 AppSettings.SaveSettings(_appSettings);
                 _customMessageBoxService.ShowInfo("Info", "Settings have been reset to default values.", this);
 
-                // Apply settings to all views                         
-                _generalSettingsView.ApplySettingsToUI(_appSettings);  
-                _defaultPathsSettingsView.ApplySettingsToUI(_appSettings);
-                _advancedSettingsView.ApplySettingsToUI(_appSettings); 
+                _settingsModel.Settings = _appSettings;
 
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = true });
             }
@@ -107,12 +103,9 @@ namespace AssetsManager.Views
 
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
-            // Save settings from all views
-            _generalSettingsView.SaveSettings();
-            _defaultPathsSettingsView.SaveSettings();
             _advancedSettingsView.SaveSettings();
 
-            AppSettings.SaveSettings(_appSettings);
+            AppSettings.SaveSettings(_settingsModel.Settings);
 
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = false });
         }

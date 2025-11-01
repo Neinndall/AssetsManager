@@ -44,6 +44,7 @@
 
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox x:Name="EnableAssetTrackerCheckBox"
+                                  IsChecked="{Binding Settings.AssetTrackerTimer, Mode=TwoWay}"
                                   Content="Enable automatic background check"
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="When enabled, the application will periodically check for new assets"
@@ -108,6 +109,7 @@
 
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox x:Name="EnablePbeStatusCheckBox"
+                                  IsChecked="{Binding Settings.CheckPbeStatus, Mode=TwoWay}"
                                   Content="PBE status notifications"
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="When enabled, the application will periodically check for PBE updates"
@@ -170,7 +172,7 @@
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
-                        <CheckBox x:Name="checkBoxMinimizeToTray" 
+                        <CheckBox IsChecked="{Binding Settings.MinimizeToTrayOnClose, Mode=TwoWay}" 
                                   Content="Close to minimize to tray" 
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="When closing the app, the application will be minimized to the system tray"
