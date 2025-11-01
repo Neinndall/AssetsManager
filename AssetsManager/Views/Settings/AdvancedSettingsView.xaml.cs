@@ -27,26 +27,28 @@ namespace AssetsManager.Views.Settings
             var model = this.DataContext as SettingsModel;
             if (model?.Settings == null) return;
 
-            if (model.Settings.AssetTrackerTimer)
+            var appSettings = model.Settings; // Added for clarity
+
+            if (appSettings.AssetTrackerTimer)
             {
                 if (int.TryParse(AssetTrackerIntervalValueTextBox.Text, out int assetValue) && assetValue >= 0)
                 {
                     string selectedAssetUnit = AssetTrackerIntervalUnitComboBox.SelectedItem as string;
                     if (selectedAssetUnit != null)
                     {
-                        model.Settings.AssetTrackerFrequency = ConvertToMinutes(assetValue, selectedAssetUnit);
+                        appSettings.AssetTrackerFrequency = ConvertToMinutes(assetValue, selectedAssetUnit);
                     }
                 }
             }
 
-            if (model.Settings.CheckPbeStatus)
+            if (appSettings.CheckPbeStatus)
             {
                 if (int.TryParse(PbeIntervalValueTextBox.Text, out int pbeValue) && pbeValue >= 0)
                 {
                     string selectedPbeUnit = PbeIntervalUnitComboBox.SelectedItem as string;
                     if (selectedPbeUnit != null)
                     {
-                        model.Settings.PbeStatusFrequency = ConvertToMinutes(pbeValue, selectedPbeUnit);
+                        appSettings.PbeStatusFrequency = ConvertToMinutes(pbeValue, selectedPbeUnit);
                     }
                 }
             }
