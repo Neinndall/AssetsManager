@@ -26,7 +26,7 @@
                 </Grid.ColumnDefinitions>
 
                 <Button x:Name="ScrollLeftButton" Grid.Column="0" Style="{StaticResource TransparentIconButton}" Click="ScrollLeftButton_Click" Visibility="Collapsed" VerticalAlignment="Center" Padding="4,2">
-                    <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Height="18" />
+                    <materialIcons:MaterialIcon Kind="ChevronLeft" Width="16" Height="16" />
                 </Button>
 
                 <ScrollViewer Grid.Column="1" x:Name="TabsScrollViewer" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" ScrollChanged="TabsScrollViewer_ScrollChanged">
@@ -73,10 +73,10 @@
                 </ScrollViewer>
 
                 <Button x:Name="ScrollRightButton" Grid.Column="2" Style="{StaticResource TransparentIconButton}" Click="ScrollRightButton_Click" Visibility="Collapsed" VerticalAlignment="Center" Padding="4,2">
-                    <materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Height="18" />
+                    <materialIcons:MaterialIcon Kind="ChevronRight" Width="16" Height="16" />
                 </Button>
             </Grid>
-        <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BorderColor}" Margin="0,5,5,5" Visibility="{Binding PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
+        <Border x:Name="PinnedTabsSeparator" DockPanel.Dock="Top" Height="1" Background="{StaticResource BorderColor}" Margin="0,5,5,5" Visibility="{Binding PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
 
         <Grid x:Name="PreviewContainer" Margin="5">
             <local:DetailsTabView x:Name="DetailsPreview" Visibility="Collapsed"/>
