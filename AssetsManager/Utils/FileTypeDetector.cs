@@ -12,6 +12,7 @@ namespace AssetsManager.Utils
         private static readonly byte[] WEBP_SIGNATURE = { 0x52, 0x49, 0x46, 0x46 }; // RIFF
         private static readonly byte[] WEBP_VP8X_SIGNATURE = { 0x57, 0x45, 0x42, 0x50 }; // WEBP
         private static readonly byte[] OGG_SIGNATURE = { 0x4F, 0x67, 0x67, 0x53 }; // "OggS"
+        private static readonly byte[] WEBM_SIGNATURE = { 0x1A, 0x45, 0xDF, 0xA3 }; // EBML header
         private static readonly byte[] WEM_SIGNATURE = { 0x52, 0x49, 0x46, 0x46 }; // RIFF
         private static readonly byte[] WEM_WAVE_SIGNATURE = { 0x57, 0x41, 0x56, 0x45 }; // WAVE
         private static readonly byte[] BNK_SIGNATURE = { 0x42, 0x4B, 0x48, 0x44 }; // "BKHD"
@@ -33,6 +34,7 @@ namespace AssetsManager.Utils
             if (StartsWith(data, PNG_SIGNATURE)) return "png";
             if (StartsWith(data, JPG_SIGNATURE)) return "jpg";
             if (StartsWith(data, OGG_SIGNATURE)) return "ogg";
+            if (StartsWith(data, WEBM_SIGNATURE)) return "webm";
             if (StartsWith(data, BNK_SIGNATURE)) return "bnk";
             if (StartsWith(data, SKL_SIGNATURE)) return "skl";
             if (StartsWith(data, SKN_SIGNATURE)) return "skn";
