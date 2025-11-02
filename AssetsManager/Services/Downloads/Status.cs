@@ -69,7 +69,7 @@ namespace AssetsManager.Services.Downloads
 
                     // Comprobamos si es una sincronización inicial.
                     // Una forma de detectarlo es si la carpeta 'olds' está vacía.
-                    bool isInitialSync = !Directory.EnumerateFileSystemEntries(_directoriesCreator.HashesOldsPath).Any();
+                    bool isInitialSync = !Directory.EnumerateFileSystemEntries(_directoriesCreator.HashesOldPath).Any();
 
                     if (isInitialSync)
                     {
@@ -77,7 +77,7 @@ namespace AssetsManager.Services.Downloads
                         foreach (var fileName in filesToCopyToOld)
                         {
                             var sourceFile = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
-                            var destFile = Path.Combine(_directoriesCreator.HashesOldsPath, fileName);
+                            var destFile = Path.Combine(_directoriesCreator.HashesOldPath, fileName);
                             if (File.Exists(sourceFile))
                             {
                                 File.Copy(sourceFile, destFile, true);

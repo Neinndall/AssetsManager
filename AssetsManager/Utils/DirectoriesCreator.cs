@@ -12,7 +12,7 @@ namespace AssetsManager.Utils
 
         public string ResourcesPath { get; private set; }
         public string HashesNewPath { get; private set; }
-        public string HashesOldsPath { get; private set; }
+        public string HashesOldPath { get; private set; }
         public string JsonCacheNewPath { get; private set; }
         public string JsonCacheOldPath { get; private set; }
         public string JsonCacheHistoryPath { get; private set; }
@@ -20,7 +20,7 @@ namespace AssetsManager.Utils
         public string SubAssetsDownloadedPath { get; private set; }
         public string BackUpOldHashesPath { get; private set; }
         public string WadComparisonSavePath { get; private set; }
-        public string VersionsPath { get; private set; } // Add this
+        public string VersionsPath { get; private set; }
         public string AppDirectory { get; private set; }
 
         public string UpdateCachePath { get; private set; }
@@ -45,8 +45,10 @@ namespace AssetsManager.Utils
         {
             _logService = logService;
 
-            HashesNewPath = Path.Combine("hashes", "new");
-            HashesOldsPath = Path.Combine("hashes", "olds");
+            AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+            HashesNewPath = Path.Combine(AppDirectory, "hashes", "new");
+            HashesOldPath = Path.Combine(AppDirectory, "hashes", "olds");
 
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
@@ -56,8 +58,6 @@ namespace AssetsManager.Utils
             JsonCacheNewPath = Path.Combine(appFolderPath, "json_cache", "new");
             JsonCacheOldPath = Path.Combine(appFolderPath, "json_cache", "old");
             JsonCacheHistoryPath = Path.Combine(appFolderPath, "json_cache", "history");
-
-            AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
             UpdateCachePath = Path.Combine(appFolderPath, "update_cache");
             UpdateLogFilePath = Path.Combine(UpdateCachePath, "update_log.log");
@@ -118,7 +118,7 @@ namespace AssetsManager.Utils
         public Task CreateHashesDirectories()
         {
             CreateDirectoryInternal(HashesNewPath, false);
-            CreateDirectoryInternal(HashesOldsPath, false);
+            CreateDirectoryInternal(HashesOldPath, false);
             return Task.CompletedTask;
         }                                                                                 
  
