@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -30,10 +31,45 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             InitializeComponent();
             ViewModel = new PinnedFilesManager();
+            ViewModel.PinnedFiles.CollectionChanged += PinnedFiles_CollectionChanged;
             this.DataContext = ViewModel;
             this.Loaded += FilePreviewerControl_Loaded;
             this.Unloaded += FilePreviewerControl_Unloaded;
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+        }
+
+        private void PinnedFiles_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            UpdateScrollButtonsVisibility();
+        }
+
+        private void ScrollLeftButton_Click(object sender, RoutedEventArgs e)
+        {
+            TabsScrollViewer.ScrollToHorizontalOffset(TabsScrollViewer.HorizontalOffset - TabsScrollViewer.ActualWidth);
+        }
+
+        private void ScrollRightButton_Click(object sender, RoutedEventArgs e)
+        {
+            TabsScrollViewer.ScrollToHorizontalOffset(TabsScrollViewer.HorizontalOffset + TabsScrollViewer.ActualWidth);
+        }
+
+        private void TabsScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            UpdateScrollButtonsVisibility();
+        }
+
+        private void UpdateScrollButtonsVisibility()
+        {
+            if (TabsScrollViewer.ScrollableWidth > 0)
+            {
+                ScrollLeftButton.Visibility = TabsScrollViewer.HorizontalOffset > 0 ? Visibility.Visible : Visibility.Collapsed;
+                ScrollRightButton.Visibility = TabsScrollViewer.HorizontalOffset < TabsScrollViewer.ScrollableWidth ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else
+            {
+                ScrollLeftButton.Visibility = Visibility.Collapsed;
+                ScrollRightButton.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void FilePreviewerControl_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -124,6 +160,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     DetailsPreview
                 );
 
+                UpdateScrollButtonsVisibility();
+
                 _isLoaded = true;
             }
             catch (Exception ex)
@@ -138,6 +176,7 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 await ExplorerPreviewService.ResetPreviewAsync();
                 ViewModel.PropertyChanged -= ViewModel_PropertyChanged; // Unsubscribe to prevent memory leaks
+                ViewModel.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
             }
             catch (Exception ex)
             {
