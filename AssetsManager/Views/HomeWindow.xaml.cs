@@ -15,7 +15,8 @@ namespace AssetsManager.Views
             LogService logService,
             ExtractionService extractionService,
             AppSettings appSettings,
-            CustomMessageBoxService customMessageBoxService)
+            CustomMessageBoxService customMessageBoxService,
+            DirectoriesCreator directoriesCreator)
         {
             InitializeComponent();
             _appSettings = appSettings;
@@ -25,6 +26,7 @@ namespace AssetsManager.Views
             HomeControl.AppSettings = appSettings;
             HomeControl.ExtractionService = extractionService;
             HomeControl.CustomMessageBoxService = customMessageBoxService;
+            HomeControl.DirectoriesCreator = directoriesCreator;
         }
 
         public void UpdateSettings(AppSettings newSettings, bool wasResetToDefaults)

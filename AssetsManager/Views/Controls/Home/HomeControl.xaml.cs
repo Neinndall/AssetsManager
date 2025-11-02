@@ -15,6 +15,7 @@ namespace AssetsManager.Views.Controls.Home
         public AppSettings AppSettings { get; set; }
         public ExtractionService ExtractionService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public DirectoriesCreator DirectoriesCreator { get; set; }
 
         public string NewHashesPath => newHashesTextBox.Text;
         public string OldHashesPath => oldHashesTextBox.Text;
@@ -23,15 +24,8 @@ namespace AssetsManager.Views.Controls.Home
         {
             InitializeComponent();
             this.Loaded += DirectorySelectionControl_Loaded;
-            this.Unloaded += DirectorySelectionControl_Unloaded;
         }
-
-        private void DirectorySelectionControl_Unloaded(object sender, RoutedEventArgs e)
-        {
-            this.Loaded -= DirectorySelectionControl_Loaded;
-            this.Unloaded -= DirectorySelectionControl_Unloaded;
-        }
-
+        
         private void DirectorySelectionControl_Loaded(object sender, RoutedEventArgs e)
         {
             // Initialize paths from saved settings
@@ -67,7 +61,9 @@ namespace AssetsManager.Views.Controls.Home
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select New Hashes Directory"
+                Title = "Select new hashes directory",
+                InitialDirectory = DirectoriesCreator.HashesNewPath
+                
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -83,7 +79,8 @@ namespace AssetsManager.Views.Controls.Home
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select Old Hashes Directory"
+                Title = "Select old hashes directory",
+                InitialDirectory = DirectoriesCreator.HashesOldPath
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
