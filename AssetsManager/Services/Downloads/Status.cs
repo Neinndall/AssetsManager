@@ -154,7 +154,7 @@ namespace AssetsManager.Services.Downloads
                 else
                 {
                     long diskSize = new FileInfo(filePath).Length;
-                    if (configSize != diskSize) isOutOfSync = true;
+                    if (diskSize < configSize) isOutOfSync = true;
                 }
 
                 if (isOutOfSync)
