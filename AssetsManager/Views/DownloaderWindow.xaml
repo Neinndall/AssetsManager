@@ -40,7 +40,7 @@
                                                  Foreground="{StaticResource AccentBrush}"
                                                  Grid.Column="0"/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="DOWNLOADER" 
+                        <TextBlock Text="ASSETS DOWNLOADER" 
                                    FontSize="26" 
                                    FontWeight="Bold"
                                    Foreground="{StaticResource AccentBrush}"

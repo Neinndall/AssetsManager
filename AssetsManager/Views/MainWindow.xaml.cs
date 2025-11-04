@@ -115,7 +115,7 @@ namespace AssetsManager.Views
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
             Sidebar.NavigationRequested += OnSidebarNavigationRequested;
-            LoadHomeWindow();
+            LoadDownloaderWindow();
 
             if (IsAnySettingActive())
             {
@@ -313,7 +313,6 @@ namespace AssetsManager.Views
             
             switch (viewTag)
             {
-                case "Home": LoadHomeWindow(); break;
                 case "Downloader": LoadDownloaderWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
@@ -322,11 +321,6 @@ namespace AssetsManager.Views
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
-        }
-
-        private void LoadHomeWindow()
-        {
-            MainContentArea.Content = _serviceProvider.GetRequiredService<HomeWindow>();
         }
 
         private void LoadDownloaderWindow()
