@@ -314,6 +314,7 @@ namespace AssetsManager.Views
             switch (viewTag)
             {
                 case "Home": LoadHomeWindow(); break;
+                case "AssetsDownloader": LoadAssetsDownloaderWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Models": LoadModelWindow(); break;
@@ -326,6 +327,11 @@ namespace AssetsManager.Views
         private void LoadHomeWindow()
         {
             MainContentArea.Content = _serviceProvider.GetRequiredService<HomeWindow>();
+        }
+
+        private void LoadAssetsDownloaderWindow()
+        {
+            MainContentArea.Content = _serviceProvider.GetRequiredService<AssetsDownloaderWindow>();
         }
 
         private void LoadExplorerWindow()
@@ -365,9 +371,9 @@ namespace AssetsManager.Views
 
         private void OnSettingsChanged(object sender, SettingsChangedEventArgs e)
         {
-            if (MainContentArea.Content is HomeWindow homeView)
+            if (MainContentArea.Content is AssetsDownloaderWindow assetsDownloaderView)
             {
-                homeView.UpdateSettings(_appSettings, e.WasResetToDefaults);
+                assetsDownloaderView.UpdateSettings(_appSettings, e.WasResetToDefaults);
             }
             _updateCheckService.Stop();
             _updateCheckService.Start();

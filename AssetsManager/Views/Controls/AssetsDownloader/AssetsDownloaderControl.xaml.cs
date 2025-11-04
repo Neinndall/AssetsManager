@@ -7,9 +7,9 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace AssetsManager.Views.Controls.Home
+namespace AssetsManager.Views.Controls.AssetsDownloader
 {
-    public partial class HomeControl : UserControl
+    public partial class AssetsDownloaderControl : UserControl
     {
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
@@ -20,7 +20,7 @@ namespace AssetsManager.Views.Controls.Home
         public string NewHashesPath => newHashesTextBox.Text;
         public string OldHashesPath => oldHashesTextBox.Text;
 
-        public HomeControl()
+        public AssetsDownloaderControl()
         {
             InitializeComponent();
             this.Loaded += DirectorySelectionControl_Loaded;
