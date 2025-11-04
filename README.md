@@ -6,7 +6,7 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/Neinndall/AssetsManager?color=yellow&logo=github&logoColor=white&label=Release&style=flat)](https://github.com/Neinndall/AssetsManager/releases)
 [![Downloads](https://img.shields.io/github/downloads/Neinndall/AssetsManager/total?color=blue&logo=github&logoColor=white&label=Downloads&style=flat)](https://github.com/Neinndall/AssetsManager/releases)
-[![VirusTotal](https://img.shields.io/badge/VirusTotal-0/72-brightgreen?logo=virustotal&logoColor=white&style=flat)](https://www.virustotal.com/gui/file/239b3f986c07c397df913912a9f96cf65ea989a402b770220f5b348f4b2ca8e8/detection)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-0/72-brightgreen?logo=virustotal&logoColor=white&style=flat)](https://www.virustotal.com/gui/file/aaaecf286e7251605110bae3394e430c4e8a9fbcde561a5e0a4237cc981039ae/detection)
 
 AssetsManager is a tool for League of Legends enthusiasts who need to analyze, manage, and track changes to game assets from PBE server updates. It goes beyond simple downloading, offering a powerful suite of features for deep asset analysis, a 3D model viewer, exploration, and monitoring for changes.
 
