@@ -7,11 +7,11 @@ using System.Windows.Controls;
 
 namespace AssetsManager.Views
 {
-    public partial class AssetsDownloaderWindow : UserControl
+    public partial class DownloaderWindow : UserControl
     {
         private AppSettings _appSettings;
 
-        public AssetsDownloaderWindow(
+        public DownloaderWindow(
             LogService logService,
             ExtractionService extractionService,
             AppSettings appSettings,
@@ -22,17 +22,17 @@ namespace AssetsManager.Views
             _appSettings = appSettings;
 
             // Inject dependencies into child controls
-            AssetsDownloaderControl.LogService = logService;
-            AssetsDownloaderControl.AppSettings = appSettings;
-            AssetsDownloaderControl.ExtractionService = extractionService;
-            AssetsDownloaderControl.CustomMessageBoxService = customMessageBoxService;
-            AssetsDownloaderControl.DirectoriesCreator = directoriesCreator;
+            DownloaderControl.LogService = logService;
+            DownloaderControl.AppSettings = appSettings;
+            DownloaderControl.ExtractionService = extractionService;
+            DownloaderControl.CustomMessageBoxService = customMessageBoxService;
+            DownloaderControl.DirectoriesCreator = directoriesCreator;
         }
 
         public void UpdateSettings(AppSettings newSettings, bool wasResetToDefaults)
         {
             _appSettings = newSettings;
-            AssetsDownloaderControl.UpdateSettings(newSettings, wasResetToDefaults);
+            DownloaderControl.UpdateSettings(newSettings, wasResetToDefaults);
         }
     }
 }

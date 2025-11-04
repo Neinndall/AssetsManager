@@ -1,11 +1,11 @@
-<UserControl x:Class="AssetsManager.Views.AssetsDownloaderWindow"
+<UserControl x:Class="AssetsManager.Views.DownloaderWindow"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:AssetsManager.Views" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:assetsDownloaderControls="clr-namespace:AssetsManager.Views.Controls.AssetsDownloader"
+             xmlns:downloaderControls="clr-namespace:AssetsManager.Views.Controls.Downloader"
              mc:Ignorable="d" FontFamily="Consolas, Courier New">    
     <Grid>
         <Grid.RowDefinitions>
@@ -40,7 +40,7 @@
                                                  Foreground="{StaticResource AccentBrush}"
                                                  Grid.Column="0"/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="ASSETS DOWNLOADER" 
+                        <TextBlock Text="DOWNLOADER" 
                                    FontSize="26" 
                                    FontWeight="Bold"
                                    Foreground="{StaticResource AccentBrush}"
@@ -70,7 +70,7 @@
                                                    Margin="0,0,12,0"
                                                    VerticalAlignment="Center"/>
                         <StackPanel>
-                            <TextBlock Text="Assets Downloader Setup" 
+                            <TextBlock Text="Downloader Setup" 
                                        FontSize="18" 
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimary}"/>
@@ -82,7 +82,7 @@
                 </Border>
 
                 <!-- Content Card -->
-                <assetsDownloaderControls:AssetsDownloaderControl x:Name="AssetsDownloaderControl"/>
+                <downloaderControls:DownloaderControl x:Name="DownloaderControl"/>
             </StackPanel>
         </ScrollViewer>
     </Grid>

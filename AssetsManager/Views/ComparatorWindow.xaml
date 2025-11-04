@@ -6,8 +6,7 @@
              xmlns:local="clr-namespace:AssetsManager.Views"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:comparator="clr-namespace:AssetsManager.Views.Controls.Comparator"
-             mc:Ignorable="d"
-             FontFamily="Consolas, Courier New">
+             mc:Ignorable="d">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

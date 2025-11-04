@@ -5,8 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:models="clr-namespace:AssetsManager.Views.Controls.Models"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="1000">
+             mc:Ignorable="d">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

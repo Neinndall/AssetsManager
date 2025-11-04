@@ -47,7 +47,7 @@
                     </Grid>
                 </RadioButton>
 
-                <RadioButton x:Name="AssetsDownloaderButton" Style="{StaticResource SidebarRadioButtonStyle}" Click="MenuButton_Click" Tag="AssetsDownloader" Margin="0,0,0,4" GroupName="SidebarNavigation">
+                <RadioButton x:Name="DownloaderButton" Style="{StaticResource SidebarRadioButtonStyle}" Click="MenuButton_Click" Tag="Downloader" Margin="0,0,0,4" GroupName="SidebarNavigation">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
