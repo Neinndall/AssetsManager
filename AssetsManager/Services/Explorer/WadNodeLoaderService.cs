@@ -255,9 +255,7 @@ namespace AssetsManager.Services.Explorer
                 SourceChunkPathHash = chunkHash,
                 Status = status
             };
-
-
-
+            
             currentNode.Children.Add(fileNode);
             return fileNode;
         }
@@ -334,4 +332,3 @@ namespace AssetsManager.Services.Explorer
         }
     }
 }
-

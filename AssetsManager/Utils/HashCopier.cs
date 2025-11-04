@@ -28,7 +28,7 @@ namespace AssetsManager.Utils
         private async Task CopyNewHashesToOlds()
         {
             string sourcePath = _directoriesCreator.HashesNewPath;
-            string destinationPath = _directoriesCreator.HashesOldsPath;
+            string destinationPath = _directoriesCreator.HashesOldPath;
             var filesToCopy = new[] { "hashes.game.txt", "hashes.lcu.txt" };
 
             try

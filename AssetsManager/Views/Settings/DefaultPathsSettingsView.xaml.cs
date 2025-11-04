@@ -1,38 +1,20 @@
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.WindowsAPICodePack.Dialogs;
-using AssetsManager.Services.Core;
-using AssetsManager.Utils;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Views.Settings
 {
     public partial class DefaultPathsSettingsView : UserControl
     {
-        private AppSettings _appSettings;
-        private readonly LogService _logService;
-
-        public DefaultPathsSettingsView(LogService logService)
+        public DefaultPathsSettingsView()
         {
             InitializeComponent();
-            _logService = logService;
         }
         
-        public void ApplySettingsToUI(AppSettings appSettings)
+        public void ApplySettingsToUI(SettingsModel model)
         {
-            _appSettings = appSettings;
-            textBoxNewHashPath.Text = _appSettings.NewHashesPath;
-            textBoxOldHashPath.Text = _appSettings.OldHashesPath;
-            textBoxLolPath.Text = _appSettings.LolDirectory;
-            textBoxDefaultExtractedPath.Text = _appSettings.DefaultExtractedSelectDirectory;
-        }
-        
-        public void SaveSettings()
-        {
-            if (_appSettings == null) return;
-            _appSettings.NewHashesPath = textBoxNewHashPath.Text;
-            _appSettings.OldHashesPath = textBoxOldHashPath.Text;
-            _appSettings.LolDirectory = textBoxLolPath.Text;
-            _appSettings.DefaultExtractedSelectDirectory = textBoxDefaultExtractedPath.Text;
+            this.DataContext = model;
         }
 
         private void btnBrowseNew_Click(object sender, RoutedEventArgs e)
@@ -40,7 +22,7 @@ namespace AssetsManager.Views.Settings
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select New Hashes Folder"
+                Title = "Select new hashes folder"
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -55,7 +37,7 @@ namespace AssetsManager.Views.Settings
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select Old Hashes Folder"
+                Title = "Select olds hashes folder"
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -70,7 +52,7 @@ namespace AssetsManager.Views.Settings
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select LoL Directory"
+                Title = "Select lol directory"
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -85,7 +67,7 @@ namespace AssetsManager.Views.Settings
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select Default Extraction Directory"
+                Title = "Select default extraction directory"
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)

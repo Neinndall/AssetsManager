@@ -96,6 +96,7 @@ namespace AssetsManager.Views.Controls.Comparator
             finally
             {
                 createLolBackupButton.IsEnabled = true;
+                LogService.LogSuccess($"LoL backup completed successfully.");
             }
         }
 

@@ -117,6 +117,7 @@ namespace AssetsManager
 
             // Windows, Views, and Dialogs
             services.AddTransient<MainWindow>();
+            services.AddTransient<DownloaderWindow>();
             services.AddTransient<HomeWindow>();
             services.AddTransient<ExplorerWindow>();
             services.AddTransient<ComparatorWindow>();

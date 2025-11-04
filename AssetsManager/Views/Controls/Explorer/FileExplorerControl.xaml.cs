@@ -186,7 +186,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             var openFileDialog = new CommonOpenFileDialog
             {
-                Title = "Select Wadcomparison File",
+                Title = "Select a backup file",
                 Filters = { new CommonFileDialogFilter("WAD Comparison JSON", "wadcomparison.json"), new CommonFileDialogFilter("All files", "*.*") },
                 InitialDirectory = DirectoriesCreator.WadComparisonSavePath
             };
@@ -332,7 +332,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else
             {
-                var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select Destination Folder" };
+                var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select destination folder" };
                 if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     destinationPath = dialog.FileName;
@@ -385,7 +385,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else
             {
-                var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select Destination Folder" };
+                var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select destination folder" };
                 if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     destinationPath = dialog.FileName;
@@ -485,7 +485,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void SelectLolDirButton_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select the League of Legends Directory" };
+            var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select a league of legends directory" };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
@@ -527,7 +527,6 @@ namespace AssetsManager.Views.Controls.Explorer
             var path = TreeUIManager.FindNodePath(RootNodes, selectedNode);
             if (path == null) return;
 
-            // If the selected node is a file, show the path to its parent
             if (selectedNode.Type == NodeType.RealFile || 
                 selectedNode.Type == NodeType.VirtualFile || 
                 selectedNode.Type == NodeType.WemFile ||
@@ -537,6 +536,23 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     path.RemoveAt(path.Count - 1);
                 }
+            }
+
+            const int maxItems = 5; 
+
+            if (path.Count > maxItems)
+            {
+                var truncatedPath = new List<FileSystemNodeModel>();
+                truncatedPath.Add(path[0]); 
+                truncatedPath.Add(path[1]); 
+        
+                truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
+
+                for (int i = path.Count - 2; i < path.Count; i++)
+                {
+                    truncatedPath.Add(path[i]);
+                }
+                path = truncatedPath; 
             }
 
             foreach (var node in path)

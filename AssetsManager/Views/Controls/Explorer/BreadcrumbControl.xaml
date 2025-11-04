@@ -8,13 +8,23 @@
     <ItemsControl ItemsSource="{Binding Nodes}">
         <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal"/>
+                <StackPanel Orientation="Horizontal"/>
             </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate>
                 <StackPanel Orientation="Horizontal">
-                    <Button Content="{Binding DisplayName}" Click="Button_Click" Style="{StaticResource TransparentIconButton}"/>
+                    <Button Content="{Binding BreadcrumbDisplayName}" Click="Button_Click">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                        <Setter Property="IsEnabled" Value="False"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <TextBlock Text="/" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                 </StackPanel>
             </DataTemplate>

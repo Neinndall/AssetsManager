@@ -23,7 +23,6 @@
         <!-- Paths Configuration Section -->
         <Border Style="{StaticResource SettingsCard}" Padding="30">
             <StackPanel>
-
                 <!-- New Hash Directory -->
                 <StackPanel Margin="0,0,0,30">
                     <Grid Margin="0,0,0,8">
@@ -42,7 +41,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxNewHashPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
+                        <TextBox x:Name="textBoxNewHashPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.NewHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                         <Button x:Name="btnBrowseNew" Grid.Column="1" Content="Browse" Click="btnBrowseNew_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
@@ -65,7 +64,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxOldHashPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
+                        <TextBox x:Name="textBoxOldHashPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.OldHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                         <Button x:Name="btnBrowseOld" Grid.Column="1" Content="Browse" Click="btnBrowseOld_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
@@ -88,7 +87,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxLolPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
+                        <TextBox x:Name="textBoxLolPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.LolDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                         <Button x:Name="btnBrowseLol" Grid.Column="1" Content="Browse" Click="btnBrowseLol_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
@@ -111,11 +110,10 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxDefaultExtractedPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0"/>
+                        <TextBox x:Name="textBoxDefaultExtractedPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.DefaultExtractedSelectDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                         <Button x:Name="btnBrowseDefaultExtracted" Grid.Column="1" Content="Browse" Click="btnBrowseDefaultExtracted_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
-
             </StackPanel>
         </Border>
     </StackPanel>

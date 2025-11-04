@@ -13,53 +13,70 @@
              d:DesignHeight="450" d:DesignWidth="400"
              PreviewKeyDown="FilePreviewerControl_PreviewKeyDown">
         <UserControl.Resources>
-            <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource AccentBrush}" FalseBrush="Transparent"/>
+            <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
             <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
         </UserControl.Resources>
         
         <DockPanel>
-            <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding PinnedFiles}" Background="{StaticResource SidebarBackground}" Margin="0,8,0,0">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="{Binding IsSelected, Converter={StaticResource BoolToBrushConverter}}" CornerRadius="5,5,0,0" Margin="2,0,2,0" MouseDown="Tab_MouseDown">
-                            <StackPanel Orientation="Horizontal" Margin="8,2,8,2">
-                                <TextBlock Text="{Binding Header}" VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                    <Setter Property="Foreground" Value="White"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <Button Click="CloseTabButton_Click" Margin="5,0,0,0">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#33FFFFFF"/>
-                                                    <Setter Property="Foreground" Value="White"/>
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12"/>
-                                </Button>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource BorderColor}" Margin="5,5,5,5"
-                Visibility="{Binding PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
+            <Grid DockPanel.Dock="Top" Background="{StaticResource SidebarBackground}" Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="ScrollLeftButton" Grid.Column="0" Style="{StaticResource TransparentIconButton}" Click="ScrollLeftButton_Click" Visibility="Collapsed" VerticalAlignment="Center" Padding="4,2">
+                    <materialIcons:MaterialIcon Kind="ChevronLeft" Width="16" Height="16" />
+                </Button>
+
+                <ScrollViewer Grid.Column="1" x:Name="TabsScrollViewer" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" ScrollChanged="TabsScrollViewer_ScrollChanged">
+                    <ItemsControl ItemsSource="{Binding PinnedFiles}" >
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{Binding IsSelected, Converter={StaticResource BoolToBrushConverter}}" CornerRadius="5,5,0,0" Margin="2,0,2,0" MouseDown="Tab_MouseDown">
+                                    <StackPanel Orientation="Horizontal" Margin="8,2,8,2">
+                                        <TextBlock Text="{Binding Header}" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                            <Setter Property="Foreground" Value="White"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <Button Click="CloseTabButton_Click" Margin="5,0,0,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="#33FFFFFF"/>
+                                                            <Setter Property="Foreground" Value="White"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <Button x:Name="ScrollRightButton" Grid.Column="2" Style="{StaticResource TransparentIconButton}" Click="ScrollRightButton_Click" Visibility="Collapsed" VerticalAlignment="Center" Padding="4,2">
+                    <materialIcons:MaterialIcon Kind="ChevronRight" Width="16" Height="16" />
+                </Button>
+            </Grid>
+        <Border x:Name="PinnedTabsSeparator" DockPanel.Dock="Top" Height="1" Background="{StaticResource BorderColor}" Margin="0,5,5,5" Visibility="{Binding PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
 
         <Grid x:Name="PreviewContainer" Margin="5">
             <local:DetailsTabView x:Name="DetailsPreview" Visibility="Collapsed"/>
