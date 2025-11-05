@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <StackPanel>
@@ -41,7 +42,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxNewHashPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.NewHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBox x:Name="textBoxNewHashPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.NewHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" helpers:TextBoxHelper.ShowClearButton="True"/>
                         <Button x:Name="btnBrowseNew" Grid.Column="1" Content="Browse" Click="btnBrowseNew_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
@@ -64,7 +65,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxOldHashPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.OldHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBox x:Name="textBoxOldHashPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.OldHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" helpers:TextBoxHelper.ShowClearButton="True"/>
                         <Button x:Name="btnBrowseOld" Grid.Column="1" Content="Browse" Click="btnBrowseOld_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
@@ -87,7 +88,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxLolPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.LolDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBox x:Name="textBoxLolPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.LolDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" helpers:TextBoxHelper.ShowClearButton="True"/>
                         <Button x:Name="btnBrowseLol" Grid.Column="1" Content="Browse" Click="btnBrowseLol_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
@@ -110,7 +111,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxCustomFloorTexturePath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.CustomFloorTexturePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBox x:Name="textBoxCustomFloorTexturePath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.CustomFloorTexturePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" helpers:TextBoxHelper.ShowClearButton="True"/>
                         <Button x:Name="btnBrowseCustomFloorTexture" Grid.Column="1" Content="Browse" Click="btnBrowseCustomFloorTexture_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
@@ -133,7 +134,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="textBoxDefaultExtractedPath" Grid.Column="0" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.DefaultExtractedSelectDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBox x:Name="textBoxDefaultExtractedPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.DefaultExtractedSelectDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" helpers:TextBoxHelper.ShowClearButton="True"/>
                         <Button x:Name="btnBrowseDefaultExtracted" Grid.Column="1" Content="Browse" Click="btnBrowseDefaultExtracted_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
