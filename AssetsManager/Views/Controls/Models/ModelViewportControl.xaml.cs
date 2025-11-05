@@ -115,11 +115,11 @@ namespace AssetsManager.Views.Controls.Models
 
             if (_sceneModel != null)
             {
-                // 🆕 Remover del viewport ANTES de Dispose
+                // Remover del viewport ANTES de Dispose
                 if (Viewport.Children.Contains(_sceneModel.RootVisual))
                     Viewport.Children.Remove(_sceneModel.RootVisual);
                 
-                // 🆕 CRÍTICO: Llamar a Dispose para liberar recursos
+                // Llamar a Dispose para liberar recursos
                 _sceneModel.Dispose();
                 _sceneModel = null;
             }
@@ -136,7 +136,7 @@ namespace AssetsManager.Views.Controls.Models
 
         public void SetModel(SceneModel model)
         {
-            // 🆕 Si ya hay un modelo, limpiarlo antes de reemplazar
+            // Si ya hay un modelo, limpiarlo antes de reemplazar
             if (_sceneModel != null && _sceneModel != model)
             {
                 ResetScene();
@@ -167,9 +167,9 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (Viewport.Camera is not PerspectiveCamera camera) return;
 
-            var position = new Point3D(0, 250, 300);
-            var lookDirection = new Vector3D(-2.059, -235.936, -598.980);
-            var upDirection = new Vector3D(0.008, 0.930, -0.367);
+            var position = new Point3D(-6, 2298, 465);
+            var lookDirection = new Vector3D(4, -164, -445);
+            var upDirection = new Vector3D(0, 1, 0);
 
             camera.Position = position;
             camera.LookDirection = lookDirection;
@@ -270,6 +270,17 @@ namespace AssetsManager.Views.Controls.Models
             {
                 MaximizeClicked?.Invoke(this, toggleButton.IsChecked ?? false);
             }
+        }
+
+        private void PrintCameraCoordinates_Click(object sender, RoutedEventArgs e)
+        {
+            if (Viewport.Camera is not PerspectiveCamera camera) return;
+
+            var position = camera.Position;
+            var lookDirection = camera.LookDirection;
+
+            LogService.Log($"Camera Position: new Point3D({position.X}, {position.Y}, {position.Z})");
+            LogService.Log($"Camera LookDirection: new Vector3D({lookDirection.X}, {lookDirection.Y}, {lookDirection.Z})");
         }
     }
 }

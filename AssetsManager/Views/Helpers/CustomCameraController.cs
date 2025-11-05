@@ -35,7 +35,6 @@ namespace AssetsManager.Views.Helpers
             }
         }
 
-
         private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.MiddleButton == MouseButtonState.Pressed)

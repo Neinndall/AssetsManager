@@ -62,6 +62,12 @@
                         Click="ResetCameraButton_Click">
                     <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
                 </Button>
+                <Button Style="{StaticResource IconButton}"
+                        ToolTip="Print Camera Coordinates"
+                        Click="PrintCameraCoordinates_Click"
+                        Margin="5,0,0,0">
+                    <materialIcons:MaterialIcon Kind="CameraOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
+                </Button>
             </StackPanel>
         </Grid>
     </Border>

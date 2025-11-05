@@ -30,6 +30,7 @@ namespace AssetsManager.Utils
         public string LolDirectory { get; set; }
         public string DefaultExtractedSelectDirectory { get; set; }
         public string LastPbeStatusMessage { get; set; }
+        public string CustomFloorTexturePath { get; set; } = string.Empty;
         public Dictionary<string, long> HashesSizes { get; set; }
 
         // Dictionary for File Watcher
@@ -135,6 +136,7 @@ namespace AssetsManager.Utils
                 OldHashesPath = null,
                 LolDirectory = null,
                 DefaultExtractedSelectDirectory = null,
+                CustomFloorTexturePath = null,
                 LastPbeStatusMessage = null,
                 HashesSizes = new Dictionary<string, long>(),
                 JsonDataModificationDates = new Dictionary<string, DateTime>(),
@@ -166,6 +168,7 @@ namespace AssetsManager.Utils
             OldHashesPath = defaultSettings.OldHashesPath;
             LolDirectory = defaultSettings.LolDirectory;
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;
+            CustomFloorTexturePath = defaultSettings.CustomFloorTexturePath;
             SaveDiffHistory = defaultSettings.SaveDiffHistory;
             BackgroundUpdates = defaultSettings.BackgroundUpdates;
             CheckPbeStatus = defaultSettings.CheckPbeStatus;
