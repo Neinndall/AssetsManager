@@ -22,19 +22,20 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="4">
                         <Grid>
-                            <TextBlock x:Name="ReadOnlyText" Text="{TemplateBinding Text}"
-                                       Visibility="Collapsed"
-                                       Margin="{TemplateBinding Padding}"
-                                       VerticalAlignment="Center"/>
                             <ScrollViewer x:Name="PART_ContentHost" 
-                                          Margin="{TemplateBinding Padding}"/>
+                                          Margin="5,2,25,2"
+                                          VerticalAlignment="Center"/>
+                            <Button x:Name="ClearTextButton" 
+                                    Style="{StaticResource TransparentIconButton}"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,0,8,0"
+                                    Visibility="Collapsed"
+                                    Focusable="False">
+                                <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12" Foreground="{StaticResource TextSecondary}"/>
+                            </Button>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsReadOnly" Value="True">
-                            <Setter TargetName="PART_ContentHost" Property="Visibility" Value="Collapsed"/>
-                            <Setter TargetName="ReadOnlyText" Property="Visibility" Value="Visible"/>
-                        </Trigger>
                         <Trigger Property="IsFocused" Value="True">
                             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                         </Trigger>

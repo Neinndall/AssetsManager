@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
              mc:Ignorable="d" 
              d:DesignHeight="48" d:DesignWidth="250"
              Width="250" Height="38">
@@ -31,7 +32,8 @@
                      Style="{StaticResource StandardSearchBoxStyle}"
                      KeyDown="SearchTextBox_KeyDown"
                      TextChanged="SearchTextBox_TextChanged"
-                     Padding="5,0"/>
+                     Padding="5,0"
+                     helpers:TextBoxHelper.ShowClearButton="True"/>
 
             <Button x:Name="PreviousButton" Grid.Column="1" Style="{StaticResource FindIconButton}" Click="PreviousButton_Click" ToolTip="Find Previous" VerticalAlignment="Center">
                 <materialIcons:MaterialIcon Kind="ChevronUp" />

@@ -3,11 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
              mc:Ignorable="d" 
              d:DesignHeight="30" d:DesignWidth="200">
     <Grid>
         <TextBox x:Name="SearchTextBox"
                  Style="{StaticResource StandardSearchBoxStyle}"
-                 TextChanged="SearchTextBox_TextChanged"/>
+                 TextChanged="SearchTextBox_TextChanged"
+                 helpers:TextBoxHelper.ShowClearButton="True"/>
     </Grid>
 </UserControl>
