@@ -30,11 +30,13 @@ namespace AssetsManager.Views.Helpers
                 {
                     textBox.Loaded += TextBox_Loaded;
                     textBox.Unloaded += TextBox_Unloaded;
+                    textBox.IsVisibleChanged += TextBox_IsVisibleChanged;
                 }
                 else
                 {
                     textBox.Loaded -= TextBox_Loaded;
                     textBox.Unloaded -= TextBox_Unloaded;
+                    textBox.IsVisibleChanged -= TextBox_IsVisibleChanged;
                 }
             }
         }
@@ -45,11 +47,6 @@ namespace AssetsManager.Views.Helpers
             {
                 UpdateClearButtonVisibility(textBox);
                 textBox.TextChanged += TextBox_TextChanged;
-
-                if (GetClearButton(textBox) is Button clearButton)
-                {
-                    clearButton.Click += ClearButton_Click;
-                }
             }
         }
 
@@ -58,12 +55,32 @@ namespace AssetsManager.Views.Helpers
             if (sender is TextBox textBox)
             {
                 textBox.TextChanged -= TextBox_TextChanged;
+                textBox.IsVisibleChanged -= TextBox_IsVisibleChanged;
                 if (GetClearButton(textBox) is Button clearButton)
                 {
                     clearButton.Click -= ClearButton_Click;
                 }
             }
         }
+
+        private static void TextBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (sender is TextBox textBox && textBox.IsVisible)
+            {
+                textBox.Dispatcher.BeginInvoke(new System.Action(() =>
+                {
+                    UpdateClearButtonVisibility(textBox);
+                    if (GetClearButton(textBox) is Button clearButton)
+                    {
+                        // Detach to prevent multiple subscriptions, then attach.
+                        clearButton.Click -= ClearButton_Click;
+                        clearButton.Click += ClearButton_Click;
+                    }
+                }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+            }
+        }
+
+        
 
         private static void TextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -77,7 +94,7 @@ namespace AssetsManager.Views.Helpers
         {
             if ((e.Source as FrameworkElement)?.TemplatedParent is TextBox textBox)
             {
-                textBox.Text = string.Empty;
+                textBox.Text = null;
             }
         }
 

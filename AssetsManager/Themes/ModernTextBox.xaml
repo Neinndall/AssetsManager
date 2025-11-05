@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
                     xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF">
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
@@ -8,6 +9,8 @@
 
     <!-- Modern TextBox Style for Browse -->
     <Style x:Key="ModernTextBox" TargetType="TextBox">
+        <Setter Property="helpers:TextBoxHelper.ShowClearButton" Value="True"/>
+        <Setter Property="IsReadOnly" Value="True"/>
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
@@ -45,8 +48,14 @@
         </Setter>
     </Style>
 
+    <!-- Modern TextBox Style for Editable Inputs -->
+    <Style x:Key="ModernTextBoxEditable" TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+        <Setter Property="IsReadOnly" Value="False"/>
+    </Style>
+
     <!-- Animated SearchBox Style -->
     <Style x:Key="AnimatedSearchBoxStyle" TargetType="TextBox">
+        <Setter Property="helpers:TextBoxHelper.ShowClearButton" Value="True"/>
         <Setter Property="Width" Value="0"/>
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -99,6 +108,7 @@
 
     <!-- Standard SearchBox Style -->
     <Style x:Key="StandardSearchBoxStyle" TargetType="TextBox">
+        <Setter Property="helpers:TextBoxHelper.ShowClearButton" Value="True"/>
         <Setter Property="Background" Value="{StaticResource DarkBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1"/>

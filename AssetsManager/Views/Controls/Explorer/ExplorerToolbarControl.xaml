@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
+             
              mc:Ignorable="d" 
              d:DesignHeight="40" d:DesignWidth="800">
     <Grid>
@@ -49,8 +49,7 @@
                 <TextBox x:Name="SearchTextBox" 
                          Style="{StaticResource AnimatedSearchBoxStyle}" 
                          Tag="{Binding IsChecked, ElementName=SearchToggleButton}"
-                         TextChanged="SearchTextBox_TextChanged"
-                         helpers:TextBoxHelper.ShowClearButton="True"/>
+                         TextChanged="SearchTextBox_TextChanged"/>
                 <StackPanel Orientation="Horizontal"
                             IsHitTestVisible="False"
                             VerticalAlignment="Center"

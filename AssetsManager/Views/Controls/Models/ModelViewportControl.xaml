@@ -20,7 +20,10 @@
                                    ShowCameraInfo="False"
                                    ShowViewCube="False"
                                    IsRotationEnabled="False"
-                                   PanGesture="RightClick">
+                                   PanGesture="RightClick"
+                                   SnapsToDevicePixels="True"
+                                   UseLayoutRounding="True"
+                                   ClipToBounds="False">
                 <helix:HelixViewport3D.Camera>
                     <PerspectiveCamera Position="0,0,10" LookDirection="0,0,-10" UpDirection="0,1,0" FarPlaneDistance="65000"/>
                 </helix:HelixViewport3D.Camera>
