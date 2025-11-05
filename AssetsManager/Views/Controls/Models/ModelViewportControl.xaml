@@ -62,12 +62,13 @@
                         Click="ResetCameraButton_Click">
                     <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
                 </Button>
-                <Button Style="{StaticResource IconButton}"
-                        ToolTip="Print Camera Coordinates"
-                        Click="PrintCameraCoordinates_Click"
-                        Margin="5,0,0,0">
-                    <materialIcons:MaterialIcon Kind="CameraOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
-                </Button>
+                <ToggleButton Style="{StaticResource IconToggleButton}"
+                              ToolTip="Show/Hide Skybox"
+                              Click="SkyboxToggleButton_Click"
+                              Margin="5,0,0,0"
+                              IsChecked="False">
+                    <materialIcons:MaterialIcon Kind="Nature" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
+                </ToggleButton>
             </StackPanel>
         </Grid>
     </Border>

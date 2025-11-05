@@ -24,6 +24,7 @@ namespace AssetsManager.Views.Controls.Models
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
         public event EventHandler<bool> MaximizeClicked;
+        public event EventHandler<bool> SkyboxVisibilityChanged;
 
         private readonly Stopwatch _stopwatch = new Stopwatch();
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
@@ -272,15 +273,12 @@ namespace AssetsManager.Views.Controls.Models
             }
         }
 
-        private void PrintCameraCoordinates_Click(object sender, RoutedEventArgs e)
+        private void SkyboxToggleButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Viewport.Camera is not PerspectiveCamera camera) return;
-
-            var position = camera.Position;
-            var lookDirection = camera.LookDirection;
-
-            LogService.Log($"Camera Position: new Point3D({position.X}, {position.Y}, {position.Z})");
-            LogService.Log($"Camera LookDirection: new Vector3D({lookDirection.X}, {lookDirection.Y}, {lookDirection.Z})");
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                SkyboxVisibilityChanged?.Invoke(this, !(toggleButton.IsChecked ?? false));
+            }
         }
     }
 }

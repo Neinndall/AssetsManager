@@ -63,6 +63,9 @@ namespace AssetsManager.Views
             PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
             PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
 
+            // Viewport events
+            ViewportControl.SkyboxVisibilityChanged += OnSkyboxVisibilityChanged;
+
             Unloaded += (s, e) => {
                 CleanupResources();
             };
@@ -74,10 +77,30 @@ namespace AssetsManager.Views
             ViewportControl.ResetCamera();
         }
 
+        private void OnSkyboxVisibilityChanged(object sender, bool isVisible)
+        {
+            if (_skyVisual == null) return;
+
+            if (isVisible && !ViewportControl.Viewport.Children.Contains(_skyVisual))
+            {
+                ViewportControl.Viewport.Children.Add(_skyVisual);
+            }
+            else if (!isVisible && ViewportControl.Viewport.Children.Contains(_skyVisual))
+            {
+                ViewportControl.Viewport.Children.Remove(_skyVisual);
+            }
+        }
+
         public void CleanupResources()
         {
             // Limpiar el controlador de la cámara para desuscribir eventos
             _cameraController?.Dispose();
+
+            // Desuscribir eventos del ViewportControl
+            if (ViewportControl != null)
+            {
+                ViewportControl.SkyboxVisibilityChanged -= OnSkyboxVisibilityChanged;
+            }
 
             // Limpiar viewport
             ViewportControl?.Cleanup();
