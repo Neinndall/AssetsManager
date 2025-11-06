@@ -32,6 +32,7 @@
                         <AmbientLight Color="White"/>
                     </ModelVisual3D.Content>
                 </ModelVisual3D>
+                
             </helix:HelixViewport3D>
 
             <StackPanel HorizontalAlignment="Right" 

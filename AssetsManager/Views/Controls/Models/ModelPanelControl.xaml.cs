@@ -13,9 +13,18 @@ using AssetsManager.Services.Core;
 using Material.Icons;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
+using System.Windows.Media.Media3D;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Controls.Models
 {
+    public class ModelTransformData
+    {
+        public Vector3D Position { get; set; } = new Vector3D(0, 0, 0);
+        public Vector3D Rotation { get; set; } = new Vector3D(0, 0, 0);
+        public double Scale { get; set; } = 1.0;
+    }
+
     public partial class ModelPanelControl : UserControl
     {
         private enum ModelType { Skn, MapGeometry }
@@ -47,7 +56,9 @@ namespace AssetsManager.Views.Controls.Models
         private readonly Dictionary<string, IAnimationAsset> _animations = new();
         private readonly ObservableCollection<string> _animationNames = new();
         private readonly ObservableCollection<SceneModel> _loadedModels = new();
+        private readonly Dictionary<SceneModel, ModelTransformData> _transformData = new();
         private RigResource _skeleton;
+        private SceneModel _selectedModel;
 
         public ModelPanelControl()
         {
@@ -75,6 +86,7 @@ namespace AssetsManager.Views.Controls.Models
                 model?.Dispose();  // Libera texturas, geometrías y materiales
             }
             _loadedModels.Clear();
+            _transformData.Clear();
             
             // 3. Limpiar referencias
             _skeleton = null;
@@ -110,6 +122,7 @@ namespace AssetsManager.Views.Controls.Models
                 modelToDelete?.Dispose();
                 
                 _loadedModels.Remove(modelToDelete);
+                _transformData.Remove(modelToDelete);
                 ModelRemovedFromViewport?.Invoke(modelToDelete);
 
                 if (_loadedModels.Count == 0)
@@ -217,6 +230,10 @@ namespace AssetsManager.Views.Controls.Models
                     EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
                     MainContentVisibilityChanged?.Invoke(Visibility.Visible);
                 }
+
+                var transformData = new ModelTransformData { Position = new Vector3D(0, SceneElements.GroundLevel, 0) };
+                _transformData.Add(newModel, transformData);
+                UpdateTransform(newModel, transformData);
 
                 ModelReadyForViewport?.Invoke(newModel);
                 MeshesListBox.ItemsSource = newModel.Parts;
@@ -330,9 +347,74 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (e.AddedItems.Count > 0 && e.AddedItems[0] is SceneModel selectedModel)
             {
+                _selectedModel = selectedModel;
                 ActiveModelChanged?.Invoke(selectedModel);
                 MeshesListBox.ItemsSource = selectedModel.Parts;
+
+                if (_transformData.TryGetValue(selectedModel, out var transformData))
+                {
+                    // Unsubscribe from events to prevent feedback loop
+                    PositionXSlider.ValueChanged -= TransformSlider_ValueChanged;
+                    PositionYSlider.ValueChanged -= TransformSlider_ValueChanged;
+                    PositionZSlider.ValueChanged -= TransformSlider_ValueChanged;
+                    RotationXSlider.ValueChanged -= TransformSlider_ValueChanged;
+                    RotationYSlider.ValueChanged -= TransformSlider_ValueChanged;
+                    RotationZSlider.ValueChanged -= TransformSlider_ValueChanged;
+                    ScaleSlider.ValueChanged -= TransformSlider_ValueChanged;
+
+                    PositionXSlider.Value = transformData.Position.X;
+                    PositionYSlider.Value = transformData.Position.Y;
+                    PositionZSlider.Value = transformData.Position.Z;
+                    RotationXSlider.Value = transformData.Rotation.X;
+                    RotationYSlider.Value = transformData.Rotation.Y;
+                    RotationZSlider.Value = transformData.Rotation.Z;
+                    ScaleSlider.Value = transformData.Scale;
+
+                    // Re-subscribe to events
+                    PositionXSlider.ValueChanged += TransformSlider_ValueChanged;
+                    PositionYSlider.ValueChanged += TransformSlider_ValueChanged;
+                    PositionZSlider.ValueChanged += TransformSlider_ValueChanged;
+                    RotationXSlider.ValueChanged += TransformSlider_ValueChanged;
+                    RotationYSlider.ValueChanged += TransformSlider_ValueChanged;
+                    RotationZSlider.ValueChanged += TransformSlider_ValueChanged;
+                    ScaleSlider.ValueChanged += TransformSlider_ValueChanged;
+                }
             }
+        }
+
+        private void TransformSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_selectedModel == null || !_transformData.TryGetValue(_selectedModel, out var transformData))
+            {
+                return;
+            }
+
+            transformData.Position = new Vector3D(PositionXSlider.Value, PositionYSlider.Value, PositionZSlider.Value);
+            transformData.Rotation = new Vector3D(RotationXSlider.Value, RotationYSlider.Value, RotationZSlider.Value);
+            transformData.Scale = ScaleSlider.Value;
+
+            UpdateTransform(_selectedModel, transformData);
+        }
+
+        private void UpdateTransform(SceneModel model, ModelTransformData data)
+        {
+            var transformGroup = new Transform3DGroup();
+
+            // Scale
+            transformGroup.Children.Add(new ScaleTransform3D(data.Scale, data.Scale, data.Scale));
+
+            // Rotation
+            var rotationX = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), data.Rotation.X));
+            var rotationY = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), data.Rotation.Y));
+            var rotationZ = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), data.Rotation.Z));
+            transformGroup.Children.Add(rotationX);
+            transformGroup.Children.Add(rotationY);
+            transformGroup.Children.Add(rotationZ);
+
+            // Position
+            transformGroup.Children.Add(new TranslateTransform3D(data.Position.X, data.Position.Y, data.Position.Z));
+
+            model.RootVisual.Transform = transformGroup;
         }
     }
 }

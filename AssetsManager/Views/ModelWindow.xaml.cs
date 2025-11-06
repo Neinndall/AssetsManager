@@ -52,7 +52,6 @@ namespace AssetsManager.Views
 
             // Model events
             PanelControl.ModelReadyForViewport += (model) => {
-                model.RootVisual.Transform = new TranslateTransform3D(0, SceneElements.GroundLevel, 0);
                 ViewportControl.AddModel(model);
             };
             PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.RemoveModel(model);
