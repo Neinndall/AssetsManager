@@ -32,7 +32,6 @@ namespace AssetsManager.Views.Controls.Models
         private AnimationPlayer _animationPlayer;
 
         private IAnimationAsset _currentAnimation;
-        private RigResource _skeleton;
         private SceneModel _activeSceneModel;
         private readonly List<SceneModel> _loadedModels = new();
         public bool IsAnimationPaused { get; private set; }
@@ -79,7 +78,6 @@ namespace AssetsManager.Views.Controls.Models
             // 6. Limpiar referencias
             _animationPlayer = null;
             _currentAnimation = null;
-            _skeleton = null;
         }
 
         public void SetAnimation(IAnimationAsset animation)
@@ -126,12 +124,6 @@ namespace AssetsManager.Views.Controls.Models
 
             _skeletonVisual.Points?.Clear();
             _jointsVisual.Points?.Clear();
-            _skeleton = null;
-        }
-
-        public void SetSkeleton(RigResource skeleton)
-        {
-            _skeleton = skeleton;
         }
 
         public void AddModel(SceneModel model)
@@ -157,18 +149,21 @@ namespace AssetsManager.Views.Controls.Models
 
         public void SetActiveModel(SceneModel model)
         {
+            if (_activeSceneModel != model)
+            {
+                StopAnimation();
+            }
             _activeSceneModel = model;
         }
 
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {
-            if (_animationPlayer != null && _currentAnimation != null && _skeleton != null && 
-                _activeSceneModel != null && _activeSceneModel.SkinnedMesh != null)
+            if (_animationPlayer != null && _currentAnimation != null && _activeSceneModel?.Skeleton != null && _activeSceneModel.SkinnedMesh != null)
             {
                 _animationPlayer.Update(
                     (float)_stopwatch.Elapsed.TotalSeconds, 
                     _currentAnimation, 
-                    _skeleton, 
+                    _activeSceneModel.Skeleton, 
                     _activeSceneModel.SkinnedMesh, 
                     _activeSceneModel.Parts.ToList(), 
                     _skeletonVisual, 

@@ -56,7 +56,6 @@ namespace AssetsManager.Views
             };
             PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.RemoveModel(model);
             PanelControl.ActiveModelChanged += (model) => ViewportControl.SetActiveModel(model);
-            PanelControl.SkeletonReadyForViewport += (skeleton) => ViewportControl.SetSkeleton(skeleton);
             PanelControl.MapGeometryLoadRequested += (s, e) => OpenGeometryFile_Click(s, null);
 
             // Animation events

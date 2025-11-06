@@ -18,6 +18,7 @@ namespace AssetsManager.Views.Models
         public ObservableCollection<ModelPart> Parts { get; set; }
         public ObservableCollection<AnimationData> Animations { get; set; }
         public ObservableCollection<string> AnimationNames { get; set; }
+        public RigResource Skeleton { get; set; }
 
         public SceneModel()
         {
@@ -50,6 +51,7 @@ namespace AssetsManager.Views.Models
             AnimationNames.Clear();
             
             // Limpiar referencias
+            Skeleton = null;
             SkinnedMesh = null;
             RootVisual = null;
             Transform = null;

@@ -44,7 +44,6 @@ namespace AssetsManager.Views.Controls.Models
 
         public event Action<SceneModel> ModelReadyForViewport;
         public event Action<SceneModel> ActiveModelChanged;
-        public event Action<RigResource> SkeletonReadyForViewport;
         public event Action SceneSetupRequested;
         public event Action CameraResetRequested;
         public event Action<Visibility> EmptyStateVisibilityChanged;
@@ -56,7 +55,6 @@ namespace AssetsManager.Views.Controls.Models
 
         private readonly ObservableCollection<SceneModel> _loadedModels = new();
         private readonly Dictionary<SceneModel, ModelTransformData> _transformData = new();
-        private RigResource _skeleton;
         private SceneModel _selectedModel;
 
         public ModelPanelControl()
@@ -85,7 +83,6 @@ namespace AssetsManager.Views.Controls.Models
             _transformData.Clear();
             
             // 3. Limpiar referencias
-            _skeleton = null;
             
             // 4. Limpiar UI
             MeshesListBox.ItemsSource = null;
@@ -185,12 +182,16 @@ namespace AssetsManager.Views.Controls.Models
 
         public void LoadSkeleton(string filePath)
         {
+            if (_selectedModel == null)
+            {
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model to associate the skeleton with.");
+                return;
+            }
             using (var stream = File.OpenRead(filePath))
             {
-                _skeleton = new RigResource(stream);
-                SkeletonReadyForViewport?.Invoke(_skeleton);
+                _selectedModel.Skeleton = new RigResource(stream);
             }
-            LogService.LogDebug($"Loaded skeleton: {Path.GetFileName(filePath)}");
+            LogService.LogDebug($"Loaded skeleton: {Path.GetFileName(filePath)} for model {_selectedModel.Name}");
         }
 
         public void ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
@@ -198,16 +199,6 @@ namespace AssetsManager.Views.Controls.Models
             _currentMode = ModelType.Skn;
             LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
             LoadModelButton.ToolTip = "Load Model";
-
-            string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
-            if (File.Exists(sklFilePath))
-            {
-                using (var stream = File.OpenRead(sklFilePath))
-                {
-                    _skeleton = new RigResource(stream);
-                    SkeletonReadyForViewport?.Invoke(_skeleton);
-                }
-            }
 
             SceneModel newModel;
             if (string.IsNullOrEmpty(texturePath))
@@ -221,6 +212,15 @@ namespace AssetsManager.Views.Controls.Models
 
             if (newModel != null)
             {
+                string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
+                if (File.Exists(sklFilePath))
+                {
+                    using (var stream = File.OpenRead(sklFilePath))
+                    {
+                        newModel.Skeleton = new RigResource(stream);
+                    }
+                }
+
                 if (isInitialLoad)
                 {
                     SceneSetupRequested?.Invoke();
@@ -236,6 +236,7 @@ namespace AssetsManager.Views.Controls.Models
                 MeshesListBox.ItemsSource = newModel.Parts;
 
                 _loadedModels.Add(newModel);
+                ModelsListBox.SelectedItem = newModel;
 
                 CameraResetRequested?.Invoke();
 
@@ -245,6 +246,17 @@ namespace AssetsManager.Views.Controls.Models
 
         private void LoadAnimationButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_selectedModel == null && _loadedModels.Count == 1)
+            {
+                ModelsListBox.SelectedIndex = 0;
+            }
+
+            if (_selectedModel == null)
+            {
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                return;
+            }
+
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("Animation files", "*.anm"), new CommonFileDialogFilter("All files", "*.*") },
@@ -269,7 +281,7 @@ namespace AssetsManager.Views.Controls.Models
                 return;
             }
 
-            if (_skeleton == null)
+            if (_selectedModel.Skeleton == null)
             {
                 CustomMessageBoxService.ShowWarning("Missing Skeleton", "Please load a skeleton (.skl) file first.");
                 return;
