@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Mesh;
+using LeagueToolkit.Core.Animation;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Views.Models
 {
@@ -14,6 +16,12 @@ namespace AssetsManager.Views.Models
         public ModelVisual3D RootVisual { get; set; }
         public TranslateTransform3D Transform { get; set; }
         public ObservableCollection<ModelPart> Parts { get; set; }
+        public ObservableCollection<AnimationData> Animations { get; set; }
+        public ObservableCollection<string> AnimationNames { get; set; }
+        public RigResource Skeleton { get; set; }
+        public IAnimationAsset CurrentAnimation { get; set; }
+        public bool IsAnimationPaused { get; set; }
+        public double AnimationTime { get; set; }
 
         public SceneModel()
         {
@@ -22,6 +30,8 @@ namespace AssetsManager.Views.Models
             Transform = new TranslateTransform3D();
             RootVisual.Transform = this.Transform;
             Parts = new ObservableCollection<ModelPart>();
+            Animations = new ObservableCollection<AnimationData>();
+            AnimationNames = new ObservableCollection<string>();
         }
 
         public void Dispose()
@@ -38,8 +48,16 @@ namespace AssetsManager.Views.Models
                 }
                 Parts.Clear();
             }
+
+            // Limpiar animaciones
+            Animations.Clear();
+            AnimationNames.Clear();
+            CurrentAnimation = null;
+            IsAnimationPaused = false;
+            AnimationTime = 0;
             
             // Limpiar referencias
+            Skeleton = null;
             SkinnedMesh = null;
             RootVisual = null;
             Transform = null;

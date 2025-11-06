@@ -9,10 +9,12 @@ namespace AssetsManager.Views.Helpers
 {
     public static class SceneElements
     {
+        public const double GroundLevel = 2000;
+
         public static ModelVisual3D CreateSidePlanes(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc)
         {
             Model3DGroup finalGroup = new Model3DGroup();
-            double size = 20000; // A large size for the skybox planes
+            double size = 2500; // Sides are 5000x5000
 
             // 1. Load individual textures for each side and create their materials
             string frontTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_front.dds";
@@ -112,10 +114,12 @@ namespace AssetsManager.Views.Helpers
             bottomPlane.Transform = bottomTransform;
             finalGroup.Children.Add(bottomPlane);
 
+            finalGroup.Transform = new TranslateTransform3D(0, size, 0);
+
             return new ModelVisual3D { Content = finalGroup };
         }
 
-        public static ModelVisual3D CreateGroundPlane(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc)
+        public static ModelVisual3D CreateGroundPlane(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc, string customTexturePath = null)
         {
             MeshGeometry3D groundMesh = new MeshGeometry3D();
 
@@ -123,10 +127,10 @@ namespace AssetsManager.Views.Helpers
             // Y-coordinate is 0 to place it at the base of the model
             groundMesh.Positions = new Point3DCollection()
             {
-                new Point3D(-1600, 0, -1600), // Bottom-left
-                new Point3D(1600, 0, -1600),  // Bottom-right
-                new Point3D(1600, 0, 1600),   // Top-right
-                new Point3D(-1600, 0, 1600)   // Top-left
+                new Point3D(-1000, GroundLevel, -1000), // Bottom-left
+                new Point3D(1000, GroundLevel, -1000),  // Bottom-right
+                new Point3D(1000, GroundLevel, 1000),   // Top-right
+                new Point3D(-1000, GroundLevel, 1000)   // Top-left
             };
 
             // Define triangle indices (two triangles for a square)
@@ -142,8 +146,14 @@ namespace AssetsManager.Views.Helpers
             };
 
             // Load the ground texture
-            string groundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Floor/ground_rift.dds"; // Assuming ground_rift.dds is in the app directory
-            BitmapSource groundTexture = loadTextureFunc(groundTexturePath);
+            string finalGroundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Floor/ground_rift.dds"; // Default to resource path
+
+            if (!string.IsNullOrEmpty(customTexturePath) && File.Exists(customTexturePath))
+            {
+                finalGroundTexturePath = customTexturePath;
+            }
+
+            BitmapSource groundTexture = loadTextureFunc(finalGroundTexturePath);
 
             Material3D groundMaterial;
             if (groundTexture != null)
@@ -154,7 +164,7 @@ namespace AssetsManager.Views.Helpers
             {
                 // Fallback to a solid color if texture loading fails
                 groundMaterial = new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 120, 80))); // Earthy color
-                logErrorFunc($"Failed to load ground texture from {groundTexturePath}. Using solid color fallback.");
+                logErrorFunc($"Failed to load ground texture from {finalGroundTexturePath}. Using solid color fallback.");
             }
 
             // Create the GeometryModel3D and ModelVisual3D

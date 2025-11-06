@@ -31,9 +31,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             set => resultsTreeView.ItemsSource = value;
         }
 
-        private Button _clearTextButton;
-        private RoutedEventHandler _clearTextButtonClickHandler;
-
         public WadResultsTreeControl()
         {
             InitializeComponent();
@@ -48,29 +45,13 @@ namespace AssetsManager.Views.Dialogs.Controls
             Unloaded -= WadResultsTreeControl_Unloaded;
             resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
             searchTextBox.TextChanged -= SearchTextBox_TextChanged;
-            if (_clearTextButton != null && _clearTextButtonClickHandler != null)
-            {
-                _clearTextButton.Click -= _clearTextButtonClickHandler;
-            }
 
             // Anular referencias
             resultsTreeView.ItemsSource = null;
-            _clearTextButton = null;
-            _clearTextButtonClickHandler = null;
         }
 
         private void WadResultsTreeControl_Loaded(object sender, RoutedEventArgs e)
         {
-            searchTextBox.ApplyTemplate();
-            if (searchTextBox.Template.FindName("ClearTextButton", searchTextBox) is Button clearButton)
-            {
-                _clearTextButton = clearButton;
-                _clearTextButtonClickHandler = (s, args) =>
-                {
-                    searchTextBox.Text = string.Empty;
-                };
-                _clearTextButton.Click += _clearTextButtonClickHandler;
-            }
             resultsTreeView.SelectedItemChanged += ResultsTreeView_SelectedItemChanged;
             searchTextBox.TextChanged += SearchTextBox_TextChanged;
         }
@@ -82,10 +63,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (searchTextBox.Template.FindName("ClearTextButton", searchTextBox) is Button clearButton)
-            {
-                clearButton.Visibility = string.IsNullOrEmpty(searchTextBox.Text) ? Visibility.Collapsed : Visibility.Visible;
-            }
             SearchTextChanged?.Invoke(this, e);
         }
 
@@ -109,7 +86,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         }
 
         private static TreeViewItem VisualUpwardSearch(DependencyObject source)
-        {
+        { 
             while (source != null && !(source is TreeViewItem))
             {
                 source = VisualTreeHelper.GetParent(source);

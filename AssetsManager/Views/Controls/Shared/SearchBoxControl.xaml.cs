@@ -32,33 +32,13 @@ namespace AssetsManager.Views.Controls.Shared
             searchTimer.Interval = TimeSpan.FromMilliseconds(300);
             searchTimer.Tick += SearchTimer_Tick;
 
-            Loaded += SearchBoxControl_Loaded;
             Unloaded += SearchBoxControl_Unloaded;
-        }
-
-        private void SearchBoxControl_Loaded(object sender, RoutedEventArgs e)
-        {
-            SearchTextBox.ApplyTemplate();
-            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
-            {
-                clearButton.Click += ClearTextButton_Click;
-            }
-        }
-
-        private void ClearTextButton_Click(object sender, RoutedEventArgs e)
-        {
-            SearchTextBox.Text = string.Empty;
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             searchTimer.Stop();
             searchTimer.Start();
-
-            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
-            {
-                clearButton.Visibility = string.IsNullOrEmpty(SearchTextBox.Text) ? Visibility.Collapsed : Visibility.Visible;
-            }
         }
 
         private void SearchTimer_Tick(object sender, EventArgs e)
@@ -73,10 +53,6 @@ namespace AssetsManager.Views.Controls.Shared
             {
                 searchTimer.Stop();
                 searchTimer.Tick -= SearchTimer_Tick;
-            }
-            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
-            {
-                clearButton.Click -= ClearTextButton_Click;
             }
         }
     }

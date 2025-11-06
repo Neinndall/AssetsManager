@@ -76,5 +76,24 @@ namespace AssetsManager.Views.Settings
                 }
             }
         }
+
+        private void btnBrowseCustomFloorTexture_Click(object sender, RoutedEventArgs e)
+        {
+            using (var openFileDialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = false,
+                Title = "Select custom floor texture file",
+                Filters = { 
+                    new CommonFileDialogFilter("Image Files", "*.png;*.jpg;*.jpeg;*.dds;*.tga"),
+                    new CommonFileDialogFilter("All Files", "*.*")
+                }
+            })
+            {
+                if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    textBoxCustomFloorTexturePath.Text = openFileDialog.FileName;
+                }
+            }
+        }
     }
 }

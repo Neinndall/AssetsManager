@@ -492,8 +492,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 string selectedDirectory = dialog.FileName;
                 if (Directory.Exists(selectedDirectory))
                 {
-                    AppSettings.LolDirectory = selectedDirectory;
-                    await ReloadTreeAsync();
+                    await BuildWadTreeAsync(selectedDirectory);
                 }
                 else
                 {

@@ -24,13 +24,16 @@ namespace AssetsManager.Views
         private ModelVisual3D _groundVisual;
         private ModelVisual3D _skyVisual;
 
-        public ModelWindow(SknModelLoadingService sknModelLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService)
+        private readonly AppSettings _appSettings;
+
+        public ModelWindow(SknModelLoadingService sknModelLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService, AppSettings appSettings)
         {
             InitializeComponent();
             _sknModelLoadingService = sknModelLoadingService;
             _mapGeometryLoadingService = mapGeometryLoadingService;
             _logService = logService;
             _customMessageBoxService = customMessageBoxService;
+            _appSettings = appSettings;
             _cameraController = new CustomCameraController(ViewportControl.Viewport);
 
             // Inject services into controls
@@ -48,14 +51,19 @@ namespace AssetsManager.Views
             PanelControl.MainContentVisibilityChanged += (visibility) => MainContentGrid.Visibility = visibility;
 
             // Model events
-            PanelControl.ModelReadyForViewport += (model) => ViewportControl.SetModel(model);
-            PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.Viewport.Children.Remove(model.RootVisual);
-            PanelControl.SkeletonReadyForViewport += (skeleton) => ViewportControl.SetSkeleton(skeleton);
+            PanelControl.ModelReadyForViewport += (model) => {
+                ViewportControl.AddModel(model);
+            };
+            PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.RemoveModel(model);
+            PanelControl.ActiveModelChanged += (model) => ViewportControl.SetActiveModel(model);
             PanelControl.MapGeometryLoadRequested += (s, e) => OpenGeometryFile_Click(s, null);
 
             // Animation events
             PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
             PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
+
+            // Viewport events
+            ViewportControl.SkyboxVisibilityChanged += OnSkyboxVisibilityChanged;
 
             Unloaded += (s, e) => {
                 CleanupResources();
@@ -68,10 +76,30 @@ namespace AssetsManager.Views
             ViewportControl.ResetCamera();
         }
 
+        private void OnSkyboxVisibilityChanged(object sender, bool isVisible)
+        {
+            if (_skyVisual == null) return;
+
+            if (isVisible && !ViewportControl.Viewport.Children.Contains(_skyVisual))
+            {
+                ViewportControl.Viewport.Children.Add(_skyVisual);
+            }
+            else if (!isVisible && ViewportControl.Viewport.Children.Contains(_skyVisual))
+            {
+                ViewportControl.Viewport.Children.Remove(_skyVisual);
+            }
+        }
+
         public void CleanupResources()
         {
             // Limpiar el controlador de la cámara para desuscribir eventos
             _cameraController?.Dispose();
+
+            // Desuscribir eventos del ViewportControl
+            if (ViewportControl != null)
+            {
+                ViewportControl.SkyboxVisibilityChanged -= OnSkyboxVisibilityChanged;
+            }
 
             // Limpiar viewport
             ViewportControl?.Cleanup();
@@ -118,26 +146,38 @@ namespace AssetsManager.Views
             }
 
             // Otherwise, create and add them
-            _groundVisual = SceneElements.CreateGroundPlane(path => LoadSceneTexture(path), _logService.LogError);
+            _groundVisual = SceneElements.CreateGroundPlane(path => LoadSceneTexture(path), _logService.LogError, _appSettings.CustomFloorTexturePath);
             _skyVisual = SceneElements.CreateSidePlanes(path => LoadSceneTexture(path), _logService.LogError);
 
             ViewportControl.Viewport.Children.Add(_groundVisual);
             ViewportControl.Viewport.Children.Add(_skyVisual);
         }
 
-        private BitmapSource LoadSceneTexture(string uri)
+        private BitmapSource LoadSceneTexture(string path)
         {
             try
             {
-                using (Stream resourceStream = Application.GetResourceStream(new Uri(uri)).Stream)
+                // Check if the path is a file path (not a pack URI)
+                if (File.Exists(path))
                 {
-                    // Resize scene textures to a maximum of 1024x1024 for a balance of quality and memory.
-                    return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(uri), 1024);
+                    using (FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
+                    {
+                        return TextureUtils.LoadTexture(fileStream, Path.GetExtension(path), 1024);
+                    }
+                }
+                else
+                {
+                    // Assume it's a pack URI for resource loading
+                    using (Stream resourceStream = Application.GetResourceStream(new Uri(path)).Stream)
+                    {
+                        // Resize scene textures to a maximum of 1024x1024 for a balance of quality and memory.
+                        return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(path), 1024);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Failed to load scene texture: {uri}");
+                _logService.LogError(ex, $"Failed to load scene texture: {path}");
                 return null;
             }
         }

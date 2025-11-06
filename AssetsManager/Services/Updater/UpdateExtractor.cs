@@ -75,16 +75,23 @@ namespace AssetsManager.Services.Updater
                     appDirectory,
                     executablePath,
                     _directoriesCreator.UpdateLogFilePath,
-                    updaterCachePath, // New argument
-                    preserveConfig.ToString() // New argument
+                    updaterCachePath,
+                    preserveConfig.ToString()
                 };
 
-                Process.Start(new ProcessStartInfo(updaterExePath, string.Join(" ", arguments))
+                var startInfo = new ProcessStartInfo(updaterExePath)
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden
-                });
+                };
+
+                foreach (var arg in arguments)
+                {
+                    startInfo.ArgumentList.Add(arg);
+                }
+
+                Process.Start(startInfo);
 
                 _logService.Log("Update process started. Application will now shut down.");
                 Application.Current.Shutdown();

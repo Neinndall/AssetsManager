@@ -32,40 +32,10 @@ namespace AssetsManager.Views.Controls.Shared
         public FindInDocumentControl()
         {
             InitializeComponent();
-            this.Loaded += FindInDocumentControl_Loaded;
-            this.Unloaded += FindInDocumentControl_Unloaded;
-        }
-
-        private void FindInDocumentControl_Loaded(object sender, RoutedEventArgs e)
-        {
-            SearchTextBox.ApplyTemplate();
-            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
-            {
-                clearButton.Click += ClearTextButton_Click;
-            }
-        }
-
-        private void FindInDocumentControl_Unloaded(object sender, RoutedEventArgs e)
-        {
-            this.Loaded -= FindInDocumentControl_Loaded;
-            this.Unloaded -= FindInDocumentControl_Unloaded;
-            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
-            {
-                clearButton.Click -= ClearTextButton_Click;
-            }
-        }
-
-        private void ClearTextButton_Click(object sender, RoutedEventArgs e)
-        {
-            SearchTextBox.Text = string.Empty;
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
-            {
-                clearButton.Visibility = string.IsNullOrEmpty(SearchTextBox.Text) ? Visibility.Collapsed : Visibility.Visible;
-            }
         }
 
         public void FocusInput()

@@ -65,22 +65,54 @@ namespace AssetsManager.Utils
 
             var materialKeywords = getKeywords(materialName);
             string bestScoringMatch = null;
-            int bestScore = 0;
+            int bestScore = -1; // Initialize with -1 to ensure any valid score is higher
 
             foreach (string key in availableTextureKeys)
             {
                 var textureKeywords = getKeywords(key);
-                int currentScore = materialKeywords.Intersect(textureKeywords).Count();
+                string lowerKey = key.ToLower();
+                int currentScore = 0;
+
+                // Score for exact keyword matches or partial matches
+                foreach (string matKeyword in materialKeywords)
+                {
+                    if (textureKeywords.Contains(matKeyword))
+                    {
+                        currentScore += 2; // Exact keyword match
+                    }
+                    else if (textureKeywords.Any(texKeyword => texKeyword.Contains(matKeyword) || matKeyword.Contains(texKeyword)))
+                    {
+                        currentScore += 1; // Partial keyword match
+                    }
+                }
+
+                // Score for containing the full material name (or parts of it)
+                if (lowerKey.Contains(lowerMaterialName))
+                {
+                    currentScore += 3; // Strong match if texture key contains material name
+                }
+                else if (materialKeywords.Any(mk => lowerKey.Contains(mk)))
+                {
+                    currentScore += 1; // Match if texture key contains any material keyword
+                }
+
+                // Score for _tx_cm suffix (often indicates a main texture)
+                if (lowerKey.Contains("_tx_cm"))
+                {
+                    currentScore += 1;
+                }
 
                 if (currentScore > bestScore)
                 {
                     bestScore = currentScore;
                     bestScoringMatch = key;
                 }
-                else if (currentScore > 0 && currentScore == bestScore)
+                else if (currentScore == bestScore)
                 {
+                    // Tie-breaking:
+                    // 1. Prefer textures that contain "_tx_cm" if scores are equal
                     bool bestIsTxCm = bestScoringMatch?.ToLower().Contains("_tx_cm") ?? false;
-                    bool currentIsTxCm = key.ToLower().Contains("_tx_cm");
+                    bool currentIsTxCm = lowerKey.Contains("_tx_cm");
 
                     if (currentIsTxCm && !bestIsTxCm)
                     {
@@ -88,7 +120,11 @@ namespace AssetsManager.Utils
                     }
                     else if (!currentIsTxCm && bestIsTxCm)
                     {
+                        // Keep bestScoringMatch
                     }
+                    // 2. If still a tie, prefer the one that is a better substring match (longer common substring)
+                    // This is implicitly handled by the scoring, but if scores are equal, we need another tie-breaker.
+                    // For now, let's keep the "prefer shorter name" as a last resort, but it's less likely to be hit.
                     else if (bestScoringMatch == null || key.Length < bestScoringMatch.Length) // Prefer shorter name
                     {
                         bestScoringMatch = key;

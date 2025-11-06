@@ -78,7 +78,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBox x:Name="AssetTrackerIntervalValueTextBox"
                                          Width="75"
-                                         Style="{StaticResource ModernTextBox}"/>
+                                         Style="{StaticResource ModernTextBoxEditable}"/>
                                 <ComboBox x:Name="AssetTrackerIntervalUnitComboBox"
                                           Width="100"
                                           Margin="10,0,0,0"
@@ -143,7 +143,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBox x:Name="PbeIntervalValueTextBox"
                                          Width="75"
-                                         Style="{StaticResource ModernTextBox}"/>
+                                         Style="{StaticResource ModernTextBoxEditable}"/>
                                 <ComboBox x:Name="PbeIntervalUnitComboBox"
                                           Width="100"
                                           Margin="10,0,0,0"

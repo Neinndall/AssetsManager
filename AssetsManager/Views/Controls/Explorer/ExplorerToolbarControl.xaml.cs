@@ -16,29 +16,11 @@ namespace AssetsManager.Views.Controls.Explorer
         public ExplorerToolbarControl()
         {
             InitializeComponent();
-            Loaded += ExplorerToolbarControl_Loaded;
-        }
-
-        private void ExplorerToolbarControl_Loaded(object sender, RoutedEventArgs e)
-        {
-            SearchTextBox.ApplyTemplate();
-            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
-            {
-                clearButton.Click += (s, args) => 
-                {
-                    SearchTextBox.Text = string.Empty;
-                };
-            }
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             SearchTextChanged?.Invoke(this, e);
-
-            if (SearchTextBox.Template.FindName("ClearTextButton", SearchTextBox) is Button clearButton)
-            {
-                clearButton.Visibility = string.IsNullOrEmpty(SearchTextBox.Text) ? Visibility.Collapsed : Visibility.Visible;
-            }
         }
 
         private void CollapseToContainerButton_Click(object sender, RoutedEventArgs e)
