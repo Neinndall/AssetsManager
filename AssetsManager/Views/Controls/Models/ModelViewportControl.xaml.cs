@@ -29,6 +29,7 @@ namespace AssetsManager.Views.Controls.Models
         public event EventHandler<double> AnimationProgressChanged;
         public event EventHandler<bool> MaximizeClicked;
         public event EventHandler<bool> SkyboxVisibilityChanged;
+        public event EventHandler<double> AutoRotationStopped;
 
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
         private readonly PointsVisual3D _jointsVisual = new PointsVisual3D { Color = Colors.Blue, Size = 5 };
@@ -370,6 +371,7 @@ namespace AssetsManager.Views.Controls.Models
                     var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
                     if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
                     {
+                        AutoRotationStopped?.Invoke(this, ((AxisAngleRotation3D)_autoRotation.Rotation).Angle);
                         transformGroup.Children.Remove(_autoRotation);
                         ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                     }

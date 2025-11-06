@@ -67,6 +67,7 @@ namespace AssetsManager.Views
 
             // Viewport events
             ViewportControl.SkyboxVisibilityChanged += OnSkyboxVisibilityChanged;
+            ViewportControl.AutoRotationStopped += OnAutoRotationStopped;
 
             Unloaded += (s, e) => {
                 CleanupResources();
@@ -86,6 +87,8 @@ namespace AssetsManager.Views
         private void OnAnimationSeekRequested(object s, (AnimationModel, TimeSpan) args) => ViewportControl.SeekAnimation(args.Item2);
         private void OnAnimationProgressChanged(object s, double time) => PanelControl.UpdateAnimationProgress(time);
         private void OnPlaybackStateChanged(IAnimationAsset asset, bool isPlaying) => PanelControl.SetAnimationPlayingState(asset, isPlaying);
+
+        private void OnAutoRotationStopped(object sender, double angle) => PanelControl.ApplyAutoRotation(angle);
 
         private void OnSceneClearRequested(object sender, EventArgs e)
         {
@@ -131,6 +134,7 @@ namespace AssetsManager.Views
                 ViewportControl.AnimationProgressChanged -= OnAnimationProgressChanged;
                 ViewportControl.PlaybackStateChanged -= OnPlaybackStateChanged;
                 ViewportControl.SkyboxVisibilityChanged -= OnSkyboxVisibilityChanged;
+                ViewportControl.AutoRotationStopped -= OnAutoRotationStopped;
             }
 
             // 2. Limpiar el controlador de la cámara

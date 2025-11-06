@@ -512,5 +512,20 @@ namespace AssetsManager.Views.Controls.Models
         {
             ScaleSlider.Value = 1;
         }
+
+        public void ApplyAutoRotation(double angle)
+        {
+            if (_selectedModel != null && _transformData.TryGetValue(_selectedModel, out var transformData))
+            {
+                var newRotationY = transformData.Rotation.Y + angle;
+                // Normalize the angle to be within -360 to 360
+                newRotationY %= 360;
+                transformData.Rotation = new Vector3D(transformData.Rotation.X, newRotationY, transformData.Rotation.Z);
+
+                // Update the slider, which will trigger the TransformSlider_ValueChanged event
+                // and update the visual transform.
+                RotationYSlider.Value = newRotationY;
+            }
+        }
     }
 }
