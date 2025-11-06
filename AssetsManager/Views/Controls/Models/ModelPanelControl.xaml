@@ -21,38 +21,38 @@
 
             <TabControl Grid.Row="0" Style="{StaticResource CustomTabControlStyle}">
                 <TabItem Header="Meshes">
-                    <ListBox x:Name="MeshesListBox" 
-                             Style="{StaticResource SmoothScrollListBox}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="0,0,0,4" Padding="0,6,0,6">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="MeshesItemsControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <GroupBox Style="{StaticResource SettingsGroupBoxStyle}" Padding="10" Margin="0,0,0,5">
+                                        <GroupBox.Header>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox Grid.Column="0" Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                            </Grid>
+                                        </GroupBox.Header>
 
-                                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                        </StackPanel>
-
-                                        <Grid Grid.Row="1" Margin="0,4,0,0">
+                                        <Grid Margin="0,4,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center" Margin="10,0,8,0"/>
+                                            <TextBlock Grid.Column="0" Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                             <ComboBox Grid.Column="1" Style="{StaticResource ModernComboBox}"
                                                       ItemsSource="{Binding AvailableTextureNames}"
                                                       SelectedItem="{Binding SelectedTextureName}"
-                                                      Margin="0,0,10,0"/>
+                                                      Margin="0,0,0,0"/>
                                         </Grid>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                                    </GroupBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </TabItem>
                 <TabItem Header="Animations">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

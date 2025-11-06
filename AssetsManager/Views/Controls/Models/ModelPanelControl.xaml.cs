@@ -52,9 +52,6 @@ namespace AssetsManager.Views.Controls.Models
         public event Action<Visibility> EmptyStateVisibilityChanged;
         public event Action<Visibility> MainContentVisibilityChanged;
 
-        public ListBox MeshesListBoxControl => MeshesListBox;
-        public ItemsControl AnimationsListBoxControl => AnimationsListBox;
-        public ListBox ModelsListBoxControl => ModelsListBox;
         public ObservableCollection<AnimationModel> AnimationModels => _animationModels;
 
         private readonly ObservableCollection<SceneModel> _loadedModels = new();
@@ -66,7 +63,7 @@ namespace AssetsManager.Views.Controls.Models
         public ModelPanelControl()
         {
             InitializeComponent();
-            ModelsListBoxControl.ItemsSource = _loadedModels;
+            ModelsListBox.ItemsSource = _loadedModels;
             AnimationsListBox.ItemsSource = _animationModels;
 
             Unloaded += (s, e) => Cleanup();
@@ -93,7 +90,7 @@ namespace AssetsManager.Views.Controls.Models
             _currentlyPlayingAnimation = null;
 
             // 4. Limpiar UI
-            MeshesListBox.ItemsSource = null;
+            MeshesItemsControl.ItemsSource = null;
             _animationModels.Clear();
             ModelsListBox.SelectedItem = null;
 
@@ -240,7 +237,7 @@ namespace AssetsManager.Views.Controls.Models
                 UpdateTransform(newModel, transformData);
 
                 ModelReadyForViewport?.Invoke(newModel);
-                MeshesListBox.ItemsSource = newModel.Parts;
+                MeshesItemsControl.ItemsSource = newModel.Parts;
 
                 _loadedModels.Add(newModel);
                 ModelsListBox.SelectedItem = newModel;
@@ -352,7 +349,7 @@ namespace AssetsManager.Views.Controls.Models
                 MainContentVisibilityChanged?.Invoke(Visibility.Visible);
 
                 ModelReadyForViewport?.Invoke(newModel);
-                MeshesListBox.ItemsSource = newModel.Parts;
+                MeshesItemsControl.ItemsSource = newModel.Parts;
 
                 foreach (var model in _loadedModels)
                 {
@@ -383,7 +380,7 @@ namespace AssetsManager.Views.Controls.Models
             {
                 _selectedModel = selectedModel;
                 ActiveModelChanged?.Invoke(selectedModel);
-                MeshesListBox.ItemsSource = selectedModel.Parts;
+                MeshesItemsControl.ItemsSource = selectedModel.Parts;
 
                 _animationModels.Clear();
                 if (selectedModel.Animations != null)
