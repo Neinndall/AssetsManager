@@ -98,7 +98,8 @@
                 </TabItem>
                 <TabItem Header="Models">
                     <ListBox x:Name="ModelsListBox"
-                             Style="{StaticResource SmoothScrollListBox}">
+                             Style="{StaticResource SmoothScrollListBox}"
+                             SelectionChanged="ModelsListBox_SelectionChanged">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid>

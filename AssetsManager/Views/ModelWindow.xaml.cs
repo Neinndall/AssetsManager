@@ -53,9 +53,10 @@ namespace AssetsManager.Views
             // Model events
             PanelControl.ModelReadyForViewport += (model) => {
                 model.RootVisual.Transform = new TranslateTransform3D(0, SceneElements.GroundLevel, 0);
-                ViewportControl.SetModel(model);
+                ViewportControl.AddModel(model);
             };
-            PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.Viewport.Children.Remove(model.RootVisual);
+            PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.RemoveModel(model);
+            PanelControl.ActiveModelChanged += (model) => ViewportControl.SetActiveModel(model);
             PanelControl.SkeletonReadyForViewport += (skeleton) => ViewportControl.SetSkeleton(skeleton);
             PanelControl.MapGeometryLoadRequested += (s, e) => OpenGeometryFile_Click(s, null);
 

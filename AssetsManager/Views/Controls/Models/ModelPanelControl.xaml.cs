@@ -33,6 +33,7 @@ namespace AssetsManager.Views.Controls.Models
         public event EventHandler MapGeometryLoadRequested;
 
         public event Action<SceneModel> ModelReadyForViewport;
+        public event Action<SceneModel> ActiveModelChanged;
         public event Action<RigResource> SkeletonReadyForViewport;
         public event Action SceneSetupRequested;
         public event Action CameraResetRequested;
@@ -47,7 +48,6 @@ namespace AssetsManager.Views.Controls.Models
         private readonly ObservableCollection<string> _animationNames = new();
         private readonly ObservableCollection<SceneModel> _loadedModels = new();
         private RigResource _skeleton;
-        private SceneModel _sceneModel;
 
         public ModelPanelControl()
         {
@@ -77,8 +77,6 @@ namespace AssetsManager.Views.Controls.Models
             _loadedModels.Clear();
             
             // 3. Limpiar referencias
-            _sceneModel?.Dispose();
-            _sceneModel = null;
             _skeleton = null;
             
             // 4. Limpiar UI
@@ -118,6 +116,10 @@ namespace AssetsManager.Views.Controls.Models
                 {
                     ResetScene();
                     SceneClearRequested?.Invoke(this, EventArgs.Empty);
+                }
+                else
+                {
+                    ModelsListBox.SelectedIndex = 0;
                 }
             }
         }
@@ -197,18 +199,17 @@ namespace AssetsManager.Views.Controls.Models
                 }
             }
 
-            _sceneModel?.Dispose();
-
+            SceneModel newModel;
             if (string.IsNullOrEmpty(texturePath))
             {
-                _sceneModel = SknModelLoadingService.LoadModel(modelPath);
+                newModel = SknModelLoadingService.LoadModel(modelPath);
             }
             else
             {
-                _sceneModel = SknModelLoadingService.LoadModel(modelPath, texturePath);
+                newModel = SknModelLoadingService.LoadModel(modelPath, texturePath);
             }
 
-            if (_sceneModel != null)
+            if (newModel != null)
             {
                 if (isInitialLoad)
                 {
@@ -217,20 +218,13 @@ namespace AssetsManager.Views.Controls.Models
                     MainContentVisibilityChanged?.Invoke(Visibility.Visible);
                 }
 
-                ModelReadyForViewport?.Invoke(_sceneModel);
-                MeshesListBox.ItemsSource = _sceneModel.Parts;
+                ModelReadyForViewport?.Invoke(newModel);
+                MeshesListBox.ItemsSource = newModel.Parts;
 
-                foreach (var model in _loadedModels)
-                {
-                    model?.Dispose();
-                }
-                _loadedModels.Clear();
-                _loadedModels.Add(_sceneModel);
+                _loadedModels.Add(newModel);
 
                 CameraResetRequested?.Invoke();
 
-                LoadModelButton.IsEnabled = false;
-                LoadChromaModelButton.IsEnabled = false;
                 LoadAnimationButton.IsEnabled = true;
             }
         }
@@ -289,34 +283,31 @@ namespace AssetsManager.Views.Controls.Models
             LoadModelIcon.Kind = MaterialIconKind.Map;
             LoadModelButton.ToolTip = "Load MapGeometry";
 
-            // 🆕 Dispose del modelo anterior
-            _sceneModel?.Dispose();
-
+            SceneModel newModel;
             if (!string.IsNullOrEmpty(materialsPath))
             {
-                _sceneModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
+                newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
             }
             else
             {
-                _sceneModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, gameDataPath);
+                newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, gameDataPath);
             }
 
-            if (_sceneModel != null)
+            if (newModel != null)
             {
                 SceneSetupRequested?.Invoke();
                 EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
                 MainContentVisibilityChanged?.Invoke(Visibility.Visible);
 
-                ModelReadyForViewport?.Invoke(_sceneModel);
-                MeshesListBox.ItemsSource = _sceneModel.Parts;
+                ModelReadyForViewport?.Invoke(newModel);
+                MeshesListBox.ItemsSource = newModel.Parts;
 
-                // Limpiar y disponer modelos antiguos en la colección
                 foreach (var model in _loadedModels)
                 {
                     model?.Dispose();
                 }
                 _loadedModels.Clear();
-                _loadedModels.Add(_sceneModel);
+                _loadedModels.Add(newModel);
 
                 CameraResetRequested?.Invoke();
 
@@ -332,6 +323,15 @@ namespace AssetsManager.Views.Controls.Models
                 _animations.TryGetValue(animationName, out var animationAsset))
             {
                 AnimationStopRequested?.Invoke(this, animationAsset);
+            }
+        }
+
+        private void ModelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.AddedItems.Count > 0 && e.AddedItems[0] is SceneModel selectedModel)
+            {
+                ActiveModelChanged?.Invoke(selectedModel);
+                MeshesListBox.ItemsSource = selectedModel.Parts;
             }
         }
     }

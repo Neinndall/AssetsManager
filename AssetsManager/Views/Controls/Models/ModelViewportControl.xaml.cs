@@ -33,7 +33,8 @@ namespace AssetsManager.Views.Controls.Models
 
         private IAnimationAsset _currentAnimation;
         private RigResource _skeleton;
-        private SceneModel _sceneModel;
+        private SceneModel _activeSceneModel;
+        private readonly List<SceneModel> _loadedModels = new();
         public bool IsAnimationPaused { get; private set; }
 
         public ModelViewportControl()
@@ -114,16 +115,14 @@ namespace AssetsManager.Views.Controls.Models
         {
             StopAnimation();
 
-            if (_sceneModel != null)
+            foreach (var model in _loadedModels)
             {
-                // Remover del viewport ANTES de Dispose
-                if (Viewport.Children.Contains(_sceneModel.RootVisual))
-                    Viewport.Children.Remove(_sceneModel.RootVisual);
-                
-                // Llamar a Dispose para liberar recursos
-                _sceneModel.Dispose();
-                _sceneModel = null;
+                if (Viewport.Children.Contains(model.RootVisual))
+                    Viewport.Children.Remove(model.RootVisual);
+                model.Dispose();
             }
+            _loadedModels.Clear();
+            _activeSceneModel = null;
 
             _skeletonVisual.Points?.Clear();
             _jointsVisual.Points?.Clear();
@@ -135,29 +134,43 @@ namespace AssetsManager.Views.Controls.Models
             _skeleton = skeleton;
         }
 
-        public void SetModel(SceneModel model)
+        public void AddModel(SceneModel model)
         {
-            // Si ya hay un modelo, limpiarlo antes de reemplazar
-            if (_sceneModel != null && _sceneModel != model)
-            {
-                ResetScene();
-            }
-            
-            _sceneModel = model;
+            _loadedModels.Add(model);
             Viewport.Children.Add(model.RootVisual);
+            SetActiveModel(model);
+        }
+
+        public void RemoveModel(SceneModel model)
+        {
+            if (model == _activeSceneModel)
+            {
+                _activeSceneModel = null;
+            }
+            _loadedModels.Remove(model);
+            if (Viewport.Children.Contains(model.RootVisual))
+            {
+                Viewport.Children.Remove(model.RootVisual);
+            }
+            model.Dispose();
+        }
+
+        public void SetActiveModel(SceneModel model)
+        {
+            _activeSceneModel = model;
         }
 
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {
             if (_animationPlayer != null && _currentAnimation != null && _skeleton != null && 
-                _sceneModel != null && _sceneModel.SkinnedMesh != null)
+                _activeSceneModel != null && _activeSceneModel.SkinnedMesh != null)
             {
                 _animationPlayer.Update(
                     (float)_stopwatch.Elapsed.TotalSeconds, 
                     _currentAnimation, 
                     _skeleton, 
-                    _sceneModel.SkinnedMesh, 
-                    _sceneModel.Parts.ToList(), 
+                    _activeSceneModel.SkinnedMesh, 
+                    _activeSceneModel.Parts.ToList(), 
                     _skeletonVisual, 
                     _jointsVisual
                 );
@@ -233,13 +246,13 @@ namespace AssetsManager.Views.Controls.Models
 
         private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_sceneModel == null || string.IsNullOrEmpty(_sceneModel.Name))
+            if (_activeSceneModel == null || string.IsNullOrEmpty(_activeSceneModel.Name))
             {
                 LogService.LogWarning("No model loaded to name the screenshot automatically. Please load a model first.");
                 return;
             }
 
-            string modelName = _sceneModel.Name;
+            string modelName = _activeSceneModel.Name;
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string defaultFileName = $"{modelName}_{timestamp}.png";
 
