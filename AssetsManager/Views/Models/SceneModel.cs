@@ -19,6 +19,9 @@ namespace AssetsManager.Views.Models
         public ObservableCollection<AnimationData> Animations { get; set; }
         public ObservableCollection<string> AnimationNames { get; set; }
         public RigResource Skeleton { get; set; }
+        public IAnimationAsset CurrentAnimation { get; set; }
+        public bool IsAnimationPaused { get; set; }
+        public double AnimationTime { get; set; }
 
         public SceneModel()
         {
@@ -49,6 +52,9 @@ namespace AssetsManager.Views.Models
             // Limpiar animaciones
             Animations.Clear();
             AnimationNames.Clear();
+            CurrentAnimation = null;
+            IsAnimationPaused = false;
+            AnimationTime = 0;
             
             // Limpiar referencias
             Skeleton = null;

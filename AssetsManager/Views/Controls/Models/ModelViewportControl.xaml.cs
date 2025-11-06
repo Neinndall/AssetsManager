@@ -26,15 +26,13 @@ namespace AssetsManager.Views.Controls.Models
         public event EventHandler<bool> MaximizeClicked;
         public event EventHandler<bool> SkyboxVisibilityChanged;
 
-        private readonly Stopwatch _stopwatch = new Stopwatch();
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
         private readonly PointsVisual3D _jointsVisual = new PointsVisual3D { Color = Colors.Blue, Size = 5 };
         private AnimationPlayer _animationPlayer;
+        private DateTime _lastFrameTime;
 
-        private IAnimationAsset _currentAnimation;
         private SceneModel _activeSceneModel;
         private readonly List<SceneModel> _loadedModels = new();
-        public bool IsAnimationPaused { get; private set; }
 
         public ModelViewportControl()
         {
@@ -50,14 +48,13 @@ namespace AssetsManager.Views.Controls.Models
             Viewport.Children.Add(_jointsVisual);
 
             CompositionTarget.Rendering += CompositionTarget_Rendering;
-            _stopwatch.Start();
+            _lastFrameTime = DateTime.Now;
         }
 
         public void Cleanup()
         {
             // 1. Desuscribir eventos
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
-            _stopwatch.Stop();
             
             // 2. Limpiar escena y animaciones (ahora con Dispose)
             ResetScene();
@@ -77,36 +74,32 @@ namespace AssetsManager.Views.Controls.Models
             
             // 6. Limpiar referencias
             _animationPlayer = null;
-            _currentAnimation = null;
         }
 
         public void SetAnimation(IAnimationAsset animation)
         {
-            _currentAnimation = animation;
-            _stopwatch.Restart();
-            IsAnimationPaused = false;
+            if (_activeSceneModel == null) return;
+
+            _activeSceneModel.CurrentAnimation = animation;
+            _activeSceneModel.AnimationTime = 0;
+            _activeSceneModel.IsAnimationPaused = false;
+            _lastFrameTime = DateTime.Now;
         }
 
         public void TogglePauseResume(IAnimationAsset animationToToggle)
         {
-            if (_currentAnimation != animationToToggle) return;
+            if (_activeSceneModel?.CurrentAnimation != animationToToggle) return;
 
-            IsAnimationPaused = !IsAnimationPaused;
-            if (IsAnimationPaused)
-            {
-                _stopwatch.Stop();
-            }
-            else
-            {
-                _stopwatch.Start();
-            }
+            _activeSceneModel.IsAnimationPaused = !_activeSceneModel.IsAnimationPaused;
         }
 
         public void StopAnimation()
         {
-            _currentAnimation = null;
-            _stopwatch.Stop();
-            IsAnimationPaused = false;
+            if (_activeSceneModel == null) return;
+
+            _activeSceneModel.CurrentAnimation = null;
+            _activeSceneModel.AnimationTime = 0;
+            _activeSceneModel.IsAnimationPaused = true;
         }
 
         public void ResetScene()
@@ -149,24 +142,29 @@ namespace AssetsManager.Views.Controls.Models
 
         public void SetActiveModel(SceneModel model)
         {
-            if (_activeSceneModel != model)
-            {
-                StopAnimation();
-            }
             _activeSceneModel = model;
         }
 
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {
-            if (_animationPlayer != null && _currentAnimation != null && _activeSceneModel?.Skeleton != null && _activeSceneModel.SkinnedMesh != null)
+            var now = DateTime.Now;
+            var deltaTime = (now - _lastFrameTime).TotalSeconds;
+            _lastFrameTime = now;
+
+            if (_animationPlayer != null && _activeSceneModel?.CurrentAnimation != null && _activeSceneModel.Skeleton != null && _activeSceneModel.SkinnedMesh != null)
             {
+                if (!_activeSceneModel.IsAnimationPaused)
+                {
+                    _activeSceneModel.AnimationTime += deltaTime;
+                }
+
                 _animationPlayer.Update(
-                    (float)_stopwatch.Elapsed.TotalSeconds, 
-                    _currentAnimation, 
-                    _activeSceneModel.Skeleton, 
-                    _activeSceneModel.SkinnedMesh, 
-                    _activeSceneModel.Parts.ToList(), 
-                    _skeletonVisual, 
+                    (float)_activeSceneModel.AnimationTime,
+                    _activeSceneModel.CurrentAnimation,
+                    _activeSceneModel.Skeleton,
+                    _activeSceneModel.SkinnedMesh,
+                    _activeSceneModel.Parts.ToList(),
+                    _skeletonVisual,
                     _jointsVisual
                 );
             }
