@@ -25,6 +25,7 @@ namespace AssetsManager.Views.Controls.Models
         public LogService LogService { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
+        public event Action<IAnimationAsset, bool> PlaybackStateChanged;
         public event EventHandler<double> AnimationProgressChanged;
         public event EventHandler<bool> MaximizeClicked;
         public event EventHandler<bool> SkyboxVisibilityChanged;
@@ -90,6 +91,8 @@ namespace AssetsManager.Views.Controls.Models
             _activeSceneModel.AnimationTime = 0;
             _activeSceneModel.IsAnimationPaused = false;
             _lastFrameTime = DateTime.Now;
+
+            PlaybackStateChanged?.Invoke(animation, true);
         }
 
         public void TogglePauseResume(IAnimationAsset animationToToggle)
@@ -97,6 +100,8 @@ namespace AssetsManager.Views.Controls.Models
             if (_activeSceneModel?.CurrentAnimation != animationToToggle) return;
 
             _activeSceneModel.IsAnimationPaused = !_activeSceneModel.IsAnimationPaused;
+
+            PlaybackStateChanged?.Invoke(animationToToggle, !_activeSceneModel.IsAnimationPaused);
         }
 
         public void SeekAnimation(TimeSpan time)
@@ -110,6 +115,11 @@ namespace AssetsManager.Views.Controls.Models
         public void StopAnimation()
         {
             if (_activeSceneModel == null) return;
+
+            if(_activeSceneModel.CurrentAnimation != null)
+            {
+                PlaybackStateChanged?.Invoke(_activeSceneModel.CurrentAnimation, false);
+            }
 
             _activeSceneModel.CurrentAnimation = null;
             _activeSceneModel.AnimationTime = 0;
@@ -219,6 +229,13 @@ namespace AssetsManager.Views.Controls.Models
                 if (!_activeSceneModel.IsAnimationPaused)
                 {
                     _activeSceneModel.AnimationTime += deltaTime;
+
+                    var duration = _activeSceneModel.CurrentAnimation.Duration;
+                    if (duration > 0 && _activeSceneModel.AnimationTime >= duration)
+                    {
+                        _activeSceneModel.AnimationTime = 0;
+                    }
+
                     AnimationProgressChanged?.Invoke(this, _activeSceneModel.AnimationTime);
                 }
 

@@ -38,7 +38,35 @@ namespace AssetsManager.Views.Models
             set => SetField(ref _totalDuration, value);
         }
 
-        public string ProgressText => $"{TimeSpan.FromSeconds(CurrentTime):mm:ss} / {TimeSpan.FromSeconds(TotalDuration):mm:ss}";
+        public string ProgressText
+        {
+            get
+            {
+                try
+                {
+                    // Use the comprehensive checks from the "robust" version
+                    if (double.IsNaN(TotalDuration) || double.IsInfinity(TotalDuration) || TotalDuration <= 0 ||
+                        double.IsNaN(CurrentTime) || double.IsInfinity(CurrentTime))
+                    {
+                        return "--:-- / --:--";
+                    }
+
+                    // Clamp CurrentTime to be within the valid duration
+                    var clampedCurrentTime = Math.Max(0, Math.Min(CurrentTime, TotalDuration));
+
+                    // Use the .ToString() format that is known to work
+                    var totalStr = TimeSpan.FromSeconds(TotalDuration).ToString("mm':'ss");
+                    var currentStr = TimeSpan.FromSeconds(clampedCurrentTime).ToString("mm':'ss");
+
+                    return $"{currentStr} / {totalStr}";
+                }
+                catch (Exception)
+                {
+                    // This catch is still a good safeguard, just in case.
+                    return "Error";
+                }
+            }
+        }
 
         public string Name => AnimationData.Name;
 

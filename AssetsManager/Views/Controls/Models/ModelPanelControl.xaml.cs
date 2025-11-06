@@ -371,19 +371,8 @@ namespace AssetsManager.Views.Controls.Models
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedModel == null)
-            {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
-                return;
-            }
-
             if (sender is Button button && button.Tag is AnimationModel animationModel)
             {
-                if (_currentlyPlayingAnimation == animationModel)
-                {
-                    _currentlyPlayingAnimation.IsPlaying = false;
-                }
-                
                 AnimationStopRequested?.Invoke(this, animationModel.AnimationData.AnimationAsset);
             }
         }
@@ -448,6 +437,15 @@ namespace AssetsManager.Views.Controls.Models
             transformData.Scale = ScaleSlider.Value;
 
             UpdateTransform(_selectedModel, transformData);
+        }
+
+        public void SetAnimationPlayingState(IAnimationAsset asset, bool isPlaying)
+        {
+            var animationModel = _animationModels.FirstOrDefault(a => a.AnimationData.AnimationAsset == asset);
+            if (animationModel != null)
+            {
+                animationModel.IsPlaying = isPlaying;
+            }
         }
 
         public void UpdateAnimationProgress(double currentTime)
