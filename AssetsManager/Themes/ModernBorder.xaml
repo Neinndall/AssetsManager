@@ -22,4 +22,32 @@
         <Setter Property="Margin" Value="0,0,0,16"/>
     </Style>
 
+    <!-- Settings GroupBox Style -->
+    <Style x:Key="SettingsGroupBoxStyle" TargetType="GroupBox">
+        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="15"/>
+        <Setter Property="Margin" Value="0,0,0,16"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GroupBox">
+                    <Border BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}"
+                            Margin="{TemplateBinding Margin}">
+                        <StackPanel>
+                            <ContentPresenter ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              Margin="0,0,0,10"/>
+                            <ContentPresenter/>
+                        </StackPanel>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

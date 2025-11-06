@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using AssetsManager.Utils;
 using System.Windows.Media.Media3D;
 using AssetsManager.Views.Helpers;
+using System.Linq;
 
 namespace AssetsManager.Views.Controls.Models
 {
@@ -53,8 +54,6 @@ namespace AssetsManager.Views.Controls.Models
         public ListBox AnimationsListBoxControl => AnimationsListBox;
         public ListBox ModelsListBoxControl => ModelsListBox;
 
-        private readonly Dictionary<string, IAnimationAsset> _animations = new();
-        private readonly ObservableCollection<string> _animationNames = new();
         private readonly ObservableCollection<SceneModel> _loadedModels = new();
         private readonly Dictionary<SceneModel, ModelTransformData> _transformData = new();
         private RigResource _skeleton;
@@ -63,7 +62,6 @@ namespace AssetsManager.Views.Controls.Models
         public ModelPanelControl()
         {
             InitializeComponent();
-            AnimationsListBoxControl.ItemsSource = _animationNames;
             ModelsListBoxControl.ItemsSource = _loadedModels;
 
             Unloaded += (s, e) => Cleanup();
@@ -76,9 +74,7 @@ namespace AssetsManager.Views.Controls.Models
 
         public void ResetScene()
         {
-            // 1. Limpiar animaciones
-            _animations.Clear();
-            _animationNames.Clear();
+            // 1. Limpiar animaciones (ahora se limpian con el Dispose de SceneModel)
             
             // 2. CRÍTICO: Liberar recursos de TODOS los modelos
             foreach (var model in _loadedModels)
@@ -93,6 +89,7 @@ namespace AssetsManager.Views.Controls.Models
             
             // 4. Limpiar UI
             MeshesListBox.ItemsSource = null;
+            AnimationsListBox.ItemsSource = null;
             AnimationsListBox.SelectedItem = null;
             ModelsListBox.SelectedItem = null;
 
@@ -266,6 +263,12 @@ namespace AssetsManager.Views.Controls.Models
 
         private void LoadAnimation(string filePath)
         {
+            if (_selectedModel == null)
+            {
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                return;
+            }
+
             if (_skeleton == null)
             {
                 CustomMessageBoxService.ShowWarning("Missing Skeleton", "Please load a skeleton (.skl) file first.");
@@ -276,21 +279,30 @@ namespace AssetsManager.Views.Controls.Models
                 var animationAsset = AnimationAsset.Load(stream);
                 var animationName = Path.GetFileNameWithoutExtension(filePath);
 
-                if (!_animations.ContainsKey(animationName))
+                if (!_selectedModel.AnimationNames.Contains(animationName))
                 {
-                    _animations[animationName] = animationAsset;
-                    _animationNames.Add(animationName);
+                    _selectedModel.Animations.Add(new AnimationData { AnimationAsset = animationAsset, Name = animationName });
+                    _selectedModel.AnimationNames.Add(animationName);
                 }
             }
         }
 
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is string animationName && 
-                _animations.TryGetValue(animationName, out var animationAsset))
+            if (_selectedModel == null)
             {
-                AnimationsListBox.SelectedItem = animationName;
-                AnimationReadyForDisplay?.Invoke(this, animationAsset);
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                return;
+            }
+
+            if (sender is Button button && button.Tag is string animationName)
+            {
+                var animationData = _selectedModel.Animations.FirstOrDefault(a => a.Name == animationName);
+                if (animationData != null)
+                {
+                    AnimationsListBox.SelectedItem = animationName;
+                    AnimationReadyForDisplay?.Invoke(this, animationData.AnimationAsset);
+                }
             }
         }
 
@@ -336,10 +348,19 @@ namespace AssetsManager.Views.Controls.Models
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is string animationName && 
-                _animations.TryGetValue(animationName, out var animationAsset))
+            if (_selectedModel == null)
             {
-                AnimationStopRequested?.Invoke(this, animationAsset);
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                return;
+            }
+
+            if (sender is Button button && button.Tag is string animationName)
+            {
+                var animationData = _selectedModel.Animations.FirstOrDefault(a => a.Name == animationName);
+                if (animationData != null)
+                {
+                    AnimationStopRequested?.Invoke(this, animationData.AnimationAsset);
+                }
             }
         }
 
@@ -350,6 +371,7 @@ namespace AssetsManager.Views.Controls.Models
                 _selectedModel = selectedModel;
                 ActiveModelChanged?.Invoke(selectedModel);
                 MeshesListBox.ItemsSource = selectedModel.Parts;
+                AnimationsListBox.ItemsSource = selectedModel.AnimationNames;
 
                 if (_transformData.TryGetValue(selectedModel, out var transformData))
                 {

@@ -128,82 +128,94 @@
                 </TabItem>
                 <TabItem Header="Transform">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="10">
-                            <TextBlock Text="Position" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="X" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <Slider Grid.Column="1" x:Name="PositionXSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionXSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Y" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <Slider Grid.Column="1" x:Name="PositionYSlider" Minimum="-1000" Maximum="3000" ValueChanged="TransformSlider_ValueChanged"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionYSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Z" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <Slider Grid.Column="1" x:Name="PositionZSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionZSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                            </Grid>
+                        <StackPanel Margin="5">
+                            <!-- Position -->
+                            <GroupBox Header="Position" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="ArrowRight" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                        <Slider Grid.Column="1" x:Name="PositionXSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionXSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" Margin="5,0,0,0"/>
+                                    </Grid>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="ArrowUp" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                        <Slider Grid.Column="1" x:Name="PositionYSlider" Minimum="-1000" Maximum="3000" ValueChanged="TransformSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionYSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" Margin="5,0,0,0"/>
+                                    </Grid>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="ArrowDown" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                        <Slider Grid.Column="1" x:Name="PositionZSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionZSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" Margin="5,0,0,0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </GroupBox>
 
-                            <TextBlock Text="Rotation" FontWeight="Bold" Margin="0,10,0,0" Foreground="{StaticResource TextPrimary}"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="X" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <Slider Grid.Column="1" x:Name="RotationXSlider" Minimum="-180" Maximum="180" ValueChanged="TransformSlider_ValueChanged"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationXSlider, Path=Value, StringFormat={}{0:F0}}" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Y" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <Slider Grid.Column="1" x:Name="RotationYSlider" Minimum="-180" Maximum="180" ValueChanged="TransformSlider_ValueChanged"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationYSlider, Path=Value, StringFormat={}{0:F0}}" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                            </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Z" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <Slider Grid.Column="1" x:Name="RotationZSlider" Minimum="-180" Maximum="180" ValueChanged="TransformSlider_ValueChanged"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationZSlider, Path=Value, StringFormat={}{0:F0}}" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                            </Grid>
+                            <!-- Rotation -->
+                            <GroupBox Header="Rotation" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Rotate3d" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                        <Slider Grid.Column="1" x:Name="RotationXSlider" Minimum="-180" Maximum="180" ValueChanged="TransformSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationXSlider, Path=Value, StringFormat={}{0:F0}}" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" Margin="5,0,0,0"/>
+                                    </Grid>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Rotate3d" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                        <Slider Grid.Column="1" x:Name="RotationYSlider" Minimum="-180" Maximum="180" ValueChanged="TransformSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationYSlider, Path=Value, StringFormat={}{0:F0}}" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" Margin="5,0,0,0"/>
+                                    </Grid>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Rotate3d" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                        <Slider Grid.Column="1" x:Name="RotationZSlider" Minimum="-180" Maximum="180" ValueChanged="TransformSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationZSlider, Path=Value, StringFormat={}{0:F0}}" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" Margin="5,0,0,0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </GroupBox>
 
-                            <TextBlock Text="Scale" FontWeight="Bold" Margin="0,10,0,0" Foreground="{StaticResource TextPrimary}"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Uniform" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <Slider Grid.Column="1" x:Name="ScaleSlider" Minimum="0.1" Maximum="5" Value="1" ValueChanged="TransformSlider_ValueChanged"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ElementName=ScaleSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                            </Grid>
+                            <!-- Scale -->
+                            <GroupBox Header="Scale" Style="{StaticResource SettingsGroupBoxStyle}">
+                                <StackPanel>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Resize" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                        <Slider Grid.Column="1" x:Name="ScaleSlider" Minimum="0.1" Maximum="5" Value="1" ValueChanged="TransformSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ElementName=ScaleSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" Foreground="{StaticResource TextMuted}" Margin="5,0,0,0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </GroupBox>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
