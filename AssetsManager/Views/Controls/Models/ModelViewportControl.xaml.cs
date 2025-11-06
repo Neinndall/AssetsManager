@@ -23,6 +23,9 @@ namespace AssetsManager.Views.Controls.Models
     {
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
+        public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
+        public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
+        public event EventHandler<double> AnimationProgressChanged;
         public event EventHandler<bool> MaximizeClicked;
         public event EventHandler<bool> SkyboxVisibilityChanged;
 
@@ -94,6 +97,14 @@ namespace AssetsManager.Views.Controls.Models
             if (_activeSceneModel?.CurrentAnimation != animationToToggle) return;
 
             _activeSceneModel.IsAnimationPaused = !_activeSceneModel.IsAnimationPaused;
+        }
+
+        public void SeekAnimation(TimeSpan time)
+        {
+            if (_activeSceneModel != null)
+            {
+                _activeSceneModel.AnimationTime = time.TotalSeconds;
+            }
         }
 
         public void StopAnimation()
@@ -208,6 +219,7 @@ namespace AssetsManager.Views.Controls.Models
                 if (!_activeSceneModel.IsAnimationPaused)
                 {
                     _activeSceneModel.AnimationTime += deltaTime;
+                    AnimationProgressChanged?.Invoke(this, _activeSceneModel.AnimationTime);
                 }
 
                 _animationPlayer.Update(

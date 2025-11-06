@@ -61,6 +61,8 @@ namespace AssetsManager.Views
             // Animation events
             PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
             PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
+            PanelControl.AnimationSeekRequested += (s, args) => ViewportControl.SeekAnimation(args.Item2);
+            ViewportControl.AnimationProgressChanged += (s, time) => PanelControl.UpdateAnimationProgress(time);
 
             // Viewport events
             ViewportControl.SkyboxVisibilityChanged += OnSkyboxVisibilityChanged;

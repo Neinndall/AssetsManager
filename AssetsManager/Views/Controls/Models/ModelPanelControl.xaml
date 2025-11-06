@@ -55,46 +55,49 @@
                     </ListBox>
                 </TabItem>
                 <TabItem Header="Animations">
-                    <ListBox x:Name="AnimationsListBox"
-                             Style="{StaticResource SmoothScrollListBox}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{Binding}" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextPrimary}"/>
-                                    <Button Grid.Column="1" x:Name="PlayButton"
-                                            Click="PlayButton_Click"
-                                            Tag="{Binding}"
-                                            ToolTip="Play Animation"
-                                            Margin="5,0,0,0">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                                <Setter Property="Background" Value="White"/>
-                                                <Setter Property="Foreground" Value="Green"/>
-                                            </Style>
-                                        </Button.Style>
-                                        <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14"/>
-                                    </Button>
-                                    <Button Grid.Column="2" x:Name="StopButton"
-                                            Click="StopButton_Click"
-                                            Tag="{Binding}"
-                                            ToolTip="Pause/Resume"
-                                            Margin="5,0,5,0">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                                <Setter Property="Foreground" Value="Red"/>
-                                            </Style>
-                                        </Button.Style>
-                                        <materialIcons:MaterialIcon Kind="Pause" Width="14" Height="14"/>
-                                    </Button>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="AnimationsListBox">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <GroupBox Style="{StaticResource SettingsGroupBoxStyle}" Padding="10" Margin="0,0,0,5">
+                                        <GroupBox.Header>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                <Button Grid.Column="1" x:Name="PlayButton" Click="PlayButton_Click" Tag="{Binding}" ToolTip="Play Animation" Margin="5,0,0,0">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}"/>
+                                                    </Button.Style>
+                                                    <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14" Foreground="Green"/>
+                                                </Button>
+                                                <Button Grid.Column="2" x:Name="StopButton" Click="StopButton_Click" Tag="{Binding}" ToolTip="Pause/Resume" Margin="5,0,0,0">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}"/>
+                                                    </Button.Style>
+                                                    <materialIcons:MaterialIcon Kind="Pause" Width="14" Height="14" Foreground="Red"/>
+                                                </Button>
+                                            </Grid>
+                                        </GroupBox.Header>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="80"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="ClockOutline" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                            <Slider Grid.Column="1" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragCompleted="AnimationSlider_DragCompleted" Tag="{Binding}" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding ProgressText}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource TextMuted}" FontSize="10"/>
+                                        </Grid>
+                                    </GroupBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </TabItem>
                 <TabItem Header="Models">
                     <ListBox x:Name="ModelsListBox"

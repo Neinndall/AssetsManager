@@ -15,6 +15,8 @@ using System.Threading.Tasks;
 using AssetsManager.Utils;
 using System.Windows.Media.Media3D;
 using AssetsManager.Views.Helpers;
+using System.Windows.Media;
+using System.Windows.Controls.Primitives;
 using System.Linq;
 
 namespace AssetsManager.Views.Controls.Models
@@ -37,6 +39,7 @@ namespace AssetsManager.Views.Controls.Models
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         
         public event EventHandler<IAnimationAsset> AnimationReadyForDisplay;
+        public event EventHandler<(AnimationModel, TimeSpan)> AnimationSeekRequested;
         public event Action<SceneModel> ModelRemovedFromViewport;
         public event EventHandler<IAnimationAsset> AnimationStopRequested;
         public event EventHandler SceneClearRequested;
@@ -50,17 +53,21 @@ namespace AssetsManager.Views.Controls.Models
         public event Action<Visibility> MainContentVisibilityChanged;
 
         public ListBox MeshesListBoxControl => MeshesListBox;
-        public ListBox AnimationsListBoxControl => AnimationsListBox;
+        public ItemsControl AnimationsListBoxControl => AnimationsListBox;
         public ListBox ModelsListBoxControl => ModelsListBox;
+        public ObservableCollection<AnimationModel> AnimationModels => _animationModels;
 
         private readonly ObservableCollection<SceneModel> _loadedModels = new();
+        private readonly ObservableCollection<AnimationModel> _animationModels = new();
         private readonly Dictionary<SceneModel, ModelTransformData> _transformData = new();
         private SceneModel _selectedModel;
+        private AnimationModel _currentlyPlayingAnimation;
 
         public ModelPanelControl()
         {
             InitializeComponent();
             ModelsListBoxControl.ItemsSource = _loadedModels;
+            AnimationsListBox.ItemsSource = _animationModels;
 
             Unloaded += (s, e) => Cleanup();
         }
@@ -83,11 +90,11 @@ namespace AssetsManager.Views.Controls.Models
             _transformData.Clear();
             
             // 3. Limpiar referencias
-            
+            _currentlyPlayingAnimation = null;
+
             // 4. Limpiar UI
             MeshesListBox.ItemsSource = null;
-            AnimationsListBox.ItemsSource = null;
-            AnimationsListBox.SelectedItem = null;
+            _animationModels.Clear();
             ModelsListBox.SelectedItem = null;
 
             LoadModelButton.IsEnabled = true;
@@ -291,10 +298,11 @@ namespace AssetsManager.Views.Controls.Models
                 var animationAsset = AnimationAsset.Load(stream);
                 var animationName = Path.GetFileNameWithoutExtension(filePath);
 
-                if (!_selectedModel.AnimationNames.Contains(animationName))
+                if (!_animationModels.Any(a => a.Name == animationName))
                 {
-                    _selectedModel.Animations.Add(new AnimationData { AnimationAsset = animationAsset, Name = animationName });
-                    _selectedModel.AnimationNames.Add(animationName);
+                    var animationData = new AnimationData { AnimationAsset = animationAsset, Name = animationName };
+                    _selectedModel.Animations.Add(animationData);
+                    _animationModels.Add(new AnimationModel(animationData));
                 }
             }
         }
@@ -307,14 +315,17 @@ namespace AssetsManager.Views.Controls.Models
                 return;
             }
 
-            if (sender is Button button && button.Tag is string animationName)
+            if (sender is Button button && button.Tag is AnimationModel animationModel)
             {
-                var animationData = _selectedModel.Animations.FirstOrDefault(a => a.Name == animationName);
-                if (animationData != null)
+                if (_currentlyPlayingAnimation != null)
                 {
-                    AnimationsListBox.SelectedItem = animationName;
-                    AnimationReadyForDisplay?.Invoke(this, animationData.AnimationAsset);
+                    _currentlyPlayingAnimation.IsPlaying = false;
                 }
+
+                _currentlyPlayingAnimation = animationModel;
+                _currentlyPlayingAnimation.IsPlaying = true;
+
+                AnimationReadyForDisplay?.Invoke(this, animationModel.AnimationData.AnimationAsset);
             }
         }
 
@@ -366,13 +377,14 @@ namespace AssetsManager.Views.Controls.Models
                 return;
             }
 
-            if (sender is Button button && button.Tag is string animationName)
+            if (sender is Button button && button.Tag is AnimationModel animationModel)
             {
-                var animationData = _selectedModel.Animations.FirstOrDefault(a => a.Name == animationName);
-                if (animationData != null)
+                if (_currentlyPlayingAnimation == animationModel)
                 {
-                    AnimationStopRequested?.Invoke(this, animationData.AnimationAsset);
+                    _currentlyPlayingAnimation.IsPlaying = false;
                 }
+                
+                AnimationStopRequested?.Invoke(this, animationModel.AnimationData.AnimationAsset);
             }
         }
 
@@ -383,7 +395,15 @@ namespace AssetsManager.Views.Controls.Models
                 _selectedModel = selectedModel;
                 ActiveModelChanged?.Invoke(selectedModel);
                 MeshesListBox.ItemsSource = selectedModel.Parts;
-                AnimationsListBox.ItemsSource = selectedModel.AnimationNames;
+
+                _animationModels.Clear();
+                if (selectedModel.Animations != null)
+                {
+                    foreach (var animData in selectedModel.Animations)
+                    {
+                        _animationModels.Add(new AnimationModel(animData));
+                    }
+                }
 
                 if (_transformData.TryGetValue(selectedModel, out var transformData))
                 {
@@ -430,6 +450,14 @@ namespace AssetsManager.Views.Controls.Models
             UpdateTransform(_selectedModel, transformData);
         }
 
+        public void UpdateAnimationProgress(double currentTime)
+        {
+            if (_currentlyPlayingAnimation != null && _currentlyPlayingAnimation.IsPlaying)
+            {
+                _currentlyPlayingAnimation.CurrentTime = currentTime;
+            }
+        }
+
         private void UpdateTransform(SceneModel model, ModelTransformData data)
         {
             var transformGroup = new Transform3DGroup();
@@ -449,6 +477,14 @@ namespace AssetsManager.Views.Controls.Models
             transformGroup.Children.Add(new TranslateTransform3D(data.Position.X, data.Position.Y, data.Position.Z));
 
             model.RootVisual.Transform = transformGroup;
+        }
+
+        private void AnimationSlider_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+        {
+            if (sender is Slider slider && slider.Tag is AnimationModel animationModel)
+            {
+                AnimationSeekRequested?.Invoke(this, (animationModel, TimeSpan.FromSeconds(slider.Value)));
+            }
         }
     }
 }
