@@ -493,5 +493,24 @@ namespace AssetsManager.Views.Controls.Models
                 AnimationSeekRequested?.Invoke(this, (animationModel, TimeSpan.FromSeconds(e.NewValue)));
             }
         }
+
+        private void ResetPosition_Click(object sender, RoutedEventArgs e)
+        {
+            PositionXSlider.Value = 0;
+            PositionYSlider.Value = SceneElements.GroundLevel;
+            PositionZSlider.Value = 0;
+        }
+
+        private void ResetRotation_Click(object sender, RoutedEventArgs e)
+        {
+            RotationXSlider.Value = 0;
+            RotationYSlider.Value = 0;
+            RotationZSlider.Value = 0;
+        }
+
+        private void ResetScale_Click(object sender, RoutedEventArgs e)
+        {
+            ScaleSlider.Value = 1;
+        }
     }
 }
