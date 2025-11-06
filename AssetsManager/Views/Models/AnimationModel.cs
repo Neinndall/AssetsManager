@@ -55,8 +55,8 @@ namespace AssetsManager.Views.Models
                     var clampedCurrentTime = Math.Max(0, Math.Min(CurrentTime, TotalDuration));
 
                     // Use the .ToString() format that is known to work
-                    var totalStr = TimeSpan.FromSeconds(TotalDuration).ToString("mm':'ss");
-                    var currentStr = TimeSpan.FromSeconds(clampedCurrentTime).ToString("mm':'ss");
+                    var totalStr = TimeSpan.FromSeconds(TotalDuration).ToString("mm':'ss'.'fff");
+                    var currentStr = TimeSpan.FromSeconds(clampedCurrentTime).ToString("mm':'ss'.'fff");
 
                     return $"{currentStr} / {totalStr}";
                 }

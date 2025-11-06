@@ -477,11 +477,23 @@ namespace AssetsManager.Views.Controls.Models
             model.RootVisual.Transform = transformGroup;
         }
 
+        private bool _isSliderDragging = false;
+
+        private void AnimationSlider_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
+        {
+            _isSliderDragging = true;
+        }
+
         private void AnimationSlider_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
         {
-            if (sender is Slider slider && slider.Tag is AnimationModel animationModel)
+            _isSliderDragging = false;
+        }
+
+        private void AnimationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (sender is Slider slider && slider.Tag is AnimationModel animationModel && _isSliderDragging)
             {
-                AnimationSeekRequested?.Invoke(this, (animationModel, TimeSpan.FromSeconds(slider.Value)));
+                AnimationSeekRequested?.Invoke(this, (animationModel, TimeSpan.FromSeconds(e.NewValue)));
             }
         }
     }
