@@ -165,7 +165,7 @@ namespace AssetsManager.Views.Controls.Models
                 var folderBrowserDialog = new CommonOpenFileDialog
                 {
                     IsFolderPicker = true,
-                    Title = "Select the Texture Folder for the Chroma"
+                    Title = "Select the texture folder for the chroma"
                 };
 
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)

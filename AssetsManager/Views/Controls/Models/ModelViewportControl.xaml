@@ -79,7 +79,7 @@
                               Click="SkyboxToggleButton_Click"
                               Margin="5,0,0,0"
                               IsChecked="False">
-                    <materialIcons:MaterialIcon Kind="Nature" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
+                    <materialIcons:MaterialIcon Kind="Panorama" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
                 </ToggleButton>
             </StackPanel>
         </Grid>

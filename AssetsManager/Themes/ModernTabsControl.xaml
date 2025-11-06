@@ -21,7 +21,8 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Padding="{TemplateBinding Padding}">
-                        <ContentPresenter ContentSource="Header"
+                        <ContentPresenter x:Name="HeaderPresenter"
+                                          ContentSource="Header"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
                     </Border>
@@ -31,7 +32,7 @@
                             <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                         </Trigger>
                         <DataTrigger Binding="{Binding IsMouseOver, ElementName=Border}" Value="True">
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Setter TargetName="HeaderPresenter" Property="TextElement.Foreground" Value="{StaticResource TextPrimary}"/>
                         </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
