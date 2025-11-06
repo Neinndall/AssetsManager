@@ -31,6 +31,9 @@ namespace AssetsManager.Views.Controls.Models
         private AnimationPlayer _animationPlayer;
         private DateTime _lastFrameTime;
 
+        private bool _isAutoRotating = false;
+        private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
+
         private SceneModel _activeSceneModel;
         private readonly List<SceneModel> _loadedModels = new();
 
@@ -115,6 +118,13 @@ namespace AssetsManager.Views.Controls.Models
             _loadedModels.Clear();
             _activeSceneModel = null;
 
+            if (AutoRotateToggleButton != null)
+            {
+                AutoRotateToggleButton.IsChecked = false;
+            }
+            _isAutoRotating = false;
+            ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
+
             _skeletonVisual.Points?.Clear();
             _jointsVisual.Points?.Clear();
         }
@@ -130,6 +140,14 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (model == _activeSceneModel)
             {
+                if (_isAutoRotating)
+                {
+                    var transformGroup = model.RootVisual.Transform as Transform3DGroup;
+                    if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
+                    {
+                        transformGroup.Children.Remove(_autoRotation);
+                    }
+                }
                 _activeSceneModel = null;
             }
             _loadedModels.Remove(model);
@@ -142,6 +160,15 @@ namespace AssetsManager.Views.Controls.Models
 
         public void SetActiveModel(SceneModel model)
         {
+            if (_isAutoRotating && _activeSceneModel != null)
+            {
+                var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
+                if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
+                {
+                    transformGroup.Children.Remove(_autoRotation);
+                }
+            }
+
             _activeSceneModel = model;
         }
 
@@ -150,6 +177,31 @@ namespace AssetsManager.Views.Controls.Models
             var now = DateTime.Now;
             var deltaTime = (now - _lastFrameTime).TotalSeconds;
             _lastFrameTime = now;
+
+            if (_isAutoRotating && _activeSceneModel != null)
+            {
+                var transform = _activeSceneModel.RootVisual.Transform;
+                Transform3DGroup transformGroup;
+
+                if (transform == null || transform == Transform3D.Identity)
+                {
+                    transformGroup = new Transform3DGroup();
+                    _activeSceneModel.RootVisual.Transform = transformGroup;
+                }
+                else
+                {
+                    transformGroup = transform as Transform3DGroup;
+                }
+
+                if (transformGroup != null)
+                {
+                    if (!transformGroup.Children.Contains(_autoRotation))
+                    {
+                        transformGroup.Children.Add(_autoRotation);
+                    }
+                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle += 0.5;
+                }
+            }
 
             if (_animationPlayer != null && _activeSceneModel?.CurrentAnimation != null && _activeSceneModel.Skeleton != null && _activeSceneModel.SkinnedMesh != null)
             {
@@ -276,6 +328,23 @@ namespace AssetsManager.Views.Controls.Models
             if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
             {
                 MaximizeClicked?.Invoke(this, toggleButton.IsChecked ?? false);
+            }
+        }
+
+        private void AutoRotateToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                _isAutoRotating = toggleButton.IsChecked ?? false;
+                if (!_isAutoRotating && _activeSceneModel != null)
+                {
+                    var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
+                    if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
+                    {
+                        transformGroup.Children.Remove(_autoRotation);
+                        ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
+                    }
+                }
             }
         }
 

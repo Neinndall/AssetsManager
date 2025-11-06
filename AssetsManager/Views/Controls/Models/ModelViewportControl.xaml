@@ -63,9 +63,17 @@
                 </Button>
                 <Button Style="{StaticResource IconButton}"
                         ToolTip="Reset Camera"
-                        Click="ResetCameraButton_Click">
+                        Click="ResetCameraButton_Click"
+                        Margin="0,0,5,0">
                     <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
                 </Button>
+                <ToggleButton Style="{StaticResource IconToggleButton}"
+                              x:Name="AutoRotateToggleButton"
+                              ToolTip="Auto-Rotate"
+                              Click="AutoRotateToggleButton_Click"
+                              IsChecked="False">
+                    <materialIcons:MaterialIcon Kind="Autorenew" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" />
+                </ToggleButton>
                 <ToggleButton Style="{StaticResource IconToggleButton}"
                               ToolTip="Show/Hide Skybox"
                               Click="SkyboxToggleButton_Click"
