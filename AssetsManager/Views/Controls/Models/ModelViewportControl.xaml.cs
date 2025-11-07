@@ -16,6 +16,7 @@ using AssetsManager.Services.Models;
 using AssetsManager.Views.Models;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace AssetsManager.Views.Controls.Models
 {
@@ -263,7 +264,9 @@ namespace AssetsManager.Views.Controls.Models
             camera.Position = position;
             camera.LookDirection = lookDirection;
             camera.UpDirection = upDirection;
-            camera.FieldOfView = 45;
+            camera.FieldOfView = 50;
+            camera.NearPlaneDistance = 1.0; // Evita clipping cercano
+            camera.FarPlaneDistance = 10000; // Asegura ver objetos lejanos
         }
 
         public void TakeScreenshot(string filePath)
@@ -273,35 +276,50 @@ namespace AssetsManager.Views.Controls.Models
             {
                 finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
             }
-
+            
             var originalShowFrameRate = Viewport3D.ShowFrameRate;
+            var originalTransform = Viewport3D.LayoutTransform;
+            var camera = Viewport3D.Camera as PerspectiveCamera;
+            double originalNearPlaneDistance = camera?.NearPlaneDistance ?? 1.0;
+            
             try
             {
                 Viewport3D.ShowFrameRate = false;
-
+                              
                 double scalingFactor = 4.0;
                 int width = (int)(Viewport3D.ActualWidth * scalingFactor);
                 int height = (int)(Viewport3D.ActualHeight * scalingFactor);
+                
+                Viewport3D.LayoutTransform = new ScaleTransform(scalingFactor, scalingFactor);
+                Viewport3D.UpdateLayout();
+                Viewport3D.InvalidateVisual();
 
-                var renderBitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+                // Pausa única y optimizada para estabilizar el renderizado
+                System.Threading.Thread.Sleep(120);
 
-                var visual = new DrawingVisual();
-                using (var context = visual.RenderOpen())
-                {
-                    var brush = new VisualBrush(Viewport3D);
-                    context.DrawRectangle(brush, null, new Rect(0, 0, Viewport3D.ActualWidth, Viewport3D.ActualHeight));
-                }
-
-                visual.Transform = new ScaleTransform(scalingFactor, scalingFactor);
-                renderBitmap.Render(visual);
-
-                BitmapEncoder bitmapEncoder = new PngBitmapEncoder();
-                bitmapEncoder.Frames.Add(BitmapFrame.Create(renderBitmap));
-
+                var rtb = new RenderTargetBitmap(
+                    width, 
+                    height, 
+                    96 * scalingFactor, 
+                    96 * scalingFactor, 
+                    PixelFormats.Pbgra32
+                );
+                
+                RenderOptions.SetBitmapScalingMode(rtb, BitmapScalingMode.HighQuality);
+                RenderOptions.SetEdgeMode(rtb, EdgeMode.Unspecified);
+                RenderOptions.SetClearTypeHint(rtb, ClearTypeHint.Enabled);
+                
+                rtb.Render(Viewport3D);
+                
+                var pngEncoder = new PngBitmapEncoder();
+                pngEncoder.Interlace = PngInterlaceOption.Off;
+                pngEncoder.Frames.Add(BitmapFrame.Create(rtb));
+                
                 using (var stream = File.Create(finalFilePath))
                 {
-                    bitmapEncoder.Save(stream);
+                    pngEncoder.Save(stream);
                 }
+                
                 LogService.LogInteractiveSuccess($"Screenshot saved to {finalFilePath}", finalFilePath);
             }
             catch (Exception ex)
@@ -310,6 +328,12 @@ namespace AssetsManager.Views.Controls.Models
             }
             finally
             {
+                if (camera != null)
+                {
+                    camera.NearPlaneDistance = originalNearPlaneDistance;
+                }
+                Viewport3D.LayoutTransform = originalTransform;
+                Viewport3D.UpdateLayout();
                 Viewport3D.ShowFrameRate = originalShowFrameRate;
             }
         }

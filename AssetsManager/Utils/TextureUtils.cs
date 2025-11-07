@@ -164,17 +164,21 @@ namespace AssetsManager.Utils
                     TileMode = TileMode.Tile,
                     Stretch = Stretch.Fill
                 };
+                
+                // Mejora la calidad
+                RenderOptions.SetBitmapScalingMode(imageBrush, BitmapScalingMode.HighQuality);
+                RenderOptions.SetCachingHint(imageBrush, CachingHint.Cache);
+                RenderOptions.SetEdgeMode(imageBrush, EdgeMode.Unspecified);
+                
                 materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
 
-                // Componente especular para dar brillo/reflejo
-                materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 15));
+                // Reduce el brillo especular (puede causar más aliasing visible)
+                materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 8)); // Era 15, ahora 8
 
-                // Componente emisivo suave para mejor visibilidad
+                // Emisivo suave
                 materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(System.Windows.Media.Color.FromArgb(10, 255, 255, 255))));
 
                 modelPart.Geometry.Material = materialGroup;
-
-                // IMPORTANTE: También aplicar al BackMaterial para ver ambas caras
                 modelPart.Geometry.BackMaterial = materialGroup;
             }
         }
@@ -190,14 +194,28 @@ namespace AssetsManager.Utils
                     Texture tex = Texture.Load(textureStream);
                     if (tex.Mips.Length > 0)
                     {
-                        using (Image<Rgba32> imageSharp = tex.Mips[0].ToImage())
+                        // *** USA EL MIP APROPIADO según el tamaño deseado ***
+                        int mipLevel = 0;
+                        if (maxWidth.HasValue && tex.Mips.Length > 1)
+                        {
+                            // Calcula el mip level óptimo
+                            int currentWidth = tex.Mips[0].Width;
+                            while (mipLevel < tex.Mips.Length - 1 && currentWidth > maxWidth.Value * 2)
+                            {
+                                mipLevel++;
+                                currentWidth /= 2;
+                            }
+                        }
+                        
+                        using (Image<Rgba32> imageSharp = tex.Mips[mipLevel].ToImage())
                         {
                             if (maxWidth.HasValue && (imageSharp.Width > maxWidth.Value || imageSharp.Height > maxWidth.Value))
                             {
                                 imageSharp.Mutate(x => x.Resize(new ResizeOptions
                                 {
                                     Size = new Size(maxWidth.Value, maxWidth.Value),
-                                    Mode = ResizeMode.Max
+                                    Mode = ResizeMode.Max,
+                                    Sampler = KnownResamplers.Lanczos3 // *** MEJOR SAMPLER ***
                                 }));
                             }
 
@@ -207,7 +225,15 @@ namespace AssetsManager.Utils
                                 bgra32Image.CopyPixelDataTo(pixelBuffer);
 
                                 int stride = bgra32Image.Width * 4;
-                                var bitmapSource = BitmapSource.Create(bgra32Image.Width, bgra32Image.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
+                                var bitmapSource = BitmapSource.Create(
+                                    bgra32Image.Width, 
+                                    bgra32Image.Height, 
+                                    96, 96, 
+                                    PixelFormats.Bgra32, 
+                                    null, 
+                                    pixelBuffer, 
+                                    stride
+                                );
                                 bitmapSource.Freeze();
 
                                 return bitmapSource;
