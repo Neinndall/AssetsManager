@@ -21,80 +21,83 @@
 
             <TabControl Grid.Row="0" Style="{StaticResource CustomTabControlStyle}">
                 <TabItem Header="Meshes">
-                    <ListBox x:Name="MeshesListBox" 
-                             Style="{StaticResource SmoothScrollListBox}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="0,0,0,4" Padding="0,6,0,6">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="MeshesItemsControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <GroupBox Style="{StaticResource SettingsGroupBoxStyle}" Padding="10" Margin="0,0,0,5">
+                                        <GroupBox.Header>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox Grid.Column="0" Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                            </Grid>
+                                        </GroupBox.Header>
 
-                                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                        </StackPanel>
-
-                                        <Grid Grid.Row="1" Margin="0,4,0,0">
+                                        <Grid Margin="0,4,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center" Margin="10,0,8,0"/>
+                                            <TextBlock Grid.Column="0" Text="Texture:" FontSize="10" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                             <ComboBox Grid.Column="1" Style="{StaticResource ModernComboBox}"
                                                       ItemsSource="{Binding AvailableTextureNames}"
                                                       SelectedItem="{Binding SelectedTextureName}"
-                                                      Margin="0,0,10,0"/>
+                                                      Margin="0,0,0,0"/>
                                         </Grid>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                                    </GroupBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </TabItem>
                 <TabItem Header="Animations">
-                    <ListBox x:Name="AnimationsListBox"
-                             Style="{StaticResource SmoothScrollListBox}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{Binding}" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextPrimary}"/>
-                                    <Button Grid.Column="1" x:Name="PlayButton"
-                                            Click="PlayButton_Click"
-                                            Tag="{Binding}"
-                                            ToolTip="Play Animation"
-                                            Margin="5,0,0,0">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                                <Setter Property="Background" Value="White"/>
-                                                <Setter Property="Foreground" Value="Green"/>
-                                            </Style>
-                                        </Button.Style>
-                                        <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14"/>
-                                    </Button>
-                                    <Button Grid.Column="2" x:Name="StopButton"
-                                            Click="StopButton_Click"
-                                            Tag="{Binding}"
-                                            ToolTip="Pause/Resume"
-                                            Margin="5,0,5,0">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                                <Setter Property="Foreground" Value="Red"/>
-                                            </Style>
-                                        </Button.Style>
-                                        <materialIcons:MaterialIcon Kind="Pause" Width="14" Height="14"/>
-                                    </Button>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="AnimationsListBox">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <GroupBox Style="{StaticResource SettingsGroupBoxStyle}" Padding="10" Margin="0,0,0,5">
+                                        <GroupBox.Header>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                <Button Grid.Column="1" x:Name="PlayButton" Click="PlayButton_Click" Tag="{Binding}" ToolTip="Play Animation" Margin="5,0,0,0">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}"/>
+                                                    </Button.Style>
+                                                    <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14" Foreground="Green"/>
+                                                </Button>
+                                                <Button Grid.Column="2" x:Name="StopButton" Click="StopButton_Click" Tag="{Binding}" ToolTip="Pause/Resume" Margin="5,0,0,0">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}"/>
+                                                    </Button.Style>
+                                                    <materialIcons:MaterialIcon Kind="Pause" Width="14" Height="14" Foreground="Red"/>
+                                                </Button>
+                                            </Grid>
+                                        </GroupBox.Header>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="120"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="ClockOutline" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                            <Slider Grid.Column="1" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Tag="{Binding}" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding ProgressText}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource TextMuted}" FontSize="10"/>
+                                        </Grid>
+                                    </GroupBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </TabItem>
                 <TabItem Header="Models">
                     <ListBox x:Name="ModelsListBox"
@@ -130,7 +133,19 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="5">
                             <!-- Position -->
-                            <GroupBox Header="Position" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,10">
+                            <GroupBox Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,10">
+                                <GroupBox.Header>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Position"/>
+                                        <Button Grid.Column="1" x:Name="ResetPositionButton" Style="{StaticResource TransparentIconButton}" ToolTip="Reset Position" Click="ResetPosition_Click">
+                                            <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14"/>
+                                        </Button>
+                                    </Grid>
+                                </GroupBox.Header>
                                 <StackPanel>
                                     <Grid Margin="0,5,0,0">
                                         <Grid.ColumnDefinitions>
@@ -166,7 +181,19 @@
                             </GroupBox>
 
                             <!-- Rotation -->
-                            <GroupBox Header="Rotation" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,10">
+                            <GroupBox Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,10">
+                                <GroupBox.Header>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Rotation"/>
+                                        <Button Grid.Column="1" x:Name="ResetRotationButton" Style="{StaticResource TransparentIconButton}" ToolTip="Reset Rotation" Click="ResetRotation_Click">
+                                            <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14"/>
+                                        </Button>
+                                    </Grid>
+                                </GroupBox.Header>
                                 <StackPanel>
                                     <Grid Margin="0,5,0,0">
                                         <Grid.ColumnDefinitions>
@@ -202,7 +229,19 @@
                             </GroupBox>
 
                             <!-- Scale -->
-                            <GroupBox Header="Scale" Style="{StaticResource SettingsGroupBoxStyle}">
+                            <GroupBox Style="{StaticResource SettingsGroupBoxStyle}">
+                                <GroupBox.Header>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Scale"/>
+                                        <Button Grid.Column="1" x:Name="ResetScaleButton" Style="{StaticResource TransparentIconButton}" ToolTip="Reset Scale" Click="ResetScale_Click">
+                                            <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14"/>
+                                        </Button>
+                                    </Grid>
+                                </GroupBox.Header>
                                 <StackPanel>
                                     <Grid Margin="0,5,0,0">
                                         <Grid.ColumnDefinitions>

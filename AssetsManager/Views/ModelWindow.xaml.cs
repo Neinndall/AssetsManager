@@ -10,6 +10,8 @@ using AssetsManager.Views.Helpers;
 using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
 using System.Threading.Tasks;
+using LeagueToolkit.Core.Animation;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Views
 {
@@ -46,29 +48,47 @@ namespace AssetsManager.Views
             // Scene events
             PanelControl.SceneClearRequested += OnSceneClearRequested;
             PanelControl.SceneSetupRequested += SetupScene;
-            PanelControl.CameraResetRequested += () => ViewportControl.ResetCamera();
-            PanelControl.EmptyStateVisibilityChanged += (visibility) => EmptyStatePanel.Visibility = visibility;
-            PanelControl.MainContentVisibilityChanged += (visibility) => MainContentGrid.Visibility = visibility;
+            PanelControl.CameraResetRequested += OnCameraResetRequested;
+            PanelControl.EmptyStateVisibilityChanged += OnEmptyStateVisibilityChanged;
+            PanelControl.MainContentVisibilityChanged += OnMainContentVisibilityChanged;
 
             // Model events
-            PanelControl.ModelReadyForViewport += (model) => {
-                ViewportControl.AddModel(model);
-            };
-            PanelControl.ModelRemovedFromViewport += (model) => ViewportControl.RemoveModel(model);
-            PanelControl.ActiveModelChanged += (model) => ViewportControl.SetActiveModel(model);
-            PanelControl.MapGeometryLoadRequested += (s, e) => OpenGeometryFile_Click(s, null);
+            PanelControl.ModelReadyForViewport += OnModelReadyForViewport;
+            PanelControl.ModelRemovedFromViewport += OnModelRemovedFromViewport;
+            PanelControl.ActiveModelChanged += OnActiveModelChanged;
+            PanelControl.MapGeometryLoadRequested += OnMapGeometryLoadRequested;
 
             // Animation events
-            PanelControl.AnimationReadyForDisplay += (s, anim) => ViewportControl.SetAnimation(anim);
-            PanelControl.AnimationStopRequested += (s, animAsset) => ViewportControl.TogglePauseResume(animAsset);
+            PanelControl.AnimationReadyForDisplay += OnAnimationReadyForDisplay;
+            PanelControl.AnimationStopRequested += OnAnimationStopRequested;
+            PanelControl.AnimationSeekRequested += OnAnimationSeekRequested;
+            ViewportControl.AnimationProgressChanged += OnAnimationProgressChanged;
+            ViewportControl.PlaybackStateChanged += OnPlaybackStateChanged;
 
             // Viewport events
             ViewportControl.SkyboxVisibilityChanged += OnSkyboxVisibilityChanged;
+            ViewportControl.AutoRotationStopped += OnAutoRotationStopped;
 
             Unloaded += (s, e) => {
                 CleanupResources();
             };
         }
+
+        // Event handlers extraídos de lambdas
+        private void OnCameraResetRequested() => ViewportControl.ResetCamera();
+        private void OnEmptyStateVisibilityChanged(Visibility visibility) => EmptyStatePanel.Visibility = visibility;
+        private void OnMainContentVisibilityChanged(Visibility visibility) => MainContentGrid.Visibility = visibility;
+        private void OnModelReadyForViewport(SceneModel model) => ViewportControl.AddModel(model);
+        private void OnModelRemovedFromViewport(SceneModel model) => ViewportControl.RemoveModel(model);
+        private void OnActiveModelChanged(SceneModel model) => ViewportControl.SetActiveModel(model);
+        private void OnMapGeometryLoadRequested(object s, EventArgs e) => OpenGeometryFile_Click(s, null);
+        private void OnAnimationReadyForDisplay(object s, IAnimationAsset anim) => ViewportControl.SetAnimation(anim);
+        private void OnAnimationStopRequested(object s, IAnimationAsset animAsset) => ViewportControl.TogglePauseResume(animAsset);
+        private void OnAnimationSeekRequested(object s, (AnimationModel, TimeSpan) args) => ViewportControl.SeekAnimation(args.Item2);
+        private void OnAnimationProgressChanged(object s, double time) => PanelControl.UpdateAnimationProgress(time);
+        private void OnPlaybackStateChanged(IAnimationAsset asset, bool isPlaying) => PanelControl.SetAnimationPlayingState(asset, isPlaying);
+
+        private void OnAutoRotationStopped(object sender, double angle) => PanelControl.ApplyAutoRotation(angle);
 
         private void OnSceneClearRequested(object sender, EventArgs e)
         {
@@ -92,19 +112,38 @@ namespace AssetsManager.Views
 
         public void CleanupResources()
         {
-            // Limpiar el controlador de la cámara para desuscribir eventos
-            _cameraController?.Dispose();
-
-            // Desuscribir eventos del ViewportControl
-            if (ViewportControl != null)
+            // 1. CRÍTICO: Desuscribirse de TODOS los eventos para evitar memory leaks
+            if (PanelControl != null)
             {
-                ViewportControl.SkyboxVisibilityChanged -= OnSkyboxVisibilityChanged;
+                PanelControl.SceneClearRequested -= OnSceneClearRequested;
+                PanelControl.SceneSetupRequested -= SetupScene;
+                PanelControl.CameraResetRequested -= OnCameraResetRequested;
+                PanelControl.EmptyStateVisibilityChanged -= OnEmptyStateVisibilityChanged;
+                PanelControl.MainContentVisibilityChanged -= OnMainContentVisibilityChanged;
+                PanelControl.ModelReadyForViewport -= OnModelReadyForViewport;
+                PanelControl.ModelRemovedFromViewport -= OnModelRemovedFromViewport;
+                PanelControl.ActiveModelChanged -= OnActiveModelChanged;
+                PanelControl.MapGeometryLoadRequested -= OnMapGeometryLoadRequested;
+                PanelControl.AnimationReadyForDisplay -= OnAnimationReadyForDisplay;
+                PanelControl.AnimationStopRequested -= OnAnimationStopRequested;
+                PanelControl.AnimationSeekRequested -= OnAnimationSeekRequested;
             }
 
-            // Limpiar viewport
+            if (ViewportControl != null)
+            {
+                ViewportControl.AnimationProgressChanged -= OnAnimationProgressChanged;
+                ViewportControl.PlaybackStateChanged -= OnPlaybackStateChanged;
+                ViewportControl.SkyboxVisibilityChanged -= OnSkyboxVisibilityChanged;
+                ViewportControl.AutoRotationStopped -= OnAutoRotationStopped;
+            }
+
+            // 2. Limpiar el controlador de la cámara
+            _cameraController?.Dispose();
+
+            // 3. Limpiar viewport
             ViewportControl?.Cleanup();
             
-            // Limpiar ground y sky
+            // 4. Limpiar ground y sky
             if (_groundVisual != null)
             {
                 ViewportControl.Viewport.Children.Remove(_groundVisual);
@@ -117,7 +156,7 @@ namespace AssetsManager.Views
                 _skyVisual = null;
             }
             
-            // Limpiar panel
+            // 5. Limpiar panel
             PanelControl?.Cleanup();
         }
 

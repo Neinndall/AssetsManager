@@ -17,7 +17,7 @@ namespace AssetsManager.Views.Models
         public TranslateTransform3D Transform { get; set; }
         public ObservableCollection<ModelPart> Parts { get; set; }
         public ObservableCollection<AnimationData> Animations { get; set; }
-        public ObservableCollection<string> AnimationNames { get; set; }
+        
         public RigResource Skeleton { get; set; }
         public IAnimationAsset CurrentAnimation { get; set; }
         public bool IsAnimationPaused { get; set; }
@@ -31,7 +31,7 @@ namespace AssetsManager.Views.Models
             RootVisual.Transform = this.Transform;
             Parts = new ObservableCollection<ModelPart>();
             Animations = new ObservableCollection<AnimationData>();
-            AnimationNames = new ObservableCollection<string>();
+            
         }
 
         public void Dispose()
@@ -51,7 +51,7 @@ namespace AssetsManager.Views.Models
 
             // Limpiar animaciones
             Animations.Clear();
-            AnimationNames.Clear();
+            
             CurrentAnimation = null;
             IsAnimationPaused = false;
             AnimationTime = 0;

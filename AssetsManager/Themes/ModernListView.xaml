@@ -116,7 +116,6 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
-
         <!-- Estilo para tipo Models/Paneles Seleccioanables (Meshes, Animations ...) -->
         <Style x:Key="ListBoxItemStyle" TargetType="ListBoxItem">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
