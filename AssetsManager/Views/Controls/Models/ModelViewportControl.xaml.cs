@@ -286,7 +286,7 @@ namespace AssetsManager.Views.Controls.Models
             {
                 Viewport3D.ShowFrameRate = false;
                               
-                double scalingFactor = 4.0;
+                double scalingFactor = 5.0;
                 int width = (int)(Viewport3D.ActualWidth * scalingFactor);
                 int height = (int)(Viewport3D.ActualHeight * scalingFactor);
                 

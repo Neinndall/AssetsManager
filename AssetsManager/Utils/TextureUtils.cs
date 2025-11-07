@@ -194,28 +194,14 @@ namespace AssetsManager.Utils
                     Texture tex = Texture.Load(textureStream);
                     if (tex.Mips.Length > 0)
                     {
-                        // *** USA EL MIP APROPIADO según el tamaño deseado ***
-                        int mipLevel = 0;
-                        if (maxWidth.HasValue && tex.Mips.Length > 1)
-                        {
-                            // Calcula el mip level óptimo
-                            int currentWidth = tex.Mips[0].Width;
-                            while (mipLevel < tex.Mips.Length - 1 && currentWidth > maxWidth.Value * 2)
-                            {
-                                mipLevel++;
-                                currentWidth /= 2;
-                            }
-                        }
-                        
-                        using (Image<Rgba32> imageSharp = tex.Mips[mipLevel].ToImage())
+                        using (Image<Rgba32> imageSharp = tex.Mips[0].ToImage())
                         {
                             if (maxWidth.HasValue && (imageSharp.Width > maxWidth.Value || imageSharp.Height > maxWidth.Value))
                             {
                                 imageSharp.Mutate(x => x.Resize(new ResizeOptions
                                 {
                                     Size = new Size(maxWidth.Value, maxWidth.Value),
-                                    Mode = ResizeMode.Max,
-                                    Sampler = KnownResamplers.Lanczos3 // *** MEJOR SAMPLER ***
+                                    Mode = ResizeMode.Max
                                 }));
                             }
 
@@ -225,15 +211,7 @@ namespace AssetsManager.Utils
                                 bgra32Image.CopyPixelDataTo(pixelBuffer);
 
                                 int stride = bgra32Image.Width * 4;
-                                var bitmapSource = BitmapSource.Create(
-                                    bgra32Image.Width, 
-                                    bgra32Image.Height, 
-                                    96, 96, 
-                                    PixelFormats.Bgra32, 
-                                    null, 
-                                    pixelBuffer, 
-                                    stride
-                                );
+                                var bitmapSource = BitmapSource.Create(bgra32Image.Width, bgra32Image.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
                                 bitmapSource.Freeze();
 
                                 return bitmapSource;
