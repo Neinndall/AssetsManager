@@ -90,7 +90,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="120"/>
                                                 </Grid.ColumnDefinitions>
-                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="ClockOutline" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="ClockOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
                                                 <Slider Grid.Column="1" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Tag="{Binding}" VerticalAlignment="Center"/>
                                                 <TextBlock Grid.Column="2" Text="{Binding ProgressText}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource TextMuted}" FontSize="10"/>
                                             </Grid>
@@ -101,7 +101,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="120"/>
                                                 </Grid.ColumnDefinitions>
-                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="Speedometer" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="Speedometer" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
                                                 <Slider Grid.Column="1" Minimum="0.1" Maximum="4.0" Value="{Binding Speed, Mode=TwoWay}" VerticalAlignment="Center"/>
                                                 <TextBlock Grid.Column="2" Text="{Binding Speed, StringFormat='Speed: {0:F1}x'}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource TextMuted}" FontSize="10"/>
                                             </Grid>
