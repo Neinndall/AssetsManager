@@ -141,7 +141,7 @@
             </Setter>
         </Style>
 
-        <!-- Estilo para ListBox con Scroll Suave y apariencia unificada -->
+        <!-- Estilo para ListBox con Scroll Suave y apariencia unificada. Utilizado para la lista de modelos y la lista de animaciones. -->
         <Style x:Key="SmoothScrollListBox" TargetType="ListBox">
             <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
             <Setter Property="BorderThickness" Value="0"/>

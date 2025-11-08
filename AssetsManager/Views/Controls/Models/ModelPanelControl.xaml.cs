@@ -93,6 +93,8 @@ namespace AssetsManager.Views.Controls.Models
             MeshesItemsControl.ItemsSource = null;
             _animationModels.Clear();
             ModelsListBox.SelectedItem = null;
+            AnimationControlsPanel.Visibility = Visibility.Collapsed;
+            AnimationControlsPanel.DataContext = null;
 
             LoadModelButton.IsEnabled = true;
             LoadChromaModelButton.IsEnabled = true;
@@ -312,9 +314,9 @@ namespace AssetsManager.Views.Controls.Models
                 return;
             }
 
-            if (sender is Button button && button.Tag is AnimationModel animationModel)
+            if (AnimationsListBox.SelectedItem is AnimationModel animationModel)
             {
-                if (_currentlyPlayingAnimation != null)
+                if (_currentlyPlayingAnimation != null && _currentlyPlayingAnimation != animationModel)
                 {
                     _currentlyPlayingAnimation.IsPlaying = false;
                 }
@@ -368,14 +370,32 @@ namespace AssetsManager.Views.Controls.Models
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is ToggleButton button && button.Tag is AnimationModel animationModel)
+            if (AnimationsListBox.SelectedItem is AnimationModel animationModel)
             {
                 AnimationStopRequested?.Invoke(this, animationModel);
             }
         }
 
+        private void AnimationsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (AnimationsListBox.SelectedItem is AnimationModel selectedAnimation)
+            {
+                AnimationControlsPanel.DataContext = selectedAnimation;
+                AnimationControlsPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                AnimationControlsPanel.DataContext = null;
+                AnimationControlsPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
         private void ModelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // Hide animation controls when model selection changes
+            AnimationControlsPanel.Visibility = Visibility.Collapsed;
+            AnimationControlsPanel.DataContext = null;
+
             if (e.AddedItems.Count > 0 && e.AddedItems[0] is SceneModel selectedModel)
             {
                 _selectedModel = selectedModel;
@@ -496,7 +516,7 @@ namespace AssetsManager.Views.Controls.Models
 
         private void AnimationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (sender is Slider slider && slider.Tag is AnimationModel animationModel && _isSliderDragging)
+            if (AnimationsListBox.SelectedItem is AnimationModel animationModel && _isSliderDragging)
             {
                 AnimationSeekRequested?.Invoke(this, (animationModel, TimeSpan.FromSeconds(e.NewValue)));
             }

@@ -55,75 +55,82 @@
                     </ScrollViewer>
                 </TabItem>
                 <TabItem Header="Animations">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="AnimationsListBox">
-                            <ItemsControl.ItemTemplate>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <ListBox Grid.Row="0" x:Name="AnimationsListBox" SelectionChanged="AnimationsListBox_SelectionChanged" Style="{StaticResource SmoothScrollListBox}">
+                            <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <GroupBox Style="{StaticResource SettingsGroupBoxStyle}" Padding="10" Margin="0,0,0,5">
-                                        <GroupBox.Header>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center"/>
-                                                <Button Grid.Column="1" x:Name="PlayButton" Click="PlayButton_Click" Tag="{Binding}" ToolTip="Play Animation" Margin="5,0,0,0">
-                                                    <Button.Style>
-                                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}"/>
-                                                    </Button.Style>
-                                                    <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14" Foreground="Green"/>
-                                                </Button>
-                                                <ToggleButton Grid.Column="2" IsChecked="{Binding IsPlaying, Mode=OneWay}" Click="StopButton_Click" Tag="{Binding}" ToolTip="Pause/Resume" Margin="5,0,0,0">
-                                                    <ToggleButton.Style>
-                                                        <Style TargetType="ToggleButton" BasedOn="{StaticResource IconToggleButton}"/>
-                                                    </ToggleButton.Style>
-                                                    <materialIcons:MaterialIcon Width="14" Height="14">
-                                                        <materialIcons:MaterialIcon.Style>
-                                                            <Style TargetType="materialIcons:MaterialIcon">
-                                                                <Setter Property="Kind" Value="Pause"/>
-                                                                <Setter Property="Foreground" Value="Red"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="False">
-                                                                        <Setter Property="Kind" Value="Stop"/>
-                                                                        <Setter Property="Foreground" Value="Red"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </materialIcons:MaterialIcon.Style>
-                                                    </materialIcons:MaterialIcon>
-                                                </ToggleButton>
-                                            </Grid>
-                                        </GroupBox.Header>
-
-                                        <StackPanel>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="120"/>
-                                                </Grid.ColumnDefinitions>
-                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="ClockOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
-                                                <Slider Grid.Column="1" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Tag="{Binding}" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding ProgressText}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource TextMuted}" FontSize="10"/>
-                                            </Grid>
-
-                                            <Grid Margin="0,5,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="120"/>
-                                                </Grid.ColumnDefinitions>
-                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="Speedometer" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
-                                                <Slider Grid.Column="1" Minimum="0.1" Maximum="4.0" Value="{Binding Speed, Mode=TwoWay}" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding Speed, StringFormat='Speed: {0:F1}x'}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource TextMuted}" FontSize="10"/>
-                                            </Grid>
-                                        </StackPanel>
-                                    </GroupBox>
+                                    <TextBlock Text="{Binding Name}" Margin="10,5" Foreground="{StaticResource TextPrimary}"/>
                                 </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <GroupBox Grid.Row="1" x:Name="AnimationControlsPanel" Style="{StaticResource SettingsGroupBoxStyle}" Padding="10" Margin="0,5,0,0" Visibility="Collapsed">
+                            <GroupBox.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" x:Name="PlayButton" Click="PlayButton_Click" ToolTip="Play Animation" Margin="5,0,0,0">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}"/>
+                                        </Button.Style>
+                                        <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14" Foreground="Green"/>
+                                    </Button>
+                                    <ToggleButton Grid.Column="2" IsChecked="{Binding IsPlaying, Mode=OneWay}" Click="StopButton_Click" ToolTip="Pause/Resume" Margin="5,0,0,0">
+                                        <ToggleButton.Style>
+                                            <Style TargetType="ToggleButton" BasedOn="{StaticResource IconToggleButton}"/>
+                                        </ToggleButton.Style>
+                                        <materialIcons:MaterialIcon Width="14" Height="14">
+                                            <materialIcons:MaterialIcon.Style>
+                                                <Style TargetType="materialIcons:MaterialIcon">
+                                                    <Setter Property="Kind" Value="Pause"/>
+                                                    <Setter Property="Foreground" Value="Red"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="False">
+                                                            <Setter Property="Kind" Value="Stop"/>
+                                                            <Setter Property="Foreground" Value="Red"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialIcons:MaterialIcon.Style>
+                                        </materialIcons:MaterialIcon>
+                                    </ToggleButton>
+                                </Grid>
+                            </GroupBox.Header>
+
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="120"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Grid.Column="0" Kind="ClockOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                    <Slider Grid.Column="1" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding ProgressText}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource TextMuted}" FontSize="10"/>
+                                </Grid>
+
+                                <Grid Margin="0,5,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="120"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Grid.Column="0" Kind="Speedometer" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
+                                    <Slider Grid.Column="1" Minimum="0.1" Maximum="4.0" Value="{Binding Speed, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Speed, StringFormat='Speed: {0:F1}x'}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource TextMuted}" FontSize="10"/>
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+                    </Grid>
                 </TabItem>
                 <TabItem Header="Models">
                     <ListBox x:Name="ModelsListBox"
