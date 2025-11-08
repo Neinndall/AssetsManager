@@ -26,7 +26,7 @@ namespace AssetsManager.Views.Controls.Models
         public LogService LogService { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
-        public event Action<IAnimationAsset, bool> PlaybackStateChanged;
+        public event Action<AnimationModel, bool> PlaybackStateChanged;
         public event EventHandler<double> AnimationProgressChanged;
         public event EventHandler<bool> MaximizeClicked;
         public event EventHandler<bool> SkyboxVisibilityChanged;
@@ -41,6 +41,7 @@ namespace AssetsManager.Views.Controls.Models
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
 
         private SceneModel _activeSceneModel;
+        private AnimationModel _activeAnimationModel;
         private readonly List<SceneModel> _loadedModels = new();
 
         public ModelViewportControl()
@@ -85,25 +86,26 @@ namespace AssetsManager.Views.Controls.Models
             _animationPlayer = null;
         }
 
-        public void SetAnimation(IAnimationAsset animation)
+        public void SetAnimation(AnimationModel animationModel)
         {
             if (_activeSceneModel == null) return;
 
-            _activeSceneModel.CurrentAnimation = animation;
+            _activeAnimationModel = animationModel;
+            _activeSceneModel.CurrentAnimation = animationModel.AnimationData.AnimationAsset;
             _activeSceneModel.AnimationTime = 0;
             _activeSceneModel.IsAnimationPaused = false;
             _lastFrameTime = DateTime.Now;
 
-            PlaybackStateChanged?.Invoke(animation, true);
+            PlaybackStateChanged?.Invoke(animationModel, true);
         }
 
-        public void TogglePauseResume(IAnimationAsset animationToToggle)
+        public void TogglePauseResume(AnimationModel animationToToggle)
         {
-            if (_activeSceneModel?.CurrentAnimation != animationToToggle) return;
+            if (_activeAnimationModel != animationToToggle) return;
 
             _activeSceneModel.IsAnimationPaused = !_activeSceneModel.IsAnimationPaused;
 
-            PlaybackStateChanged?.Invoke(animationToToggle, !_activeSceneModel.IsAnimationPaused);
+            PlaybackStateChanged?.Invoke(_activeAnimationModel, !_activeSceneModel.IsAnimationPaused);
         }
 
         public void SeekAnimation(TimeSpan time)
@@ -116,14 +118,15 @@ namespace AssetsManager.Views.Controls.Models
 
         public void StopAnimation()
         {
-            if (_activeSceneModel == null) return;
+            if (_activeSceneModel == null || _activeAnimationModel == null) return;
 
             if(_activeSceneModel.CurrentAnimation != null)
             {
-                PlaybackStateChanged?.Invoke(_activeSceneModel.CurrentAnimation, false);
+                PlaybackStateChanged?.Invoke(_activeAnimationModel, false);
             }
 
             _activeSceneModel.CurrentAnimation = null;
+            _activeAnimationModel = null;
             _activeSceneModel.AnimationTime = 0;
             _activeSceneModel.IsAnimationPaused = true;
         }
@@ -230,7 +233,8 @@ namespace AssetsManager.Views.Controls.Models
             {
                 if (!_activeSceneModel.IsAnimationPaused)
                 {
-                    _activeSceneModel.AnimationTime += deltaTime;
+                    var speed = _activeAnimationModel?.Speed ?? 1.0;
+                    _activeSceneModel.AnimationTime += deltaTime * speed;
 
                     var duration = _activeSceneModel.CurrentAnimation.Duration;
                     if (duration > 0 && _activeSceneModel.AnimationTime >= duration)

@@ -38,10 +38,10 @@ namespace AssetsManager.Views.Controls.Models
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         
-        public event EventHandler<IAnimationAsset> AnimationReadyForDisplay;
+        public event EventHandler<AnimationModel> AnimationReadyForDisplay;
         public event EventHandler<(AnimationModel, TimeSpan)> AnimationSeekRequested;
         public event Action<SceneModel> ModelRemovedFromViewport;
-        public event EventHandler<IAnimationAsset> AnimationStopRequested;
+        public event EventHandler<AnimationModel> AnimationStopRequested;
         public event EventHandler SceneClearRequested;
         public event EventHandler MapGeometryLoadRequested;
 
@@ -322,7 +322,7 @@ namespace AssetsManager.Views.Controls.Models
                 _currentlyPlayingAnimation = animationModel;
                 _currentlyPlayingAnimation.IsPlaying = true;
 
-                AnimationReadyForDisplay?.Invoke(this, animationModel.AnimationData.AnimationAsset);
+                AnimationReadyForDisplay?.Invoke(this, animationModel);
             }
         }
 
@@ -370,7 +370,7 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (sender is Button button && button.Tag is AnimationModel animationModel)
             {
-                AnimationStopRequested?.Invoke(this, animationModel.AnimationData.AnimationAsset);
+                AnimationStopRequested?.Invoke(this, animationModel);
             }
         }
 
@@ -436,9 +436,8 @@ namespace AssetsManager.Views.Controls.Models
             UpdateTransform(_selectedModel, transformData);
         }
 
-        public void SetAnimationPlayingState(IAnimationAsset asset, bool isPlaying)
+        public void SetAnimationPlayingState(AnimationModel animationModel, bool isPlaying)
         {
-            var animationModel = _animationModels.FirstOrDefault(a => a.AnimationData.AnimationAsset == asset);
             if (animationModel != null)
             {
                 animationModel.IsPlaying = isPlaying;

@@ -38,6 +38,13 @@ namespace AssetsManager.Views.Models
             set => SetField(ref _totalDuration, value);
         }
 
+        private double _speed = 1.0;
+        public double Speed
+        {
+            get => _speed;
+            set => SetField(ref _speed, value);
+        }
+
         public string ProgressText
         {
             get
