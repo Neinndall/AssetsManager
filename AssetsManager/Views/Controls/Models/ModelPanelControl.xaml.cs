@@ -368,7 +368,7 @@ namespace AssetsManager.Views.Controls.Models
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is AnimationModel animationModel)
+            if (sender is ToggleButton button && button.Tag is AnimationModel animationModel)
             {
                 AnimationStopRequested?.Invoke(this, animationModel);
             }

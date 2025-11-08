@@ -74,12 +74,25 @@
                                                     </Button.Style>
                                                     <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14" Foreground="Green"/>
                                                 </Button>
-                                                <Button Grid.Column="2" x:Name="StopButton" Click="StopButton_Click" Tag="{Binding}" ToolTip="Pause/Resume" Margin="5,0,0,0">
-                                                    <Button.Style>
-                                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}"/>
-                                                    </Button.Style>
-                                                    <materialIcons:MaterialIcon Kind="Pause" Width="14" Height="14" Foreground="Red"/>
-                                                </Button>
+                                                <ToggleButton Grid.Column="2" IsChecked="{Binding IsPlaying, Mode=OneWay}" Click="StopButton_Click" Tag="{Binding}" ToolTip="Pause/Resume" Margin="5,0,0,0">
+                                                    <ToggleButton.Style>
+                                                        <Style TargetType="ToggleButton" BasedOn="{StaticResource IconToggleButton}"/>
+                                                    </ToggleButton.Style>
+                                                    <materialIcons:MaterialIcon Width="14" Height="14">
+                                                        <materialIcons:MaterialIcon.Style>
+                                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                                <Setter Property="Kind" Value="Pause"/>
+                                                                <Setter Property="Foreground" Value="Red"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="False">
+                                                                        <Setter Property="Kind" Value="Stop"/>
+                                                                        <Setter Property="Foreground" Value="Red"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialIcons:MaterialIcon.Style>
+                                                    </materialIcons:MaterialIcon>
+                                                </ToggleButton>
                                             </Grid>
                                         </GroupBox.Header>
 
