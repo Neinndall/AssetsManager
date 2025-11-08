@@ -190,30 +190,72 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="ArrowRight" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
                                         <Slider Grid.Column="1" x:Name="PositionXSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged"/>
                                         <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionXSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{StaticResource TextMuted}"/>
+                                        <ToggleButton Grid.Column="3" x:Name="PositionXLock" Style="{StaticResource TransparentIconToggleButton}" ToolTip="Lock Value">
+                                            <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14" Height="14">
+                                                <materialIcons:MaterialIcon.Style>
+                                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                                <Setter Property="Kind" Value="Lock"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialIcons:MaterialIcon.Style>
+                                            </materialIcons:MaterialIcon>
+                                        </ToggleButton>
                                     </Grid>
                                     <Grid Margin="0,5,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="ArrowUp" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
                                         <Slider Grid.Column="1" x:Name="PositionYSlider" Minimum="-1000" Maximum="3000" ValueChanged="TransformSlider_ValueChanged"/>
                                         <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionYSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{StaticResource TextMuted}"/>
+                                        <ToggleButton Grid.Column="3" x:Name="PositionYLock" Style="{StaticResource TransparentIconToggleButton}" ToolTip="Lock Value">
+                                            <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14" Height="14">
+                                                <materialIcons:MaterialIcon.Style>
+                                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                                <Setter Property="Kind" Value="Lock"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialIcons:MaterialIcon.Style>
+                                            </materialIcons:MaterialIcon>
+                                        </ToggleButton>
                                     </Grid>
                                     <Grid Margin="0,5,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="ArrowDown" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
                                         <Slider Grid.Column="1" x:Name="PositionZSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged"/>
                                         <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionZSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{StaticResource TextMuted}"/>
+                                        <ToggleButton Grid.Column="3" x:Name="PositionZLock" Style="{StaticResource TransparentIconToggleButton}" ToolTip="Lock Value">
+                                            <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14" Height="14">
+                                                <materialIcons:MaterialIcon.Style>
+                                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                                <Setter Property="Kind" Value="Lock"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialIcons:MaterialIcon.Style>
+                                            </materialIcons:MaterialIcon>
+                                        </ToggleButton>
                                     </Grid>
                                 </StackPanel>
                             </GroupBox>
@@ -238,30 +280,72 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="Rotate3d" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
                                         <Slider Grid.Column="1" x:Name="RotationXSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged"/>
                                         <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationXSlider, Path=Value, StringFormat={}{0:F0}}" VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{StaticResource TextMuted}"/>
+                                        <ToggleButton Grid.Column="3" x:Name="RotationXLock" Style="{StaticResource TransparentIconToggleButton}" ToolTip="Lock Value">
+                                            <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14" Height="14">
+                                                <materialIcons:MaterialIcon.Style>
+                                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                                <Setter Property="Kind" Value="Lock"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialIcons:MaterialIcon.Style>
+                                            </materialIcons:MaterialIcon>
+                                        </ToggleButton>
                                     </Grid>
                                     <Grid Margin="0,5,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="Rotate3d" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
                                         <Slider Grid.Column="1" x:Name="RotationYSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged"/>
                                         <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationYSlider, Path=Value, StringFormat={}{0:F0}}" VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{StaticResource TextMuted}"/>
+                                        <ToggleButton Grid.Column="3" x:Name="RotationYLock" Style="{StaticResource TransparentIconToggleButton}" ToolTip="Lock Value">
+                                            <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14" Height="14">
+                                                <materialIcons:MaterialIcon.Style>
+                                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                                <Setter Property="Kind" Value="Lock"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialIcons:MaterialIcon.Style>
+                                            </materialIcons:MaterialIcon>
+                                        </ToggleButton>
                                     </Grid>
                                     <Grid Margin="0,5,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="Rotate3d" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
                                         <Slider Grid.Column="1" x:Name="RotationZSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged"/>
                                         <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationZSlider, Path=Value, StringFormat={}{0:F0}}" VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{StaticResource TextMuted}"/>
+                                        <ToggleButton Grid.Column="3" x:Name="RotationZLock" Style="{StaticResource TransparentIconToggleButton}" ToolTip="Lock Value">
+                                            <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14" Height="14">
+                                                <materialIcons:MaterialIcon.Style>
+                                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                                <Setter Property="Kind" Value="Lock"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialIcons:MaterialIcon.Style>
+                                            </materialIcons:MaterialIcon>
+                                        </ToggleButton>
                                     </Grid>
                                 </StackPanel>
                             </GroupBox>
@@ -286,10 +370,24 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="Resize" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource TextPrimary}"/>
                                         <Slider Grid.Column="1" x:Name="ScaleSlider" Minimum="0.1" Maximum="5" Value="1" ValueChanged="TransformSlider_ValueChanged"/>
                                         <TextBlock Grid.Column="2" Text="{Binding ElementName=ScaleSlider, Path=Value, StringFormat={}{0:F2}}" VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center" Foreground="{StaticResource TextMuted}"/>
+                                        <ToggleButton Grid.Column="3" x:Name="ScaleLock" Style="{StaticResource TransparentIconToggleButton}" ToolTip="Lock Value">
+                                            <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14" Height="14">
+                                                <materialIcons:MaterialIcon.Style>
+                                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                                <Setter Property="Kind" Value="Lock"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialIcons:MaterialIcon.Style>
+                                            </materialIcons:MaterialIcon>
+                                        </ToggleButton>
                                     </Grid>
                                 </StackPanel>
                             </GroupBox>

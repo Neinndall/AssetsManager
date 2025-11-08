@@ -419,6 +419,15 @@ namespace AssetsManager.Views.Controls.Models
                     RotationZSlider.ValueChanged += TransformSlider_ValueChanged;
                     ScaleSlider.ValueChanged += TransformSlider_ValueChanged;
                 }
+
+                // Reset locks
+                PositionXLock.IsChecked = false;
+                PositionYLock.IsChecked = false;
+                PositionZLock.IsChecked = false;
+                RotationXLock.IsChecked = false;
+                RotationYLock.IsChecked = false;
+                RotationZLock.IsChecked = false;
+                ScaleLock.IsChecked = false;
             }
         }
 
@@ -495,21 +504,42 @@ namespace AssetsManager.Views.Controls.Models
 
         private void ResetPosition_Click(object sender, RoutedEventArgs e)
         {
-            PositionXSlider.Value = 0;
-            PositionYSlider.Value = SceneElements.GroundLevel;
-            PositionZSlider.Value = 0;
+            if (PositionXLock.IsChecked == false)
+            {
+                PositionXSlider.Value = 0;
+            }
+            if (PositionYLock.IsChecked == false)
+            {
+                PositionYSlider.Value = SceneElements.GroundLevel;
+            }
+            if (PositionZLock.IsChecked == false)
+            {
+                PositionZSlider.Value = 0;
+            }
         }
 
         private void ResetRotation_Click(object sender, RoutedEventArgs e)
         {
-            RotationXSlider.Value = 0;
-            RotationYSlider.Value = 0;
-            RotationZSlider.Value = 0;
+            if (RotationXLock.IsChecked == false)
+            {
+                RotationXSlider.Value = 0;
+            }
+            if (RotationYLock.IsChecked == false)
+            {
+                RotationYSlider.Value = 0;
+            }
+            if (RotationZLock.IsChecked == false)
+            {
+                RotationZSlider.Value = 0;
+            }
         }
 
         private void ResetScale_Click(object sender, RoutedEventArgs e)
         {
-            ScaleSlider.Value = 1;
+            if (ScaleLock.IsChecked == false)
+            {
+                ScaleSlider.Value = 1;
+            }
         }
 
         public void ApplyAutoRotation(double angle)
