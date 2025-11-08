@@ -122,19 +122,31 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextPrimary}"/>
-                                    <Button Grid.Column="1" x:Name="DeleteModelButton"
+
+                                    <ToggleButton Grid.Column="1" IsChecked="{Binding AreAllPartsVisible, Mode=TwoWay}" ToolTip="Show/Hide Meshes" Style="{StaticResource TransparentIconToggleButton}" Margin="5,0,0,0">
+                                        <materialIcons:MaterialIcon Width="14" Height="14">
+                                            <materialIcons:MaterialIcon.Style>
+                                                <Style TargetType="materialIcons:MaterialIcon">
+                                                    <Setter Property="Kind" Value="Eye" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="False">
+                                                            <Setter Property="Kind" Value="EyeOff" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialIcons:MaterialIcon.Style>
+                                        </materialIcons:MaterialIcon>
+                                    </ToggleButton>
+
+                                    <Button Grid.Column="2" x:Name="DeleteModelButton"
                                             Click="DeleteModelButton_Click"
                                             Tag="{Binding}"
                                             ToolTip="Delete Model"
+                                            Style="{StaticResource TransparentIconButton}"
                                             Margin="5,0,5,0">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                                <Setter Property="Background" Value="{StaticResource AccentRed}"/>
-                                                <Setter Property="Foreground" Value="White"/>
-                                            </Style>
-                                        </Button.Style>
                                         <materialIcons:MaterialIcon Kind="TrashCan" Width="14" Height="14"/>
                                     </Button>
                                 </Grid>

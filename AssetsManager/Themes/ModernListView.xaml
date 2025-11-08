@@ -116,7 +116,7 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
-        <!-- Estilo para tipo Models/Paneles Seleccioanables (Meshes, Animations ...) -->
+        <!-- Estilo para tipo Models/Paneles Seleccioanables (Models) -->
         <Style x:Key="ListBoxItemStyle" TargetType="ListBoxItem">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="Padding" Value="2"/>
@@ -129,7 +129,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Border" Property="Background" Value="{StaticResource CardBackground}"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -144,9 +144,7 @@
         <!-- Estilo para ListBox con Scroll Suave y apariencia unificada -->
         <Style x:Key="SmoothScrollListBox" TargetType="ListBox">
             <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-            <!-- La propiedad clave para el scroll suave -->
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
             <Setter Property="ItemContainerStyle" Value="{StaticResource ListBoxItemStyle}"/>
         </Style>
