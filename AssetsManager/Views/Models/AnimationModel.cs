@@ -1,6 +1,7 @@
 
 using System;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models;
 using System.Collections.Generic;
@@ -38,6 +39,13 @@ namespace AssetsManager.Views.Models
             set => SetField(ref _totalDuration, value);
         }
 
+        private double _speed = 1.0;
+        public double Speed
+        {
+            get => _speed;
+            set => SetField(ref _speed, value);
+        }
+
         public string ProgressText
         {
             get
@@ -54,9 +62,9 @@ namespace AssetsManager.Views.Models
                     // Clamp CurrentTime to be within the valid duration
                     var clampedCurrentTime = Math.Max(0, Math.Min(CurrentTime, TotalDuration));
 
-                    // Use the .ToString() format that is known to work
-                    var totalStr = TimeSpan.FromSeconds(TotalDuration).ToString("mm':'ss'.'fff");
-                    var currentStr = TimeSpan.FromSeconds(clampedCurrentTime).ToString("mm':'ss'.'fff");
+                    // Use a simpler format "ss.ffff" with an invariant culture to force "." as separator
+                    var totalStr = TotalDuration.ToString("0.0000", CultureInfo.InvariantCulture);
+                    var currentStr = clampedCurrentTime.ToString("0.0000", CultureInfo.InvariantCulture);
 
                     return $"{currentStr} / {totalStr}";
                 }

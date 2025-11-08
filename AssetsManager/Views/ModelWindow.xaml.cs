@@ -82,11 +82,11 @@ namespace AssetsManager.Views
         private void OnModelRemovedFromViewport(SceneModel model) => ViewportControl.RemoveModel(model);
         private void OnActiveModelChanged(SceneModel model) => ViewportControl.SetActiveModel(model);
         private void OnMapGeometryLoadRequested(object s, EventArgs e) => OpenGeometryFile_Click(s, null);
-        private void OnAnimationReadyForDisplay(object s, IAnimationAsset anim) => ViewportControl.SetAnimation(anim);
-        private void OnAnimationStopRequested(object s, IAnimationAsset animAsset) => ViewportControl.TogglePauseResume(animAsset);
+        private void OnAnimationReadyForDisplay(object s, AnimationModel anim) => ViewportControl.SetAnimation(anim);
+        private void OnAnimationStopRequested(object s, AnimationModel anim) => ViewportControl.TogglePauseResume(anim);
         private void OnAnimationSeekRequested(object s, (AnimationModel, TimeSpan) args) => ViewportControl.SeekAnimation(args.Item2);
         private void OnAnimationProgressChanged(object s, double time) => PanelControl.UpdateAnimationProgress(time);
-        private void OnPlaybackStateChanged(IAnimationAsset asset, bool isPlaying) => PanelControl.SetAnimationPlayingState(asset, isPlaying);
+        private void OnPlaybackStateChanged(AnimationModel model, bool isPlaying) => PanelControl.SetAnimationPlayingState(model, isPlaying);
 
         private void OnAutoRotationStopped(object sender, double angle) => PanelControl.ApplyAutoRotation(angle);
 

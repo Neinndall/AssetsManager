@@ -164,17 +164,21 @@ namespace AssetsManager.Utils
                     TileMode = TileMode.Tile,
                     Stretch = Stretch.Fill
                 };
+                
+                // Mejora la calidad
+                RenderOptions.SetBitmapScalingMode(imageBrush, BitmapScalingMode.HighQuality);
+                RenderOptions.SetCachingHint(imageBrush, CachingHint.Cache);
+                RenderOptions.SetEdgeMode(imageBrush, EdgeMode.Unspecified);
+                
                 materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
 
-                // Componente especular para dar brillo/reflejo
-                materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 15));
+                // Reduce el brillo especular (puede causar más aliasing visible)
+                materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 8)); // Era 15, ahora 8
 
-                // Componente emisivo suave para mejor visibilidad
+                // Emisivo suave
                 materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(System.Windows.Media.Color.FromArgb(10, 255, 255, 255))));
 
                 modelPart.Geometry.Material = materialGroup;
-
-                // IMPORTANTE: También aplicar al BackMaterial para ver ambas caras
                 modelPart.Geometry.BackMaterial = materialGroup;
             }
         }

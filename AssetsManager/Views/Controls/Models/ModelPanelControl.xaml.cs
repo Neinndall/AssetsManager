@@ -38,10 +38,10 @@ namespace AssetsManager.Views.Controls.Models
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         
-        public event EventHandler<IAnimationAsset> AnimationReadyForDisplay;
+        public event EventHandler<AnimationModel> AnimationReadyForDisplay;
         public event EventHandler<(AnimationModel, TimeSpan)> AnimationSeekRequested;
         public event Action<SceneModel> ModelRemovedFromViewport;
-        public event EventHandler<IAnimationAsset> AnimationStopRequested;
+        public event EventHandler<AnimationModel> AnimationStopRequested;
         public event EventHandler SceneClearRequested;
         public event EventHandler MapGeometryLoadRequested;
 
@@ -93,6 +93,8 @@ namespace AssetsManager.Views.Controls.Models
             MeshesItemsControl.ItemsSource = null;
             _animationModels.Clear();
             ModelsListBox.SelectedItem = null;
+            AnimationControlsPanel.Visibility = Visibility.Collapsed;
+            AnimationControlsPanel.DataContext = null;
 
             LoadModelButton.IsEnabled = true;
             LoadChromaModelButton.IsEnabled = true;
@@ -312,9 +314,9 @@ namespace AssetsManager.Views.Controls.Models
                 return;
             }
 
-            if (sender is Button button && button.Tag is AnimationModel animationModel)
+            if (AnimationsListBox.SelectedItem is AnimationModel animationModel)
             {
-                if (_currentlyPlayingAnimation != null)
+                if (_currentlyPlayingAnimation != null && _currentlyPlayingAnimation != animationModel)
                 {
                     _currentlyPlayingAnimation.IsPlaying = false;
                 }
@@ -322,7 +324,7 @@ namespace AssetsManager.Views.Controls.Models
                 _currentlyPlayingAnimation = animationModel;
                 _currentlyPlayingAnimation.IsPlaying = true;
 
-                AnimationReadyForDisplay?.Invoke(this, animationModel.AnimationData.AnimationAsset);
+                AnimationReadyForDisplay?.Invoke(this, animationModel);
             }
         }
 
@@ -368,14 +370,32 @@ namespace AssetsManager.Views.Controls.Models
 
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is AnimationModel animationModel)
+            if (AnimationsListBox.SelectedItem is AnimationModel animationModel)
             {
-                AnimationStopRequested?.Invoke(this, animationModel.AnimationData.AnimationAsset);
+                AnimationStopRequested?.Invoke(this, animationModel);
+            }
+        }
+
+        private void AnimationsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (AnimationsListBox.SelectedItem is AnimationModel selectedAnimation)
+            {
+                AnimationControlsPanel.DataContext = selectedAnimation;
+                AnimationControlsPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                AnimationControlsPanel.DataContext = null;
+                AnimationControlsPanel.Visibility = Visibility.Collapsed;
             }
         }
 
         private void ModelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // Hide animation controls when model selection changes
+            AnimationControlsPanel.Visibility = Visibility.Collapsed;
+            AnimationControlsPanel.DataContext = null;
+
             if (e.AddedItems.Count > 0 && e.AddedItems[0] is SceneModel selectedModel)
             {
                 _selectedModel = selectedModel;
@@ -419,6 +439,15 @@ namespace AssetsManager.Views.Controls.Models
                     RotationZSlider.ValueChanged += TransformSlider_ValueChanged;
                     ScaleSlider.ValueChanged += TransformSlider_ValueChanged;
                 }
+
+                // Reset locks
+                PositionXLock.IsChecked = false;
+                PositionYLock.IsChecked = false;
+                PositionZLock.IsChecked = false;
+                RotationXLock.IsChecked = false;
+                RotationYLock.IsChecked = false;
+                RotationZLock.IsChecked = false;
+                ScaleLock.IsChecked = false;
             }
         }
 
@@ -436,9 +465,8 @@ namespace AssetsManager.Views.Controls.Models
             UpdateTransform(_selectedModel, transformData);
         }
 
-        public void SetAnimationPlayingState(IAnimationAsset asset, bool isPlaying)
+        public void SetAnimationPlayingState(AnimationModel animationModel, bool isPlaying)
         {
-            var animationModel = _animationModels.FirstOrDefault(a => a.AnimationData.AnimationAsset == asset);
             if (animationModel != null)
             {
                 animationModel.IsPlaying = isPlaying;
@@ -488,7 +516,7 @@ namespace AssetsManager.Views.Controls.Models
 
         private void AnimationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (sender is Slider slider && slider.Tag is AnimationModel animationModel && _isSliderDragging)
+            if (AnimationsListBox.SelectedItem is AnimationModel animationModel && _isSliderDragging)
             {
                 AnimationSeekRequested?.Invoke(this, (animationModel, TimeSpan.FromSeconds(e.NewValue)));
             }
@@ -496,21 +524,42 @@ namespace AssetsManager.Views.Controls.Models
 
         private void ResetPosition_Click(object sender, RoutedEventArgs e)
         {
-            PositionXSlider.Value = 0;
-            PositionYSlider.Value = SceneElements.GroundLevel;
-            PositionZSlider.Value = 0;
+            if (PositionXLock.IsChecked == false)
+            {
+                PositionXSlider.Value = 0;
+            }
+            if (PositionYLock.IsChecked == false)
+            {
+                PositionYSlider.Value = SceneElements.GroundLevel;
+            }
+            if (PositionZLock.IsChecked == false)
+            {
+                PositionZSlider.Value = 0;
+            }
         }
 
         private void ResetRotation_Click(object sender, RoutedEventArgs e)
         {
-            RotationXSlider.Value = 0;
-            RotationYSlider.Value = 0;
-            RotationZSlider.Value = 0;
+            if (RotationXLock.IsChecked == false)
+            {
+                RotationXSlider.Value = 0;
+            }
+            if (RotationYLock.IsChecked == false)
+            {
+                RotationYSlider.Value = 0;
+            }
+            if (RotationZLock.IsChecked == false)
+            {
+                RotationZSlider.Value = 0;
+            }
         }
 
         private void ResetScale_Click(object sender, RoutedEventArgs e)
         {
-            ScaleSlider.Value = 1;
+            if (ScaleLock.IsChecked == false)
+            {
+                ScaleSlider.Value = 1;
+            }
         }
 
         public void ApplyAutoRotation(double angle)
