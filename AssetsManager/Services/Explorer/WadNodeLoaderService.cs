@@ -134,8 +134,16 @@ namespace AssetsManager.Services.Explorer
 
             foreach (var bnkNode in bnkFiles)
             {
-                string baseName = Path.GetFileNameWithoutExtension(bnkNode.Name);
-                if (wpkFiles.Contains(baseName))
+                string bnkBaseName = Path.GetFileNameWithoutExtension(bnkNode.Name);
+
+                // Case 1: A WPK with the exact same name exists (e.g., common.bnk, common.wpk)
+                bool directMatch = wpkFiles.Contains(bnkBaseName);
+
+                // Case 2: An events/music BNK corresponds to an audio WPK (e.g., vo_events.bnk, vo_audio.wpk)
+                string correspondingAudioWpkName = bnkBaseName.Replace("_events", "_audio").Replace("_music", "_audio");
+                bool audioMatch = wpkFiles.Contains(correspondingAudioWpkName);
+
+                if (directMatch || audioMatch)
                 {
                     bnkNode.Children.Clear(); // Remove the dummy node, thus removing the expander
                 }
