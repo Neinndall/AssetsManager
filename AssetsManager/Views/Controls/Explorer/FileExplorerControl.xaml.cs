@@ -422,12 +422,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null, BackupChunkPath: not null } selectedNode) return;
 
-            // backupDir is three levels up from the chunk path (e.g., /backup_root/wad_chunks/new/file.chunk)
-            string backupDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(selectedNode.BackupChunkPath)));
-            string oldChunksPath = Path.Combine(backupDir, "wad_chunks", "old");
-            string newChunksPath = Path.Combine(backupDir, "wad_chunks", "new");
-
-            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldChunksPath, newChunksPath, Window.GetWindow(this));
+            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, this.OldLolPath, this.NewLolPath, Window.GetWindow(this), selectedNode.BackupChunkPath);
         }
 
         private void PinSelected_Click(object sender, RoutedEventArgs e)

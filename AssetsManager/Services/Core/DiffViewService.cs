@@ -41,7 +41,7 @@ namespace AssetsManager.Services.Core
             _wadExtractionService = wadExtractionService;
         }
 
-        public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner)
+        public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string backupChunkPath = null)
         {
             if (diff == null) return;
 
@@ -61,7 +61,7 @@ namespace AssetsManager.Services.Core
             {
                 if (SupportedFileTypes.AudioBank.Contains(extension))
                 {
-                    await HandleAudioBankDiffAsync(diff, oldPbePath, newPbePath, owner);
+                    await HandleAudioBankDiffAsync(diff, oldPbePath, newPbePath, owner, backupChunkPath);
                 }
                 else if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
                 {
@@ -83,7 +83,7 @@ namespace AssetsManager.Services.Core
             }
         }
 
-        private async Task HandleAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner)
+        private async Task HandleAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string backupChunkPath)
         {
             string oldJson = "{}";
             string newJson = "{}";
@@ -95,7 +95,7 @@ namespace AssetsManager.Services.Core
 
             if (diff.Type is ChunkDiffType.Modified or ChunkDiffType.Renamed or ChunkDiffType.Removed)
             {
-                var tempNodeOld = new FileSystemNodeModel { Name = Path.GetFileName(diff.OldPath), FullPath = diff.OldPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff };
+                var tempNodeOld = new FileSystemNodeModel { Name = Path.GetFileName(diff.OldPath), FullPath = diff.OldPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPath };
                 var linkedBankOld = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeOld, oldPbePath);
                 if (linkedBankOld != null)
                 {
@@ -109,7 +109,7 @@ namespace AssetsManager.Services.Core
 
             if (diff.Type is ChunkDiffType.Modified or ChunkDiffType.Renamed or ChunkDiffType.New)
             {
-                var tempNodeNew = new FileSystemNodeModel { Name = Path.GetFileName(diff.NewPath), FullPath = diff.NewPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff };
+                var tempNodeNew = new FileSystemNodeModel { Name = Path.GetFileName(diff.NewPath), FullPath = diff.NewPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPath };
                 var linkedBankNew = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeNew, newPbePath);
                 if (linkedBankNew != null)
                 {
