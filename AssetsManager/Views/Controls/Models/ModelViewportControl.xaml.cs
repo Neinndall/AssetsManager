@@ -261,16 +261,16 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (Viewport.Camera is not PerspectiveCamera camera) return;
 
-            var position = new Point3D(-6, 2298, 465);
-            var lookDirection = new Vector3D(4, -164, -445);
+            var position = new Point3D(0, 2298, 465);
+            var lookDirection = new Vector3D(0, -164, -445);
             var upDirection = new Vector3D(0, 1, 0);
 
             camera.Position = position;
             camera.LookDirection = lookDirection;
             camera.UpDirection = upDirection;
             camera.FieldOfView = 50;
-            camera.NearPlaneDistance = 1.0; // Evita clipping cercano
-            camera.FarPlaneDistance = 10000; // Asegura ver objetos lejanos
+            camera.NearPlaneDistance = 0.1; // Evita clipping cercano
+            camera.FarPlaneDistance = 20000; // Asegura ver objetos lejanos
         }
 
         public void TakeScreenshot(string filePath)
@@ -290,7 +290,7 @@ namespace AssetsManager.Views.Controls.Models
             {
                 Viewport3D.ShowFrameRate = false;
                               
-                double scalingFactor = 5.0;
+                double scalingFactor = 4.0;
                 int width = (int)(Viewport3D.ActualWidth * scalingFactor);
                 int height = (int)(Viewport3D.ActualHeight * scalingFactor);
                 
