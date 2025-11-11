@@ -61,29 +61,26 @@ namespace AssetsManager.Services.Core
             {
                 if (SupportedFileTypes.AudioBank.Contains(extension))
                 {
-                    await HandleAudioBankDiffAsync(diff, oldPbePath, newPbePath, owner, backupChunkPath);
+                    await HandleAudioBankDiffAsync(diff, oldPbePath, newPbePath, owner, backupChunkPath, loadingWindow);
                 }
                 else if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
                 {
-                    await HandleImageDiffAsync(diff, oldPbePath, newPbePath, owner, extension);
+                    await HandleImageDiffAsync(diff, oldPbePath, newPbePath, owner, extension, loadingWindow);
                 }
                 else
                 {
-                    await HandleTextDiffAsync(diff, oldPbePath, newPbePath, owner);
+                    await HandleTextDiffAsync(diff, oldPbePath, newPbePath, owner, loadingWindow);
                 }
             }
             catch (Exception ex)
             {
+                loadingWindow.Close();
                 _customMessageBoxService.ShowError("Comparison Error", $"An unexpected error occurred while preparing the file for comparison. Details: {ex.Message}", owner);
                 _logService.LogError(ex, "Error showing WAD diff");
             }
-            finally
-            {
-                loadingWindow.Close();
-            }
         }
 
-        private async Task HandleAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string backupChunkPath)
+        private async Task HandleAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string backupChunkPath, LoadingDiffWindow loadingWindow)
         {
             string oldJson = "{}";
             string newJson = "{}";
@@ -123,6 +120,7 @@ namespace AssetsManager.Services.Core
 
             if (oldJson == newJson)
             {
+                loadingWindow.Close();
                 _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
                 return;
             }
@@ -130,6 +128,8 @@ namespace AssetsManager.Services.Core
             var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
             diffWindow.Owner = owner;
             await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, diff.OldPath, diff.NewPath);
+            
+            loadingWindow.Close();
             diffWindow.ShowDialog();
         }
 
@@ -155,13 +155,14 @@ namespace AssetsManager.Services.Core
             return await JsonFormatter.FormatJsonAsync(result, settings);
         }
 
-        private async Task HandleTextDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner)
+        private async Task HandleTextDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)
         {
             var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
             var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
 
             if (oldText == newText)
             {
+                loadingWindow.Close();
                 _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
                 return;
             }
@@ -169,16 +170,19 @@ namespace AssetsManager.Services.Core
             var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
             diffWindow.Owner = owner;
             await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath);
+
+            loadingWindow.Close();
             diffWindow.ShowDialog();
         }
 
-        private async Task HandleImageDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string extension)
+        private async Task HandleImageDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string extension, LoadingDiffWindow loadingWindow)
         {
             var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
 
             var oldImage = ToBitmapSource((byte[])oldData, extension);
             var newImage = ToBitmapSource((byte[])newData, extension);
 
+            loadingWindow.Close();
             var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath) { Owner = owner };
             imageDiffWindow.Show();
         }
