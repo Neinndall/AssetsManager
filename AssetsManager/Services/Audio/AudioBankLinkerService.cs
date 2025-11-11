@@ -179,11 +179,11 @@ namespace AssetsManager.Services.Audio
             string wadDirectory;
             if (strategy.Type == BinType.Champion)
             {
-                wadDirectory = Path.Combine(basePath, "Game", "DATA", "FINAL", "Champions");
+                wadDirectory = basePath;
             }
             else if (strategy.Type == BinType.Map)
             {
-                wadDirectory = Path.Combine(basePath, "Game", "DATA", "FINAL", "Maps");
+                wadDirectory = basePath;
             }
             else
             {
