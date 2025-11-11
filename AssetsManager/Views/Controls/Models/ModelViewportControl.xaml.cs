@@ -362,7 +362,7 @@ namespace AssetsManager.Views.Controls.Models
             var saveFileDialog = new CommonSaveFileDialog
             {
                 Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
-                Title = "Save Screenshot File",
+                Title = "Save screenshot file",
                 DefaultExtension = ".png",
                 DefaultFileName = defaultFileName // Pre-populate with the generated name
             };
