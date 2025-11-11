@@ -115,6 +115,11 @@ namespace AssetsManager.Services.Formatting
 
         private async Task<string> GetBnkJsonStringAsync(byte[] data)
         {
+            if (data == null || data.Length == 0)
+            {
+                return "{}";
+            }
+
             try
             {
                 using var bnkStream = new MemoryStream(data);
@@ -130,6 +135,11 @@ namespace AssetsManager.Services.Formatting
 
         private async Task<string> GetBinJsonStringAsync(byte[] data)
         {
+            if (data == null || data.Length == 0)
+            {
+                return "{}";
+            }
+
             try
             {
                 using var binStream = new MemoryStream(data);
@@ -149,6 +159,11 @@ namespace AssetsManager.Services.Formatting
 
         private async Task<string> GetStringTableJsonStringAsync(byte[] data)
         {
+            if (data == null || data.Length == 0)
+            {
+                return "{}";
+            }
+
             try
             {
                 using var inputStream = new MemoryStream(data);
@@ -167,6 +182,11 @@ namespace AssetsManager.Services.Formatting
 
         private async Task<string> GetCssJsonStringAsync(byte[] data)
         {
+            if (data == null || data.Length == 0)
+            {
+                return "{}";
+            }
+
             try
             {
                 var cssText = Encoding.UTF8.GetString(data);
