@@ -26,36 +26,37 @@ namespace AssetsManager.Views.Helpers
 
         public static Task<string> FormatJsonAsync(object jsonInput)
         {
+            return FormatJsonAsync(jsonInput, null);
+        }
+
+        public static Task<string> FormatJsonAsync(object jsonInput, JsonSerializerSettings settings)
+        {
             if (jsonInput == null)
                 return Task.FromResult(string.Empty);
+
+            settings ??= new JsonSerializerSettings();
+            // Ensure Indented formatting is always applied for consistency, but allow other settings to be customized.
+            settings.Formatting = Formatting.Indented;
 
             return Task.Run(() =>
             {
                 try
                 {
-                    using (var stringWriter = new StringWriter())
-                    using (var jsonWriter = new JsonTextWriter(stringWriter) { Formatting = Formatting.Indented })
+                    if (jsonInput is string jsonString)
                     {
-                        if (jsonInput is string jsonString)
-                        {
-                            // If it's a string, read from it
-                            using (var stringReader = new StringReader(jsonString))
-                            using (var jsonReader = new JsonTextReader(stringReader))
-                            {
-                                jsonWriter.WriteToken(jsonReader);
-                            }
-                        }
-                        else
-                        {
-                            // If it's an object (like a Dictionary), serialize it directly
-                            var serializer = new JsonSerializer();
-                            serializer.Serialize(jsonWriter, jsonInput);
-                        }
-                        return stringWriter.ToString();
+                        // If it's a string, parse and re-serialize with settings
+                        var parsedJson = JToken.Parse(jsonString);
+                        return parsedJson.ToString(settings.Formatting);
+                    }
+                    else
+                    {
+                        // If it's an object, serialize it directly with the given settings
+                        return JsonConvert.SerializeObject(jsonInput, settings);
                     }
                 }
-                catch (Exception) 
+                catch (Exception)
                 {
+                    // Fallback for invalid JSON strings or serialization errors
                     return jsonInput.ToString();
                 }
             });
