@@ -299,7 +299,7 @@ namespace AssetsManager.Views.Controls.Models
                 Viewport3D.InvalidateVisual();
 
                 // Pausa única y optimizada para estabilizar el renderizado
-                System.Threading.Thread.Sleep(120);
+                System.Threading.Thread.Sleep(160);
 
                 var rtb = new RenderTargetBitmap(
                     width, 
