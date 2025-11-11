@@ -4,8 +4,10 @@ using System.Text;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models;
 using LeagueToolkit.Core.Meta;
 
 namespace AssetsManager.Services.Formatting
@@ -57,12 +59,30 @@ namespace AssetsManager.Services.Formatting
                         formattedContent = Encoding.UTF8.GetString(data);
                     }
                     break;
+                case "bnk":
+                    formattedContent = await GetBnkJsonStringAsync(data);
+                    break;
                 case "text":
                 default:
                     formattedContent = Encoding.UTF8.GetString(data);
                     break;
             }
             return formattedContent;
+        }
+
+        private async Task<string> GetBnkJsonStringAsync(byte[] data)
+        {
+            try
+            {
+                using var bnkStream = new MemoryStream(data);
+                var bnkFile = BnkParser.Parse(bnkStream, _logService);
+                return await JsonFormatter.FormatJsonAsync(bnkFile);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse .bnk file content.");
+                return "Error parsing .bnk file. See logs for details.";
+            }
         }
 
         private async Task<string> GetBinJsonStringAsync(byte[] data)

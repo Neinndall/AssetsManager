@@ -173,6 +173,7 @@ namespace AssetsManager.Services.Core
                    SupportedFileTypes.Css.Contains(extension) ||
                    SupportedFileTypes.Bin.Contains(extension) ||
                    SupportedFileTypes.StringTable.Contains(extension) ||
+                   extension == ".bnk" || // Explicitly check for .bnk files
                    SupportedFileTypes.PlainText.Contains(extension);
         }
 
