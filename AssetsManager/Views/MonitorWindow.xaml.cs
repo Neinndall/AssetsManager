@@ -1,4 +1,5 @@
 using AssetsManager.Services;
+using AssetsManager.Services.Api;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
@@ -14,7 +15,7 @@ namespace AssetsManager.Views
     {
         public MonitorWindow(
             MonitorService monitorService, 
-            AssetDownloader assetDownloader, // Add this
+            AssetDownloader assetDownloader,
             IServiceProvider serviceProvider, 
             DiffViewService diffViewService, 
             AppSettings appSettings, 
@@ -22,7 +23,8 @@ namespace AssetsManager.Views
             CustomMessageBoxService customMessageBoxService,
             JsonDataService jsonDataService,
             VersionService versionService,
-            DirectoriesCreator directoriesCreator)
+            DirectoriesCreator directoriesCreator,
+            RiotApiService riotApiService) // Added RiotApiService
         {
             InitializeComponent();
 
@@ -43,15 +45,22 @@ namespace AssetsManager.Views
 
             // Setup and inject dependencies for AssetTrackerControl
             AssetTrackerControl.MonitorService = monitorService;
-            AssetTrackerControl.AssetDownloader = assetDownloader; // Add this
+            AssetTrackerControl.AssetDownloader = assetDownloader;
             AssetTrackerControl.LogService = logService;
             AssetTrackerControl.CustomMessageBoxService = customMessageBoxService;
 
             // Setup and inject dependencies for ManageVersionsControl
             ManageVersionsControl.VersionService = versionService;
             ManageVersionsControl.LogService = logService;
-            ManageVersionsControl.AppSettings = appSettings; // Add this
-            ManageVersionsControl.CustomMessageBoxService = customMessageBoxService; // Add this
+            ManageVersionsControl.AppSettings = appSettings;
+            ManageVersionsControl.CustomMessageBoxService = customMessageBoxService;
+
+            // Setup and inject dependencies for ApiControl
+            ApiControl.LogService = logService;
+            ApiControl.CustomMessageBoxService = customMessageBoxService;
+            ApiControl.RiotApiService = riotApiService;
+            ApiControl.AppSettings = appSettings;
+            ApiControl.DirectoriesCreator = directoriesCreator;
         }
     }
 }

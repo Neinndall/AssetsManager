@@ -24,6 +24,7 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Versions;
 using AssetsManager.Services.Audio;
+using AssetsManager.Services.Api; // Added for RiotApiService
 
 namespace AssetsManager
 {
@@ -63,7 +64,24 @@ namespace AssetsManager
             // Core Services
             services.AddSingleton<PbeStatusService>();
             services.AddSingleton<LogService>();
-            services.AddSingleton<HttpClient>();
+            
+            // Configure and register HttpClient for LCU API (ignoring self-signed cert for loopback)
+            services.AddSingleton<HttpClient>(sp =>
+            {
+                var handler = new HttpClientHandler();
+                handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
+                {
+                    // Trust the self-signed certificate for the local LCU API
+                    if (message.RequestUri.IsLoopback)
+                    {
+                        return true;
+                    }
+                    // For all other requests, use the default system validation
+                    return errors == System.Net.Security.SslPolicyErrors.None;
+                };
+                return new HttpClient(handler);
+            });
+
             services.AddSingleton<DirectoriesCreator>();
             services.AddSingleton(provider => AppSettings.LoadSettings());
             services.AddSingleton<Requests>();
@@ -89,6 +107,9 @@ namespace AssetsManager
             services.AddSingleton<DiffViewService>();
             services.AddSingleton<MonitorService>();
             services.AddSingleton<WadSavingService>();
+
+            // Riot API Service
+            services.AddSingleton<RiotApiService>();
 
             // Versions Service
             services.AddSingleton<VersionService>();

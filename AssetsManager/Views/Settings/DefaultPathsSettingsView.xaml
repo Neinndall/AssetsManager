@@ -79,8 +79,8 @@
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderSearch" Foreground="{StaticResource AccentBrush}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="LoL Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Directory where League of Legends is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                            <TextBlock Text="LoL PBE Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Directory where League of Legends PBE is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
                     <Grid>
@@ -90,6 +90,29 @@
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="textBoxLolPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.LolDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <Button x:Name="btnBrowseLol" Grid.Column="1" Content="Browse" Click="btnBrowseLol_Click" Style="{StaticResource SecondaryButton}"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- LoL Live Directory -->
+                <StackPanel Margin="0,0,0,30">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderHeart" Foreground="{StaticResource AccentBrush}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="LoL Live Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Directory where League of Legends LIVE is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="textBoxLolLivePath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.LolLiveDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button x:Name="btnBrowseLolLive" Grid.Column="1" Content="Browse" Click="btnBrowseLolLive_Click" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
                 </StackPanel>
 

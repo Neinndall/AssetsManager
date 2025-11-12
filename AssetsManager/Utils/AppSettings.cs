@@ -28,6 +28,7 @@ namespace AssetsManager.Utils
         public string NewHashesPath { get; set; }
         public string OldHashesPath { get; set; }
         public string LolDirectory { get; set; }
+        public string LolLiveDirectory { get; set; }
         public string DefaultExtractedSelectDirectory { get; set; }
         public string LastPbeStatusMessage { get; set; }
         public string CustomFloorTexturePath { get; set; } = string.Empty;
@@ -45,6 +46,8 @@ namespace AssetsManager.Utils
         public Dictionary<string, Dictionary<long, string>> AssetTrackerUrlOverrides { get; set; }
 
         public Dictionary<string, List<long>> AssetTrackerUserRemovedIds { get; set; }
+
+        public ApiSettings ApiSettings { get; set; }
 
         private const string ConfigFilePath = "config.json";
 
@@ -112,6 +115,23 @@ namespace AssetsManager.Utils
             settings.AssetTrackerUrlOverrides ??= new Dictionary<string, Dictionary<long, string>>();
             settings.AssetTrackerUserRemovedIds ??= new Dictionary<string, List<long>>();
 
+            // Robustly initialize and heal ApiSettings
+            if (settings.ApiSettings == null)
+            {
+                settings.ApiSettings = GetDefaultSettings().ApiSettings;
+                needsResave = true;
+            }
+            else
+            {
+                settings.ApiSettings.Connection ??= new ConnectionInfo();
+                settings.ApiSettings.Token ??= new TokenInfo();
+            }
+
+            if (needsResave)
+            {
+                SaveSettings(settings);
+            }
+
             return settings;
         }
 
@@ -135,6 +155,7 @@ namespace AssetsManager.Utils
                 NewHashesPath = null,
                 OldHashesPath = null,
                 LolDirectory = null,
+                LolLiveDirectory = null,
                 DefaultExtractedSelectDirectory = null,
                 CustomFloorTexturePath = null,
                 LastPbeStatusMessage = null,
@@ -147,6 +168,11 @@ namespace AssetsManager.Utils
                 AssetTrackerFoundIds = new Dictionary<string, List<long>>(),
                 AssetTrackerUrlOverrides = new Dictionary<string, Dictionary<long, string>>(),
                 AssetTrackerUserRemovedIds = new Dictionary<string, List<long>>(),
+                ApiSettings = new ApiSettings
+                {
+                    Connection = new ConnectionInfo(),
+                    Token = new TokenInfo()
+                },
             };
         }
 
@@ -167,6 +193,7 @@ namespace AssetsManager.Utils
             NewHashesPath = defaultSettings.NewHashesPath;
             OldHashesPath = defaultSettings.OldHashesPath;
             LolDirectory = defaultSettings.LolDirectory;
+            LolLiveDirectory = defaultSettings.LolLiveDirectory;
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;
             CustomFloorTexturePath = defaultSettings.CustomFloorTexturePath;
             SaveDiffHistory = defaultSettings.SaveDiffHistory;
