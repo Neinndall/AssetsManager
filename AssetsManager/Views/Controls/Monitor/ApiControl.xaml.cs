@@ -9,7 +9,10 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Media.Imaging; // Added for RenderTargetBitmap
+using Microsoft.WindowsAPICodePack.Dialogs; // Added for CommonSaveFileDialog
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -117,6 +120,127 @@ namespace AssetsManager.Views.Controls.Monitor
             else
             {
                 CustomMessageBoxService.ShowError("Error", "Could not retrieve sales data.", null);
+            }
+        }
+
+        private async void SaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Status.SalesCatalog.Count == 0)
+            {
+                CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
+                return;
+            }
+
+            var dialog = new CommonSaveFileDialog
+            {
+                Title = "Save sales data",
+                DefaultFileName = "sales",
+                InitialDirectory = DirectoriesCreator.AssetsDownloadedPath,
+                DefaultExtension = ".png" // Default to PNG
+            };
+            dialog.Filters.Add(new CommonFileDialogFilter("PNG Image", "*.png"));
+
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                string filePath = dialog.FileName;
+                string extension = Path.GetExtension(filePath).ToLowerInvariant();
+
+                try
+                {
+                    if (extension == ".png")
+                    {
+                        await SaveSalesAsPngAsync(filePath);
+                    }
+                    else
+                    {
+                        CustomMessageBoxService.ShowError("Error", "Unsupported file format selected. Only PNG is supported.", Window.GetWindow(this));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, $"Failed to save sales data to {filePath}.");
+                    CustomMessageBoxService.ShowError("Error", $"An error occurred while saving: {ex.Message}", Window.GetWindow(this));
+                }
+            }
+        }
+
+        private async Task SaveSalesAsPngAsync(string filePath)
+        {
+            try
+            {
+                var items = Status.SalesCatalog; // Use the currently displayed page
+                if (items == null || !items.Any())
+                {
+                    CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
+                    return;
+                }
+
+                // 1. Create the container
+                var grid = new Grid
+                {
+                    Background = this.Background, // Use the control's own background
+                    SnapsToDevicePixels = true,
+                    UseLayoutRounding = true
+                };
+
+                var uniformGridFactory = new FrameworkElementFactory(typeof(UniformGrid));
+                uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, 3);
+                var itemsPanelTemplate = new ItemsPanelTemplate(uniformGridFactory);
+
+                // 2. Create the ItemsControl
+                var itemsControl = new ItemsControl
+                {
+                    ItemsSource = items,
+                    ItemTemplate = SalesItemsControl.ItemTemplate,
+                    ItemsPanel = itemsPanelTemplate
+                };
+                
+                grid.Children.Add(itemsControl);
+
+                // 3. Set width and measure
+                var renderWidth = SalesItemsControl.ActualWidth;
+                grid.Width = renderWidth;
+
+                // To get the desired height, we need to run the layout pass
+                grid.Measure(new Size(renderWidth, double.PositiveInfinity));
+                grid.Arrange(new Rect(0, 0, grid.DesiredSize.Width, grid.DesiredSize.Height));
+                
+                var renderHeight = grid.DesiredSize.Height;
+
+                if (renderWidth <= 0 || renderHeight <= 0)
+                {
+                    LogService.LogWarning("The size of the off-screen control for PNG capture is invalid.");
+                    return;
+                }
+
+                // 4. Render
+                RenderTargetBitmap rtb = new RenderTargetBitmap((int)renderWidth, (int)renderHeight, 96, 96, PixelFormats.Pbgra32);
+                rtb.Render(grid);
+
+                // 5. Encode and Save
+                PngBitmapEncoder pngEncoder = new PngBitmapEncoder();
+                pngEncoder.Frames.Add(BitmapFrame.Create(rtb));
+
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    pngEncoder.Save(ms);
+                    ms.Seek(0, SeekOrigin.Begin);
+
+                    await Task.Run(async () =>
+                    {
+                        using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true))
+                        {
+                            await ms.CopyToAsync(fileStream);
+                        }
+                    });
+                }
+
+                LogService.LogInteractiveSuccess($"Sales data saved as PNG to {filePath}", filePath);
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"Failed to save sales data as PNG to {filePath}.");
+                CustomMessageBoxService.ShowError("Error", $"An error occurred while saving: {ex.Message}", Window.GetWindow(this));
             }
         }
 

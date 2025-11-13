@@ -152,13 +152,18 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Button Grid.Column="1"
-                                    Content="Requests Sales"
-                                    Style="{StaticResource ModernButton}"
-                                    Click="RequestsSales_Click"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Content="Requests Sales"
+                                        Style="{StaticResource ModernButton}"
+                                        Click="RequestsSales_Click"/>
+                                <Button Content="Save"
+                                        Style="{StaticResource ModernButton}"
+                                        Margin="10,0,0,0"
+                                        Click="SaveButton_Click"/>
+                            </StackPanel>
                         </Grid>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding Status.SalesCatalog}" Margin="0,16,0,0">
+                    <ItemsControl x:Name="SalesItemsControl" ItemsSource="{Binding Status.SalesCatalog}" Margin="0,16,0,0">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Columns="3"/>
