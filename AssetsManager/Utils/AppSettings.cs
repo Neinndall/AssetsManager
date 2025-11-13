@@ -27,7 +27,7 @@ namespace AssetsManager.Utils
 
         public string NewHashesPath { get; set; }
         public string OldHashesPath { get; set; }
-        public string LolDirectory { get; set; }
+        public string LolPbeDirectory { get; set; }
         public string LolLiveDirectory { get; set; }
         public string DefaultExtractedSelectDirectory { get; set; }
         public string LastPbeStatusMessage { get; set; }
@@ -154,7 +154,7 @@ namespace AssetsManager.Utils
                 PbeStatusFrequency = 10,
                 NewHashesPath = null,
                 OldHashesPath = null,
-                LolDirectory = null,
+                LolPbeDirectory = null,
                 LolLiveDirectory = null,
                 DefaultExtractedSelectDirectory = null,
                 CustomFloorTexturePath = null,
@@ -192,7 +192,7 @@ namespace AssetsManager.Utils
             OnlyCheckDifferences = defaultSettings.OnlyCheckDifferences;
             NewHashesPath = defaultSettings.NewHashesPath;
             OldHashesPath = defaultSettings.OldHashesPath;
-            LolDirectory = defaultSettings.LolDirectory;
+            LolPbeDirectory = defaultSettings.LolPbeDirectory;
             LolLiveDirectory = defaultSettings.LolLiveDirectory;
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;
             CustomFloorTexturePath = defaultSettings.CustomFloorTexturePath;

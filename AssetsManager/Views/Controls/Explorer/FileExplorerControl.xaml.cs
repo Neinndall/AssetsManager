@@ -125,9 +125,9 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
 
-            if (_isWadMode && !string.IsNullOrEmpty(AppSettings.LolDirectory) && Directory.Exists(AppSettings.LolDirectory))
+            if (_isWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
             {
-                await BuildWadTreeAsync(AppSettings.LolDirectory);
+                await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
             }
             else
             {
@@ -150,9 +150,9 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (_isWadMode)
             {
-                if (!string.IsNullOrEmpty(AppSettings.LolDirectory) && Directory.Exists(AppSettings.LolDirectory))
+                if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
                 {
-                    await BuildWadTreeAsync(AppSettings.LolDirectory);
+                    await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
                 }
                 else
                 {

@@ -61,7 +61,7 @@ namespace AssetsManager.Views.Controls.Comparator
 
         private async void createLolBackupButton_Click(object sender, RoutedEventArgs e)
         {
-            string sourceLolPath = AppSettings.LolDirectory;
+            string sourceLolPath = AppSettings.LolPbeDirectory;
 
             if (string.IsNullOrEmpty(sourceLolPath))
             {
@@ -80,7 +80,7 @@ namespace AssetsManager.Views.Controls.Comparator
             createLolBackupButton.IsEnabled = false;
             try
             {
-                await BackupManager.CreateLolDirectoryBackupAsync(sourceLolPath, destinationBackupPath);
+                await BackupManager.CreateLolPbeDirectoryBackupAsync(sourceLolPath, destinationBackupPath);
                 CustomMessageBoxService.ShowInfo("Info", "LoL backup completed successfully.", Window.GetWindow(this));
             }
             catch (DirectoryNotFoundException ex)
@@ -100,39 +100,39 @@ namespace AssetsManager.Views.Controls.Comparator
             }
         }
 
-        private void btnSelectOldLolDirectory_Click(object sender, RoutedEventArgs e)
+        private void btnSelectOldLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
                 Title = "Select old directory",
-                InitialDirectory = AppSettings.LolDirectory
+                InitialDirectory = AppSettings.LolPbeDirectory
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     var oldPath = folderBrowserDialog.FileName;
-                    oldLolDirectoryTextBox.Text = oldPath;
-                    newLolDirectoryTextBox.Text = oldPath.Replace("(PBE)_old", "(PBE)");
+                    oldLolPbeDirectoryTextBox.Text = oldPath;
+                    newLolPbeDirectoryTextBox.Text = oldPath.Replace("(PBE)_old", "(PBE)");
                     LogService.LogDebug($"Old Directory selected: {oldPath}");
                 }
             }
         }
 
-        private void btnSelectNewLolDirectory_Click(object sender, RoutedEventArgs e)
+        private void btnSelectNewLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
                 Title = "Select new directory",
-                InitialDirectory = AppSettings.LolDirectory
+                InitialDirectory = AppSettings.LolPbeDirectory
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     var newPath = folderBrowserDialog.FileName;
-                    newLolDirectoryTextBox.Text = newPath;
-                    oldLolDirectoryTextBox.Text = newPath.Replace("(PBE)", "(PBE)_old");
+                    newLolPbeDirectoryTextBox.Text = newPath;
+                    oldLolPbeDirectoryTextBox.Text = newPath.Replace("(PBE)", "(PBE)_old");
                     LogService.LogDebug($"New Directory selected: {newPath}");
                 }
             }
@@ -144,7 +144,7 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
                 Title = "Select old wad file",
-                InitialDirectory = AppSettings.LolDirectory
+                InitialDirectory = AppSettings.LolPbeDirectory
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -161,7 +161,7 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
                 Title = "Select new wad file",
-                InitialDirectory = AppSettings.LolDirectory
+                InitialDirectory = AppSettings.LolPbeDirectory
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -179,14 +179,14 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 if (wadComparatorTabControl.SelectedIndex == 0) // By Directory
                 {
-                    if (string.IsNullOrEmpty(oldLolDirectoryTextBox.Text) || string.IsNullOrEmpty(newLolDirectoryTextBox.Text))
+                    if (string.IsNullOrEmpty(oldLolPbeDirectoryTextBox.Text) || string.IsNullOrEmpty(newLolPbeDirectoryTextBox.Text))
                     {
                         CustomMessageBoxService.ShowWarning("Warning", "Please select both directories.", Window.GetWindow(this));
                         compareWadButton.IsEnabled = true;
                         return;
                     }
-                    _oldLolPath = oldLolDirectoryTextBox.Text;
-                    _newLolPath = newLolDirectoryTextBox.Text;
+                    _oldLolPath = oldLolPbeDirectoryTextBox.Text;
+                    _newLolPath = newLolPbeDirectoryTextBox.Text;
                     await WadComparatorService.CompareWadsAsync(_oldLolPath, _newLolPath);
                 }
                 else // By File

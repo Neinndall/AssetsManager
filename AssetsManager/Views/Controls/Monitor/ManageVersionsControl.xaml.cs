@@ -69,7 +69,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             var selectedVersion = selectedVersions.Single();
 
-            if (string.IsNullOrEmpty(AppSettings.LolDirectory))
+            if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
             {
                 CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.");
                 return;
@@ -86,7 +86,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            await VersionService.DownloadPluginsAsync(selectedVersion.Content, AppSettings.LolDirectory, locales);
+            await VersionService.DownloadPluginsAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales);
         }
 
         private async void GetLoLGameClient_Click(object sender, RoutedEventArgs e)
@@ -104,7 +104,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             var selectedVersion = selectedVersions.Single();
 
-            if (string.IsNullOrEmpty(AppSettings.LolDirectory))
+            if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
             {
                 CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.");
                 return;
@@ -120,7 +120,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolDirectory, locales);
+            await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales);
         }
 
         private void ListView_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -60,7 +60,7 @@
                                         <ColumnDefinition Width="12"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="newLolDirectoryTextBox" 
+                                    <TextBox x:Name="newLolPbeDirectoryTextBox" 
                                                  Grid.Column="0"
                                                  IsReadOnly="True"
                                                  Style="{StaticResource ModernTextBox}"
@@ -68,7 +68,7 @@
                                     <Button Grid.Column="2"
                                                 Content="Browse"
                                                 Style="{StaticResource SecondaryButton}"
-                                                Click="btnSelectNewLolDirectory_Click"
+                                                Click="btnSelectNewLolPbeDirectory_Click"
                                                 ToolTip="Browse for directory"/>
                                 </Grid>
                             </Grid>
@@ -101,7 +101,7 @@
                                         <ColumnDefinition Width="12"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="oldLolDirectoryTextBox" 
+                                    <TextBox x:Name="oldLolPbeDirectoryTextBox" 
                                                  Grid.Column="0"
                                                  IsReadOnly="True"
                                                  Style="{StaticResource ModernTextBox}"
@@ -109,7 +109,7 @@
                                     <Button Grid.Column="2"
                                                 Content="Browse"
                                                 Style="{StaticResource SecondaryButton}"
-                                                Click="btnSelectOldLolDirectory_Click"
+                                                Click="btnSelectOldLolPbeDirectory_Click"
                                                 ToolTip="Browse for directory"/>
                                 </Grid>
                             </Grid>
