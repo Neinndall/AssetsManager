@@ -67,19 +67,27 @@ namespace AssetsManager.Views.Models
 
         public void UpdatePaging()
         {
-            TotalPages = (int)Math.Ceiling((double)_fullList.Count / PageSize);
-            if (TotalPages == 0) TotalPages = 1;
-            if (_currentPage > TotalPages) CurrentPage = TotalPages;
-            if (_currentPage < 1) CurrentPage = 1;
-
-            var pagedItems = _fullList
-                .Skip((CurrentPage - 1) * PageSize)
-                .Take(PageSize);
-
-            PagedItems.Clear();
-            foreach (var item in pagedItems)
+            if (_fullList == null || _fullList.Count == 0)
             {
-                PagedItems.Add(item);
+                TotalPages = 0;
+                CurrentPage = 0;
+                PagedItems.Clear();
+            }
+            else
+            {
+                TotalPages = (int)Math.Ceiling((double)_fullList.Count / PageSize);
+                if (CurrentPage > TotalPages) CurrentPage = TotalPages;
+                if (CurrentPage < 1) CurrentPage = 1;
+
+                var pagedItems = _fullList
+                    .Skip((CurrentPage - 1) * PageSize)
+                    .Take(PageSize);
+
+                PagedItems.Clear();
+                foreach (var item in pagedItems)
+                {
+                    PagedItems.Add(item);
+                }
             }
 
             OnPropertyChanged(nameof(CanGoToNextPage));
