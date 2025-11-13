@@ -14,6 +14,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer.Tree;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models;
 
@@ -43,6 +44,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public TreeUIManager TreeUIManager { get; set; }
         public AudioBankService AudioBankService { get; set; }
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
+        public HashResolverService HashResolverService { get; set; }
 
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
@@ -51,6 +53,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
         private bool _isWadMode = true;
+        private CancellationTokenSource _cancellationTokenSource;
 
         public FileExplorerControl()
         {
@@ -66,6 +69,8 @@ namespace AssetsManager.Views.Controls.Explorer
         
         public void CleanupResources()
         {
+            _cancellationTokenSource?.Cancel();
+
             // 1. Detener el timer PRIMERO
             if (_searchTimer != null)
             {
@@ -119,15 +124,19 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
+            // Await hashes BEFORE any UI logic that depends on them.
+            await HashResolverService.StartupTask;
+
+            // Now proceed with the original logic
             Toolbar.SearchTextChanged += Toolbar_SearchTextChanged;
             Toolbar.CollapseToContainerClicked += Toolbar_CollapseToContainerClicked;
             Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;
             Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
 
-            if (_isWadMode && !string.IsNullOrEmpty(AppSettings.LolDirectory) && Directory.Exists(AppSettings.LolDirectory))
+            if (_isWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
             {
-                await BuildWadTreeAsync(AppSettings.LolDirectory);
+                await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
             }
             else
             {
@@ -150,9 +159,9 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (_isWadMode)
             {
-                if (!string.IsNullOrEmpty(AppSettings.LolDirectory) && Directory.Exists(AppSettings.LolDirectory))
+                if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
                 {
-                    await BuildWadTreeAsync(AppSettings.LolDirectory);
+                    await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
                 }
                 else
                 {
@@ -199,6 +208,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildWadTreeAsync(string rootPath)
         {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
             _currentRootPath = rootPath;
             NewLolPath = null;
             OldLolPath = null;
@@ -208,7 +221,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath);
+                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, token);
+                token.ThrowIfCancellationRequested();
+
                 RootNodes.Clear();
                 foreach (var node in newNodes)
                 {
@@ -220,6 +235,10 @@ namespace AssetsManager.Views.Controls.Explorer
                     CustomMessageBoxService.ShowError("Error", "Could not find any WAD files in 'Game' or 'Plugins' subdirectories.", Window.GetWindow(this));
                     NoDirectoryMessage.Visibility = Visibility.Visible;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                LogService.Log("WAD tree building was cancelled.");
             }
             catch (Exception ex)
             {
@@ -238,14 +257,18 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
             _currentRootPath = rootPath;
             NewLolPath = null;
             OldLolPath = null;
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
 
-            var cts = new CancellationTokenSource();
-            var indicatorTask = Task.Delay(100, cts.Token).ContinueWith(t =>
+            // Delayed loading indicator logic
+            var indicatorTask = Task.Delay(100, token).ContinueWith(t =>
             {
                 if (!t.IsCanceled)
                 {
@@ -255,12 +278,18 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath);
+                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, token);
+                token.ThrowIfCancellationRequested();
+
                 RootNodes.Clear();
                 foreach (var node in newNodes)
                 {
                     RootNodes.Add(node);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                LogService.Log("Directory tree building was cancelled.");
             }
             catch (Exception ex)
             {
@@ -270,7 +299,9 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             finally
             {
-                cts.Cancel();
+                // The indicatorTask will be implicitly cancelled by the main token,
+                // or its continuation will check t.IsCanceled.
+                // No need for explicit cts.Cancel() here as the token is already cancelled by _cancellationTokenSource?.Cancel()
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
@@ -280,13 +311,19 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildTreeFromBackupAsync(string jsonPath)
         {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
 
             try
             {
-                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath);
+                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, token);
+                token.ThrowIfCancellationRequested();
+
                 RootNodes.Clear();
                 NewLolPath = newLolPath;
                 OldLolPath = oldLolPath;
@@ -294,6 +331,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     RootNodes.Add(node);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                LogService.Log("Backup tree building was cancelled.");
             }
             catch (Exception ex)
             {
@@ -422,12 +463,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null, BackupChunkPath: not null } selectedNode) return;
 
-            // backupDir is three levels up from the chunk path (e.g., /backup_root/wad_chunks/new/file.chunk)
-            string backupDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(selectedNode.BackupChunkPath)));
-            string oldChunksPath = Path.Combine(backupDir, "wad_chunks", "old");
-            string newChunksPath = Path.Combine(backupDir, "wad_chunks", "new");
-
-            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldChunksPath, newChunksPath, Window.GetWindow(this));
+            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, this.OldLolPath, this.NewLolPath, Window.GetWindow(this), selectedNode.BackupChunkPath);
         }
 
         private void PinSelected_Click(object sender, RoutedEventArgs e)

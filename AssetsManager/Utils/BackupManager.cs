@@ -58,7 +58,7 @@ namespace AssetsManager.Utils
             }
         }
 
-        public async Task CreateLolDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath)
+        public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath)
         {
             await Task.Run(() =>
             {
@@ -74,7 +74,7 @@ namespace AssetsManager.Utils
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, $"AssetsManager.Utils.BackupManager.CreateLolDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
+                    _logService.LogError(ex, $"AssetsManager.Utils.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
                     throw; // Re-throw the exception after logging
                 }
             });

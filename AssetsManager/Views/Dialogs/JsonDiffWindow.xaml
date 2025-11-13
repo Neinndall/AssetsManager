@@ -6,13 +6,9 @@
         xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d"
-        Title="Difference Viewer" Height="960" Width="1500" MinHeight="960" MinWidth="1500"
-        WindowStartupLocation="CenterScreen"
-        Background="{StaticResource SidebarBackground}"
-        FontFamily="Consolas, Courier New">
+        Title="Difference Viewer" Height="900" Width="1400" MinHeight="900" MinWidth="1400"
+        WindowStartupLocation="CenterScreen">
     <Grid>
         <controls:JsonDiffControl x:Name="JsonDiffControl"/>
-        
-        
     </Grid>
 </Window>

@@ -52,12 +52,27 @@ namespace AssetsManager.Views.Settings
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select lol directory"
+                Title = "Select lol PBE directory"
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     textBoxLolPath.Text = folderBrowserDialog.FileName;
+                }
+            }
+        }
+
+        private void btnBrowseLolLive_Click(object sender, RoutedEventArgs e)
+        {
+            using (var folderBrowserDialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "Select lol Live directory"
+            })
+            {
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    textBoxLolLivePath.Text = folderBrowserDialog.FileName;
                 }
             }
         }

@@ -8,8 +8,9 @@
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d"
         Title="AssetsManager"
-        Width="950" Height="750" 
+        Width="950" Height="750"
         MinWidth="950" MinHeight="750" 
+        MaxWidth="1100" MaxHeight="900"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource SidebarBackground}"
         FontFamily="Consolas, Courier New">

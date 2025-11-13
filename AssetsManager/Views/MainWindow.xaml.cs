@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Input;
+using System.IO; // Added for Path and Directory
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
@@ -127,6 +128,8 @@ namespace AssetsManager.Views
 
             InitializeNotifyIcon();
             
+            this.Loaded += MainWindow_Loaded;
+            
             StateChanged += MainWindow_StateChanged;
             Closing += MainWindow_Closing;
         }
@@ -134,15 +137,51 @@ namespace AssetsManager.Views
         private async void InitializeApplicationAsync()
         {
             await _updateCheckService.CheckForAllUpdatesAsync();
-            await LoadAllHashesOnStartupAsync();
+            await _hashResolverService.StartupTask;
         }
 
-        private async Task LoadAllHashesOnStartupAsync()
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            await _hashResolverService.LoadHashesAsync();
-            await _hashResolverService.LoadBinHashesAsync();
-            await _hashResolverService.LoadRstHashesAsync();
-            _logService.LogSuccess("Hashes loaded on startup.");
+            // TEMPORARY: Check for old AppData folder structure and prompt for deletion
+            // This code is temporary and should be removed in a future version after users have updated.
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string oldAppFolderPath = Path.Combine(appDataPath, "AssetsManager");
+
+            if (Directory.Exists(oldAppFolderPath))
+            {
+                bool shouldDelete = _customMessageBoxService.ShowYesNo(
+                    "Directory Update",
+                    "An old AssetsManager directory structure has been detected in AppData. " +
+                    "To ensure consistency and avoid issues, would you like to delete the old folder " +
+                    $"'{oldAppFolderPath}'?\n\n" +
+                    "IMPORTANT: Please ensure you have manually backed up any important files from this folder " +
+                    "before proceeding, as this action cannot be undone. " +
+                    "This action is recommended and will not affect your current settings, " +
+                    "as they are saved in a different location. " +
+                    "This message is temporary and will be removed in future versions.",
+                    this
+                ).GetValueOrDefault(false);
+
+                if (shouldDelete)
+                {
+                    try
+                    {
+                        Directory.Delete(oldAppFolderPath, true); // true for recursive deletion
+                        _logService.LogSuccess($"Old AssetsManager folder deleted: {oldAppFolderPath}");
+                        _customMessageBoxService.ShowInfo("Deletion Complete", "The old folder has been successfully deleted.", this);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, $"Error attempting to delete old AssetsManager folder: {oldAppFolderPath}");
+                        _customMessageBoxService.ShowError("Deletion Error", $"Could not delete the old folder: {ex.Message}", this);
+                    }
+                }
+                else
+                {
+                    _logService.LogWarning($"User chose not to delete the old AssetsManager folder: {oldAppFolderPath}");
+                }
+            }
+            // END TEMPORARY CODE
         }
 
         protected override void OnSourceInitialized(EventArgs e)

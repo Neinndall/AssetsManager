@@ -13,87 +13,14 @@ namespace AssetsManager.Views.Models
     {
         private readonly VersionService _versionService;
         private readonly LogService _logService;
-        private const int PageSize = 5;
 
-        private List<VersionFileInfo> _allLeagueClientVersions;
-        private List<VersionFileInfo> _allLoLGameClientVersions;
+        public List<VersionFileInfo> AllLeagueClientVersions { get; private set; }
+        public List<VersionFileInfo> AllLoLGameClientVersions { get; private set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public ObservableCollection<VersionFileInfo> LeagueClientVersions { get; set; }
-        public ObservableCollection<VersionFileInfo> LoLGameClientVersions { get; set; }
-
-        private int _leagueClientCurrentPage = 1;
-        public int LeagueClientCurrentPage
-        {
-            get => _leagueClientCurrentPage;
-            set
-            {
-                if (_leagueClientCurrentPage != value)
-                {
-                    _leagueClientCurrentPage = value;
-                    OnPropertyChanged(nameof(LeagueClientCurrentPage));
-                    OnPropertyChanged(nameof(CanGoToPrevLeagueClientPage));
-                    OnPropertyChanged(nameof(CanGoToNextLeagueClientPage));
-                    UpdateLeagueClientPagedView();
-                }
-            }
-        }
-
-        private int _leagueClientTotalPages;
-        public int LeagueClientTotalPages
-        {
-            get => _leagueClientTotalPages;
-            private set
-            {
-                if (_leagueClientTotalPages != value)
-                {
-                    _leagueClientTotalPages = value;
-                    OnPropertyChanged(nameof(LeagueClientTotalPages));
-                    OnPropertyChanged(nameof(CanGoToPrevLeagueClientPage));
-                    OnPropertyChanged(nameof(CanGoToNextLeagueClientPage));
-                }
-            }
-        }
-
-        public bool CanGoToPrevLeagueClientPage => LeagueClientCurrentPage > 1;
-        public bool CanGoToNextLeagueClientPage => LeagueClientCurrentPage < LeagueClientTotalPages;
-
-        private int _loLGameClientCurrentPage = 1;
-        public int LoLGameClientCurrentPage
-        {
-            get => _loLGameClientCurrentPage;
-            set
-            {
-                if (_loLGameClientCurrentPage != value)
-                {
-                    _loLGameClientCurrentPage = value;
-                    OnPropertyChanged(nameof(LoLGameClientCurrentPage));
-                    OnPropertyChanged(nameof(CanGoToPrevLoLGameClientPage));
-                    OnPropertyChanged(nameof(CanGoToNextLoLGameClientPage));
-                    UpdateLoLGameClientPagedView();
-                }
-            }
-        }
-
-        private int _loLGameClientTotalPages;
-        public int LoLGameClientTotalPages
-        {
-            get => _loLGameClientTotalPages;
-            private set
-            {
-                if (_loLGameClientTotalPages != value)
-                {
-                    _loLGameClientTotalPages = value;
-                    OnPropertyChanged(nameof(LoLGameClientTotalPages));
-                    OnPropertyChanged(nameof(CanGoToPrevLoLGameClientPage));
-                    OnPropertyChanged(nameof(CanGoToNextLoLGameClientPage));
-                }
-            }
-        }
-
-        public bool CanGoToPrevLoLGameClientPage => LoLGameClientCurrentPage > 1;
-        public bool CanGoToNextLoLGameClientPage => LoLGameClientCurrentPage < LoLGameClientTotalPages;
+        public PaginationModel<VersionFileInfo> LeagueClientPaginator { get; }
+        public PaginationModel<VersionFileInfo> LoLGameClientPaginator { get; }
 
         public ObservableCollection<LocaleOption> AvailableLocales { get; set; }
 
@@ -102,11 +29,11 @@ namespace AssetsManager.Views.Models
             _versionService = versionService;
             _logService = logService;
 
-            _allLeagueClientVersions = new List<VersionFileInfo>();
-            _allLoLGameClientVersions = new List<VersionFileInfo>();
+            AllLeagueClientVersions = new List<VersionFileInfo>();
+            AllLoLGameClientVersions = new List<VersionFileInfo>();
 
-            LeagueClientVersions = new ObservableCollection<VersionFileInfo>();
-            LoLGameClientVersions = new ObservableCollection<VersionFileInfo>();
+            LeagueClientPaginator = new PaginationModel<VersionFileInfo>();
+            LoLGameClientPaginator = new PaginationModel<VersionFileInfo>();
 
             AvailableLocales = new ObservableCollection<LocaleOption>
             {
@@ -123,89 +50,12 @@ namespace AssetsManager.Views.Models
             {
                 var allFiles = await _versionService.GetVersionFilesAsync();
 
-                _allLeagueClientVersions = allFiles.Where(f => f.Category == "league-client").ToList();
+                AllLeagueClientVersions = allFiles.Where(f => f.Category == "league-client").ToList();
                 var gameClientCategories = new[] { "lol-game-client" };
-                _allLoLGameClientVersions = allFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
+                AllLoLGameClientVersions = allFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
 
-                var newLeagueClientTotalPages = (int)Math.Ceiling(_allLeagueClientVersions.Count / (double)PageSize);
-                if (newLeagueClientTotalPages == 0) newLeagueClientTotalPages = 1;
-
-                if (LeagueClientCurrentPage > newLeagueClientTotalPages)
-                {
-                    LeagueClientCurrentPage = newLeagueClientTotalPages;
-                }
-                else
-                {
-                    UpdateLeagueClientPagedView();
-                }
-
-                var newLoLGameClientTotalPages = (int)Math.Ceiling(_allLoLGameClientVersions.Count / (double)PageSize);
-                if (newLoLGameClientTotalPages == 0) newLoLGameClientTotalPages = 1;
-
-                if (LoLGameClientCurrentPage > newLoLGameClientTotalPages)
-                {
-                    LoLGameClientCurrentPage = newLoLGameClientTotalPages;
-                }
-                else
-                {
-                    UpdateLoLGameClientPagedView();
-                }
-            }
-        }
-
-        private void UpdateLeagueClientPagedView()
-        {
-            LeagueClientTotalPages = (int)Math.Ceiling(_allLeagueClientVersions.Count / (double)PageSize);
-            var pagedItems = _allLeagueClientVersions.Skip((LeagueClientCurrentPage - 1) * PageSize).Take(PageSize);
-
-            LeagueClientVersions.Clear();
-            foreach (var item in pagedItems)
-            {
-                LeagueClientVersions.Add(item);
-            }
-        }
-
-        private void UpdateLoLGameClientPagedView()
-        {
-            LoLGameClientTotalPages = (int)Math.Ceiling(_allLoLGameClientVersions.Count / (double)PageSize);
-            var pagedItems = _allLoLGameClientVersions.Skip((LoLGameClientCurrentPage - 1) * PageSize).Take(PageSize);
-
-            LoLGameClientVersions.Clear();
-            foreach (var item in pagedItems)
-            {
-                LoLGameClientVersions.Add(item);
-            }
-        }
-
-        public void NextLeagueClientPage()
-        {
-            if (CanGoToNextLeagueClientPage)
-            {
-                LeagueClientCurrentPage++;
-            }
-        }
-
-        public void PrevLeagueClientPage()
-        {
-            if (CanGoToPrevLeagueClientPage)
-            {
-                LeagueClientCurrentPage--;
-            }
-        }
-
-        public void NextLoLGameClientPage()
-        {
-            if (CanGoToNextLoLGameClientPage)
-            {
-                LoLGameClientCurrentPage++;
-            }
-        }
-
-        public void PrevLoLGameClientPage()
-        {
-            if (CanGoToPrevLoLGameClientPage)
-            {
-                LoLGameClientCurrentPage--;
+                LeagueClientPaginator.SetFullList(AllLeagueClientVersions);
+                LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions);
             }
         }
 
@@ -217,12 +67,12 @@ namespace AssetsManager.Views.Models
             {
                 foreach (var versionFile in versionsToDelete.ToList())
                 {
-                    _allLeagueClientVersions.Remove(versionFile);
-                    _allLoLGameClientVersions.Remove(versionFile);
+                    AllLeagueClientVersions.Remove(versionFile);
+                    AllLoLGameClientVersions.Remove(versionFile);
                 }
                 // Recalculate total pages and update views after deletion
-                UpdateLeagueClientPagedView();
-                UpdateLoLGameClientPagedView();
+                LeagueClientPaginator.SetFullList(AllLeagueClientVersions);
+                LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions);
             }
         }
 

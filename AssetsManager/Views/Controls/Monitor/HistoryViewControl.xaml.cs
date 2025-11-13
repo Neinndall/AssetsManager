@@ -91,12 +91,12 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void PrevPage_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.PrevPage();
+            _viewModel.Paginator.PreviousPage();
         }
 
         private void NextPage_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.NextPage();
+            _viewModel.Paginator.NextPage();
         }
     }
 }

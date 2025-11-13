@@ -347,9 +347,13 @@ namespace AssetsManager.Services.Versions
                 if (process.ExitCode != 0)
                 {
                     if (!string.IsNullOrWhiteSpace(error))
-                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}: {error}");
+                    {
+                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}. Please check network connection or manifest URL.");
+                    }
                     else
-                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}");
+                    {
+                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}.");
+                    }
                 }
             }
         }
@@ -372,7 +376,7 @@ namespace AssetsManager.Services.Versions
             }
         }
 
-        public async Task DownloadPluginsAsync(string manifestUrl, string lolDirectory, List<string> locales)
+        public async Task DownloadPluginsAsync(string manifestUrl, string lolPbeDirectory, List<string> locales)
         {
             const string taskName = "Updating League Client";
             bool success = false;
@@ -381,7 +385,7 @@ namespace AssetsManager.Services.Versions
                 _logService.Log("Starting verifying/updating the league client...");
                 ExtractManifestDownloader();
 
-                if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolDirectory) || locales == null || !locales.Any())
+                if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolPbeDirectory) || locales == null || !locales.Any())
                 {
                     _logService.LogWarning("DownloadPluginsAsync called with invalid parameters.");
                     VersionDownloadCompleted?.Invoke(this, (taskName, false, "Invalid parameters."));
@@ -392,9 +396,9 @@ namespace AssetsManager.Services.Versions
                 VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files..."));
 
                 string localesArgument = string.Join(" ", locales);
-                int totalFiles = await GetManifestFileCountAsync(manifestUrl, lolDirectory, localesArgument);
+                int totalFiles = await GetManifestFileCountAsync(manifestUrl, lolPbeDirectory, localesArgument);
 
-                string arguments = $"\"{manifestUrl}\" -o \"{lolDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
+                string arguments = $"\"{manifestUrl}\" -o \"{lolPbeDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
 
                 await RunManifestDownloaderAsync(arguments, taskName, totalFiles);
                 _logService.LogSuccess("Plugin download process finished.");
@@ -412,7 +416,7 @@ namespace AssetsManager.Services.Versions
             }
         }
 
-        public async Task DownloadGameClientAsync(string manifestUrl, string lolDirectory, List<string> locales)
+        public async Task DownloadGameClientAsync(string manifestUrl, string lolPbeDirectory, List<string> locales)
         {
             const string taskName = "Updating Game Client";
             bool success = false;
@@ -421,7 +425,7 @@ namespace AssetsManager.Services.Versions
                 _logService.Log("Starting verifying/updating the game client...");
                 ExtractManifestDownloader();
 
-                if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolDirectory) || locales == null || !locales.Any())
+                if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolPbeDirectory) || locales == null || !locales.Any())
                 {
                     _logService.LogWarning("DownloadGameClientAsync called with invalid parameters.");
                     VersionDownloadCompleted?.Invoke(this, (taskName, false, "Invalid parameters."));
@@ -431,7 +435,7 @@ namespace AssetsManager.Services.Versions
                 VersionDownloadStarted?.Invoke(this, taskName);
                 VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files..."));
 
-                string gameDirectory = Path.Combine(lolDirectory, "Game");
+                string gameDirectory = Path.Combine(lolPbeDirectory, "Game");
                 string localesArgument = string.Join(" ", locales);
                 int totalFiles = await GetManifestFileCountAsync(manifestUrl, gameDirectory, localesArgument);
 
