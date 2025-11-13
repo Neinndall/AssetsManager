@@ -63,8 +63,6 @@ namespace AssetsManager.Views.Models
             OnPropertyChanged(nameof(ExpirationText));
         }
         
-
-
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {

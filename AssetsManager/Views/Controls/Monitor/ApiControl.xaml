@@ -160,7 +160,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="10">
+                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="10">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
@@ -169,9 +169,25 @@
 
                                         <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,5,0,0">
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="{Binding OriginalPriceText}" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="{Binding SalePriceText}" Foreground="{StaticResource AccentGreen}" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Sale.FormattedEndDate}" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
+
+                                            <TextBlock Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center">
+                                                <Run Text="Original Price: "/>
+                                                <Run Text="{Binding Rp}" TextDecorations="Strikethrough"/>
+                                                <Run Text=" RP"/>
+                                            </TextBlock>
+
+                                            <TextBlock Foreground="{StaticResource AccentGreen}" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center">
+                                                <Run Text="Sale: "/>
+                                                <Run Text="{Binding Sale.Rp}"/>
+                                                <Run Text=" RP ("/>
+                                                <Run Text="{Binding Sale.PercentOff}"/>
+                                                <Run Text="% off)"/>
+                                            </TextBlock>
+
+                                            <TextBlock FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center">
+                                                <Run Text="Ends:"/>
+                                                <Run Text="{Binding Sale.EndDate}"/>
+                                            </TextBlock>
                                         </StackPanel>
                                     </Grid>
                                 </Border>

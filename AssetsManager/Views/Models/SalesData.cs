@@ -70,30 +70,6 @@ namespace AssetsManager.Views.Models
 
         [JsonPropertyName("sale")]
         public SaleInfo Sale { get; set; }
-
-        public string OriginalPriceText
-        {
-            get
-            {
-                if (Rp.HasValue)
-                {
-                    return $"Original Price: {Rp.Value} RP";
-                }
-                return string.Empty;
-            }
-        }
-
-        public string SalePriceText
-        {
-            get
-            {
-                if (Sale != null)
-                {
-                    return $"Sale: {Sale.Rp} RP ({Sale.PercentOff}% off)";
-                }
-                return string.Empty;
-            }
-        }
     }
 
     public class SaleInfo
@@ -106,13 +82,5 @@ namespace AssetsManager.Views.Models
 
         [JsonPropertyName("endDate")]
         public string EndDate { get; set; }
-
-        public string FormattedEndDate
-        {
-            get
-            {
-                return $"Ends: {EndDate}";
-            }
-        }
     }
 }
