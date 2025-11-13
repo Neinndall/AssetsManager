@@ -14,6 +14,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer.Tree;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models;
 
@@ -43,6 +44,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public TreeUIManager TreeUIManager { get; set; }
         public AudioBankService AudioBankService { get; set; }
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
+        public HashResolverService HashResolverService { get; set; }
 
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
@@ -119,6 +121,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
+            // Await hashes BEFORE any UI logic that depends on them.
+            await HashResolverService.StartupTask;
+
+            // Now proceed with the original logic
             Toolbar.SearchTextChanged += Toolbar_SearchTextChanged;
             Toolbar.CollapseToContainerClicked += Toolbar_CollapseToContainerClicked;
             Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;

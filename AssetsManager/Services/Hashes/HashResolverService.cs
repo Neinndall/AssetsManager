@@ -28,10 +28,30 @@ namespace AssetsManager.Services.Hashes
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
 
+        public Task StartupTask { get; private set; }
+
         public HashResolverService(DirectoriesCreator directoriesCreator, LogService logService)
         {
             _directoriesCreator = directoriesCreator;
             _logService = logService;
+            StartupTask = LoadAllHashesOnStartupAsync();
+        }
+
+        private async Task LoadAllHashesOnStartupAsync()
+        {
+            try
+            {
+                await Task.WhenAll(
+                    LoadHashesAsync(),
+                    LoadBinHashesAsync(),
+                    LoadRstHashesAsync()
+                );
+                _logService.LogSuccess("Hashes loaded on startup.");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to load hashes on startup.");
+            }
         }
 
         private bool _gameLcuHashesLoaded = false;
@@ -172,9 +192,8 @@ namespace AssetsManager.Services.Hashes
             _gameLcuHashesLoaded = false;
             _binHashesLoaded = false;
             _rstHashesLoaded = false;
-            await LoadHashesAsync();
-            await LoadBinHashesAsync();
-            await LoadRstHashesAsync();
+            StartupTask = LoadAllHashesOnStartupAsync();
+            await StartupTask;
         }
     }
 }

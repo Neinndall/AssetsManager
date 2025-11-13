@@ -28,7 +28,8 @@ namespace AssetsManager.Views
             TreeUIManager treeUIManager,
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
-            WadSavingService wadSavingService
+            WadSavingService wadSavingService,
+            HashResolverService hashResolverService // Added HashResolverService
         )
         {
             InitializeComponent();
@@ -45,6 +46,7 @@ namespace AssetsManager.Views
             FileExplorer.TreeUIManager = treeUIManager;
             FileExplorer.AudioBankService = audioBankService;
             FileExplorer.AudioBankLinkerService = audioBankLinkerService;
+            FileExplorer.HashResolverService = hashResolverService; // Assign the service
 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;

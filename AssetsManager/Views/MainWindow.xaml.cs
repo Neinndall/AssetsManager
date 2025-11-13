@@ -134,15 +134,7 @@ namespace AssetsManager.Views
         private async void InitializeApplicationAsync()
         {
             await _updateCheckService.CheckForAllUpdatesAsync();
-            await LoadAllHashesOnStartupAsync();
-        }
-
-        private async Task LoadAllHashesOnStartupAsync()
-        {
-            await _hashResolverService.LoadHashesAsync();
-            await _hashResolverService.LoadBinHashesAsync();
-            await _hashResolverService.LoadRstHashesAsync();
-            _logService.LogSuccess("Hashes loaded on startup.");
+            await _hashResolverService.StartupTask;
         }
 
         protected override void OnSourceInitialized(EventArgs e)

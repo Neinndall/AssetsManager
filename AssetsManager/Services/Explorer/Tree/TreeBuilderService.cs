@@ -26,8 +26,7 @@ namespace AssetsManager.Services.Explorer.Tree
         {
             var rootNodes = new ObservableCollection<FileSystemNodeModel>();
 
-            // Esta llamada a la carga de hashes ha sido eliminada y movida  
-            // a MainWindow para que carguen en memoria al principio
+            // Esta llamada a la carga de hashes ha sido eliminada y movida a HashResolverService para que carguen en memoria al principio
 
             string gamePath = Path.Combine(rootPath, "Game");
             if (Directory.Exists(gamePath))
