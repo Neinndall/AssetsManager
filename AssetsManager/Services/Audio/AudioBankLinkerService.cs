@@ -291,6 +291,7 @@ namespace AssetsManager.Services.Audio
                         return (binNode, baseName, strategy.Type);
                     }
                 }
+                return (null, baseName, strategy.Type);
             }
 
             // Fallback to filesystem search for live comparisons.
