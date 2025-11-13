@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models;
 using AssetsManager.Utils;
+using System.Text.RegularExpressions;
 
 namespace AssetsManager.Services.Api
 {
@@ -261,6 +262,9 @@ namespace AssetsManager.Services.Api
                 _logService.LogError("Could not determine region from JWT. Cannot make remote request.");
                 return null;
             }
+
+            // Remove trailing digits from the region string (e.g., "euw1" -> "euw")
+            region = Regex.Replace(region, @"\d+$", "");
 
             var baseUrl = Endpoints.BaseUrlLive.Replace("{region}", region);
 
