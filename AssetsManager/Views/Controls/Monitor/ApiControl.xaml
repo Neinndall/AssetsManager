@@ -19,7 +19,7 @@
                 Margin="0,0,0,16">
             <StackPanel Orientation="Horizontal">
                 <materialIcons:MaterialIcon Kind="CloudBraces" 
-                                           Height="20" Width="20"
+                                           FontSize="20" 
                                            Foreground="{StaticResource AccentBrush}"
                                            Margin="0,0,12,0"
                                            VerticalAlignment="Center"/>
@@ -135,14 +135,21 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Available Requests" 
-                                           FontSize="16" 
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Perform requests to external APIs" 
-                                           FontSize="11" 
-                                           Foreground="{StaticResource TextMuted}"/>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="Store" 
+                                                            FontSize="20" 
+                                                            Foreground="{StaticResource AccentBrush}"
+                                                            Margin="0,0,12,0"
+                                                            VerticalAlignment="Center"/>
+                                <StackPanel>
+                                    <TextBlock Text="Available Requests" 
+                                               FontSize="16" 
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Perform requests to external APIs" 
+                                               FontSize="11" 
+                                               Foreground="{StaticResource TextMuted}"/>
+                                </StackPanel>
                             </StackPanel>
 
                             <Button Grid.Column="1"
