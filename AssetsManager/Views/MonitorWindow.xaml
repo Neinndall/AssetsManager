@@ -48,9 +48,6 @@
 
         <!-- Body -->
         <ScrollViewer Grid.Row="1" 
-                      Background="Transparent"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled"
                       Padding="32,24,32,0">
             <TabControl Style="{StaticResource CustomTabControlStyle}">
                 <TabItem Header="File Watcher" Style="{StaticResource CustomTabItemStyle}">
