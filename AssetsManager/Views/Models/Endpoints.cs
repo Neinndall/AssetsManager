@@ -5,7 +5,7 @@ namespace AssetsManager.Views.Models
     public static class Endpoints
     {
         public static string BaseUrlPBE => "https://pbe-red.lol.sgp.pvp.net";
-        public static string BaseUrlLive => "https://euw-red.lol.sgp.pvp.net";
+        public static string BaseUrlLive => "https://{region}-red.lol.sgp.pvp.net";
 
         public static Dictionary<string, string> GetLocalEndpoints() => new Dictionary<string, string>
         {

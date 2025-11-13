@@ -255,14 +255,14 @@ namespace AssetsManager.Services.Api
                 return null;
             }
 
-            // Always use PBE base URL as per user's request
-            var baseUrl = Endpoints.BaseUrlLive;
-            
-            if (string.IsNullOrEmpty(baseUrl))
+            var region = _appSettings.ApiSettings.Token.Region?.ToLower();
+            if (string.IsNullOrEmpty(region) || region == "unknown")
             {
-                _logService.LogError("The remote base URL (Live) is not configured.");
+                _logService.LogError("Could not determine region from JWT. Cannot make remote request.");
                 return null;
             }
+
+            var baseUrl = Endpoints.BaseUrlLive.Replace("{region}", region);
 
             if (!_remoteEndpoints.TryGetValue(endpointKey, out var endpointPath))
             {
