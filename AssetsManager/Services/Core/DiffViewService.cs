@@ -92,15 +92,10 @@ namespace AssetsManager.Services.Core
 
             if (diff.Type is ChunkDiffType.Modified or ChunkDiffType.Renamed or ChunkDiffType.Removed)
             {
-                _logService.Log("[AUDIO-DIFF] Processing OLD version.");
                 var tempNodeOld = new FileSystemNodeModel { Name = Path.GetFileName(diff.OldPath), FullPath = diff.OldPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPath };
                 var linkedBankOld = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeOld, oldPbePath, true);
                 if (linkedBankOld != null)
                 {
-                    _logService.Log($"[AUDIO-DIFF-OLD] EventsBNK Path: {linkedBankOld.EventsBnkNode?.BackupChunkPath ?? "N/A"}");
-                    _logService.Log($"[AUDIO-DIFF-OLD] AudioBNK Path: {linkedBankOld.AudioBnkNode?.BackupChunkPath ?? "N/A"}");
-                    _logService.Log($"[AUDIO-DIFF-OLD] WPK Path: {linkedBankOld.WpkNode?.BackupChunkPath ?? "N/A"}");
-                    _logService.Log($"[AUDIO-DIFF-OLD] BIN Data available: {linkedBankOld.BinData != null}");
                     oldJson = await AudioBankToStringAsync(linkedBankOld);
                 }
                 else
@@ -111,15 +106,10 @@ namespace AssetsManager.Services.Core
 
             if (diff.Type is ChunkDiffType.Modified or ChunkDiffType.Renamed or ChunkDiffType.New)
             {
-                _logService.Log("[AUDIO-DIFF] Processing NEW version.");
                 var tempNodeNew = new FileSystemNodeModel { Name = Path.GetFileName(diff.NewPath), FullPath = diff.NewPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPath };
                 var linkedBankNew = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeNew, newPbePath, false);
                 if (linkedBankNew != null)
                 {
-                    _logService.Log($"[AUDIO-DIFF-NEW] EventsBNK Path: {linkedBankNew.EventsBnkNode?.BackupChunkPath ?? "N/A"}");
-                    _logService.Log($"[AUDIO-DIFF-NEW] AudioBNK Path: {linkedBankNew.AudioBnkNode?.BackupChunkPath ?? "N/A"}");
-                    _logService.Log($"[AUDIO-DIFF-NEW] WPK Path: {linkedBankNew.WpkNode?.BackupChunkPath ?? "N/A"}");
-                    _logService.Log($"[AUDIO-DIFF-NEW] BIN Data available: {linkedBankNew.BinData != null}");
                     newJson = await AudioBankToStringAsync(linkedBankNew);
                 }
                 else
