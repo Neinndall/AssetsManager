@@ -121,7 +121,14 @@ namespace AssetsManager.Services.Core
             if (oldJson == newJson)
             {
                 loadingWindow.Close();
-                _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
+                if (diff.Type == ChunkDiffType.Modified)
+                {
+                    _customMessageBoxService.ShowInfo("Info", "The file is marked as modified and has binary differences, but its parsed content is identical. No semantic changes were found.", owner);
+                }
+                else
+                {
+                    _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
+                }
                 return;
             }
 
