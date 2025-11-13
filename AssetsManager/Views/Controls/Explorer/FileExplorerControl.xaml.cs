@@ -53,6 +53,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
         private bool _isWadMode = true;
+        private CancellationTokenSource _cancellationTokenSource;
 
         public FileExplorerControl()
         {
@@ -68,6 +69,8 @@ namespace AssetsManager.Views.Controls.Explorer
         
         public void CleanupResources()
         {
+            _cancellationTokenSource?.Cancel();
+
             // 1. Detener el timer PRIMERO
             if (_searchTimer != null)
             {
@@ -205,6 +208,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildWadTreeAsync(string rootPath)
         {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
             _currentRootPath = rootPath;
             NewLolPath = null;
             OldLolPath = null;
@@ -214,7 +221,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath);
+                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, token);
+                token.ThrowIfCancellationRequested();
+
                 RootNodes.Clear();
                 foreach (var node in newNodes)
                 {
@@ -226,6 +235,10 @@ namespace AssetsManager.Views.Controls.Explorer
                     CustomMessageBoxService.ShowError("Error", "Could not find any WAD files in 'Game' or 'Plugins' subdirectories.", Window.GetWindow(this));
                     NoDirectoryMessage.Visibility = Visibility.Visible;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                LogService.Log("WAD tree building was cancelled.");
             }
             catch (Exception ex)
             {
@@ -244,14 +257,18 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
             _currentRootPath = rootPath;
             NewLolPath = null;
             OldLolPath = null;
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
 
-            var cts = new CancellationTokenSource();
-            var indicatorTask = Task.Delay(100, cts.Token).ContinueWith(t =>
+            // Delayed loading indicator logic
+            var indicatorTask = Task.Delay(100, token).ContinueWith(t =>
             {
                 if (!t.IsCanceled)
                 {
@@ -261,12 +278,18 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath);
+                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, token);
+                token.ThrowIfCancellationRequested();
+
                 RootNodes.Clear();
                 foreach (var node in newNodes)
                 {
                     RootNodes.Add(node);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                LogService.Log("Directory tree building was cancelled.");
             }
             catch (Exception ex)
             {
@@ -276,7 +299,9 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             finally
             {
-                cts.Cancel();
+                // The indicatorTask will be implicitly cancelled by the main token,
+                // or its continuation will check t.IsCanceled.
+                // No need for explicit cts.Cancel() here as the token is already cancelled by _cancellationTokenSource?.Cancel()
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
@@ -286,13 +311,19 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildTreeFromBackupAsync(string jsonPath)
         {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
 
             try
             {
-                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath);
+                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, token);
+                token.ThrowIfCancellationRequested();
+
                 RootNodes.Clear();
                 NewLolPath = newLolPath;
                 OldLolPath = oldLolPath;
@@ -300,6 +331,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     RootNodes.Add(node);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                LogService.Log("Backup tree building was cancelled.");
             }
             catch (Exception ex)
             {

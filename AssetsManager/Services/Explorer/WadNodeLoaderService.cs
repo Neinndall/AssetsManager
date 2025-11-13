@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
@@ -24,7 +25,7 @@ namespace AssetsManager.Services.Explorer
             _logService = logService;
         }
 
-        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath)
+        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, CancellationToken token)
         {
             var options = new JsonSerializerOptions
             {
@@ -32,7 +33,9 @@ namespace AssetsManager.Services.Explorer
                 Converters = { new JsonStringEnumConverter() }
             };
 
-            string jsonContent = await File.ReadAllTextAsync(jsonPath);
+            string jsonContent = await File.ReadAllTextAsync(jsonPath, token);
+            token.ThrowIfCancellationRequested();
+
             var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
 
             var rootNodes = new List<FileSystemNodeModel>();
@@ -46,6 +49,7 @@ namespace AssetsManager.Services.Explorer
 
             foreach (var wadGroup in diffsByWad)
             {
+                token.ThrowIfCancellationRequested();
                 var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
 
                 var newFiles = wadGroup.Where(d => d.Type == ChunkDiffType.New).ToList();
@@ -163,16 +167,18 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode)
+        public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken token)
         {
             var childrenToAdd = await Task.Run(() =>
             {
+                token.ThrowIfCancellationRequested();
                 string pathToWad = wadNode.Type == NodeType.WadFile ? wadNode.FullPath : wadNode.SourceWadPath;
                 var rootVirtualNode = new FileSystemNodeModel(wadNode.Name, true, wadNode.FullPath, pathToWad);
                 using (var wadFile = new WadFile(pathToWad))
                 {
                     foreach (var chunk in wadFile.Chunks.Values)
                     {
+                        token.ThrowIfCancellationRequested();
                         string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
 
                         bool isUnresolved = virtualPath == chunk.PathHash.ToString("x16");
@@ -199,7 +205,7 @@ namespace AssetsManager.Services.Explorer
 
                 SortChildrenRecursively(rootVirtualNode);
                 return rootVirtualNode.Children.ToList();
-            });
+            }, token);
 
             return childrenToAdd;
         }
@@ -268,27 +274,31 @@ namespace AssetsManager.Services.Explorer
             return fileNode;
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath)
+        public async Task<List<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken token)
         {
             return await Task.Run(() =>
             {
+                token.ThrowIfCancellationRequested();
                 var rootNode = new FileSystemNodeModel(rootPath);
                 rootNode.Children.Clear(); // Clear dummy node
-                AddNodeToRealTree(rootNode, rootPath);
+                AddNodeToRealTree(rootNode, rootPath, token);
                 return rootNode.Children.ToList();
-            });
+            }, token);
         }
 
-        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path)
+        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken token)
         {
+            token.ThrowIfCancellationRequested();
             foreach (var directory in Directory.GetDirectories(path).OrderBy(d => d))
             {
+                token.ThrowIfCancellationRequested();
                 var dirNode = new FileSystemNodeModel(directory);
                 dirNode.Children.Clear(); // Clear dummy node
                 parentNode.Children.Add(dirNode);
-                AddNodeToRealTree(dirNode, directory);
+                AddNodeToRealTree(dirNode, directory, token);
             }
 
+            token.ThrowIfCancellationRequested();
             foreach (var file in Directory.GetFiles(path).OrderBy(f => f))
             {
                 var fileNode = new FileSystemNodeModel(file);

@@ -14,6 +14,7 @@ using BCnEncoder.Shared;
 using System.Runtime.InteropServices;
 using LeagueToolkit.Core.Renderer;
 using AssetsManager.Services.Parsers;
+using System.Threading;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -56,7 +57,7 @@ namespace AssetsManager.Services.Explorer
             // If children are not loaded (i.e., it's the dummy node), load them.
             if (dirNode.Children.Count == 1 && dirNode.Children[0].Name == "Loading...")
             {
-                var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(dirNode);
+                var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(dirNode, CancellationToken.None);
                 dirNode.Children.Clear(); // Remove dummy node
                 foreach(var child in loadedChildren)
                 {

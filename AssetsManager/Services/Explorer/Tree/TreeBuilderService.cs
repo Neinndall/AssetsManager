@@ -7,6 +7,8 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models;
 
+using System.Threading;
+
 namespace AssetsManager.Services.Explorer.Tree
 {
     public class TreeBuilderService
@@ -22,28 +24,29 @@ namespace AssetsManager.Services.Explorer.Tree
             _logService = logService;
         }
 
-        public async Task<ObservableCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath)
+        public async Task<ObservableCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken token)
         {
             var rootNodes = new ObservableCollection<FileSystemNodeModel>();
-
-            // Esta llamada a la carga de hashes ha sido eliminada y movida a HashResolverService para que carguen en memoria al principio
 
             string gamePath = Path.Combine(rootPath, "Game");
             if (Directory.Exists(gamePath))
             {
+                token.ThrowIfCancellationRequested();
                 var gameNode = new FileSystemNodeModel(gamePath);
                 rootNodes.Add(gameNode);
-                await LoadAllChildren(gameNode, rootPath);
+                await LoadAllChildren(gameNode, rootPath, token);
             }
 
             string pluginsPath = Path.Combine(rootPath, "Plugins");
             if (Directory.Exists(pluginsPath))
             {
+                token.ThrowIfCancellationRequested();
                 var pluginsNode = new FileSystemNodeModel(pluginsPath);
                 rootNodes.Add(pluginsNode);
-                await LoadAllChildren(pluginsNode, rootPath);
+                await LoadAllChildren(pluginsNode, rootPath, token);
             }
 
+            token.ThrowIfCancellationRequested();
             for (int i = rootNodes.Count - 1; i >= 0; i--)
             {
                 if (!PruneEmptyDirectories(rootNodes[i]))
@@ -55,20 +58,22 @@ namespace AssetsManager.Services.Explorer.Tree
             return rootNodes;
         }
 
-        public async Task<ObservableCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath)
+        public async Task<ObservableCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken token)
         {
-            var nodes = await _wadNodeLoaderService.LoadDirectoryAsync(rootPath);
+            var nodes = await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, token);
             return new ObservableCollection<FileSystemNodeModel>(nodes);
         }
 
-        public async Task<(ObservableCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath)
+        public async Task<(ObservableCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath, CancellationToken token)
         {
-            var (nodes, newLolPath, oldLolPath) = await _wadNodeLoaderService.LoadFromBackupAsync(jsonPath);
+            var (nodes, newLolPath, oldLolPath) = await _wadNodeLoaderService.LoadFromBackupAsync(jsonPath, token);
             return (new ObservableCollection<FileSystemNodeModel>(nodes), newLolPath, oldLolPath);
         }
 
-        public async Task LoadAllChildren(FileSystemNodeModel node, string currentRootPath)
+        public async Task LoadAllChildren(FileSystemNodeModel node, string currentRootPath, CancellationToken token = default)
         {
+            token.ThrowIfCancellationRequested();
+
             if (node.Children.Count == 1 && node.Children[0].Name == "Loading...")
             {
                 node.Children.Clear();
@@ -76,7 +81,7 @@ namespace AssetsManager.Services.Explorer.Tree
 
             if (node.Type == NodeType.WadFile)
             {
-                var children = await _wadNodeLoaderService.LoadChildrenAsync(node);
+                var children = await _wadNodeLoaderService.LoadChildrenAsync(node, token);
                 foreach (var child in children)
                 {
                     node.Children.Add(child);
@@ -91,14 +96,16 @@ namespace AssetsManager.Services.Explorer.Tree
                     var directories = Directory.GetDirectories(node.FullPath);
                     foreach (var dir in directories.OrderBy(d => d))
                     {
+                        token.ThrowIfCancellationRequested();
                         var childNode = new FileSystemNodeModel(dir);
                         node.Children.Add(childNode);
-                        await LoadAllChildren(childNode, currentRootPath);
+                        await LoadAllChildren(childNode, currentRootPath, token);
                     }
 
                     var files = Directory.GetFiles(node.FullPath);
                     foreach (var file in files.OrderBy(f => f))
                     {
+                        token.ThrowIfCancellationRequested();
                         string lowerFile = file.ToLowerInvariant();
 
                         bool keepFile = false;
@@ -117,7 +124,7 @@ namespace AssetsManager.Services.Explorer.Tree
                         {
                             var childNode = new FileSystemNodeModel(file);
                             node.Children.Add(childNode);
-                            await LoadAllChildren(childNode, currentRootPath); // Eager load WAD content
+                            await LoadAllChildren(childNode, currentRootPath, token); // Eager load WAD content
                         }
                     }
                 }
