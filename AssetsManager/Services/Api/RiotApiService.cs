@@ -206,11 +206,9 @@ namespace AssetsManager.Services.Api
 
                 // Save to API cache
                 await _directoriesCreator.CreateDirApiCacheAsync();
-                var fileName = $"sales_data_{DateTime.Now:yyyyMMddHHmmss}.json";
+                var fileName = "sales.json";
                 var filePath = Path.Combine(_directoriesCreator.ApiCachePath, fileName);
-                await File.WriteAllTextAsync(filePath, salesJson);
-                _logService.LogSuccess($"Sales data saved to API cache: {filePath}");
-
+                await File.WriteAllTextAsync(filePath, salesJson);                
                 return salesJson;
             }
             return null;

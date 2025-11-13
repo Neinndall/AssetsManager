@@ -48,14 +48,11 @@ namespace AssetsManager.Views.Controls.Monitor
 
             try
             {
-                var directory = new DirectoryInfo(DirectoriesCreator.ApiCachePath);
-                var latestSaleFile = directory.GetFiles("sales_data_*.json")
-                                              .OrderByDescending(f => f.LastWriteTimeUtc)
-                                              .FirstOrDefault();
+                var salesFilePath = Path.Combine(DirectoriesCreator.ApiCachePath, "sales.json");
 
-                if (latestSaleFile != null)
+                if (File.Exists(salesFilePath))
                 {
-                    var jsonContent = await File.ReadAllTextAsync(latestSaleFile.FullName);
+                    var jsonContent = await File.ReadAllTextAsync(salesFilePath);
                     var salesCatalog = JsonSerializer.Deserialize<SalesCatalog>(jsonContent);
 
                     if (salesCatalog != null)

@@ -178,10 +178,7 @@
 
                                             <TextBlock Foreground="{StaticResource AccentGreen}" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center">
                                                 <Run Text="Sale: "/>
-                                                <Run Text="{Binding Sale.Rp}"/>
-                                                <Run Text=" RP ("/>
-                                                <Run Text="{Binding Sale.PercentOff}"/>
-                                                <Run Text="% off)"/>
+                                                <Run Text="{Binding Sale.Rp}"/><Run Text=" RP ("/><Run Text="{Binding Sale.PercentOff}"/><Run Text="% dto)"/>
                                             </TextBlock>
 
                                             <TextBlock FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center">
