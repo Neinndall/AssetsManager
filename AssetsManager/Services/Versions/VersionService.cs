@@ -347,9 +347,13 @@ namespace AssetsManager.Services.Versions
                 if (process.ExitCode != 0)
                 {
                     if (!string.IsNullOrWhiteSpace(error))
-                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}: {error}");
+                    {
+                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}. Please check network connection or manifest URL.");
+                    }
                     else
-                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}");
+                    {
+                        _logService.LogError($"ManifestDownloader.exe failed with exit code {process.ExitCode}.");
+                    }
                 }
             }
         }
