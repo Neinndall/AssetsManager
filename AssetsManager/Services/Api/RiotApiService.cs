@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models;
 using AssetsManager.Utils;
+using System.Text.RegularExpressions;
 
 namespace AssetsManager.Services.Api
 {
@@ -255,14 +256,17 @@ namespace AssetsManager.Services.Api
                 return null;
             }
 
-            // Always use PBE base URL as per user's request
-            var baseUrl = Endpoints.BaseUrlLive;
-            
-            if (string.IsNullOrEmpty(baseUrl))
+            var region = _appSettings.ApiSettings.Token.Region?.ToLower();
+            if (string.IsNullOrEmpty(region) || region == "unknown")
             {
-                _logService.LogError("The remote base URL (Live) is not configured.");
+                _logService.LogError("Could not determine region from JWT. Cannot make remote request.");
                 return null;
             }
+
+            // Remove trailing digits from the region string (e.g., "euw1" -> "euw")
+            region = Regex.Replace(region, @"\d+$", "");
+
+            var baseUrl = Endpoints.BaseUrlLive.Replace("{region}", region);
 
             if (!_remoteEndpoints.TryGetValue(endpointKey, out var endpointPath))
             {
