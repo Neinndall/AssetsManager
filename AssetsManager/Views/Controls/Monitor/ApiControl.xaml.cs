@@ -58,11 +58,8 @@ namespace AssetsManager.Views.Controls.Monitor
                     if (salesCatalog != null)
                     {
                         Status.Player = salesCatalog.Player;
-                        Status.SalesCatalog.Clear();
-                        foreach (var item in salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null))
-                        {
-                            Status.SalesCatalog.Add(item);
-                        }
+                        var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null);
+                        Status.SetFullSalesCatalog(salesItems);
                     }
                 }
             }
@@ -113,17 +110,24 @@ namespace AssetsManager.Views.Controls.Monitor
             if (salesCatalog != null)
             {
                 Status.Player = salesCatalog.Player;
-                Status.SalesCatalog.Clear();
-                foreach (var item in salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null))
-                {
-                    Status.SalesCatalog.Add(item);
-                }
+                var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null);
+                Status.SetFullSalesCatalog(salesItems);
                 LogService.LogSuccess("Sales data retrieved and displayed successfully.");
             }
             else
             {
                 CustomMessageBoxService.ShowError("Error", "Could not retrieve sales data.", null);
             }
+        }
+
+        private void PreviousPage_Click(object sender, RoutedEventArgs e)
+        {
+            Status.PreviousPage();
+        }
+
+        private void NextPage_Click(object sender, RoutedEventArgs e)
+        {
+            Status.NextPage();
         }
 
         private void CheckAuthenticationState()

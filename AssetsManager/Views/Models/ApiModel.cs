@@ -6,12 +6,14 @@ using System.Collections.Generic;
 using AssetsManager.Utils;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace AssetsManager.Views.Models
 {
     public class ApiModel : INotifyPropertyChanged
     {
         private ApiSettings _apiSettings;
+        private List<CatalogItem> _fullSalesCatalog = new List<CatalogItem>();
 
         private string _statusText;
         public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
@@ -33,6 +35,20 @@ namespace AssetsManager.Views.Models
 
         public ObservableCollection<CatalogItem> SalesCatalog { get; set; } = new ObservableCollection<CatalogItem>();
 
+        // Paging properties
+        private int _currentPage = 1;
+        public int CurrentPage { get => _currentPage; set { SetProperty(ref _currentPage, value); UpdatePaging(); } }
+
+        private int _pageSize = 12;
+        public int PageSize { get => _pageSize; set { SetProperty(ref _pageSize, value); UpdatePaging(); } }
+
+        private int _totalPages;
+        public int TotalPages { get => _totalPages; set { SetProperty(ref _totalPages, value); OnPropertyChanged(nameof(TotalPages)); OnPropertyChanged(nameof(CanGoToNextPage)); OnPropertyChanged(nameof(CanGoToPreviousPage)); OnPropertyChanged(nameof(PageInfo)); } }
+
+        public bool CanGoToNextPage => CurrentPage < TotalPages;
+        public bool CanGoToPreviousPage => CurrentPage > 1;
+        public string PageInfo => $"{CurrentPage} / {TotalPages}";
+
         // Computed properties for display
         public string RegionText => $"Region: {_apiSettings?.Token?.Region ?? "N/A"}";
         public string PlatformText => $"Platform: {_apiSettings?.Token?.Platform ?? "N/A"}";
@@ -49,6 +65,51 @@ namespace AssetsManager.Views.Models
             ButtonContent = "Get Token";
             IsAuthenticated = false;
             IsBusy = false;
+        }
+
+        public void SetFullSalesCatalog(IEnumerable<CatalogItem> items)
+        {
+            _fullSalesCatalog = items.ToList();
+            CurrentPage = 1; // Reset to first page
+            UpdatePaging();
+        }
+
+        public void UpdatePaging()
+        {
+            TotalPages = (int)Math.Ceiling((double)_fullSalesCatalog.Count / PageSize);
+            if (TotalPages == 0) TotalPages = 1;
+            if (CurrentPage > TotalPages) CurrentPage = TotalPages;
+            if (CurrentPage < 1) CurrentPage = 1;
+
+            var pagedItems = _fullSalesCatalog
+                .Skip((CurrentPage - 1) * PageSize)
+                .Take(PageSize);
+
+            SalesCatalog.Clear();
+            foreach (var item in pagedItems)
+            {
+                SalesCatalog.Add(item);
+            }
+
+            OnPropertyChanged(nameof(CanGoToNextPage));
+            OnPropertyChanged(nameof(CanGoToPreviousPage));
+            OnPropertyChanged(nameof(PageInfo));
+        }
+
+        public void NextPage()
+        {
+            if (CanGoToNextPage)
+            {
+                CurrentPage++;
+            }
+        }
+
+        public void PreviousPage()
+        {
+            if (CanGoToPreviousPage)
+            {
+                CurrentPage--;
+            }
         }
 
         public void Update(AppSettings appSettings)

@@ -158,7 +158,6 @@
                                     Click="RequestsSales_Click"/>
                         </Grid>
                     </Border>
-
                     <ItemsControl ItemsSource="{Binding Status.SalesCatalog}" Margin="0,16,0,0">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -173,21 +172,17 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
-
                                         <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,5,0,0">
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
-
                                             <TextBlock Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center">
                                                 <Run Text="Original Price: "/>
                                                 <Run Text="{Binding Rp}" TextDecorations="Strikethrough"/>
                                                 <Run Text=" RP"/>
                                             </TextBlock>
-
                                             <TextBlock Foreground="{StaticResource AccentGreen}" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center">
                                                 <Run Text="Sale: "/>
                                                 <Run Text="{Binding Sale.Rp}"/><Run Text=" RP ("/><Run Text="{Binding Sale.PercentOff}"/><Run Text="% dto)"/>
                                             </TextBlock>
-
                                             <TextBlock FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center">
                                                 <Run Text="Ends:"/>
                                                 <Run Text="{Binding Sale.EndDate}"/>
@@ -198,6 +193,34 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <!-- Pagination Controls -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Status.TotalPages}" Value="1">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status.TotalPages}" Value="0">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                Click="PreviousPage_Click"
+                                IsEnabled="{Binding Status.CanGoToPreviousPage}">
+                            <materialIcons:MaterialIcon Kind="ChevronLeft" />
+                        </Button>
+                        <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}"
+                                   Text="{Binding Status.PageInfo}"/>
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                Click="NextPage_Click"
+                                IsEnabled="{Binding Status.CanGoToNextPage}">
+                            <materialIcons:MaterialIcon Kind="ChevronRight" />
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
             <TabItem Header="Mythic Shop">
