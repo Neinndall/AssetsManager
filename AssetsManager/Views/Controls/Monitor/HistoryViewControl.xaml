@@ -63,7 +63,7 @@
         <!-- ListView sin GridView -->
         <ListView x:Name="DiffHistoryListView" 
                   Grid.Row="2"
-                  ItemsSource="{Binding PaginatedHistory}"
+                  ItemsSource="{Binding Paginator.PagedItems}"
                   Margin="0"
                   Style="{StaticResource ModernListView}"
                   ItemContainerStyle="{StaticResource ModernListViewItem}"
@@ -102,7 +102,7 @@
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding TotalPages}" Value="0">
+                            <DataTrigger Binding="{Binding Paginator.TotalPages}" Value="0">
                                 <Setter Property="Visibility" Value="Collapsed"/>
                             </DataTrigger>
                         </Style.Triggers>
@@ -110,18 +110,18 @@
                 </StackPanel.Style>
                 <Button Style="{StaticResource TransparentIconButton}"
                         Click="PrevPage_Click"
-                        IsEnabled="{Binding CanGoToPrevPage}">
+                        IsEnabled="{Binding Paginator.CanGoToPreviousPage}">
                     <materialIcons:MaterialIcon Kind="ChevronLeft" />
                 </Button>
 
                 <TextBlock VerticalAlignment="Center" Margin="5,0" Foreground="{StaticResource TextPrimary}">
-                    <Run Text="{Binding CurrentPage, Mode=OneWay}" />
+                    <Run Text="{Binding Paginator.CurrentPage, Mode=OneWay}" />
                     <Run Text="/"/>
-                    <Run Text="{Binding TotalPages, Mode=OneWay}" />
+                    <Run Text="{Binding Paginator.TotalPages, Mode=OneWay}" />
                 </TextBlock>
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="NextPage_Click"
-                            IsEnabled="{Binding CanGoToNextPage}">
+                            IsEnabled="{Binding Paginator.CanGoToNextPage}">
                         <materialIcons:MaterialIcon Kind="ChevronRight" />                
                     </Button>
             </StackPanel>

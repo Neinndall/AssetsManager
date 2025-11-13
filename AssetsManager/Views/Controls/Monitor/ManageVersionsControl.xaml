@@ -166,7 +166,7 @@
                                 </Border>
                             </Grid>
                             <ListView Grid.Row="1" x:Name="LeagueClientVersionsListView"
-                                      ItemsSource="{Binding LeagueClientVersions}"
+                                      ItemsSource="{Binding LeagueClientPaginator.PagedItems}"
                                       Style="{StaticResource ModernListView}"
                                       ScrollViewer.VerticalScrollBarVisibility="Auto"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -214,7 +214,7 @@
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding LeagueClientTotalPages}" Value="0">
+                                <DataTrigger Binding="{Binding LeagueClientPaginator.TotalPages}" Value="0">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </Style.Triggers>
@@ -222,19 +222,19 @@
                     </StackPanel.Style>
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="PrevLeagueClientPage_Click"
-                            IsEnabled="{Binding CanGoToPrevLeagueClientPage}">
+                            IsEnabled="{Binding LeagueClientPaginator.CanGoToPreviousPage}">
                         <materialIcons:MaterialIcon Kind="ChevronLeft" />
                     </Button>
 
                     <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
-                        <Run Text="{Binding LeagueClientCurrentPage, Mode=OneWay}" />
+                        <Run Text="{Binding LeagueClientPaginator.CurrentPage, Mode=OneWay}" />
                         <Run Text="/" />
-                        <Run Text="{Binding LeagueClientTotalPages, Mode=OneWay}" />
+                        <Run Text="{Binding LeagueClientPaginator.TotalPages, Mode=OneWay}" />
                     </TextBlock>
 
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="NextLeagueClientPage_Click"
-                            IsEnabled="{Binding CanGoToNextLeagueClientPage}">
+                            IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}">
                         <materialIcons:MaterialIcon Kind="ChevronRight" />
                     </Button>
                 </StackPanel>
@@ -299,7 +299,7 @@
                                 </Border>
                             </Grid>
                             <ListView Grid.Row="1" x:Name="LoLGameClientVersionsListView" 
-                                      ItemsSource="{Binding LoLGameClientVersions}"
+                                      ItemsSource="{Binding LoLGameClientPaginator.PagedItems}"
                                       Style="{StaticResource ModernListView}"
                                       ScrollViewer.VerticalScrollBarVisibility="Auto"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -347,7 +347,7 @@
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding LoLGameClientTotalPages}" Value="0">
+                                <DataTrigger Binding="{Binding LoLGameClientPaginator.TotalPages}" Value="0">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </Style.Triggers>
@@ -355,19 +355,19 @@
                     </StackPanel.Style>
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="PrevLoLGameClientPage_Click"
-                            IsEnabled="{Binding CanGoToPrevLoLGameClientPage}">
+                            IsEnabled="{Binding LoLGameClientPaginator.CanGoToPreviousPage}">
                         <materialIcons:MaterialIcon Kind="ChevronLeft" />
                     </Button>
 
                     <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
-                        <Run Text="{Binding LoLGameClientCurrentPage, Mode=OneWay}" />
+                        <Run Text="{Binding LoLGameClientPaginator.CurrentPage, Mode=OneWay}" />
                         <Run Text="/" />
-                        <Run Text="{Binding LoLGameClientTotalPages, Mode=OneWay}" />
+                        <Run Text="{Binding LoLGameClientPaginator.TotalPages, Mode=OneWay}" />
                     </TextBlock>
 
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="NextLoLGameClientPage_Click"
-                            IsEnabled="{Binding CanGoToNextLoLGameClientPage}">
+                            IsEnabled="{Binding LoLGameClientPaginator.CanGoToNextPage}">
                         <materialIcons:MaterialIcon Kind="ChevronRight" />
                     </Button>
                 </StackPanel>

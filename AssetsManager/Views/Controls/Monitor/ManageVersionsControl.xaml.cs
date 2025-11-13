@@ -56,7 +56,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void GetLeagueClient_Click(object sender, RoutedEventArgs e)
         {
-            var selectedVersions = _viewModel?.LeagueClientVersions.Where(v => v.IsSelected).ToList();
+            var selectedVersions = _viewModel?.AllLeagueClientVersions.Where(v => v.IsSelected).ToList();
             if (selectedVersions == null || !selectedVersions.Any())
             {
                 CustomMessageBoxService.ShowWarning("Warning", "Please select a League Client version from the list first.");
@@ -91,7 +91,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void GetLoLGameClient_Click(object sender, RoutedEventArgs e)
         {
-            var selectedVersions = _viewModel?.LoLGameClientVersions.Where(v => v.IsSelected).ToList();
+            var selectedVersions = _viewModel?.AllLoLGameClientVersions.Where(v => v.IsSelected).ToList();
             if (selectedVersions == null || !selectedVersions.Any())
             {
                 CustomMessageBoxService.ShowWarning("Warning", "Please select a LoL Game Client version from the list first.");
@@ -131,8 +131,8 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void DeleteSelectedVersions_Click(object sender, RoutedEventArgs e)
         {
-            var selectedVersions = _viewModel.LeagueClientVersions.Where(v => v.IsSelected).ToList();
-            selectedVersions.AddRange(_viewModel.LoLGameClientVersions.Where(v => v.IsSelected));
+            var selectedVersions = _viewModel.AllLeagueClientVersions.Where(v => v.IsSelected).ToList();
+            selectedVersions.AddRange(_viewModel.AllLoLGameClientVersions.Where(v => v.IsSelected));
 
             if (!selectedVersions.Any())
             {
@@ -149,22 +149,22 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void PrevLeagueClientPage_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.PrevLeagueClientPage();
+            _viewModel.LeagueClientPaginator.PreviousPage();
         }
 
         private void NextLeagueClientPage_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.NextLeagueClientPage();
+            _viewModel.LeagueClientPaginator.NextPage();
         }
 
         private void PrevLoLGameClientPage_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.PrevLoLGameClientPage();
+            _viewModel.LoLGameClientPaginator.PreviousPage();
         }
 
         private void NextLoLGameClientPage_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.NextLoLGameClientPage();
+            _viewModel.LoLGameClientPaginator.NextPage();
         }
 
         private void ManageVersionsControl_Unloaded(object sender, RoutedEventArgs e)
