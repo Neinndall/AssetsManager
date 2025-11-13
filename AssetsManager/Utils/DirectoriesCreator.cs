@@ -63,12 +63,12 @@ namespace AssetsManager.Utils
             UpdateCachePath = Path.Combine(appFolderPath, "update_cache");
             UpdateLogFilePath = Path.Combine(UpdateCachePath, "update_log.log");
 
-            WebView2DataPath = Path.Combine(appFolderPath, "WebView2Data");
+            WebView2DataPath = Path.Combine(appFolderPath, "webview2data");
             TempPreviewPath = Path.Combine(WebView2DataPath, "TempPreview");
             ApiCachePath = Path.Combine(appFolderPath, "api_cache");
             
-            WadComparisonSavePath = Path.Combine(appFolderPath, "WadComparison");
-            VersionsPath = Path.Combine(appFolderPath, "Versions");
+            WadComparisonSavePath = Path.Combine(appFolderPath, "wadcomparison");
+            VersionsPath = Path.Combine(appFolderPath, "versions");
         }
 
         public void GenerateNewResourcesPath()
@@ -95,7 +95,7 @@ namespace AssetsManager.Utils
         public void GenerateNewWadComparisonPaths()
         {
             string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
-            WadComparisonDirName = $"Comparison_{date}";
+            WadComparisonDirName = $"comparison_{date}";
             WadComparisonFullPath = Path.Combine(WadComparisonSavePath, WadComparisonDirName);
             OldChunksPath = Path.Combine(WadComparisonFullPath, "wad_chunks", "old");
             NewChunksPath = Path.Combine(WadComparisonFullPath, "wad_chunks", "new");
