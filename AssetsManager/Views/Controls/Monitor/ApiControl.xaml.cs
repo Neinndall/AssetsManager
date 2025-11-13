@@ -122,12 +122,12 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void PreviousPage_Click(object sender, RoutedEventArgs e)
         {
-            Status.PreviousPage();
+            Status.Paginator.PreviousPage();
         }
 
         private void NextPage_Click(object sender, RoutedEventArgs e)
         {
-            Status.NextPage();
+            Status.Paginator.NextPage();
         }
 
         private void CheckAuthenticationState()

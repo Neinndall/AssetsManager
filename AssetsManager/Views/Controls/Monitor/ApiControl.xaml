@@ -199,10 +199,10 @@
                             <Style TargetType="StackPanel">
                                 <Setter Property="Visibility" Value="Visible"/>
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Status.TotalPages}" Value="1">
+                                    <DataTrigger Binding="{Binding Status.Paginator.TotalPages}" Value="1">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                     </DataTrigger>
-                                    <DataTrigger Binding="{Binding Status.TotalPages}" Value="0">
+                                    <DataTrigger Binding="{Binding Status.Paginator.TotalPages}" Value="0">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -210,14 +210,14 @@
                         </StackPanel.Style>
                         <Button Style="{StaticResource TransparentIconButton}"
                                 Click="PreviousPage_Click"
-                                IsEnabled="{Binding Status.CanGoToPreviousPage}">
+                                IsEnabled="{Binding Status.Paginator.CanGoToPreviousPage}">
                             <materialIcons:MaterialIcon Kind="ChevronLeft" />
                         </Button>
                         <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}"
-                                   Text="{Binding Status.PageInfo}"/>
+                                   Text="{Binding Status.Paginator.PageInfo}"/>
                         <Button Style="{StaticResource TransparentIconButton}"
                                 Click="NextPage_Click"
-                                IsEnabled="{Binding Status.CanGoToNextPage}">
+                                IsEnabled="{Binding Status.Paginator.CanGoToNextPage}">
                             <materialIcons:MaterialIcon Kind="ChevronRight" />
                         </Button>
                     </StackPanel>

@@ -13,7 +13,6 @@ namespace AssetsManager.Views.Models
     public class ApiModel : INotifyPropertyChanged
     {
         private ApiSettings _apiSettings;
-        private List<CatalogItem> _fullSalesCatalog = new List<CatalogItem>();
 
         private string _statusText;
         public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
@@ -33,21 +32,9 @@ namespace AssetsManager.Views.Models
         private PlayerInfo _player;
         public PlayerInfo Player { get => _player; set => SetProperty(ref _player, value); }
 
-        public ObservableCollection<CatalogItem> SalesCatalog { get; set; } = new ObservableCollection<CatalogItem>();
+        public PaginationModel<CatalogItem> Paginator { get; }
 
-        // Paging properties
-        private int _currentPage = 1;
-        public int CurrentPage { get => _currentPage; set { SetProperty(ref _currentPage, value); UpdatePaging(); } }
-
-        private int _pageSize = 12;
-        public int PageSize { get => _pageSize; set { SetProperty(ref _pageSize, value); UpdatePaging(); } }
-
-        private int _totalPages;
-        public int TotalPages { get => _totalPages; set { SetProperty(ref _totalPages, value); OnPropertyChanged(nameof(TotalPages)); OnPropertyChanged(nameof(CanGoToNextPage)); OnPropertyChanged(nameof(CanGoToPreviousPage)); OnPropertyChanged(nameof(PageInfo)); } }
-
-        public bool CanGoToNextPage => CurrentPage < TotalPages;
-        public bool CanGoToPreviousPage => CurrentPage > 1;
-        public string PageInfo => $"{CurrentPage} / {TotalPages}";
+        public ObservableCollection<CatalogItem> SalesCatalog => Paginator.PagedItems;
 
         // Computed properties for display
         public string RegionText => $"Region: {_apiSettings?.Token?.Region ?? "N/A"}";
@@ -65,51 +52,23 @@ namespace AssetsManager.Views.Models
             ButtonContent = "Get Token";
             IsAuthenticated = false;
             IsBusy = false;
+
+            Paginator = new PaginationModel<CatalogItem> { PageSize = 12 };
         }
 
         public void SetFullSalesCatalog(IEnumerable<CatalogItem> items)
         {
-            _fullSalesCatalog = items.ToList();
-            CurrentPage = 1; // Reset to first page
-            UpdatePaging();
-        }
-
-        public void UpdatePaging()
-        {
-            TotalPages = (int)Math.Ceiling((double)_fullSalesCatalog.Count / PageSize);
-            if (TotalPages == 0) TotalPages = 1;
-            if (CurrentPage > TotalPages) CurrentPage = TotalPages;
-            if (CurrentPage < 1) CurrentPage = 1;
-
-            var pagedItems = _fullSalesCatalog
-                .Skip((CurrentPage - 1) * PageSize)
-                .Take(PageSize);
-
-            SalesCatalog.Clear();
-            foreach (var item in pagedItems)
-            {
-                SalesCatalog.Add(item);
-            }
-
-            OnPropertyChanged(nameof(CanGoToNextPage));
-            OnPropertyChanged(nameof(CanGoToPreviousPage));
-            OnPropertyChanged(nameof(PageInfo));
+            Paginator.SetFullList(items);
         }
 
         public void NextPage()
         {
-            if (CanGoToNextPage)
-            {
-                CurrentPage++;
-            }
+            Paginator.NextPage();
         }
 
         public void PreviousPage()
         {
-            if (CanGoToPreviousPage)
-            {
-                CurrentPage--;
-            }
+            Paginator.PreviousPage();
         }
 
         public void Update(AppSettings appSettings)
