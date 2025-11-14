@@ -10,7 +10,7 @@
         Title="AssetsManager"
         Width="950" Height="750"
         MinWidth="950" MinHeight="750" 
-        MaxWidth="1100" MaxHeight="900"
+        MaxWidth="1000" MaxHeight="850"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource SidebarBackground}"
         FontFamily="Consolas, Courier New">
