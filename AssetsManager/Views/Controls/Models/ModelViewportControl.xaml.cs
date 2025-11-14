@@ -282,38 +282,32 @@ namespace AssetsManager.Views.Controls.Models
             }
             
             var originalShowFrameRate = Viewport3D.ShowFrameRate;
-            var originalTransform = Viewport3D.LayoutTransform;
-            var camera = Viewport3D.Camera as PerspectiveCamera;
-            double originalNearPlaneDistance = camera?.NearPlaneDistance ?? 1.0;
             
             try
             {
                 Viewport3D.ShowFrameRate = false;
                               
-                double scalingFactor = 4.0;
-                int width = (int)(Viewport3D.ActualWidth * scalingFactor);
-                int height = (int)(Viewport3D.ActualHeight * scalingFactor);
-                
-                Viewport3D.LayoutTransform = new ScaleTransform(scalingFactor, scalingFactor);
-                Viewport3D.UpdateLayout();
-                Viewport3D.InvalidateVisual();
+                int supersamplingFactor = 4;
+                int baseWidth = (int)Viewport3D.ActualWidth;
+                int baseHeight = (int)Viewport3D.ActualHeight;
 
-                // Pausa única y optimizada para estabilizar el renderizado
-                System.Threading.Thread.Sleep(160);
+                if (baseWidth <= 0 || baseHeight <= 0)
+                {
+                    LogService.LogWarning("Cannot take a screenshot of a zero-sized viewport.");
+                    return;
+                }
 
-                var rtb = new RenderTargetBitmap(
-                    width, 
-                    height, 
-                    96 * scalingFactor, 
-                    96 * scalingFactor, 
-                    PixelFormats.Pbgra32
-                );
+                // Traverse the visual tree to find the underlying System.Windows.Controls.Viewport3D
+                var underlyingViewport = FindVisualChild<System.Windows.Controls.Viewport3D>(Viewport3D);
+                if (underlyingViewport == null)
+                {
+                    LogService.LogError(null, "Could not find the underlying Viewport3D to create a screenshot.");
+                    return;
+                }
                 
-                RenderOptions.SetBitmapScalingMode(rtb, BitmapScalingMode.HighQuality);
-                RenderOptions.SetEdgeMode(rtb, EdgeMode.Unspecified);
-                RenderOptions.SetClearTypeHint(rtb, ClearTypeHint.Enabled);
-                
-                rtb.Render(Viewport3D);
+                // Use the built-in helper from HelixToolkit, providing the base size and a supersampling factor.
+                var backgroundBrush = Viewport3D.Background ?? Brushes.Transparent;
+                var rtb = Viewport3DHelper.RenderBitmap(underlyingViewport, baseWidth, baseHeight, backgroundBrush, supersamplingFactor);
                 
                 var pngEncoder = new PngBitmapEncoder();
                 pngEncoder.Interlace = PngInterlaceOption.Off;
@@ -332,12 +326,6 @@ namespace AssetsManager.Views.Controls.Models
             }
             finally
             {
-                if (camera != null)
-                {
-                    camera.NearPlaneDistance = originalNearPlaneDistance;
-                }
-                Viewport3D.LayoutTransform = originalTransform;
-                Viewport3D.UpdateLayout();
                 Viewport3D.ShowFrameRate = originalShowFrameRate;
             }
         }
@@ -413,6 +401,24 @@ namespace AssetsManager.Views.Controls.Models
             {
                 SkyboxVisibilityChanged?.Invoke(this, !(toggleButton.IsChecked ?? false));
             }
+        }
+
+        private static T FindVisualChild<T>(DependencyObject parent) where T : Visual
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T typedChild)
+                {
+                    return typedChild;
+                }
+                var result = FindVisualChild<T>(child);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+            return null;
         }
     }
 }
