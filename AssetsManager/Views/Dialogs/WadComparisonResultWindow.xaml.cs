@@ -282,7 +282,7 @@ namespace AssetsManager.Views.Dialogs
                 string newChunksPath = _directoriesCreator.NewChunksPath;
 
                 _logService.Log("Starting lean WAD packaging process...");
-                await _wadPackagingService.CreateLeanWadPackageAsync(_serializableDiffs, _oldPbePath, _newPbePath, oldChunksPath, newChunksPath);
+                var finalDiffs = await _wadPackagingService.CreateLeanWadPackageAsync(_serializableDiffs, _oldPbePath, _newPbePath, oldChunksPath, newChunksPath);
                 _logService.LogSuccess("Finished lean WAD packaging process.");
 
                 string jsonFilePath = Path.Combine(comparisonFullPath, "wadcomparison.json");
@@ -295,7 +295,7 @@ namespace AssetsManager.Views.Dialogs
                 {
                     OldLolPath = _oldPbePath,
                     NewLolPath = _newPbePath,
-                    Diffs = _serializableDiffs
+                    Diffs = finalDiffs
                 };
                 var json = JsonSerializer.Serialize(comparisonResult, options);
                 await File.WriteAllTextAsync(jsonFilePath, json);
@@ -343,7 +343,7 @@ namespace AssetsManager.Views.Dialogs
             if (ResultsTree.SelectedItem is not SerializableChunkDiff diff) return;
 
             var diffViewService = _serviceProvider.GetRequiredService<DiffViewService>();
-            await diffViewService.ShowWadDiffAsync(diff, _oldPbePath, _newPbePath, this);
+            await diffViewService.ShowWadDiffAsync(diff, _oldPbePath, _newPbePath, this, _sourceJsonPath);
         }
 
         private void ResultsTree_ContextMenuOpening(object sender, RoutedEventArgs e)

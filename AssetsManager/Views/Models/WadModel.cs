@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Views.Models
@@ -21,8 +22,17 @@ namespace AssetsManager.Views.Models
         public string SourceWadFile { get; set; }
     }
 
+    public class AssociatedDependency
+    {
+        public string Path { get; set; }
+        public string SourceWad { get; set; }
+        public ulong OldPathHash { get; set; }
+        public ulong NewPathHash { get; set; }
+        public WadChunkCompression CompressionType { get; set; }
+    }
+
     public class SerializableChunkDiff                                
-    {                                                                 
+    {
         public ChunkDiffType Type { get; set; }
         public string OldPath { get; set; }
         public string NewPath { get; set; }
@@ -36,8 +46,14 @@ namespace AssetsManager.Views.Models
         
         public WadChunkCompression? OldCompressionType { get; set; }
         public WadChunkCompression? NewCompressionType { get; set; }
-    }                                                                 
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<AssociatedDependency> Dependencies { get; set; }
+
+        [JsonIgnore]
+        public string BackupChunkPath { get; set; }
+    }
+        
     public class WadComparisonData
     {
         public string OldLolPath { get; set; }

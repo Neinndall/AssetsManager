@@ -53,6 +53,8 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
         private bool _isWadMode = true;
+        private bool _isBackupMode = false;
+        private string _backupJsonPath;
         private CancellationTokenSource _cancellationTokenSource;
 
         public FileExplorerControl()
@@ -208,6 +210,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildWadTreeAsync(string rootPath)
         {
+            _isBackupMode = false;
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource = new CancellationTokenSource();
             var token = _cancellationTokenSource.Token;
@@ -257,6 +260,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
+            _isBackupMode = false;
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource = new CancellationTokenSource();
             var token = _cancellationTokenSource.Token;
@@ -311,6 +315,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildTreeFromBackupAsync(string jsonPath)
         {
+            _isBackupMode = true;
+            _backupJsonPath = jsonPath;
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource = new CancellationTokenSource();
             var token = _cancellationTokenSource.Token;
@@ -461,9 +467,18 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void ViewChanges_Click(object sender, RoutedEventArgs e)
         {
-            if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null, BackupChunkPath: not null } selectedNode) return;
+            if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null } selectedNode) return;
 
-            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, this.OldLolPath, this.NewLolPath, Window.GetWindow(this), selectedNode.BackupChunkPath);
+            string oldPbePath = this.OldLolPath;
+            string newPbePath = this.NewLolPath;
+
+            if (_isBackupMode)
+            {
+                oldPbePath = null;
+                newPbePath = null;
+            }
+
+            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _isBackupMode ? _backupJsonPath : null);
         }
 
         private void PinSelected_Click(object sender, RoutedEventArgs e)
@@ -604,7 +619,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
         {
-            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, RootNodes, _currentRootPath, NewLolPath, OldLolPath);
+            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, RootNodes, _currentRootPath);
             if (linkedBank == null)
             {
                 return; // Errors are logged by the service

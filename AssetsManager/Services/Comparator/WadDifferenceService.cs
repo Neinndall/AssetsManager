@@ -20,39 +20,12 @@ namespace AssetsManager.Services.Comparator
 
         public async Task<(string DataType, object OldData, object NewData, string OldPath, string NewPath)> PrepareDifferenceDataAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath)
         {
-            if (string.IsNullOrEmpty(oldPbePath) || string.IsNullOrEmpty(newPbePath)){
-                return ("error", null, null, null, null);
-            }
-
             string extension = Path.GetExtension(diff.Path).ToLowerInvariant();
             byte[] oldData = null;
             byte[] newData = null;
 
-            bool isChunkBased = oldPbePath.Contains("wad_chunks");
-
-            if (isChunkBased)
-            {
-                if (diff.OldPathHash != 0)
-                {
-                    string oldChunkPath = Path.Combine(oldPbePath, $"{diff.OldPathHash:X16}.chunk");
-                    if (File.Exists(oldChunkPath))
-                    {
-                        byte[] compressedOldData = await File.ReadAllBytesAsync(oldChunkPath);
-                        oldData = WadChunkUtils.DecompressChunk(compressedOldData, diff.OldCompressionType);
-                    }
-                }
-
-                if (diff.NewPathHash != 0)
-                {
-                    string newChunkPath = Path.Combine(newPbePath, $"{diff.NewPathHash:X16}.chunk");
-                    if (File.Exists(newChunkPath))
-                    {
-                        byte[] compressedNewData = await File.ReadAllBytesAsync(newChunkPath);
-                        newData = WadChunkUtils.DecompressChunk(compressedNewData, diff.NewCompressionType);
-                    }
-                }
-            }
-            else
+            // Live Mode: Paths are provided to read from original WADs
+            if (oldPbePath != null && newPbePath != null)
             {
                 if (diff.OldPathHash != 0 && File.Exists(Path.Combine(oldPbePath, diff.SourceWadFile)))
                 {
@@ -71,6 +44,37 @@ namespace AssetsManager.Services.Comparator
                     {
                         using var decompressedChunk = newWad.LoadChunkDecompressed(newChunk);
                         newData = decompressedChunk.Span.ToArray();
+                    }
+                }
+            }
+            // Backup Mode: Paths are null, rely on the diff's chunk path
+            else
+            {
+                if (string.IsNullOrEmpty(diff.BackupChunkPath))
+                {
+                    _logService.LogError("Critical error: In backup mode but BackupChunkPath is null.");
+                    return ("error", null, null, null, null);
+                }
+
+                string backupRoot = Path.GetDirectoryName(Path.GetDirectoryName(diff.BackupChunkPath));
+
+                if (diff.OldPathHash != 0)
+                {
+                    string oldChunkPath = Path.Combine(backupRoot, "old", $"{diff.OldPathHash:X16}.chunk");
+                    if (File.Exists(oldChunkPath))
+                    {
+                        byte[] compressedOldData = await File.ReadAllBytesAsync(oldChunkPath);
+                        oldData = WadChunkUtils.DecompressChunk(compressedOldData, diff.OldCompressionType);
+                    }
+                }
+
+                if (diff.NewPathHash != 0)
+                {
+                    string newChunkPath = Path.Combine(backupRoot, "new", $"{diff.NewPathHash:X16}.chunk");
+                    if (File.Exists(newChunkPath))
+                    {
+                        byte[] compressedNewData = await File.ReadAllBytesAsync(newChunkPath);
+                        newData = WadChunkUtils.DecompressChunk(compressedNewData, diff.NewCompressionType);
                     }
                 }
             }
