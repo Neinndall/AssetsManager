@@ -32,6 +32,8 @@ namespace AssetsManager.Views.Models
     public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
     public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();
+    public bool IsGroupingFolder => Name != null && Name.StartsWith("[");
+
     public string DisplayName
     {
       get
