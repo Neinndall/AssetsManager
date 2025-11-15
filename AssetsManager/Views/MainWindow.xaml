@@ -31,7 +31,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" MinHeight="200"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="160" MinHeight="38"/>
+                    <RowDefinition Height="180" MinHeight="38"/> <!-- LogView Height -->
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0"
