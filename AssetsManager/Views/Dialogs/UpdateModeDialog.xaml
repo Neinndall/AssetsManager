@@ -20,11 +20,23 @@
             <Border Grid.Row="0" Background="{StaticResource AccentBrush}" CornerRadius="5,5,0,0" MouseDown="TitleBar_MouseDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <materialIcons:MaterialIcon x:Name="iconType" Kind="Update" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Medium" Margin="5,10" Foreground="White"/>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <materialIcons:MaterialIcon x:Name="iconType" Kind="Update" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White" Width="16" Height="16"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Medium" FontSize="13" Margin="5,10" Foreground="White"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,5,0">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click">
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="CancelButton_Click" Margin="5,0,0,0">
+                            <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
 

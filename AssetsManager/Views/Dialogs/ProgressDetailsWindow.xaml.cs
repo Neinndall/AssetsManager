@@ -98,6 +98,11 @@ namespace AssetsManager.Views.Dialogs
             this.Hide();
         }
 
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             _timer?.Stop();

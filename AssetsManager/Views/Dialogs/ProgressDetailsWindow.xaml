@@ -22,21 +22,36 @@
 
             <!-- Header -->
             <Border Grid.Row="0" Background="{StaticResource AccentBrush}" CornerRadius="5,5,0,0" Padding="12,8" MouseLeftButtonDown="TitleBar_MouseDown">
-                <StackPanel Orientation="Horizontal">
-                    <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" Width="16" Height="16" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding HeaderText}" FontWeight="Medium" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" Width="16" Height="16" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding HeaderText}" FontWeight="Medium" FontSize="13" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,5,0">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click">
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Margin="5,0,0,0">
+                            <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <!-- Progress Information -->
             <StackPanel Grid.Row="1" Margin="30,30,12,12">
                 <TextBlock x:Name="ProgressSummaryTextBlock" Text="{Binding OperationVerb}" FontWeight="Normal" FontSize="14" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,8"/>
-                <TextBlock x:Name="CurrentFileTextBlock" Text="" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,4"/>
+                <Grid Margin="0,0,0,4">
+                    <TextBlock x:Name="CurrentFileTextBlock" Text="" FontSize="12" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
+                </Grid>
                 <TextBlock x:Name="EstimatedTimeTextBlock" Text="Calculating..." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12"/>
             </StackPanel>
-
-            <!-- Close Button -->
-            <Button Grid.Row="2" Content="Close" HorizontalAlignment="Right" Margin="12" Width="80" Click="CloseButton_Click" Style="{StaticResource SecondaryButton}"/>
         </Grid>
     </Border>
 </Window>
