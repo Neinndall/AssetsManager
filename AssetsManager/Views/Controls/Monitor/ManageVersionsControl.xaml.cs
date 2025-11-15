@@ -135,11 +135,11 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (!selectedVersions.Any())
             {
-                CustomMessageBoxService.ShowWarning("Delete Versions", "No versions selected to delete.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowWarning("Warning", "No versions selected to delete.", Window.GetWindow(this));
                 return;
             }
 
-            var result = CustomMessageBoxService.ShowYesNo("Delete Selected Versions", $"Are you sure you want to delete {selectedVersions.Count} selected version file(s)?", Window.GetWindow(this));
+            var result = CustomMessageBoxService.ShowYesNo("Delete Versions", $"Are you sure you want to delete {selectedVersions.Count} selected version file(s)?", Window.GetWindow(this));
             if (result == true)
             {
                 _viewModel.DeleteVersions(selectedVersions);

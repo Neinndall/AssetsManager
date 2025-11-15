@@ -306,7 +306,7 @@ namespace AssetsManager.Views
                         }
                         else
                         {
-                            _customMessageBoxService.ShowWarning("Materials.bin Not Selected", "Map geometry cannot be loaded without the materials.bin file.", Window.GetWindow(this));
+                            _customMessageBoxService.ShowWarning("Warning", "Map geometry cannot be loaded without the materials.bin file.", Window.GetWindow(this));
                             return;
                         }
                     }
@@ -325,7 +325,7 @@ namespace AssetsManager.Views
                     }
                     else
                     {
-                        _customMessageBoxService.ShowWarning("Game Data Path Not Selected", "Map geometry cannot be loaded without the game data root folder.", Window.GetWindow(this));
+                        _customMessageBoxService.ShowWarning("Warning", "MapGeometry cannot be loaded without the game data root folder.", Window.GetWindow(this));
                     }
                 }
             }
