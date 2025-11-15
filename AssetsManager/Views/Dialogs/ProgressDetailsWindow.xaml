@@ -21,7 +21,7 @@
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <Border Grid.Row="0" Background="{StaticResource AccentBrush}" CornerRadius="5,5,0,0" Padding="12,8" MouseLeftButtonDown="TitleBar_MouseDown">
+            <Border Grid.Row="0" Background="{StaticResource AccentBrush}" CornerRadius="5,5,0,0" MouseLeftButtonDown="TitleBar_MouseDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -30,7 +30,7 @@
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal">
                         <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" Width="16" Height="16" Foreground="White" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding HeaderText}" FontWeight="Medium" FontSize="13" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        <TextBlock Text="{Binding HeaderText}" FontWeight="Medium" FontSize="13" Foreground="White" VerticalAlignment="Center" Margin="5,10"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,10,0">
