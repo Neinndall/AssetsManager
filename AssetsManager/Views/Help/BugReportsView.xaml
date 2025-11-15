@@ -10,14 +10,14 @@
         <!-- Page Header -->
         <StackPanel Margin="0,0,0,32">
             <TextBlock Text="Bug Reports" 
-                         FontSize="28" 
-                         FontWeight="Light" 
-                         Foreground="{StaticResource TextPrimary}"
-                         Margin="0,4,0,0"/>
+                       FontSize="28" 
+                       FontWeight="Medium" 
+                       Foreground="{StaticResource TextPrimary}"
+                       Margin="0,4,0,0"/>
             <TextBlock Text="Report issues and help improve the application" 
-                         FontSize="14" 
-                         Foreground="{StaticResource TextMuted}"
-                         Margin="0,2,0,0"/>
+                       FontSize="14" 
+                       Foreground="{StaticResource TextMuted}"
+                       Margin="0,2,0,0"/>
         </StackPanel>
 
         <!-- Bug Report Card -->
@@ -31,17 +31,18 @@
                                                VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="Report Issues" 
-                                     FontSize="18" 
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource AccentOrange}"/>
+                                   FontSize="18" 
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource AccentOrange}"/>
                         <TextBlock Text="Help us improve by reporting bugs and issues" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
                 </StackPanel>
                 
                 <TextBlock Text="Found a bug or experiencing unexpected behavior? Your feedback helps us improve the application for everyone."
-                           Foreground="{StaticResource TextPrimary}" 
+                           Foreground="{StaticResource TextSecondary}"
+                           FontWeight="Normal"
                            FontSize="13" 
                            TextWrapping="Wrap"
                            Margin="0,0,0,20"/>
@@ -65,12 +66,12 @@
                                                VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="Reporting Tips" 
-                                     FontSize="18" 
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
+                                   FontSize="18" 
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="How to write effective bug reports" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
                 </StackPanel>
 

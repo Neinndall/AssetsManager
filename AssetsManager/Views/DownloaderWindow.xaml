@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:AssetsManager.Views" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:downloaderControls="clr-namespace:AssetsManager.Views.Controls.Downloader"
-             mc:Ignorable="d" FontFamily="Consolas, Courier New">    
+             mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">    
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

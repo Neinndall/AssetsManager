@@ -7,18 +7,18 @@ using System.Windows.Media.Animation;
 
 namespace AssetsManager.Views.Controls
 {
-    public partial class LogView : UserControl
-    {
-        public RichTextBox LogRichTextBox => richTextBoxLogs;
-        
-        public LogView()
-        {
-            InitializeComponent();
-        }
+  public partial class LogView : UserControl
+  {
+    public RichTextBox LogRichTextBox => richTextBoxLogs;
 
-        private void ClearLogs_Click(object sender, RoutedEventArgs e)
-        {
-            richTextBoxLogs.Document.Blocks.Clear();
-        }
+    public LogView()
+    {
+      InitializeComponent();
     }
+
+    private void ClearLogs_Click(object sender, RoutedEventArgs e)
+    {
+      richTextBoxLogs.Document.Blocks.Clear();
+    }
+  }
 }

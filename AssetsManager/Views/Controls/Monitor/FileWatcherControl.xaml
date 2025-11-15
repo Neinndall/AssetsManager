@@ -114,7 +114,7 @@
                                 </materialIcons:MaterialIcon.Style>
                             </materialIcons:MaterialIcon>
 
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Alias, StringFormat='File: {0}'}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Alias, StringFormat='File: {0}'}" Foreground="{StaticResource TextPrimary}" FontWeight="Normal" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}" />
 
                             <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Button Content="View Changes" Click="ViewChanges_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,5,0" IsEnabled="{Binding HasChanges}" Padding="10,6"/>

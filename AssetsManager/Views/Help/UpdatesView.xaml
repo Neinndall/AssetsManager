@@ -10,14 +10,14 @@
         <!-- Page Header -->
         <StackPanel Margin="0,0,0,32">
             <TextBlock Text="Application Updates" 
-                         FontSize="28" 
-                         FontWeight="Light" 
-                         Foreground="{StaticResource TextPrimary}"
-                         Margin="0,4,0,0"/>
+                       FontSize="28" 
+                       FontWeight="Medium" 
+                       Foreground="{StaticResource TextPrimary}"
+                       Margin="0,4,0,0"/>
             <TextBlock Text="Keep your application up to date with the latest features" 
-                         FontSize="14" 
-                         Foreground="{StaticResource TextMuted}"
-                         Margin="0,2,0,0"/>
+                       FontSize="14" 
+                       Foreground="{StaticResource TextMuted}"
+                       Margin="0,2,0,0"/>
         </StackPanel>
 
         <!-- Update Check Card -->
@@ -31,17 +31,18 @@
                                                VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="Update Check" 
-                                     FontSize="18" 
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource AccentGreen}"/>
+                                   FontSize="18" 
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource AccentGreen}"/>
                         <TextBlock Text="Check for the latest version and download updates" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
                 </StackPanel>
                 
                 <TextBlock Text="Stay up to date with the latest features, improvements, and bug fixes by checking for updates regularly."
-                           Foreground="{StaticResource TextPrimary}" 
+                           Foreground="{StaticResource TextSecondary}" 
+                           FontWeight="Normal"
                            FontSize="13" 
                            TextWrapping="Wrap"
                            Margin="0,0,0,20"/>
@@ -65,12 +66,12 @@
                                                VerticalAlignment="Center"/>
                     <StackPanel>
                         <TextBlock Text="Update Information" 
-                                     FontSize="18" 
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
+                                   FontSize="18" 
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="About automatic updates and release cycle" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
                 </StackPanel>
 

@@ -11,7 +11,7 @@
         <StackPanel Margin="0,0,0,32">
             <TextBlock Text="About"
                        FontSize="28"
-                       FontWeight="Light"
+                       FontWeight="Medium"
                        Foreground="{StaticResource TextPrimary}"
                        Margin="0,4,0,0"/>
             <TextBlock Text="Information about the application"
@@ -32,7 +32,7 @@
                     <StackPanel>
                         <TextBlock Text="Description"
                                    FontSize="18"
-                                   FontWeight="SemiBold"
+                                   FontWeight="Medium"
                                    Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="General information about the application" 
                                      FontSize="12" 
@@ -40,7 +40,8 @@
                     </StackPanel>
                 </StackPanel>
                 <TextBlock Text="AssetsManager is a tool for League of Legends enthusiasts who need to analyze, manage, and track changes to game assets from PBE server updates. It goes beyond simple downloading, offering a powerful suite of features for deep asset analysis, a 3D model viewer, exploration, and monitoring for changes."
-                           Foreground="{StaticResource TextPrimary}"
+                           Foreground="{StaticResource TextSecondary}"
+                           FontWeight="Normal"
                            FontSize="13"
                            TextWrapping="Wrap"/>
             </StackPanel>
@@ -58,22 +59,23 @@
                     <StackPanel>
                         <TextBlock Text="Key Features"
                                    FontSize="18"
-                                   FontWeight="SemiBold"
+                                   FontWeight="Medium"
                                    Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="Discover the main functionalities of the application" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
                 </StackPanel>
 
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
-                               FontWeight="SemiBold"
+                               FontWeight="Medium"
                                Margin="6,0,0,0">
                         <Run Text="• Download automatically new assets"/>
                     </TextBlock>
                     <TextBlock Text="Automatically detects and downloads new assets from PBE updates."
+                               FontWeight="Normal"
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
@@ -82,11 +84,12 @@
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
-                               FontWeight="SemiBold"
+                               FontWeight="Medium"
                                Margin="6,0,0,0">
                         <Run Text="• Advanced WAD Comparator"/>
                     </TextBlock>
                     <TextBlock Text="Compares WAD files between different versions to identify new, modified, or deleted assets."
+                               FontWeight="Normal"
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
@@ -95,11 +98,12 @@
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
-                               FontWeight="SemiBold"
+                               FontWeight="Medium"
                                Margin="6,0,0,0">
                         <Run Text="• Powerful File Explorer"/>
                     </TextBlock>
                     <TextBlock Text="Explore WAD with powerful tools with archives with a file tree interface and previews dozens of formats."
+                               FontWeight="Normal"
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
@@ -108,11 +112,12 @@
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
-                               FontWeight="SemiBold"
+                               FontWeight="Medium"
                                Margin="6,0,0,0">
                         <Run Text="• 3D Model Viewer"/>
                     </TextBlock>
                     <TextBlock Text="Inspects 3D champion models with their animations and MapGeometry Environments with a built-in viewer."
+                               FontWeight="Normal"
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
@@ -121,11 +126,12 @@
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
-                               FontWeight="SemiBold"
+                               FontWeight="Medium"
                                Margin="6,0,0,0">
                         <Run Text="• Asset Monitoring"/>
                     </TextBlock>
                     <TextBlock Text="Tracks remote assets, JSON files, and the PBE server status for real-time updates."
+                               FontWeight="Normal"
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
@@ -134,11 +140,12 @@
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
-                               FontWeight="SemiBold"
+                               FontWeight="Medium"
                                Margin="6,0,0,0">
                         <Run Text="• Version Management"/>
                     </TextBlock>
                     <TextBlock Text="Manages and downloads diferentes versiones de LoL Game Client or Plugins."
+                               FontWeight="Normal"
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"
@@ -147,11 +154,12 @@
                 <StackPanel Margin="0,4">
                     <TextBlock Foreground="{StaticResource TextPrimary}"
                                FontSize="13"
-                               FontWeight="SemiBold"
+                               FontWeight="Medium"
                                Margin="6,0,0,0">
                         <Run Text="• Audio Bank"/>
                     </TextBlock>
                     <TextBlock Text="Explores audio banks (.wpk, .bnk) and displays audio events with their names and plays them."
+                               FontWeight="Normal"
                                Foreground="{StaticResource TextSecondary}"
                                FontSize="13"
                                TextWrapping="Wrap"

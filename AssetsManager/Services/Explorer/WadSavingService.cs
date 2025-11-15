@@ -16,225 +16,225 @@ using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Explorer
 {
-    public class WadSavingService
+  public class WadSavingService
+  {
+    private readonly LogService _logService;
+    private readonly WadExtractionService _wadExtractionService;
+    private readonly ContentFormatterService _contentFormatterService;
+    private readonly AudioBankService _audioBankService;
+    private readonly AudioBankLinkerService _audioBankLinkerService;
+    private readonly WemConversionService _wemConversionService;
+
+    public WadSavingService(
+        LogService logService,
+        WadExtractionService wadExtractionService,
+        ContentFormatterService contentFormatterService,
+        AudioBankService audioBankService,
+        AudioBankLinkerService audioBankLinkerService,
+        WemConversionService wemConversionService)
     {
-        private readonly LogService _logService;
-        private readonly WadExtractionService _wadExtractionService;
-        private readonly ContentFormatterService _contentFormatterService;
-        private readonly AudioBankService _audioBankService;
-        private readonly AudioBankLinkerService _audioBankLinkerService;
-        private readonly WemConversionService _wemConversionService;
-
-        public WadSavingService(
-            LogService logService,
-            WadExtractionService wadExtractionService,
-            ContentFormatterService contentFormatterService,
-            AudioBankService audioBankService,
-            AudioBankLinkerService audioBankLinkerService,
-            WemConversionService wemConversionService)
-        {
-            _logService = logService;
-            _wadExtractionService = wadExtractionService;
-            _contentFormatterService = contentFormatterService;
-            _audioBankService = audioBankService;
-            _audioBankLinkerService = audioBankLinkerService;
-            _wemConversionService = wemConversionService;
-        }
-
-        public async Task ProcessAndSaveDiffAsync(SerializableChunkDiff diff, string destinationPath, string oldLolPath, string newLolPath)
-        {
-            string basePath = (diff.Type == ChunkDiffType.Removed) ? oldLolPath : newLolPath;
-            string sourceWadPath = Path.Combine(basePath, diff.SourceWadFile);
-
-            var node = new FileSystemNodeModel(diff.FileName, false, diff.Path, sourceWadPath)
-            {
-                SourceChunkPathHash = (diff.Type == ChunkDiffType.Removed) ? diff.OldPathHash : diff.NewPathHash,
-                ChunkDiff = diff,
-                Status = (DiffStatus)diff.Type
-            };
-
-            await ProcessAndSaveAsync(node, destinationPath, null, basePath);
-        }
-
-        public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
-        {
-            if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
-            {
-                string currentDestinationPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
-                Directory.CreateDirectory(currentDestinationPath);
-
-                foreach (var child in node.Children)
-                {
-                    await ProcessAndSaveAsync(child, currentDestinationPath, rootNodes, currentRootPath);
-                }
-                return;
-            }
-
-            string extension = Path.GetExtension(node.Name).ToLower();
-
-            switch (extension)
-            {
-                case ".wpk":
-                case ".bnk":
-                    await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath);
-                    break;
-
-                case ".tex":
-                case ".dds":
-                    await HandleTextureFile(node, destinationPath);
-                    break;
-
-                case ".bin":
-                    await HandleDataFile(node, destinationPath, "bin");
-                    break;
-
-                case ".stringtable":
-                    await HandleDataFile(node, destinationPath, "stringtable");
-                    break;
-
-                case ".css":
-                    await HandleDataFile(node, destinationPath, "css");
-                    break;
-
-                case ".js":
-                    await HandleJsFile(node, destinationPath);
-                    break;
-
-                default:
-                    // For any other file, just extract it raw
-                    await _wadExtractionService.ExtractNodeAsync(node, destinationPath);
-                    break;
-            }
-        }
-
-        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath)
-        {
-            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node);
-            if (fileBytes == null) return;
-
-            var formattedContent = await _contentFormatterService.GetFormattedStringAsync("js", fileBytes);
-
-            string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
-
-            await File.WriteAllTextAsync(filePath, formattedContent);
-        }
-
-        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
-        {
-            var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
-            if (linkedBank == null) return;
-
-            // Prevent duplicate processing for linked audio bank files.
-            // Only the primary node (WPK or AudioBnkNode if no WPK) should trigger extraction.
-            if (linkedBank.WpkNode != null && node != linkedBank.WpkNode)
-            {
-                return;
-            }
-            if (linkedBank.AudioBnkNode != null && node != linkedBank.AudioBnkNode && linkedBank.WpkNode == null)
-            {
-                return;
-            }
-
-            string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
-            string audioBankPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(audioBankName));
-            Directory.CreateDirectory(audioBankPath);
-
-            var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
-            byte[] wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
-
-            List<AudioEventNode> audioTree;
-            if (linkedBank.BinData != null)
-            {
-                if (wpkData != null)
-                {
-                    audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
-                }
-                else
-                {
-                    audioTree = _audioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
-                }
-            }
-            else
-            {
-                audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
-            }
-
-            foreach (var eventNode in audioTree)
-            {
-                string eventPath = Path.Combine(audioBankPath, _wadExtractionService.SanitizeName(eventNode.Name));
-                Directory.CreateDirectory(eventPath);
-
-                foreach (var soundNode in eventNode.Sounds)
-                {
-                    byte[] wemData = null;
-                    if (linkedBank.WpkNode != null)
-                    {
-                        using var wpkStream = new MemoryStream(wpkData);
-                        var wpk = WpkParser.Parse(wpkStream, _logService);
-                        var wem = wpk.Wems.FirstOrDefault(w => w.Id == soundNode.Id);
-                        if (wem != null)
-                        {
-                            using var reader = new BinaryReader(wpkStream);
-                            wpkStream.Seek(wem.Offset, SeekOrigin.Begin);
-                            wemData = reader.ReadBytes((int)wem.Size);
-                        }
-                    }
-                    else if (audioBnkFileData != null)
-                    {
-                        wemData = new byte[soundNode.Size];
-                        Array.Copy(audioBnkFileData, soundNode.Offset, wemData, 0, soundNode.Size);
-                    }
-
-                    if (wemData != null)
-                    {
-                        byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData);
-                        if (oggData != null)
-                        {
-                            string fileName = Path.ChangeExtension(soundNode.Name, ".ogg");
-                            string filePath = Path.Combine(eventPath, _wadExtractionService.SanitizeName(fileName));
-                            await File.WriteAllBytesAsync(filePath, oggData);
-                        }
-                    }
-                }
-            }
-        }
-
-        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath)
-        {
-            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node);
-            if (fileBytes == null) return;
-
-            using (var memoryStream = new MemoryStream(fileBytes))
-            {
-                var bitmapSource = TextureUtils.LoadTexture(memoryStream, Path.GetExtension(node.Name));
-                if (bitmapSource != null)
-                {
-                    BitmapEncoder encoder = new PngBitmapEncoder();
-                    encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
-
-                    string fileName = Path.ChangeExtension(node.Name, ".png");
-                    string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
-
-                    using (var fileStream = new FileStream(filePath, FileMode.Create))
-                    {
-                        encoder.Save(fileStream);
-                    }
-                }
-            }
-        }
-
-        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type)
-        {
-            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node);
-            if (fileBytes == null) return;
-
-            var formattedContent = await _contentFormatterService.GetFormattedStringAsync(type, fileBytes);
-            
-            string fileName = Path.ChangeExtension(node.Name, ".json");
-            string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
-
-            await File.WriteAllTextAsync(filePath, formattedContent);
-        }
+      _logService = logService;
+      _wadExtractionService = wadExtractionService;
+      _contentFormatterService = contentFormatterService;
+      _audioBankService = audioBankService;
+      _audioBankLinkerService = audioBankLinkerService;
+      _wemConversionService = wemConversionService;
     }
+
+    public async Task ProcessAndSaveDiffAsync(SerializableChunkDiff diff, string destinationPath, string oldLolPath, string newLolPath)
+    {
+      string basePath = (diff.Type == ChunkDiffType.Removed) ? oldLolPath : newLolPath;
+      string sourceWadPath = Path.Combine(basePath, diff.SourceWadFile);
+
+      var node = new FileSystemNodeModel(diff.FileName, false, diff.Path, sourceWadPath)
+      {
+        SourceChunkPathHash = (diff.Type == ChunkDiffType.Removed) ? diff.OldPathHash : diff.NewPathHash,
+        ChunkDiff = diff,
+        Status = (DiffStatus)diff.Type
+      };
+
+      await ProcessAndSaveAsync(node, destinationPath, null, basePath);
+    }
+
+    public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
+    {
+      if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
+      {
+        string currentDestinationPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
+        Directory.CreateDirectory(currentDestinationPath);
+
+        foreach (var child in node.Children)
+        {
+          await ProcessAndSaveAsync(child, currentDestinationPath, rootNodes, currentRootPath);
+        }
+        return;
+      }
+
+      string extension = Path.GetExtension(node.Name).ToLower();
+
+      switch (extension)
+      {
+        case ".wpk":
+        case ".bnk":
+          await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath);
+          break;
+
+        case ".tex":
+        case ".dds":
+          await HandleTextureFile(node, destinationPath);
+          break;
+
+        case ".bin":
+          await HandleDataFile(node, destinationPath, "bin");
+          break;
+
+        case ".stringtable":
+          await HandleDataFile(node, destinationPath, "stringtable");
+          break;
+
+        case ".css":
+          await HandleDataFile(node, destinationPath, "css");
+          break;
+
+        case ".js":
+          await HandleJsFile(node, destinationPath);
+          break;
+
+        default:
+          // For any other file, just extract it raw
+          await _wadExtractionService.ExtractNodeAsync(node, destinationPath);
+          break;
+      }
+    }
+
+    private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath)
+    {
+      var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node);
+      if (fileBytes == null) return;
+
+      var formattedContent = await _contentFormatterService.GetFormattedStringAsync("js", fileBytes);
+
+      string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
+
+      await File.WriteAllTextAsync(filePath, formattedContent);
+    }
+
+    private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
+    {
+      var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
+      if (linkedBank == null) return;
+
+      // Prevent duplicate processing for linked audio bank files.
+      // Only the primary node (WPK or AudioBnkNode if no WPK) should trigger extraction.
+      if (linkedBank.WpkNode != null && node != linkedBank.WpkNode)
+      {
+        return;
+      }
+      if (linkedBank.AudioBnkNode != null && node != linkedBank.AudioBnkNode && linkedBank.WpkNode == null)
+      {
+        return;
+      }
+
+      string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
+      string audioBankPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(audioBankName));
+      Directory.CreateDirectory(audioBankPath);
+
+      var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
+      byte[] wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
+      byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
+
+      List<AudioEventNode> audioTree;
+      if (linkedBank.BinData != null)
+      {
+        if (wpkData != null)
+        {
+          audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+        }
+        else
+        {
+          audioTree = _audioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+        }
+      }
+      else
+      {
+        audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
+      }
+
+      foreach (var eventNode in audioTree)
+      {
+        string eventPath = Path.Combine(audioBankPath, _wadExtractionService.SanitizeName(eventNode.Name));
+        Directory.CreateDirectory(eventPath);
+
+        foreach (var soundNode in eventNode.Sounds)
+        {
+          byte[] wemData = null;
+          if (linkedBank.WpkNode != null)
+          {
+            using var wpkStream = new MemoryStream(wpkData);
+            var wpk = WpkParser.Parse(wpkStream, _logService);
+            var wem = wpk.Wems.FirstOrDefault(w => w.Id == soundNode.Id);
+            if (wem != null)
+            {
+              using var reader = new BinaryReader(wpkStream);
+              wpkStream.Seek(wem.Offset, SeekOrigin.Begin);
+              wemData = reader.ReadBytes((int)wem.Size);
+            }
+          }
+          else if (audioBnkFileData != null)
+          {
+            wemData = new byte[soundNode.Size];
+            Array.Copy(audioBnkFileData, soundNode.Offset, wemData, 0, soundNode.Size);
+          }
+
+          if (wemData != null)
+          {
+            byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData);
+            if (oggData != null)
+            {
+              string fileName = Path.ChangeExtension(soundNode.Name, ".ogg");
+              string filePath = Path.Combine(eventPath, _wadExtractionService.SanitizeName(fileName));
+              await File.WriteAllBytesAsync(filePath, oggData);
+            }
+          }
+        }
+      }
+    }
+
+    private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath)
+    {
+      var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node);
+      if (fileBytes == null) return;
+
+      using (var memoryStream = new MemoryStream(fileBytes))
+      {
+        var bitmapSource = TextureUtils.LoadTexture(memoryStream, Path.GetExtension(node.Name));
+        if (bitmapSource != null)
+        {
+          BitmapEncoder encoder = new PngBitmapEncoder();
+          encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
+
+          string fileName = Path.ChangeExtension(node.Name, ".png");
+          string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
+
+          using (var fileStream = new FileStream(filePath, FileMode.Create))
+          {
+            encoder.Save(fileStream);
+          }
+        }
+      }
+    }
+
+    private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type)
+    {
+      var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node);
+      if (fileBytes == null) return;
+
+      var formattedContent = await _contentFormatterService.GetFormattedStringAsync(type, fileBytes);
+
+      string fileName = Path.ChangeExtension(node.Name, ".json");
+      string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
+
+      await File.WriteAllTextAsync(filePath, formattedContent);
+    }
+  }
 }

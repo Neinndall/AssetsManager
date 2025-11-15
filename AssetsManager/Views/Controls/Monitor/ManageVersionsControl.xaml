@@ -186,19 +186,19 @@
                                             <Border Grid.Column="0" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding FileName}"
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
                                             <Border Grid.Column="1" Margin="5,0,10,0">
                                                 <TextBlock Text="{Binding Date}" 
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
                                             <Grid Grid.Column="2">
                                                 <TextBlock Text="{Binding Content}" 
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Grid>
                                         </Grid>
@@ -319,19 +319,19 @@
                                             <Border Grid.Column="0" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding FileName}"
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
                                             <Border Grid.Column="1" Margin="5,0,10,0">
                                                 <TextBlock Text="{Binding Date}"
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
                                             <Grid Grid.Column="2">
                                                 <TextBlock Text="{Binding Content}" 
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Grid>
                                         </Grid>

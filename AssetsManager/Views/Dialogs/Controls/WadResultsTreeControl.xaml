@@ -6,9 +6,8 @@
              xmlns:local="clr-namespace:AssetsManager.Views.Dialogs.Controls"
              xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             mc:Ignorable="d">
              
-             mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="400">
     <UserControl.Resources>
         <converters:PathToIconConverter x:Key="IconConverter"/>
         <converters:ChunkDiffTypeToBrushConverter x:Key="DiffTypeToBrushConverter"/>
@@ -68,7 +67,7 @@
                 <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
                                              VerticalAlignment="Center" 
                                              Margin="0,0,5,0"/>
-                <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" FontWeight="Bold" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" VerticalAlignment="Center"/>
             </Grid>
         </HierarchicalDataTemplate>
     </UserControl.Resources>
@@ -82,9 +81,9 @@
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
                 <materialIcons:MaterialIcon Kind="FormatListGroup" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                 <TextBlock Text="Differences" 
-                             FontSize="16" 
-                             FontWeight="SemiBold"
-                             Foreground="{StaticResource TextPrimary}"/>
+                           FontSize="16" 
+                           FontWeight="Medium"
+                           Foreground="{StaticResource TextPrimary}"/>
             </StackPanel>
 
             <!-- Search Box -->
@@ -92,8 +91,7 @@
                      Grid.Row="1"
                      Style="{StaticResource StandardSearchBoxStyle}"
                      Margin="0,0,0,8"
-                     TextChanged="SearchTextBox_TextChanged"
-                     />
+                     TextChanged="SearchTextBox_TextChanged"/>
 
             <Border Grid.Row="2"
                     Background="{StaticResource DarkBackground}"
@@ -104,6 +102,8 @@
                           Style="{StaticResource ModernTreeView}"
                           Background="Transparent"
                           BorderThickness="0"
+                          FontSize="14" 
+                          FontWeight="Normal"
                           ItemTemplate="{StaticResource WadGroupTemplate}"
                           SelectedItemChanged="ResultsTreeView_SelectedItemChanged">
                     <TreeView.ItemContainerStyle>

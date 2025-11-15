@@ -5,55 +5,55 @@ using System;
 
 namespace AssetsManager.Views.Controls.Shared
 {
-    public partial class SearchBoxControl : UserControl
+  public partial class SearchBoxControl : UserControl
+  {
+    private readonly DispatcherTimer searchTimer;
+
+    public static readonly RoutedEvent SearchTextChangedEvent =
+        EventManager.RegisterRoutedEvent("SearchTextChanged", RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(SearchBoxControl));
+
+    public event RoutedEventHandler SearchTextChanged
     {
-        private readonly DispatcherTimer searchTimer;
-
-        public static readonly RoutedEvent SearchTextChangedEvent =
-            EventManager.RegisterRoutedEvent("SearchTextChanged", RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(SearchBoxControl));
-
-        public event RoutedEventHandler SearchTextChanged
-        {
-            add { AddHandler(SearchTextChangedEvent, value); }
-            remove { RemoveHandler(SearchTextChangedEvent, value); }
-        }
-
-        public string Text
-        {
-            get { return SearchTextBox.Text; }
-            set { SearchTextBox.Text = value; }
-        }
-
-        public SearchBoxControl()
-        {
-            InitializeComponent();
-
-            searchTimer = new DispatcherTimer();
-            searchTimer.Interval = TimeSpan.FromMilliseconds(300);
-            searchTimer.Tick += SearchTimer_Tick;
-
-            Unloaded += SearchBoxControl_Unloaded;
-        }
-
-        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            searchTimer.Stop();
-            searchTimer.Start();
-        }
-
-        private void SearchTimer_Tick(object sender, EventArgs e)
-        {
-            searchTimer.Stop();
-            RaiseEvent(new RoutedEventArgs(SearchTextChangedEvent, SearchTextBox.Text));
-        }
-
-        private void SearchBoxControl_Unloaded(object sender, RoutedEventArgs e)
-        {
-            if (searchTimer != null)
-            {
-                searchTimer.Stop();
-                searchTimer.Tick -= SearchTimer_Tick;
-            }
-        }
+      add { AddHandler(SearchTextChangedEvent, value); }
+      remove { RemoveHandler(SearchTextChangedEvent, value); }
     }
+
+    public string Text
+    {
+      get { return SearchTextBox.Text; }
+      set { SearchTextBox.Text = value; }
+    }
+
+    public SearchBoxControl()
+    {
+      InitializeComponent();
+
+      searchTimer = new DispatcherTimer();
+      searchTimer.Interval = TimeSpan.FromMilliseconds(300);
+      searchTimer.Tick += SearchTimer_Tick;
+
+      Unloaded += SearchBoxControl_Unloaded;
+    }
+
+    private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+      searchTimer.Stop();
+      searchTimer.Start();
+    }
+
+    private void SearchTimer_Tick(object sender, EventArgs e)
+    {
+      searchTimer.Stop();
+      RaiseEvent(new RoutedEventArgs(SearchTextChangedEvent, SearchTextBox.Text));
+    }
+
+    private void SearchBoxControl_Unloaded(object sender, RoutedEventArgs e)
+    {
+      if (searchTimer != null)
+      {
+        searchTimer.Stop();
+        searchTimer.Tick -= SearchTimer_Tick;
+      }
+    }
+  }
 }

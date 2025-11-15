@@ -4,8 +4,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        mc:Ignorable="d"
-        Title="Image Comparison" Height="800" Width="1200" MinHeight="800" MinWidth="1200"
+        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+        Title="Image Comparison" Height="800" Width="1200"
         Background="{StaticResource SidebarBackground}"
         WindowStartupLocation="CenterScreen">
 
@@ -36,7 +36,7 @@
                     <StackPanel>
                         <TextBlock Text="IMAGE COMPARISON"
                                    FontSize="24"
-                                   FontWeight="Bold"
+                                   FontWeight="SemiBold"
                                    Foreground="{StaticResource AccentBrush}"/>
                         <TextBlock Text="Compare old and new image versions"
                                    FontSize="14"

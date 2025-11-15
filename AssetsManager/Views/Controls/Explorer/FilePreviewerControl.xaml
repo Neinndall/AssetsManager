@@ -9,9 +9,8 @@
              xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:avalonedit="http://icsharpcode.net/sharpdevelop/avalonedit"
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
-             mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="400"
-             PreviewKeyDown="FilePreviewerControl_PreviewKeyDown">
+             mc:Ignorable="d" PreviewKeyDown="FilePreviewerControl_PreviewKeyDown">
+             
         <UserControl.Resources>
             <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
             <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
@@ -132,17 +131,8 @@
             </StackPanel>
             <Image x:Name="ImagePreview" Visibility="Collapsed" Stretch="Uniform"/>
             <avalonedit:TextEditor x:Name="TextEditorPreview"
+                                   Style="{StaticResource BaseTextEditorStyle}"
                                    Visibility="Collapsed"
-                                   Background="#252526"
-                                   Foreground="{StaticResource TextPrimary}"
-                                   FontFamily="Consolas, 'Courier New', monospace"
-                                   FontSize="12"
-                                   IsReadOnly="True"
-                                   ShowLineNumbers="True"
-                                   WordWrap="False"
-                                   HorizontalScrollBarVisibility="Visible"
-                                   VerticalScrollBarVisibility="Auto"
-                                   Padding="0"
                                    Margin="-4,0,0,0"/>
             <Grid x:Name="WebViewContainer"/>
 

@@ -10,100 +10,100 @@ using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Parsers
 {
-    public static class BinParser
+  public static class BinParser
+  {
+    public static Dictionary<uint, string> GetEventsFromBin(byte[] binData, string bankName, BinType binType, LogService logService)
     {
-        public static Dictionary<uint, string> GetEventsFromBin(byte[] binData, string bankName, BinType binType, LogService logService)
+      var mapEventNames = new Dictionary<uint, string>();
+      if (binData == null || binData.Length == 0) return mapEventNames;
+
+      try
+      {
+        using var stream = new MemoryStream(binData);
+        var binTree = new BinTree(stream);
+
+        uint skinCharacterDataPropertiesHash = Fnv1a.HashLower("SkinCharacterDataProperties");
+        uint mapAudioDataPropertiesHash = Fnv1a.HashLower("MapAudioDataProperties");
+        uint skinAudioPropertiesHash = Fnv1a.HashLower("skinAudioProperties");
+        uint bankUnitsHash = Fnv1a.HashLower("bankUnits");
+
+        foreach (var obj in binTree.Objects.Values)
         {
-            var mapEventNames = new Dictionary<uint, string>();
-            if (binData == null || binData.Length == 0) return mapEventNames;
+          BinTreeContainer bankUnitsContainer = null;
 
-            try
-            {
-                using var stream = new MemoryStream(binData);
-                var binTree = new BinTree(stream);
-
-                uint skinCharacterDataPropertiesHash = Fnv1a.HashLower("SkinCharacterDataProperties");
-                uint mapAudioDataPropertiesHash = Fnv1a.HashLower("MapAudioDataProperties");
-                uint skinAudioPropertiesHash = Fnv1a.HashLower("skinAudioProperties");
-                uint bankUnitsHash = Fnv1a.HashLower("bankUnits");
-
-                foreach (var obj in binTree.Objects.Values)
+          switch (binType)
+          {
+            case BinType.Champion:
+              if (obj.ClassHash == skinCharacterDataPropertiesHash)
+              {
+                if (obj.Properties.TryGetValue(skinAudioPropertiesHash, out var skinAudioProp) && skinAudioProp is BinTreeStruct skinAudioStruct)
                 {
-                    BinTreeContainer bankUnitsContainer = null;
-
-                    switch (binType)
-                    {
-                        case BinType.Champion:
-                            if (obj.ClassHash == skinCharacterDataPropertiesHash)
-                            {
-                                if (obj.Properties.TryGetValue(skinAudioPropertiesHash, out var skinAudioProp) && skinAudioProp is BinTreeStruct skinAudioStruct)
-                                {
-                                    if (skinAudioStruct.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer container)
-                                    {
-                                        bankUnitsContainer = container;
-                                    }
-                                }
-                            }
-                            break;
-
-                        case BinType.Map:
-                            if (obj.ClassHash == mapAudioDataPropertiesHash)
-                            {
-                                if (obj.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer container)
-                                {
-                                    bankUnitsContainer = container;
-                                }
-                            }
-                            break;
-                    }
-
-                    if (bankUnitsContainer != null)
-                    {
-                        ExtractEventsFromBankUnits(bankUnitsContainer, bankName, mapEventNames);
-                    }
+                  if (skinAudioStruct.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer container)
+                  {
+                    bankUnitsContainer = container;
+                  }
                 }
-            }
-            catch (Exception ex) { logService.LogError(ex, "[AUDIO] Crash during BIN parsing."); }
-            logService.LogDebug($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total events for bank '{bankName}'.");
-            return mapEventNames;
-        }
+              }
+              break;
 
-        private static void ExtractEventsFromBankUnits(BinTreeContainer bankUnitsContainer, string bankName, Dictionary<uint, string> mapEventNames)
-        {
-            uint eventsHash = Fnv1a.HashLower("events");
-            uint nameHash = Fnv1a.HashLower("name");
-
-            foreach (BinTreeStruct bankUnit in bankUnitsContainer.Elements.OfType<BinTreeStruct>())
-            {
-                if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString)
+            case BinType.Map:
+              if (obj.ClassHash == mapAudioDataPropertiesHash)
+              {
+                if (obj.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer container)
                 {
-                    if (string.Equals(nameString.Value, bankName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (bankUnit.Properties.TryGetValue(eventsHash, out var eventsProp) && eventsProp is BinTreeContainer eventsContainer)
-                        {
-                            foreach (BinTreeString eventNameProp in eventsContainer.Elements.OfType<BinTreeString>())
-                            {
-                                uint eventHash = Fnv1Hash(eventNameProp.Value);
-                                mapEventNames[eventHash] = eventNameProp.Value;
-                            }
-                        }
-                    }
+                  bankUnitsContainer = container;
                 }
-            }
-        }
+              }
+              break;
+          }
 
-        private static uint Fnv1Hash(string input)
-        {
-            const uint offsetBasis = 2166136261;
-            const uint prime = 16777619;
-
-            uint hash = offsetBasis;
-            foreach (byte b in System.Text.Encoding.ASCII.GetBytes(input.ToLowerInvariant()))
-            {
-                hash *= prime;
-                hash ^= b;
-            }
-            return hash;
+          if (bankUnitsContainer != null)
+          {
+            ExtractEventsFromBankUnits(bankUnitsContainer, bankName, mapEventNames);
+          }
         }
+      }
+      catch (Exception ex) { logService.LogError(ex, "[AUDIO] Crash during BIN parsing."); }
+      logService.LogDebug($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total events for bank '{bankName}'.");
+      return mapEventNames;
     }
+
+    private static void ExtractEventsFromBankUnits(BinTreeContainer bankUnitsContainer, string bankName, Dictionary<uint, string> mapEventNames)
+    {
+      uint eventsHash = Fnv1a.HashLower("events");
+      uint nameHash = Fnv1a.HashLower("name");
+
+      foreach (BinTreeStruct bankUnit in bankUnitsContainer.Elements.OfType<BinTreeStruct>())
+      {
+        if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString)
+        {
+          if (string.Equals(nameString.Value, bankName, StringComparison.OrdinalIgnoreCase))
+          {
+            if (bankUnit.Properties.TryGetValue(eventsHash, out var eventsProp) && eventsProp is BinTreeContainer eventsContainer)
+            {
+              foreach (BinTreeString eventNameProp in eventsContainer.Elements.OfType<BinTreeString>())
+              {
+                uint eventHash = Fnv1Hash(eventNameProp.Value);
+                mapEventNames[eventHash] = eventNameProp.Value;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    private static uint Fnv1Hash(string input)
+    {
+      const uint offsetBasis = 2166136261;
+      const uint prime = 16777619;
+
+      uint hash = offsetBasis;
+      foreach (byte b in System.Text.Encoding.ASCII.GetBytes(input.ToLowerInvariant()))
+      {
+        hash *= prime;
+        hash ^= b;
+      }
+      return hash;
+    }
+  }
 }

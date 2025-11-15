@@ -79,12 +79,12 @@
                         <TextBlock Grid.Column="0" 
                                    Text="{Binding FileName}"
                                    Style="{StaticResource CellTextStyle}"
-                                   FontWeight="Medium" />
+                                   FontWeight="Normal"/>
                         <TextBlock Grid.Column="1" 
                                    Text="{Binding Timestamp, StringFormat='dd/MM/yyyy HH:mm:ss'}" 
                                    HorizontalAlignment="Center"
                                    Style="{StaticResource CellTextStyle}"
-                                   FontWeight="Medium" />
+                                   FontWeight="Normal"/>
                     </Grid>
                 </DataTemplate>
             </ListView.ItemTemplate>

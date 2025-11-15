@@ -4,36 +4,39 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        mc:Ignorable="d"
-        Height="300" Width="600"
-        MinHeight="300" MinWidth="400"
-        WindowStartupLocation="CenterOwner"
-        Background="{StaticResource SidebarBackground}"
-        FontFamily="Consolas, Courier New">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+        Background="Transparent"
+        Height="300" Width="600" WindowStyle="None" AllowsTransparency="True"
+        WindowStartupLocation="CenterOwner">
+        
+    <Border Background="{StaticResource CardBackground}"
+            BorderBrush="{StaticResource BorderColor}"
+            BorderThickness="1"
+            CornerRadius="5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Border Grid.Row="0" Background="{StaticResource AccentBrush}" CornerRadius="0" Padding="12,8">
-            <StackPanel Orientation="Horizontal">
-                <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" Width="16" Height="16" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding HeaderText}" FontWeight="Medium" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            <!-- Header -->
+            <Border Grid.Row="0" Background="{StaticResource AccentBrush}" CornerRadius="5,5,0,0" Padding="12,8" MouseLeftButtonDown="TitleBar_MouseDown">
+                <StackPanel Orientation="Horizontal">
+                    <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" Width="16" Height="16" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding HeaderText}" FontWeight="Medium" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Progress Information -->
+            <StackPanel Grid.Row="1" Margin="30,30,12,12">
+                <TextBlock x:Name="ProgressSummaryTextBlock" Text="{Binding OperationVerb}" FontWeight="Normal" FontSize="14" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,8"/>
+                <TextBlock x:Name="CurrentFileTextBlock" Text="" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,4"/>
+                <TextBlock x:Name="EstimatedTimeTextBlock" Text="Calculating..." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12"/>
             </StackPanel>
-        </Border>
 
-        <!-- Progress Information -->
-        <StackPanel Grid.Row="1" Margin="12">
-            <TextBlock x:Name="ProgressSummaryTextBlock" Text="Downloading: 0 of 0" FontWeight="Medium" FontSize="14" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,8"/>
-            <TextBlock x:Name="CurrentFileTextBlock" Text="Current file: " FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,4"/>
-            <TextBlock x:Name="EstimatedTimeTextBlock" Text="Estimated time: Calculating..." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12"/>
-
-            </StackPanel>
-
-        <!-- Close Button -->
-        <Button Grid.Row="2" Content="Close" HorizontalAlignment="Right" Margin="12" Width="80" Click="CloseButton_Click" Style="{StaticResource SecondaryButton}"/>
-    </Grid>
+            <!-- Close Button -->
+            <Button Grid.Row="2" Content="Close" HorizontalAlignment="Right" Margin="12" Width="80" Click="CloseButton_Click" Style="{StaticResource SecondaryButton}"/>
+        </Grid>
+    </Border>
 </Window>

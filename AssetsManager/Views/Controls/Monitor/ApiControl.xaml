@@ -184,7 +184,7 @@
                                                 <Run Text="{Binding Rp}" TextDecorations="Strikethrough"/>
                                                 <Run Text=" RP"/>
                                             </TextBlock>
-                                            <TextBlock Foreground="{StaticResource AccentGreen}" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center">
+                                            <TextBlock Foreground="{StaticResource AccentGreen}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center">
                                                 <Run Text="Sale: "/>
                                                 <Run Text="{Binding Sale.Rp}"/><Run Text=" RP ("/><Run Text="{Binding Sale.PercentOff}"/><Run Text="% dto)"/>
                                             </TextBlock>

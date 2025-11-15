@@ -12,7 +12,7 @@
         MinWidth="950" MinHeight="800"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource SidebarBackground}"
-        FontFamily="Consolas, Courier New">
+        FontFamily="{StaticResource AppFontFamily}">
 
     <Grid>
         <!-- Main Layout Grid -->

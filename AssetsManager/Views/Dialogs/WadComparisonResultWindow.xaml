@@ -6,10 +6,9 @@
         xmlns:local="clr-namespace:AssetsManager.Views.Dialogs"
         xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        mc:Ignorable="d"
+        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="WAD Comparison Results" Height="800" Width="1400"
         Background="{StaticResource SidebarBackground}"
-        FontFamily="Consolas, Courier New"
         WindowStartupLocation="CenterScreen">
 
     <Grid>
@@ -34,7 +33,7 @@
                     <StackPanel>
                         <TextBlock Text="WAD COMPARISON RESULTS" 
                                    FontSize="24" 
-                                   FontWeight="Bold"
+                                   FontWeight="SemiBold"
                                    Foreground="{StaticResource AccentBrush}"/>
                         <TextBlock x:Name="summaryTextBlock"
                                    Text="Loading results..." 

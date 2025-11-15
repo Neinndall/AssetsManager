@@ -2,11 +2,11 @@ using System.Windows.Controls;
 
 namespace AssetsManager.Views.Help
 {
-    public partial class AboutView : UserControl
+  public partial class AboutView : UserControl
+  {
+    public AboutView()
     {
-        public AboutView()
-        {
-            InitializeComponent();
-        }
+      InitializeComponent();
     }
+  }
 }

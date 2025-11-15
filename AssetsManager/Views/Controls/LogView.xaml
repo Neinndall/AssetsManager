@@ -27,12 +27,11 @@
                                                 VerticalAlignment="Center"
                                                 Margin="4,0,0,0"/>
                     <TextBlock Text="Logger" 
-                               FontWeight="Medium" 
+                               FontWeight="Normal" 
                                FontSize="13" 
                                Foreground="{StaticResource TextPrimary}" 
                                VerticalAlignment="Center" 
-                               Margin="6,0,0,0"
-                               FontFamily="Consolas, Courier New"/>
+                               Margin="6,0,0,0"/>
                 </StackPanel>
 
                 <Button Grid.Column="1"

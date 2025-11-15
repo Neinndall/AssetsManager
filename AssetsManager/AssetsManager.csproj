@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
     <ApplicationIcon>Resources\Img\logo.ico</ApplicationIcon>
-    <Version>2.4.4.1</Version>
+    <Version>2.4.4.0</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <UseWPF>true</UseWPF>
   </PropertyGroup>

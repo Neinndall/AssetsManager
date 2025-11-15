@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:AssetsManager.Views"
              xmlns:monitorControls="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             mc:Ignorable="d">
+             mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

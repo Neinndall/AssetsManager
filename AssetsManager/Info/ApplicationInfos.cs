@@ -15,7 +15,7 @@ namespace AssetsManager.Info
         string baseVersion = $"v{version.Major}.{version.Minor}.{version.Build}";
         if (version.Revision > 0)
         {
-            return $"{baseVersion}.{version.Revision}";
+          return $"{baseVersion}.{version.Revision}";
         }
         return baseVersion;
       }

@@ -11,7 +11,7 @@
         <StackPanel Margin="0,0,0,32">
             <TextBlock Text="Changelogs"
                        FontSize="28"
-                       FontWeight="Light"
+                       FontWeight="Medium"
                        Foreground="{StaticResource TextPrimary}"
                        Margin="0,4,0,0"/>
             <TextBlock Text="Version history and feature updates"
@@ -24,23 +24,23 @@
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Margin="0,0,0,20">
-                        <TextBlock Text="{Binding Version}" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,16"/>
+                        <TextBlock Text="{Binding Version}" FontSize="14" FontWeight="Medium" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,16"/>
                         <ItemsControl ItemsSource="{Binding Groups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Margin="0,0,0,12">
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                             <materialIcons:MaterialIcon Kind="{Binding Icon}" 
-                                                                       Foreground="{Binding IconColor}"
-                                                                       FontSize="16" 
-                                                                       Margin="0,0,8,0" 
-                                                                       VerticalAlignment="Center"/>
+                                                                        Foreground="{Binding IconColor}"
+                                                                        FontSize="16"
+                                                                        Margin="0,0,8,0" 
+                                                                        VerticalAlignment="Center"/>
                                             <TextBlock Text="{Binding Title}"
                                                        VerticalAlignment="Center">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
                                                         <Setter Property="FontSize" Value="14" />
-                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                        <Setter Property="FontWeight" Value="Medium" />
                                                         <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
                                                     </Style>
                                                 </TextBlock.Style>
@@ -51,7 +51,7 @@
                                                 <DataTemplate>
                                                     <Grid>
                                                         <!-- Subheading -->
-                                                        <TextBlock FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="10,8,0,4">
+                                                        <TextBlock FontWeight="Medium" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="10,8,0,4">
                                                             <TextBlock.Style>
                                                                 <Style TargetType="TextBlock">
                                                                     <Setter Property="Text" Value="{Binding Text}"/>
