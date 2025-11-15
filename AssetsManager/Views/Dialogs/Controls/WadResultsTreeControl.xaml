@@ -102,8 +102,6 @@
                           Style="{StaticResource ModernTreeView}"
                           Background="Transparent"
                           BorderThickness="0"
-                          FontSize="14" 
-                          FontWeight="Normal"
                           ItemTemplate="{StaticResource WadGroupTemplate}"
                           SelectedItemChanged="ResultsTreeView_SelectedItemChanged">
                     <TreeView.ItemContainerStyle>

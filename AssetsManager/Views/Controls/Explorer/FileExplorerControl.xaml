@@ -54,9 +54,7 @@
                       Margin="5,0,5,5" 
                       ItemsSource="{Binding RootNodes}"
                       SelectedItemChanged="FileTreeView_SelectedItemChanged"
-                      Style="{StaticResource ModernTreeView}"
-                      FontSize="14"
-                      FontWeight="Normal">
+                      Style="{StaticResource ModernTreeView}">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type models:FileSystemNodeModel}" ItemsSource="{Binding Children}">
                         <Grid Margin="5,2,0,2">

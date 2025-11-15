@@ -178,7 +178,7 @@
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
                                         <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,5,0,0">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center"/>
                                             <TextBlock Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center">
                                                 <Run Text="Original Price: "/>
                                                 <Run Text="{Binding Rp}" TextDecorations="Strikethrough"/>
