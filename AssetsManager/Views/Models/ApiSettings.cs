@@ -25,5 +25,6 @@ namespace AssetsManager.Views.Models
     {
         public ConnectionInfo Connection { get; set; } = new ConnectionInfo();
         public TokenInfo Token { get; set; } = new TokenInfo();
+        public bool UsePbeForApi { get; set; }
     }
 }

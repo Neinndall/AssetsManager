@@ -34,17 +34,23 @@ namespace AssetsManager.Services.Api
 
         public async Task<bool> ReadLockfileAsync()
         {
-            if (string.IsNullOrEmpty(_appSettings.LolLiveDirectory) || !Directory.Exists(_appSettings.LolLiveDirectory))
+            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi 
+                ? _appSettings.LolPbeDirectory 
+                : _appSettings.LolLiveDirectory;
+
+            string clientType = _appSettings.ApiSettings.UsePbeForApi ? "PBE" : "Live";
+
+            if (string.IsNullOrEmpty(lolDirectory) || !Directory.Exists(lolDirectory))
             {
-                _logService.LogError("LoL Live Directory is not configured or does not exist.");
+                _logService.LogError($"LoL {clientType} Directory is not configured or does not exist.");
                 return false;
             }
 
-            var lockfilePath = Path.Combine(_appSettings.LolLiveDirectory, "lockfile");
+            var lockfilePath = Path.Combine(lolDirectory, "lockfile");
 
             if (!File.Exists(lockfilePath))
             {
-                _logService.LogError($"Lockfile not found at {lockfilePath}. Make sure the Live client is running.");
+                _logService.LogError($"Lockfile not found at {lockfilePath}. Make sure the {clientType} client is running.");
                 return false;
             }
 

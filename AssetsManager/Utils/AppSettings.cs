@@ -171,7 +171,8 @@ namespace AssetsManager.Utils
                 ApiSettings = new ApiSettings
                 {
                     Connection = new ConnectionInfo(),
-                    Token = new TokenInfo()
+                    Token = new TokenInfo(),
+                    UsePbeForApi = false
                 },
             };
         }
@@ -213,6 +214,7 @@ namespace AssetsManager.Utils
             AssetTrackerProgress = defaultSettings.AssetTrackerProgress;
             AssetTrackerUrlOverrides = defaultSettings.AssetTrackerUrlOverrides;
             AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
+            ApiSettings = defaultSettings.ApiSettings;
             // SyncHashesWithCDTB and HashesSizes are intentionally not reset.
         }
     }

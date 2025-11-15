@@ -114,8 +114,17 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 Status.Player = salesCatalog.Player;
                 var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null);
-                Status.SetFullSalesCatalog(salesItems);
-                LogService.LogSuccess("Sales data retrieved and displayed successfully.");
+
+                if (salesItems.Any())
+                {
+                    Status.SetFullSalesCatalog(salesItems);
+                    LogService.LogSuccess("Sales data retrieved and displayed successfully.");
+                }
+                else
+                {
+                    Status.SetFullSalesCatalog(Enumerable.Empty<CatalogItem>()); // Clear the view
+                    LogService.LogWarning("Sales data was retrieved, but it contains no valid skin sales information (this is common for PBE).");
+                }
             }
             else
             {
