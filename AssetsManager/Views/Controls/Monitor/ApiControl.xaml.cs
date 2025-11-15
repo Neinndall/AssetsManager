@@ -76,7 +76,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (RiotApiService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "RiotApiService no está disponible.", null);
+                CustomMessageBoxService.ShowError("Error", "RiotApiService no está disponible.", Window.GetWindow(this));
                 return;
             }
 
@@ -102,7 +102,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (RiotApiService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "RiotApiService no está disponible.", null);
+                CustomMessageBoxService.ShowError("Error", "RiotApiService no está disponible.", Window.GetWindow(this));
                 return;
             }
 
@@ -128,7 +128,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             else
             {
-                CustomMessageBoxService.ShowError("Error", "Could not retrieve sales data.", null);
+                CustomMessageBoxService.ShowError("Error", "Could not retrieve sales data.", Window.GetWindow(this));
             }
         }
 
@@ -244,7 +244,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     });
                 }
 
-                LogService.LogInteractiveSuccess($"Sales data saved as PNG to {filePath}", filePath);
+                LogService.LogInteractiveSuccess($"Sales data saved as PNG to {filePath}", filePath, Path.GetFileName(filePath));
             }
             catch (Exception ex)
             {

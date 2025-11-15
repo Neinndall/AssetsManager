@@ -194,7 +194,7 @@ namespace AssetsManager
         var ex = args.Exception;
         logService.LogError(ex, "An unhandled UI exception occurred. See application_errors.log for details.");
 
-        customMessageBoxService.ShowError("Error", "A critical error occurred in the UI. Please check the logs for details.", null);
+        customMessageBoxService.ShowError("Error", "A critical error occurred in the UI. Please check the logs for details.", Application.Current.MainWindow);
         args.Handled = true;
       };
 
@@ -203,7 +203,7 @@ namespace AssetsManager
         var ex = args.ExceptionObject as Exception;
         logService.LogError(ex, "An unhandled non-UI exception occurred. See application_errors.log for details.");
 
-        customMessageBoxService.ShowError("Error", "A critical error occurred in a background process. Please check the logs for details.", null);
+        customMessageBoxService.ShowError("Error", "A critical error occurred in a background process. Please check the logs for details.", Application.Current.MainWindow);
       };
     }
   }

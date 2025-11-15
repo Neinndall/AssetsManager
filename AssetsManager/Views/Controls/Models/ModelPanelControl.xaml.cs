@@ -190,7 +190,7 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (_selectedModel == null)
             {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model to associate the skeleton with.");
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model to associate the skeleton with.", Window.GetWindow(this));
                 return;
             }
             using (var stream = File.OpenRead(filePath))
@@ -259,7 +259,7 @@ namespace AssetsManager.Views.Controls.Models
 
             if (_selectedModel == null)
             {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
                 return;
             }
 
@@ -283,13 +283,13 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (_selectedModel == null)
             {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
                 return;
             }
 
             if (_selectedModel.Skeleton == null)
             {
-                CustomMessageBoxService.ShowWarning("Missing Skeleton", "Please load a skeleton (.skl) file first.");
+                CustomMessageBoxService.ShowWarning("Missing Skeleton", "Please load a skeleton (.skl) file first.", Window.GetWindow(this));
                 return;
             }
             using (var stream = File.OpenRead(filePath))
@@ -310,7 +310,7 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (_selectedModel == null)
             {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
                 return;
             }
 

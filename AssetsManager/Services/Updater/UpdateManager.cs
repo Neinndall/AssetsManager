@@ -145,11 +145,11 @@ namespace AssetsManager.Services.Updater
                         {
                             if (dialog.SelectedMode == UpdateMode.CleanWithSaving)
                             {
-                                _updateExtractor.ExtractAndRestart(downloadPath, true);
+                                _updateExtractor.ExtractAndRestart(downloadPath, true, owner);
                             }
                             else if (dialog.SelectedMode == UpdateMode.CleanWithoutSaving)
                             {
-                                _updateExtractor.ExtractAndRestart(downloadPath, false);
+                                _updateExtractor.ExtractAndRestart(downloadPath, false, owner);
                             }
                         }
                         else

@@ -402,7 +402,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                     await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath);
 
-                    LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name} to {logPath}", logPath);
+                    LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name} to {logPath}", logPath, selectedNode.Name);
                 }
                 catch (Exception ex)
                 {
@@ -457,7 +457,7 @@ namespace AssetsManager.Views.Controls.Explorer
                         destinationPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
 
-                    LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name} to {destinationPath}", destinationPath);
+                    LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name} to {destinationPath}", destinationPath, selectedNode.Name);
                 }
                 catch (Exception ex)
                 {

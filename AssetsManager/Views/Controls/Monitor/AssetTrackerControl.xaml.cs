@@ -89,7 +89,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (AssetDownloader == null)
             {
-                CustomMessageBoxService.ShowError("Error", "Download service is not available.");
+                CustomMessageBoxService.ShowError("Error", "Download service is not available.", Window.GetWindow(this));
                 return;
             }
 
@@ -97,7 +97,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (!assetsToDownload.Any())
             {
-                CustomMessageBoxService.ShowInfo("Info", "No assets to download.");
+                CustomMessageBoxService.ShowInfo("Info", "No assets to download.", Window.GetWindow(this));
                 return;
             }
 
@@ -121,12 +121,12 @@ namespace AssetsManager.Views.Controls.Monitor
                             await AssetDownloader.DownloadAssetToCustomPathAsync(asset.Url, fullDestinationPath);
                             downloadedCount++;
                         }
-                        CustomMessageBoxService.ShowSuccess("Success", $"Successfully saved {downloadedCount} assets.");
-                        LogService.LogInteractiveSuccess($"Successfully saved {downloadedCount} assets to '{destinationPath}'.", destinationPath);
+                        CustomMessageBoxService.ShowSuccess("Success", $"Successfully saved {downloadedCount} assets.", Window.GetWindow(this));
+                        LogService.LogInteractiveSuccess($"Successfully saved {downloadedCount} assets to '{destinationPath}'.", destinationPath, Path.GetFileName(destinationPath));
                     }
                     catch (Exception ex)
                     {
-                        CustomMessageBoxService.ShowError("Error", "An error occurred during download. Please check the logs for details.");
+                        CustomMessageBoxService.ShowError("Error", "An error occurred during download. Please check the logs for details.", Window.GetWindow(this));
                         LogService.LogError(ex, "An error occurred during bulk asset download.");
                     }
                     finally
@@ -153,7 +153,7 @@ namespace AssetsManager.Views.Controls.Monitor
             catch (Exception ex)
             {
                 LogService.LogError(ex, "An error occurred while loading more assets.");
-                CustomMessageBoxService.ShowError("Error", "An error occurred while loading more assets. Please check the logs.");
+                CustomMessageBoxService.ShowError("Error", "An error occurred while loading more assets. Please check the logs.", Window.GetWindow(this));
             }
             finally
             {
@@ -168,7 +168,7 @@ namespace AssetsManager.Views.Controls.Monitor
             var assetsToCheck = Assets.Where(a => a.Status == "Pending" || a.Status == "Not Found").ToList();
             if (!assetsToCheck.Any())
             {
-                var result = CustomMessageBoxService.ShowYesNo("Info", "There are no pending or failed assets to check. Do you want to load more?");
+                var result = CustomMessageBoxService.ShowYesNo("Info", "There are no pending or failed assets to check. Do you want to load more?", Window.GetWindow(this));
                 if (result != true) return;
 
                 LoadMoreButton_Click(this, new RoutedEventArgs());
@@ -190,12 +190,12 @@ namespace AssetsManager.Views.Controls.Monitor
                 await MonitorService.CheckAssetsAsync(assetsToCheck, SelectedCategory, CancellationToken.None);
 
                 var foundCount = assetsToCheck.Count(a => a.Status == "OK");
-                CustomMessageBoxService.ShowInfo("Info", $"Check finished. Found {foundCount} new assets out of {assetsToCheck.Count} checked.");
+                CustomMessageBoxService.ShowInfo("Info", $"Check finished. Found {foundCount} new assets out of {assetsToCheck.Count} checked.", Window.GetWindow(this));
             }
             catch (Exception ex)
             {
                 LogService.LogError(ex, "An error occurred during asset check.");
-                CustomMessageBoxService.ShowError("Error", "An error occurred during asset check. Please check the logs.");
+                CustomMessageBoxService.ShowError("Error", "An error occurred during asset check. Please check the logs.", Window.GetWindow(this));
             }
             finally
             {
@@ -268,12 +268,12 @@ namespace AssetsManager.Views.Controls.Monitor
                 try
                 {
                     await AssetDownloader.DownloadAssetToCustomPathAsync(asset.Url, saveFileDialog.FileName);
-                    CustomMessageBoxService.ShowSuccess("Success", $"Asset '{asset.DisplayName}' saved successfully.");
+                    CustomMessageBoxService.ShowSuccess("Success", $"Asset '{asset.DisplayName}' saved successfully.", Window.GetWindow(this));
                 }
                 catch (Exception ex)
                 {
                     LogService.LogError(ex, $"Failed to save asset '{asset.DisplayName}'.");
-                    CustomMessageBoxService.ShowError("Error", $"Failed to save asset. Check logs for details.");
+                    CustomMessageBoxService.ShowError("Error", $"Failed to save asset. Check logs for details.", Window.GetWindow(this));
                 }
             }
         }
@@ -284,7 +284,7 @@ namespace AssetsManager.Views.Controls.Monitor
             var assetToRemove = button?.Tag as TrackedAsset;
             if (assetToRemove == null || SelectedCategory == null) return;
 
-            var result = CustomMessageBoxService.ShowYesNo("Info", $"Are you sure you want to remove '{assetToRemove.DisplayName}'? This action is permanent and the asset will not appear again in this category.");
+            var result = CustomMessageBoxService.ShowYesNo("Info", $"Are you sure you want to remove '{assetToRemove.DisplayName}'? This action is permanent and the asset will not appear again in this category.", Window.GetWindow(this));
             if (result == true)
             {
                 MonitorService.RemoveAsset(SelectedCategory, assetToRemove);

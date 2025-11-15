@@ -319,7 +319,7 @@ namespace AssetsManager.Views.Controls.Models
                     pngEncoder.Save(stream);
                 }
 
-                LogService.LogInteractiveSuccess($"Screenshot saved to {finalFilePath}", finalFilePath);
+                LogService.LogInteractiveSuccess($"Screenshot saved to {finalFilePath}", finalFilePath, Path.GetFileName(finalFilePath));
             }
             catch (Exception ex)
             {

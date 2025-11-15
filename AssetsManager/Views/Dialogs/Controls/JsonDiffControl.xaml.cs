@@ -102,7 +102,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
             catch (Exception ex)
             {
-                CustomMessageBoxService.ShowError("Error", $"Failed to load comparison: {ex.Message}. Check logs for details.");
+                CustomMessageBoxService.ShowError("Error", $"Failed to load comparison: {ex.Message}. Check logs for details.", Window.GetWindow(this));
                 OnComparisonFinished(false);
             }
         }
@@ -324,7 +324,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
             catch (Exception ex)
             {
-                CustomMessageBoxService.ShowError("Error", $"Failed to update view: {ex.Message}");
+                CustomMessageBoxService.ShowError("Error", $"Failed to update view: {ex.Message}", Window.GetWindow(this));
             }
         }
 

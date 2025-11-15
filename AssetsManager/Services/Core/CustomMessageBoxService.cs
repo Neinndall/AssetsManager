@@ -17,7 +17,7 @@ namespace AssetsManager.Services.Core
         public bool? ShowYesNo(
             string title,
             string message,
-            Window owner = null,
+            Window owner,
             CustomMessageBoxIcon icon = CustomMessageBoxIcon.Question)
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();
@@ -29,7 +29,7 @@ namespace AssetsManager.Services.Core
         public void ShowInfo(
             string title,
             string message,
-            Window owner = null,
+            Window owner,
             CustomMessageBoxIcon icon = CustomMessageBoxIcon.Info)
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();
@@ -41,7 +41,7 @@ namespace AssetsManager.Services.Core
         public void ShowSuccess(
             string title,
             string message,
-            Window owner = null,
+            Window owner,
             CustomMessageBoxIcon icon = CustomMessageBoxIcon.Success)
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();
@@ -53,7 +53,7 @@ namespace AssetsManager.Services.Core
         public void ShowError(
             string title,
             string message,
-            Window owner = null,
+            Window owner,
             CustomMessageBoxIcon icon = CustomMessageBoxIcon.Error)
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();
@@ -65,7 +65,7 @@ namespace AssetsManager.Services.Core
         public void ShowWarning(
             string title,
             string message,
-            Window owner = null,
+            Window owner,
             CustomMessageBoxIcon icon = CustomMessageBoxIcon.Warning)
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();

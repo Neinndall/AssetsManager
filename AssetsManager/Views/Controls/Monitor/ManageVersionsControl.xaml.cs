@@ -49,7 +49,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             else
             {
-                CustomMessageBoxService.ShowError("Error", "Services not initialized.");
+                CustomMessageBoxService.ShowError("Error", "Services not initialized.", Window.GetWindow(this));
             }
         }
 
@@ -58,19 +58,19 @@ namespace AssetsManager.Views.Controls.Monitor
             var selectedVersions = _viewModel?.AllLeagueClientVersions.Where(v => v.IsSelected).ToList();
             if (selectedVersions == null || !selectedVersions.Any())
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select a League Client version from the list first.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select a League Client version from the list first.", Window.GetWindow(this));
                 return;
             }
             if (selectedVersions.Count > 1)
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select only one League Client version at a time for this action.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select only one League Client version at a time for this action.", Window.GetWindow(this));
                 return;
             }
             var selectedVersion = selectedVersions.Single();
 
             if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
             {
-                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.");
+                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
                 return;
             }
 
@@ -81,7 +81,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (locales.Count == 0)
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select at least one locale to download.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select at least one locale to download.", Window.GetWindow(this));
                 return;
             }
 
@@ -93,19 +93,19 @@ namespace AssetsManager.Views.Controls.Monitor
             var selectedVersions = _viewModel?.AllLoLGameClientVersions.Where(v => v.IsSelected).ToList();
             if (selectedVersions == null || !selectedVersions.Any())
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select a LoL Game Client version from the list first.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select a LoL Game Client version from the list first.", Window.GetWindow(this));
                 return;
             }
             if (selectedVersions.Count > 1)
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select only one LoL Game Client version at a time for this action.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select only one LoL Game Client version at a time for this action.", Window.GetWindow(this));
                 return;
             }
             var selectedVersion = selectedVersions.Single();
 
             if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
             {
-                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.");
+                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
                 return;
             }
             var locales = _viewModel.AvailableLocales
@@ -115,7 +115,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (locales.Count == 0)
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select at least one locale to download.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select at least one locale to download.", Window.GetWindow(this));
                 return;
             }
 
@@ -135,11 +135,11 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (!selectedVersions.Any())
             {
-                CustomMessageBoxService.ShowWarning("Delete Versions", "No versions selected to delete.");
+                CustomMessageBoxService.ShowWarning("Delete Versions", "No versions selected to delete.", Window.GetWindow(this));
                 return;
             }
 
-            var result = CustomMessageBoxService.ShowYesNo("Delete Selected Versions", $"Are you sure you want to delete {selectedVersions.Count} selected version file(s)?");
+            var result = CustomMessageBoxService.ShowYesNo("Delete Selected Versions", $"Are you sure you want to delete {selectedVersions.Count} selected version file(s)?", Window.GetWindow(this));
             if (result == true)
             {
                 _viewModel.DeleteVersions(selectedVersions);

@@ -33,11 +33,11 @@
                         <TextBlock Text="{Binding HeaderText}" FontWeight="Medium" FontSize="13" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,5,0">
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,10,0">
                         <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click">
                             <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
                         </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Margin="5,0,0,0">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Margin="8,0,0,0">
                             <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
                         </Button>
                     </StackPanel>
