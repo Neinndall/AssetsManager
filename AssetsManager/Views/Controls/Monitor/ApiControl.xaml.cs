@@ -282,5 +282,17 @@ namespace AssetsManager.Views.Controls.Monitor
             // Update the computed properties in the model
             Status.Update(this.AppSettings);
         }
+
+        private void RequestsMythicShop_Click(object sender, RoutedEventArgs e)
+        {
+            LogService.Log("Requests MythicShop button clicked. Functionality not yet implemented.");
+            CustomMessageBoxService.ShowInfo("Mythic Shop", "Mythic Shop functionality is not yet implemented.", Window.GetWindow(this));
+        }
+
+        private void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
+        {
+            LogService.Log("Save MythicShop button clicked. Functionality not yet implemented.");
+            CustomMessageBoxService.ShowInfo("Mythic Shop", "Mythic Shop save functionality is not yet implemented.", Window.GetWindow(this));
+        }
     }
 }

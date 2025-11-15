@@ -142,11 +142,11 @@
                                                             Margin="0,0,12,0"
                                                             VerticalAlignment="Center"/>
                                 <StackPanel>
-                                    <TextBlock Text="Available Requests" 
+                                    <TextBlock Text="Sales Request" 
                                                FontSize="16" 
                                                FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Perform requests to external APIs" 
+                                    <TextBlock Text="Request and view current sales from the LCU" 
                                                FontSize="11" 
                                                Foreground="{StaticResource TextMuted}"/>
                                 </StackPanel>
@@ -229,14 +229,51 @@
                 </StackPanel>
             </TabItem>
             <TabItem Header="Mythic Shop">
-                <Grid>
+                <StackPanel>
                     <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,0">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="Construction" Height="48" Width="48" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                            <TextBlock Text="Soon" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="24" Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="DiamondStone" 
+                                                            FontSize="20" 
+                                                            Foreground="{StaticResource AccentPurple}"
+                                                            Margin="0,0,12,0"
+                                                            VerticalAlignment="Center"/>
+                                <StackPanel>
+                                    <TextBlock Text="Mythic Shop Request" 
+                                               FontSize="16" 
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Request and view current mythic shop items from the LCU" 
+                                               FontSize="11" 
+                                               Foreground="{StaticResource TextMuted}"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Content="Requests MythicShop"
+                                        Style="{StaticResource ModernButton}"
+                                        Click="RequestsMythicShop_Click"/>
+                                <Button Content="Save"
+                                        Style="{StaticResource ModernButton}"
+                                        Margin="10,0,0,0"
+                                        Click="SaveMythicShopButton_Click"/>
+                            </StackPanel>
+                        </Grid>
                     </Border>
-                </Grid>
+                    <!-- Aquí iría el ItemsControl para los elementos de la tienda mítica, similar a Sales -->
+                    <!-- Por ahora, lo dejamos vacío o con un mensaje de "Próximamente" si no hay datos -->
+                    <StackPanel Margin="0,16,0,0">
+                        <TextBlock Text="Mythic Shop data will appear here."
+                                   HorizontalAlignment="Center"
+                                   Foreground="{StaticResource TextMuted}"
+                                   FontSize="14"/>
+                    </StackPanel>
+                </StackPanel>
             </TabItem>
         </TabControl>
     </Grid>
