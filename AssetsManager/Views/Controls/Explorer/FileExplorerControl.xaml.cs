@@ -285,6 +285,8 @@ namespace AssetsManager.Views.Controls.Explorer
                 var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, token);
                 token.ThrowIfCancellationRequested();
 
+                _cancellationTokenSource.Cancel();
+
                 RootNodes.Clear();
                 foreach (var node in newNodes)
                 {
