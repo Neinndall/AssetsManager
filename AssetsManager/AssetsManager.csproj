@@ -79,5 +79,4 @@
     <Delete Files="@(DocFilesToDelete)" />
     <Delete Files="@(DocFilesToDeletePublish)" />
   </Target>
-  
 </Project>

@@ -7,56 +7,56 @@ using System.Windows.Interop;
 
 namespace AssetsManager.Utils
 {
-  public static class SingleInstance
-  {
-    private static Mutex _mutex;
-    public const string AUMID = "AssetsManager";
-    public static readonly uint WM_SHOW_APP = RegisterWindowMessage("AssetsManager_ShowApp");
-
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-    private static extern uint RegisterWindowMessage(string lpString);
-
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-    private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("shell32.dll", SetLastError = true)]
-    public static extern void SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
-
-    private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
-
-    public static bool EnsureSingleInstance()
+    public static class SingleInstance
     {
-      const string appName = "AssetsManager";
-      bool createdNew;
+        private static Mutex _mutex;
+        public const string AUMID = "AssetsManager";
+        public static readonly uint WM_SHOW_APP = RegisterWindowMessage("AssetsManager_ShowApp");
 
-      _mutex = new Mutex(true, appName, out createdNew);
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern uint RegisterWindowMessage(string lpString);
 
-      if (!createdNew)
-      {
-        PostMessage(HWND_BROADCAST, WM_SHOW_APP, IntPtr.Zero, IntPtr.Zero);
-        return false; // Not the first instance
-      }
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-      return true; // This is the first instance
-    }
+        [DllImport("shell32.dll", SetLastError = true)]
+        public static extern void SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
-    public static void RegisterWindow(Window window, Action onShowRequest)
-    {
-      if (window == null || onShowRequest == null) return;
+        private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
 
-      var source = PresentationSource.FromVisual(window) as HwndSource;
-
-      IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-      {
-        if (msg == WM_SHOW_APP)
+        public static bool EnsureSingleInstance()
         {
-          onShowRequest();
-          handled = true;
-        }
-        return IntPtr.Zero;
-      }
+            const string appName = "AssetsManager";
+            bool createdNew;
 
-      source?.AddHook(WndProc);
+            _mutex = new Mutex(true, appName, out createdNew);
+
+            if (!createdNew)
+            {
+                PostMessage(HWND_BROADCAST, WM_SHOW_APP, IntPtr.Zero, IntPtr.Zero);
+                return false; // Not the first instance
+            }
+
+            return true; // This is the first instance
+        }
+
+        public static void RegisterWindow(Window window, Action onShowRequest)
+        {
+            if (window == null || onShowRequest == null) return;
+
+            var source = PresentationSource.FromVisual(window) as HwndSource;
+
+            IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+            {
+                if (msg == WM_SHOW_APP)
+                {
+                    onShowRequest();
+                    handled = true;
+                }
+                return IntPtr.Zero;
+            }
+
+            source?.AddHook(WndProc);
+        }
     }
-  }
 }

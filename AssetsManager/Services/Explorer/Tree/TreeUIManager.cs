@@ -9,101 +9,101 @@ using System.Windows.Media;
 
 namespace AssetsManager.Services.Explorer.Tree
 {
-  public class TreeUIManager
-  {
-    public void SelectAndFocusNode(ItemsControl treeView, ObservableCollection<FileSystemNodeModel> rootNodes, FileSystemNodeModel node, bool focusNode = true)
+    public class TreeUIManager
     {
-      var path = FindNodePath(rootNodes, node);
-      if (path == null) return;
-
-      var container = treeView;
-      TreeViewItem itemContainer = null;
-
-      foreach (var parentNode in path)
-      {
-        if (parentNode == node) break;
-
-        itemContainer = (TreeViewItem)container.ItemContainerGenerator.ContainerFromItem(parentNode);
-        if (itemContainer == null)
+        public void SelectAndFocusNode(ItemsControl treeView, ObservableCollection<FileSystemNodeModel> rootNodes, FileSystemNodeModel node, bool focusNode = true)
         {
-          container.UpdateLayout();
-          itemContainer = (TreeViewItem)container.ItemContainerGenerator.ContainerFromItem(parentNode);
+            var path = FindNodePath(rootNodes, node);
+            if (path == null) return;
+
+            var container = treeView;
+            TreeViewItem itemContainer = null;
+
+            foreach (var parentNode in path)
+            {
+                if (parentNode == node) break;
+
+                itemContainer = (TreeViewItem)container.ItemContainerGenerator.ContainerFromItem(parentNode);
+                if (itemContainer == null)
+                {
+                    container.UpdateLayout();
+                    itemContainer = (TreeViewItem)container.ItemContainerGenerator.ContainerFromItem(parentNode);
+                }
+
+                if (itemContainer == null) return;
+
+                parentNode.IsExpanded = true;
+                if (!itemContainer.IsExpanded)
+                {
+                    itemContainer.IsExpanded = true;
+                }
+                container = itemContainer;
+            }
+
+            itemContainer = (TreeViewItem)container.ItemContainerGenerator.ContainerFromItem(node);
+            if (itemContainer == null)
+            {
+                container.UpdateLayout();
+                itemContainer = (TreeViewItem)container.ItemContainerGenerator.ContainerFromItem(node);
+            }
+
+            if (itemContainer != null)
+            {
+                itemContainer.BringIntoView();
+                itemContainer.IsSelected = true;
+                if (focusNode)
+                {
+                    itemContainer.Focus();
+                }
+            }
         }
 
-        if (itemContainer == null) return;
-
-        parentNode.IsExpanded = true;
-        if (!itemContainer.IsExpanded)
+        public List<FileSystemNodeModel> FindNodePath(IEnumerable<FileSystemNodeModel> nodes, FileSystemNodeModel nodeToFind)
         {
-          itemContainer.IsExpanded = true;
+            foreach (var n in nodes)
+            {
+                if (n == nodeToFind)
+                {
+                    return new List<FileSystemNodeModel> { n };
+                }
+
+                if (n.Children != null)
+                {
+                    var path = FindNodePath(n.Children, nodeToFind);
+                    if (path != null)
+                    {
+                        path.Insert(0, n);
+                        return path;
+                    }
+                }
+            }
+            return null;
         }
-        container = itemContainer;
-      }
 
-      itemContainer = (TreeViewItem)container.ItemContainerGenerator.ContainerFromItem(node);
-      if (itemContainer == null)
-      {
-        container.UpdateLayout();
-        itemContainer = (TreeViewItem)container.ItemContainerGenerator.ContainerFromItem(node);
-      }
-
-      if (itemContainer != null)
-      {
-        itemContainer.BringIntoView();
-        itemContainer.IsSelected = true;
-        if (focusNode)
+        public void CollapseAll(FileSystemNodeModel node)
         {
-          itemContainer.Focus();
+            node.IsExpanded = false;
+            if (node.Children == null) return;
+            foreach (var child in node.Children)
+            {
+                CollapseAll(child);
+            }
         }
-      }
+
+        public TreeViewItem SafeVisualUpwardSearch(DependencyObject source)
+        {
+            while (source != null && !(source is TreeViewItem))
+            {
+                if (source is Visual || source is System.Windows.Media.Media3D.Visual3D)
+                {
+                    source = VisualTreeHelper.GetParent(source);
+                }
+                else
+                {
+                    source = LogicalTreeHelper.GetParent(source);
+                }
+            }
+            return source as TreeViewItem;
+        }
     }
-
-    public List<FileSystemNodeModel> FindNodePath(IEnumerable<FileSystemNodeModel> nodes, FileSystemNodeModel nodeToFind)
-    {
-      foreach (var n in nodes)
-      {
-        if (n == nodeToFind)
-        {
-          return new List<FileSystemNodeModel> { n };
-        }
-
-        if (n.Children != null)
-        {
-          var path = FindNodePath(n.Children, nodeToFind);
-          if (path != null)
-          {
-            path.Insert(0, n);
-            return path;
-          }
-        }
-      }
-      return null;
-    }
-
-    public void CollapseAll(FileSystemNodeModel node)
-    {
-      node.IsExpanded = false;
-      if (node.Children == null) return;
-      foreach (var child in node.Children)
-      {
-        CollapseAll(child);
-      }
-    }
-
-    public TreeViewItem SafeVisualUpwardSearch(DependencyObject source)
-    {
-      while (source != null && !(source is TreeViewItem))
-      {
-        if (source is Visual || source is System.Windows.Media.Media3D.Visual3D)
-        {
-          source = VisualTreeHelper.GetParent(source);
-        }
-        else
-        {
-          source = LogicalTreeHelper.GetParent(source);
-        }
-      }
-      return source as TreeViewItem;
-    }
-  }
 }

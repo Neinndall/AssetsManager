@@ -6,59 +6,59 @@ using AssetsManager.Services.Core;
 
 namespace AssetsManager.Utils
 {
-  public class HashCopier
-  {
-    private readonly LogService _logService;
-    private readonly DirectoriesCreator _directoriesCreator;
-
-    public HashCopier(LogService logService, DirectoriesCreator directoriesCreator)
+    public class HashCopier
     {
-      _logService = logService;
-      _directoriesCreator = directoriesCreator;
-    }
+        private readonly LogService _logService;
+        private readonly DirectoriesCreator _directoriesCreator;
 
-    public async Task HandleCopyAsync(bool autoCopyHashes)
-    {
-      if (autoCopyHashes)
-      {
-        await CopyNewHashesToOlds();
-      }
-    }
-
-    private async Task CopyNewHashesToOlds()
-    {
-      string sourcePath = _directoriesCreator.HashesNewPath;
-      string destinationPath = _directoriesCreator.HashesOldPath;
-      var filesToCopy = new[] { "hashes.game.txt", "hashes.lcu.txt" };
-
-      try
-      {
-        Directory.CreateDirectory(destinationPath);
-
-        await Task.Run(() =>
+        public HashCopier(LogService logService, DirectoriesCreator directoriesCreator)
         {
-          foreach (var fileName in filesToCopy)
-          {
-            string sourceFile = Path.Combine(sourcePath, fileName);
-            string destFile = Path.Combine(destinationPath, fileName);
+            _logService = logService;
+            _directoriesCreator = directoriesCreator;
+        }
 
-            if (File.Exists(sourceFile))
+        public async Task HandleCopyAsync(bool autoCopyHashes)
+        {
+            if (autoCopyHashes)
             {
-              File.Copy(sourceFile, destFile, true);
+                await CopyNewHashesToOlds();
             }
-            else
-            {
-              _logService.LogWarning($"Source hash file not found, skipping copy: {sourceFile}");
-            }
-          }
-        });
+        }
 
-        _logService.LogSuccess("Hashes copied successfully.");
-      }
-      catch (Exception ex)
-      {
-        _logService.LogError(ex, "An error occurred while copying specific hashes.");
-      }
+        private async Task CopyNewHashesToOlds()
+        {
+            string sourcePath = _directoriesCreator.HashesNewPath;
+            string destinationPath = _directoriesCreator.HashesOldPath;
+            var filesToCopy = new[] { "hashes.game.txt", "hashes.lcu.txt" };
+
+            try
+            {
+                Directory.CreateDirectory(destinationPath);
+
+                await Task.Run(() =>
+                {
+                    foreach (var fileName in filesToCopy)
+                    {
+                        string sourceFile = Path.Combine(sourcePath, fileName);
+                        string destFile = Path.Combine(destinationPath, fileName);
+
+                        if (File.Exists(sourceFile))
+                        {
+                            File.Copy(sourceFile, destFile, true);
+                        }
+                        else
+                        {
+                            _logService.LogWarning($"Source hash file not found, skipping copy: {sourceFile}");
+                        }
+                    }
+                });
+
+                _logService.LogSuccess("Hashes copied successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "An error occurred while copying specific hashes.");
+            }
+        }
     }
-  }
 }
