@@ -64,12 +64,29 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <materialIcons:MaterialIcon Grid.Column="0" 
-                                                        Width="18" 
-                                                        Height="18" 
-                                                        VerticalAlignment="Center" 
-                                                        Margin="0,0,5,0"
-                                                        Kind="{Binding Converter={StaticResource PathToIconConverter}}"/>
+                            <materialIcons:MaterialIcon Grid.Column="0" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,5,0" Kind="{Binding Converter={StaticResource PathToIconConverter}}">
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Status}" Value="New">
+                                                <Setter Property="Foreground" Value="#4CAF50"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Modified">
+                                                <Setter Property="Foreground" Value="#2196F3"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Deleted">
+                                                <Setter Property="Foreground" Value="#F44336"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Renamed">
+                                                <Setter Property="Foreground" Value="#FF9800"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                                <Setter Property="Foreground" Value="White"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialIcons:MaterialIcon.Style>
+                            </materialIcons:MaterialIcon>
                             
                             <TextBlock Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock.Style>

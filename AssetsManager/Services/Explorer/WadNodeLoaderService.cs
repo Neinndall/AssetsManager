@@ -58,7 +58,10 @@ namespace AssetsManager.Services.Explorer
           file.BackupChunkPath = chunkPath; // Ensure the main diff object has the path
           var status = GetDiffStatus(file.Type);
 
-          var node = AddNodeToVirtualTree(wadNode, file.Path, wadGroup.Key, file.NewPathHash, status);
+          string statusPrefix = GetStatusPrefix(file.Type);
+          string prefixedPath = $"{statusPrefix}/{file.Path}";
+
+          var node = AddNodeToVirtualTree(wadNode, prefixedPath, wadGroup.Key, file.NewPathHash, status);
           node.ChunkDiff = file;
           node.BackupChunkPath = chunkPath;
           if (file.Type == ChunkDiffType.Renamed)
@@ -73,7 +76,10 @@ namespace AssetsManager.Services.Explorer
               var depStatus = GetDiffStatus(ChunkDiffType.Modified); // Treat as modified for node creation
               var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
 
-              var depNode = AddNodeToVirtualTree(wadNode, dep.Path, wadGroup.Key, dep.NewPathHash, depStatus);
+              string depStatusPrefix = GetStatusPrefix(ChunkDiffType.Modified);
+              string depPrefixedPath = $"{depStatusPrefix}/{dep.Path}";
+
+              var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, wadGroup.Key, dep.NewPathHash, depStatus);
               depNode.ChunkDiff = new SerializableChunkDiff
               {
                 Type = ChunkDiffType.Modified, // For consistency
@@ -96,6 +102,15 @@ namespace AssetsManager.Services.Explorer
 
       return (rootNodes, comparisonData.NewLolPath, comparisonData.OldLolPath);
     }
+
+    private string GetStatusPrefix(ChunkDiffType type) => type switch
+    {
+        ChunkDiffType.New => "[+] New",
+        ChunkDiffType.Modified => "[~] Modified",
+        ChunkDiffType.Renamed => "[»] Renamed",
+        ChunkDiffType.Removed => "[-] Deleted",
+        _ => "[?] Unknown"
+    };
 
     private string GetBackupChunkPath(string backupRoot, SerializableChunkDiff diff)
     {
