@@ -27,7 +27,7 @@
                                                 VerticalAlignment="Center"
                                                 Margin="4,0,0,0"/>
                     <TextBlock Text="Logger" 
-                               FontWeight="Normal" 
+                               FontWeight="Medium" 
                                FontSize="13" 
                                Foreground="{StaticResource TextPrimary}" 
                                VerticalAlignment="Center" 

@@ -31,7 +31,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="Menu" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBlock Grid.Column="1" Text="Panel" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <TextBlock Grid.Column="1" Text="Panel" FontWeight="Medium" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -42,7 +42,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="Download" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBlock Grid.Column="1" Text="Downloader" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <TextBlock Grid.Column="1" Text="Downloader" FontWeight="Medium" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -53,7 +53,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderSearchOutline" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBlock Grid.Column="1" Text="Explorer" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <TextBlock Grid.Column="1" Text="Explorer" FontWeight="Medium" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -64,7 +64,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FileCompare" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBlock Grid.Column="1" Text="Comparator" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <TextBlock Grid.Column="1" Text="Comparator" FontWeight="Medium" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -75,7 +75,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="CubeOutline" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBlock Grid.Column="1" Text="Models" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <TextBlock Grid.Column="1" Text="Models" FontWeight="Medium" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -86,7 +86,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="Radar" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBlock Grid.Column="1" Text="Monitor" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <TextBlock Grid.Column="1" Text="Monitor" FontWeight="Medium" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -97,7 +97,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="Cog" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBlock Grid.Column="1" Text="Settings" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <TextBlock Grid.Column="1" Text="Settings" FontWeight="Medium" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -108,13 +108,13 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="HelpCircleOutline" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0,0,0"/>
-                        <TextBlock Grid.Column="1" Text="Help" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <TextBlock Grid.Column="1" Text="Help" FontWeight="Medium" FontSize="12" VerticalAlignment="Center" Margin="16,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
             </StackPanel>
 
             <Border Grid.Row="1" Margin="8,0,8,8">
-                <TextBlock Text="{x:Static info:ApplicationInfos.Version}" FontWeight="Normal" FontSize="10" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Style="{StaticResource SidebarMenuTextStyle}"/>
+                <TextBlock Text="{x:Static info:ApplicationInfos.Version}" FontWeight="Medium" FontSize="10" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Style="{StaticResource SidebarMenuTextStyle}"/>
             </Border>
         </Grid>
     </Border>

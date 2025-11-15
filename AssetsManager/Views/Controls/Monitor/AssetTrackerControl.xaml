@@ -7,8 +7,8 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+             
     <DockPanel Margin="15">
-
         <!-- Header -->
         <Border DockPanel.Dock="Top"
                 Style="{StaticResource SettingsCard}"
@@ -21,12 +21,12 @@
                                            VerticalAlignment="Center"/>
                 <StackPanel>
                     <TextBlock Text="Asset Tracker" 
-                              FontSize="18" 
-                              FontWeight="SemiBold"
-                              Foreground="{StaticResource TextPrimary}"/>
+                               FontSize="18" 
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Automatically discover new assets from the CDN" 
-                              FontSize="12" 
-                              Foreground="{StaticResource TextMuted}"/>
+                               FontSize="12" 
+                               Foreground="{StaticResource TextMuted}"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -66,7 +66,7 @@
                                     </Style>
                                 </Ellipse.Style>
                             </Ellipse>
-                            <TextBlock Text="{Binding Name}" FontWeight="Normal"/>
+                            <TextBlock Text="{Binding Name}"/>
                         </StackPanel>
                     </DataTemplate>
                 </ComboBox.ItemTemplate>

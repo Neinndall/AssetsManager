@@ -68,13 +68,13 @@
                     <!-- Textos -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Top">
                         <TextBlock Text="Old Hash Directory" 
-                                                   FontWeight="SemiBold"
-                                                   FontSize="15"
-                                                   Foreground="{StaticResource TextPrimary}"/>
+                                   FontWeight="SemiBold"
+                                   FontSize="15"
+                                   Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="Select the directory containing old hash files" 
-                                                   FontSize="12" 
-                                                   Foreground="{StaticResource TextMuted}"
-                                                   Margin="0,2,0,0"/>
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextMuted}"
+                                   Margin="0,2,0,0"/>
                     </StackPanel>
                     <!-- Cuadro alineado -->
                     <Grid Grid.Column="1" Margin="0,42,0,0">
@@ -102,12 +102,11 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-
                     <materialIcons:MaterialIcon Grid.Column="0" Kind="Flash" 
-                                                 FontSize="20" 
-                                                 Foreground="{StaticResource AccentBrush}"
-                                                 Margin="0,0,12,0"
-                                                 VerticalAlignment="Top"/>
+                                                FontSize="20" 
+                                                Foreground="{StaticResource AccentBrush}"
+                                                Margin="0,0,12,0"
+                                                VerticalAlignment="Top"/>
 
                     <StackPanel Grid.Column="1">
                         <TextBlock Text="Actions" 
@@ -120,8 +119,7 @@
                                    Margin="0,2,0,12"/>
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="startButton" 
-                                    Content="▶️ Start Download" 
-
+                                    Content="▶️ Start Download"
                                     Style="{StaticResource ModernButton}"
                                     Click="startButton_Click"
                                     ToolTip="Start the download process"/>

@@ -70,7 +70,7 @@
                             <TextBlock x:Name="Text" 
                                       Text="{TemplateBinding Content}"
                                       FontSize="13"
-                                      FontWeight="Medium"
+                                      FontWeight="Normal"
                                       VerticalAlignment="Center"/>
                         </StackPanel>
                     </Border>
