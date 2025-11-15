@@ -8,10 +8,7 @@ namespace AssetsManager.Utils
     {
         private static readonly HashSet<string> _excludedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".luabin", ".luabin64", ".preload", ".scb",
-            ".sco", ".skn", ".skl", ".mapgeo", ".stringtable",
-            ".anm", ".dat", ".bnk", ".wpk",
-            ".cfg", ".cfgbin", ".subchunktoc"
+            ".luabin", ".luabin64", ".preload", ".scb", ".sco", ".skn", ".skl", ".mapgeo", ".stringtable", ".anm", ".dat", ".bnk", ".wpk", ".cfg", ".cfgbin", ".subchunktoc"
         };
 
         public static string Adjust(string url)

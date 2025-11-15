@@ -3,11 +3,11 @@ using System.Collections.Generic;
 
 namespace AssetsManager.Views.Models
 {
-  public static class DefaultCategories
-  {
-    public static List<AssetCategory> Get()
+    public static class DefaultCategories
     {
-      return new List<AssetCategory>
+        public static List<AssetCategory> Get()
+        {
+            return new List<AssetCategory>
             {
                 new AssetCategory { Id = "1", Name = "Bundles Chromas", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/bundles/", Start = 79900846, Extension = "jpg" },
                 new AssetCategory { Id = "2", Name = "Bundles Skins and Borders", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/bundles/", Start = 99901560, Extension = "png" },
@@ -22,6 +22,6 @@ namespace AssetsManager.Views.Models
                 new AssetCategory { Id = "9", Name = "Skins Augments", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/skinaugment/", Start = 4, Extension = "png" },
                 new AssetCategory { Id = "10", Name = "Skins Variants", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/bundles/", Start = 91000006, Extension = "jpg" }
             };
+        }
     }
-  }
 }

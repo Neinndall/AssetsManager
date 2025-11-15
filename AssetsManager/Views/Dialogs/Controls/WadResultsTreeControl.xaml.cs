@@ -7,96 +7,96 @@ using System.Windows.Media;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
-  public partial class WadResultsTreeControl : UserControl
-  {
-    public event RoutedPropertyChangedEventHandler<object> SelectedItemChanged;
-    public event TextChangedEventHandler SearchTextChanged;
-    public event RoutedEventHandler WadContextMenuOpening;
-    public object SelectedItem => resultsTreeView.SelectedItem;
-
-    public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
-
-    public static readonly RoutedEvent ViewDifferencesClickEvent = EventManager.RegisterRoutedEvent(
-        nameof(ViewDifferencesClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
-
-    public event RoutedEventHandler ViewDifferencesClick
+    public partial class WadResultsTreeControl : UserControl
     {
-      add { AddHandler(ViewDifferencesClickEvent, value); }
-      remove { RemoveHandler(ViewDifferencesClickEvent, value); }
-    }
+        public event RoutedPropertyChangedEventHandler<object> SelectedItemChanged;
+        public event TextChangedEventHandler SearchTextChanged;
+        public event RoutedEventHandler WadContextMenuOpening;
+        public object SelectedItem => resultsTreeView.SelectedItem;
 
-    public IEnumerable<object> ItemsSource
-    {
-      get => resultsTreeView.ItemsSource as IEnumerable<object>;
-      set => resultsTreeView.ItemsSource = value;
-    }
+        public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
 
-    public WadResultsTreeControl()
-    {
-      InitializeComponent();
-      Loaded += WadResultsTreeControl_Loaded;
-      Unloaded += WadResultsTreeControl_Unloaded;
-    }
+        public static readonly RoutedEvent ViewDifferencesClickEvent = EventManager.RegisterRoutedEvent(
+            nameof(ViewDifferencesClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
 
-    public void Cleanup()
-    {
-      // Desuscribir eventos
-      Loaded -= WadResultsTreeControl_Loaded;
-      Unloaded -= WadResultsTreeControl_Unloaded;
-      resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
-      searchTextBox.TextChanged -= SearchTextBox_TextChanged;
+        public event RoutedEventHandler ViewDifferencesClick
+        {
+            add { AddHandler(ViewDifferencesClickEvent, value); }
+            remove { RemoveHandler(ViewDifferencesClickEvent, value); }
+        }
 
-      // Anular referencias
-      resultsTreeView.ItemsSource = null;
-    }
+        public IEnumerable<object> ItemsSource
+        {
+            get => resultsTreeView.ItemsSource as IEnumerable<object>;
+            set => resultsTreeView.ItemsSource = value;
+        }
 
-    private void WadResultsTreeControl_Loaded(object sender, RoutedEventArgs e)
-    {
-      resultsTreeView.SelectedItemChanged += ResultsTreeView_SelectedItemChanged;
-      searchTextBox.TextChanged += SearchTextBox_TextChanged;
-    }
+        public WadResultsTreeControl()
+        {
+            InitializeComponent();
+            Loaded += WadResultsTreeControl_Loaded;
+            Unloaded += WadResultsTreeControl_Unloaded;
+        }
 
-    private void WadResultsTreeControl_Unloaded(object sender, RoutedEventArgs e)
-    {
-      Cleanup();
-    }
+        public void Cleanup()
+        {
+            // Desuscribir eventos
+            Loaded -= WadResultsTreeControl_Loaded;
+            Unloaded -= WadResultsTreeControl_Unloaded;
+            resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
+            searchTextBox.TextChanged -= SearchTextBox_TextChanged;
 
-    private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-      SearchTextChanged?.Invoke(this, e);
-    }
+            // Anular referencias
+            resultsTreeView.ItemsSource = null;
+        }
 
-    private void ResultsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-    {
-      SelectedItemChanged?.Invoke(this, e);
-    }
+        private void WadResultsTreeControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            resultsTreeView.SelectedItemChanged += ResultsTreeView_SelectedItemChanged;
+            searchTextBox.TextChanged += SearchTextBox_TextChanged;
+        }
 
-    private void ViewDifferences_Click(object sender, RoutedEventArgs e)
-    {
-      RaiseEvent(new RoutedEventArgs(ViewDifferencesClickEvent, SelectedItem));
-    }
+        private void WadResultsTreeControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
 
-    public void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
-    {
-      if (VisualUpwardSearch(e.OriginalSource as DependencyObject) is TreeViewItem treeViewItem)
-      {
-        treeViewItem.IsSelected = true;
-        e.Handled = true;
-      }
-    }
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            SearchTextChanged?.Invoke(this, e);
+        }
 
-    private static TreeViewItem VisualUpwardSearch(DependencyObject source)
-    {
-      while (source != null && !(source is TreeViewItem))
-      {
-        source = VisualTreeHelper.GetParent(source);
-      }
-      return source as TreeViewItem;
-    }
+        private void ResultsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            SelectedItemChanged?.Invoke(this, e);
+        }
 
-    private void ContextMenu_Opened(object sender, RoutedEventArgs e)
-    {
-      WadContextMenuOpening?.Invoke(this, e);
+        private void ViewDifferences_Click(object sender, RoutedEventArgs e)
+        {
+            RaiseEvent(new RoutedEventArgs(ViewDifferencesClickEvent, SelectedItem));
+        }
+
+        public void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (VisualUpwardSearch(e.OriginalSource as DependencyObject) is TreeViewItem treeViewItem)
+            {
+                treeViewItem.IsSelected = true;
+                e.Handled = true;
+            }
+        }
+
+        private static TreeViewItem VisualUpwardSearch(DependencyObject source)
+        {
+            while (source != null && !(source is TreeViewItem))
+            {
+                source = VisualTreeHelper.GetParent(source);
+            }
+            return source as TreeViewItem;
+        }
+
+        private void ContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            WadContextMenuOpening?.Invoke(this, e);
+        }
     }
-  }
 }

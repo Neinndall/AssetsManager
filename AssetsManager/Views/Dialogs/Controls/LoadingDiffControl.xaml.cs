@@ -4,40 +4,40 @@ using System.Windows;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
-  public partial class LoadingDiffControl : UserControl
-  {
-    private readonly Storyboard _loadingAnimation;
-
-    public LoadingDiffControl()
+    public partial class LoadingDiffControl : UserControl
     {
-      InitializeComponent();
+        private readonly Storyboard _loadingAnimation;
 
-      var originalStoryboard = (Storyboard)this.TryFindResource("SpinningIconAnimation");
-      if (originalStoryboard != null)
-      {
-        _loadingAnimation = originalStoryboard.Clone();
-        Storyboard.SetTarget(_loadingAnimation, ProgressIcon);
-      }
+        public LoadingDiffControl()
+        {
+            InitializeComponent();
 
-      this.Unloaded += LoadingDiffControl_Unloaded;
+            var originalStoryboard = (Storyboard)this.TryFindResource("SpinningIconAnimation");
+            if (originalStoryboard != null)
+            {
+                _loadingAnimation = originalStoryboard.Clone();
+                Storyboard.SetTarget(_loadingAnimation, ProgressIcon);
+            }
+
+            this.Unloaded += LoadingDiffControl_Unloaded;
+        }
+
+        private void LoadingDiffControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _loadingAnimation?.Stop();
+        }
+
+        public void ShowLoading(bool show)
+        {
+            Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (show)
+            {
+                _loadingAnimation?.Begin();
+            }
+            else
+            {
+                _loadingAnimation?.Stop();
+            }
+        }
     }
-
-    private void LoadingDiffControl_Unloaded(object sender, RoutedEventArgs e)
-    {
-      _loadingAnimation?.Stop();
-    }
-
-    public void ShowLoading(bool show)
-    {
-      Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-      if (show)
-      {
-        _loadingAnimation?.Begin();
-      }
-      else
-      {
-        _loadingAnimation?.Stop();
-      }
-    }
-  }
 }

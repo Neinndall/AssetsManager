@@ -7,124 +7,124 @@ using System.Runtime.CompilerServices;
 
 namespace AssetsManager.Views.Models
 {
-  public class PaginationModel<T> : INotifyPropertyChanged
-  {
-    private List<T> _fullList = new List<T>();
-
-    public ObservableCollection<T> PagedItems { get; } = new ObservableCollection<T>();
-
-    private int _currentPage = 1;
-    public int CurrentPage
+    public class PaginationModel<T> : INotifyPropertyChanged
     {
-      get => _currentPage;
-      set
-      {
-        if (SetProperty(ref _currentPage, value))
+        private List<T> _fullList = new List<T>();
+
+        public ObservableCollection<T> PagedItems { get; } = new ObservableCollection<T>();
+
+        private int _currentPage = 1;
+        public int CurrentPage
         {
-          UpdatePaging();
+            get => _currentPage;
+            set
+            {
+                if (SetProperty(ref _currentPage, value))
+                {
+                    UpdatePaging();
+                }
+            }
         }
-      }
-    }
 
-    private int _pageSize = 5;
-    public int PageSize
-    {
-      get => _pageSize;
-      set
-      {
-        if (SetProperty(ref _pageSize, value))
+        private int _pageSize = 5;
+        public int PageSize
         {
-          UpdatePaging();
+            get => _pageSize;
+            set
+            {
+                if (SetProperty(ref _pageSize, value))
+                {
+                    UpdatePaging();
+                }
+            }
         }
-      }
-    }
 
-    private int _totalPages;
-    public int TotalPages
-    {
-      get => _totalPages;
-      private set
-      {
-        if (SetProperty(ref _totalPages, value))
+        private int _totalPages;
+        public int TotalPages
         {
-          OnPropertyChanged(nameof(CanGoToNextPage));
-          OnPropertyChanged(nameof(CanGoToPreviousPage));
-          OnPropertyChanged(nameof(PageInfo));
+            get => _totalPages;
+            private set
+            {
+                if (SetProperty(ref _totalPages, value))
+                {
+                    OnPropertyChanged(nameof(CanGoToNextPage));
+                    OnPropertyChanged(nameof(CanGoToPreviousPage));
+                    OnPropertyChanged(nameof(PageInfo));
+                }
+            }
         }
-      }
-    }
 
-    public bool CanGoToPreviousPage => CurrentPage > 1;
-    public bool CanGoToNextPage => CurrentPage < TotalPages;
-    public string PageInfo => $"{CurrentPage} / {TotalPages}";
+        public bool CanGoToPreviousPage => CurrentPage > 1;
+        public bool CanGoToNextPage => CurrentPage < TotalPages;
+        public string PageInfo => $"{CurrentPage} / {TotalPages}";
 
-    public void SetFullList(IEnumerable<T> fullList)
-    {
-      _fullList = fullList?.ToList() ?? new List<T>();
-      CurrentPage = 1;
-      UpdatePaging();
-    }
-
-    public void UpdatePaging()
-    {
-      if (_fullList == null || _fullList.Count == 0)
-      {
-        TotalPages = 0;
-        CurrentPage = 0;
-        PagedItems.Clear();
-      }
-      else
-      {
-        TotalPages = (int)Math.Ceiling((double)_fullList.Count / PageSize);
-        if (CurrentPage > TotalPages) CurrentPage = TotalPages;
-        if (CurrentPage < 1) CurrentPage = 1;
-
-        var pagedItems = _fullList
-            .Skip((CurrentPage - 1) * PageSize)
-            .Take(PageSize);
-
-        PagedItems.Clear();
-        foreach (var item in pagedItems)
+        public void SetFullList(IEnumerable<T> fullList)
         {
-          PagedItems.Add(item);
+            _fullList = fullList?.ToList() ?? new List<T>();
+            CurrentPage = 1;
+            UpdatePaging();
         }
-      }
 
-      OnPropertyChanged(nameof(CanGoToNextPage));
-      OnPropertyChanged(nameof(CanGoToPreviousPage));
-      OnPropertyChanged(nameof(PageInfo));
-      OnPropertyChanged(nameof(CurrentPage));
-      OnPropertyChanged(nameof(TotalPages));
-    }
+        public void UpdatePaging()
+        {
+            if (_fullList == null || _fullList.Count == 0)
+            {
+                TotalPages = 0;
+                CurrentPage = 0;
+                PagedItems.Clear();
+            }
+            else
+            {
+                TotalPages = (int)Math.Ceiling((double)_fullList.Count / PageSize);
+                if (CurrentPage > TotalPages) CurrentPage = TotalPages;
+                if (CurrentPage < 1) CurrentPage = 1;
 
-    public void NextPage()
-    {
-      if (CanGoToNextPage)
-      {
-        CurrentPage++;
-      }
-    }
+                var pagedItems = _fullList
+                    .Skip((CurrentPage - 1) * PageSize)
+                    .Take(PageSize);
 
-    public void PreviousPage()
-    {
-      if (CanGoToPreviousPage)
-      {
-        CurrentPage--;
-      }
-    }
+                PagedItems.Clear();
+                foreach (var item in pagedItems)
+                {
+                    PagedItems.Add(item);
+                }
+            }
 
-    public event PropertyChangedEventHandler PropertyChanged;
-    protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
-    {
-      PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
+            OnPropertyChanged(nameof(CanGoToNextPage));
+            OnPropertyChanged(nameof(CanGoToPreviousPage));
+            OnPropertyChanged(nameof(PageInfo));
+            OnPropertyChanged(nameof(CurrentPage));
+            OnPropertyChanged(nameof(TotalPages));
+        }
 
-    protected bool SetProperty<TValue>(ref TValue field, TValue value, [CallerMemberName] string propertyName = null)
-    {
-      if (EqualityComparer<TValue>.Default.Equals(field, value)) return false;
-      field = value;
-      OnPropertyChanged(propertyName);
-      return true;
+        public void NextPage()
+        {
+            if (CanGoToNextPage)
+            {
+                CurrentPage++;
+            }
+        }
+
+        public void PreviousPage()
+        {
+            if (CanGoToPreviousPage)
+            {
+                CurrentPage--;
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        protected bool SetProperty<TValue>(ref TValue field, TValue value, [CallerMemberName] string propertyName = null)
+        {
+            if (EqualityComparer<TValue>.Default.Equals(field, value)) return false;
+            field = value;
+            OnPropertyChanged(propertyName);
+            return true;
+        }
     }
-  }
 }

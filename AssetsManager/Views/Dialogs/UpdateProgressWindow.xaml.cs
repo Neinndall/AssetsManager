@@ -7,34 +7,34 @@ using Serilog;
 
 namespace AssetsManager.Views.Dialogs
 {
-  /// <summary>
-  /// Interaction logic for UpdateProgressWindow.xaml
-  /// </summary>
-  public partial class UpdateProgressWindow : Window
-  {
-    public UpdateProgressWindow()
+    /// <summary>
+    /// Interaction logic for UpdateProgressWindow.xaml
+    /// </summary>
+    public partial class UpdateProgressWindow : Window
     {
-      InitializeComponent();
-    }
+        public UpdateProgressWindow()
+        {
+            InitializeComponent();
+        }
 
-    public void SetProgress(int percentage, string message)
-    {
-      if (!CheckAccess())
-      {
-        Dispatcher.Invoke(() => SetProgress(percentage, message));
-        return;
-      }
+        public void SetProgress(int percentage, string message)
+        {
+            if (!CheckAccess())
+            {
+                Dispatcher.Invoke(() => SetProgress(percentage, message));
+                return;
+            }
 
-      Log.Debug($"UpdateProgressWindow: Setting progress to {percentage}% with message: {message}");
-      // Update the progress bar value directly
-      DownloadProgressBar.Value = percentage;
-      MessageTextBlock.Text = message;
-    }
+            Log.Debug($"UpdateProgressWindow: Setting progress to {percentage}% with message: {message}");
+            // Update the progress bar value directly
+            DownloadProgressBar.Value = percentage;
+            MessageTextBlock.Text = message;
+        }
 
-    private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
-    {
-      if (e.ChangedButton == MouseButton.Left)
-        this.DragMove();
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                this.DragMove();
+        }
     }
-  }
 }

@@ -3,47 +3,47 @@ using System.Windows.Controls;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
-  public partial class ExplorerToolbarControl : UserControl
-  {
-    public event TextChangedEventHandler SearchTextChanged;
-    public event RoutedEventHandler CollapseToContainerClicked;
-    public event RoutedEventHandler LoadComparisonClicked;
-    public event RoutedEventHandler SwitchModeClicked;
-    public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
-
-    public string SearchText => SearchTextBox.Text;
-
-    public ExplorerToolbarControl()
+    public partial class ExplorerToolbarControl : UserControl
     {
-      InitializeComponent();
-    }
+        public event TextChangedEventHandler SearchTextChanged;
+        public event RoutedEventHandler CollapseToContainerClicked;
+        public event RoutedEventHandler LoadComparisonClicked;
+        public event RoutedEventHandler SwitchModeClicked;
+        public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
 
-    private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-      SearchTextChanged?.Invoke(this, e);
-    }
+        public string SearchText => SearchTextBox.Text;
 
-    private void CollapseToContainerButton_Click(object sender, RoutedEventArgs e)
-    {
-      CollapseToContainerClicked?.Invoke(this, e);
-    }
+        public ExplorerToolbarControl()
+        {
+            InitializeComponent();
+        }
 
-    private void LoadComparisonButton_Click(object sender, RoutedEventArgs e)
-    {
-      LoadComparisonClicked?.Invoke(this, e);
-    }
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            SearchTextChanged?.Invoke(this, e);
+        }
 
-    private void SwitchModeButton_Click(object sender, RoutedEventArgs e)
-    {
-      SwitchModeClicked?.Invoke(this, e);
-    }
+        private void CollapseToContainerButton_Click(object sender, RoutedEventArgs e)
+        {
+            CollapseToContainerClicked?.Invoke(this, e);
+        }
 
-    private void BreadcrumbToggleButton_Click(object sender, RoutedEventArgs e)
-    {
-      if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
-      {
-        BreadcrumbVisibilityChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
-      }
+        private void LoadComparisonButton_Click(object sender, RoutedEventArgs e)
+        {
+            LoadComparisonClicked?.Invoke(this, e);
+        }
+
+        private void SwitchModeButton_Click(object sender, RoutedEventArgs e)
+        {
+            SwitchModeClicked?.Invoke(this, e);
+        }
+
+        private void BreadcrumbToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                BreadcrumbVisibilityChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
+            }
+        }
     }
-  }
 }

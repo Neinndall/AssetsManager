@@ -3,16 +3,16 @@ using AssetsManager.Views.Models;
 
 namespace AssetsManager.Views.Settings
 {
-  public partial class GeneralSettingsView : UserControl
-  {
-    public GeneralSettingsView()
+    public partial class GeneralSettingsView : UserControl
     {
-      InitializeComponent();
-    }
+        public GeneralSettingsView()
+        {
+            InitializeComponent();
+        }
 
-    public void ApplySettingsToUI(SettingsModel model)
-    {
-      this.DataContext = model;
+        public void ApplySettingsToUI(SettingsModel model)
+        {
+            this.DataContext = model;
+        }
     }
-  }
 }

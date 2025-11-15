@@ -5,110 +5,110 @@ using AssetsManager.Views.Models;
 
 namespace AssetsManager.Views.Settings
 {
-  public partial class DefaultPathsSettingsView : UserControl
-  {
-    public DefaultPathsSettingsView()
+    public partial class DefaultPathsSettingsView : UserControl
     {
-      InitializeComponent();
-    }
-
-    public void ApplySettingsToUI(SettingsModel model)
-    {
-      this.DataContext = model;
-    }
-
-    private void btnBrowseNew_Click(object sender, RoutedEventArgs e)
-    {
-      using (var folderBrowserDialog = new CommonOpenFileDialog
-      {
-        IsFolderPicker = true,
-        Title = "Select new hashes folder"
-      })
-      {
-        if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+        public DefaultPathsSettingsView()
         {
-          textBoxNewHashPath.Text = folderBrowserDialog.FileName;
+            InitializeComponent();
         }
-      }
-    }
 
-    private void btnBrowseOld_Click(object sender, RoutedEventArgs e)
-    {
-      using (var folderBrowserDialog = new CommonOpenFileDialog
-      {
-        IsFolderPicker = true,
-        Title = "Select olds hashes folder"
-      })
-      {
-        if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+        public void ApplySettingsToUI(SettingsModel model)
         {
-          textBoxOldHashPath.Text = folderBrowserDialog.FileName;
+            this.DataContext = model;
         }
-      }
-    }
 
-    private void btnBrowseLol_Click(object sender, RoutedEventArgs e)
-    {
-      using (var folderBrowserDialog = new CommonOpenFileDialog
-      {
-        IsFolderPicker = true,
-        Title = "Select lol PBE directory"
-      })
-      {
-        if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+        private void btnBrowseNew_Click(object sender, RoutedEventArgs e)
         {
-          textBoxLolPath.Text = folderBrowserDialog.FileName;
+            using (var folderBrowserDialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "Select new hashes folder"
+            })
+            {
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    textBoxNewHashPath.Text = folderBrowserDialog.FileName;
+                }
+            }
         }
-      }
-    }
 
-    private void btnBrowseLolLive_Click(object sender, RoutedEventArgs e)
-    {
-      using (var folderBrowserDialog = new CommonOpenFileDialog
-      {
-        IsFolderPicker = true,
-        Title = "Select lol Live directory"
-      })
-      {
-        if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+        private void btnBrowseOld_Click(object sender, RoutedEventArgs e)
         {
-          textBoxLolLivePath.Text = folderBrowserDialog.FileName;
+            using (var folderBrowserDialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "Select olds hashes folder"
+            })
+            {
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    textBoxOldHashPath.Text = folderBrowserDialog.FileName;
+                }
+            }
         }
-      }
-    }
 
-    private void btnBrowseDefaultExtracted_Click(object sender, RoutedEventArgs e)
-    {
-      using (var folderBrowserDialog = new CommonOpenFileDialog
-      {
-        IsFolderPicker = true,
-        Title = "Select default extraction directory"
-      })
-      {
-        if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+        private void btnBrowseLol_Click(object sender, RoutedEventArgs e)
         {
-          textBoxDefaultExtractedPath.Text = folderBrowserDialog.FileName;
+            using (var folderBrowserDialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "Select lol PBE directory"
+            })
+            {
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    textBoxLolPath.Text = folderBrowserDialog.FileName;
+                }
+            }
         }
-      }
-    }
 
-    private void btnBrowseCustomFloorTexture_Click(object sender, RoutedEventArgs e)
-    {
-      using (var openFileDialog = new CommonOpenFileDialog
-      {
-        IsFolderPicker = false,
-        Title = "Select custom floor texture file",
-        Filters = {
+        private void btnBrowseLolLive_Click(object sender, RoutedEventArgs e)
+        {
+            using (var folderBrowserDialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "Select lol Live directory"
+            })
+            {
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    textBoxLolLivePath.Text = folderBrowserDialog.FileName;
+                }
+            }
+        }
+
+        private void btnBrowseDefaultExtracted_Click(object sender, RoutedEventArgs e)
+        {
+            using (var folderBrowserDialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "Select default extraction directory"
+            })
+            {
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    textBoxDefaultExtractedPath.Text = folderBrowserDialog.FileName;
+                }
+            }
+        }
+
+        private void btnBrowseCustomFloorTexture_Click(object sender, RoutedEventArgs e)
+        {
+            using (var openFileDialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = false,
+                Title = "Select custom floor texture file",
+                Filters = {
                     new CommonFileDialogFilter("Image Files", "*.png;*.jpg;*.jpeg;*.dds;*.tga"),
                     new CommonFileDialogFilter("All Files", "*.*")
                 }
-      })
-      {
-        if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-        {
-          textBoxCustomFloorTexturePath.Text = openFileDialog.FileName;
+            })
+            {
+                if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    textBoxCustomFloorTexturePath.Text = openFileDialog.FileName;
+                }
+            }
         }
-      }
     }
-  }
 }

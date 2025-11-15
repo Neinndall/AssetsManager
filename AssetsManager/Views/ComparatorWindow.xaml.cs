@@ -11,42 +11,42 @@ using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Views
 {
-  public partial class ComparatorWindow : UserControl
-  {
-    public ComparatorWindow(
-        CustomMessageBoxService customMessageBoxService,
-        WadComparatorService wadComparatorService,
-        LogService logService,
-        DirectoriesCreator directoriesCreator,
-        AssetDownloader assetDownloader,
-        WadDifferenceService wadDifferenceService,
-        WadPackagingService wadPackagingService,
-        BackupManager backupManager,
-        AppSettings appSettings,
-        DiffViewService diffViewService,
-        IServiceProvider serviceProvider,
-        HashResolverService hashResolverService
-        )
+    public partial class ComparatorWindow : UserControl
     {
-      InitializeComponent();
+        public ComparatorWindow(
+            CustomMessageBoxService customMessageBoxService,
+            WadComparatorService wadComparatorService,
+            LogService logService,
+            DirectoriesCreator directoriesCreator,
+            AssetDownloader assetDownloader,
+            WadDifferenceService wadDifferenceService,
+            WadPackagingService wadPackagingService,
+            BackupManager backupManager,
+            AppSettings appSettings,
+            DiffViewService diffViewService,
+            IServiceProvider serviceProvider,
+            HashResolverService hashResolverService
+            )
+        {
+            InitializeComponent();
 
-      // Set services for JsonComparisonControl
-      JsonComparisonControl.CustomMessageBoxService = customMessageBoxService;
-      JsonComparisonControl.DiffViewService = diffViewService;
+            // Set services for JsonComparisonControl
+            JsonComparisonControl.CustomMessageBoxService = customMessageBoxService;
+            JsonComparisonControl.DiffViewService = diffViewService;
 
-      // Set services for WadComparisonControl
-      WadComparisonControl.CustomMessageBoxService = customMessageBoxService;
-      WadComparisonControl.WadComparatorService = wadComparatorService;
-      WadComparisonControl.LogService = logService;
-      WadComparisonControl.DirectoriesCreator = directoriesCreator;
-      WadComparisonControl.AssetDownloaderService = assetDownloader;
-      WadComparisonControl.WadDifferenceService = wadDifferenceService;
-      WadComparisonControl.WadPackagingService = wadPackagingService;
-      WadComparisonControl.BackupManager = backupManager;
-      WadComparisonControl.AppSettings = appSettings;
-      WadComparisonControl.ServiceProvider = serviceProvider;
-      WadComparisonControl.DiffViewService = diffViewService;
-      WadComparisonControl.HashResolverService = hashResolverService;
+            // Set services for WadComparisonControl
+            WadComparisonControl.CustomMessageBoxService = customMessageBoxService;
+            WadComparisonControl.WadComparatorService = wadComparatorService;
+            WadComparisonControl.LogService = logService;
+            WadComparisonControl.DirectoriesCreator = directoriesCreator;
+            WadComparisonControl.AssetDownloaderService = assetDownloader;
+            WadComparisonControl.WadDifferenceService = wadDifferenceService;
+            WadComparisonControl.WadPackagingService = wadPackagingService;
+            WadComparisonControl.BackupManager = backupManager;
+            WadComparisonControl.AppSettings = appSettings;
+            WadComparisonControl.ServiceProvider = serviceProvider;
+            WadComparisonControl.DiffViewService = diffViewService;
+            WadComparisonControl.HashResolverService = hashResolverService;
+        }
     }
-  }
 }

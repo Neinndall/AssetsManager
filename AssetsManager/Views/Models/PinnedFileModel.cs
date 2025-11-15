@@ -2,49 +2,49 @@ using System.ComponentModel;
 
 namespace AssetsManager.Views.Models
 {
-  public class PinnedFileModel : INotifyPropertyChanged
-  {
-    private FileSystemNodeModel _node;
-    public FileSystemNodeModel Node
+    public class PinnedFileModel : INotifyPropertyChanged
     {
-      get => _node;
-      set
-      {
-        if (_node != value)
+        private FileSystemNodeModel _node;
+        public FileSystemNodeModel Node
         {
-          _node = value;
-          OnPropertyChanged(nameof(Node));
-          OnPropertyChanged(nameof(Header));
+            get => _node;
+            set
+            {
+                if (_node != value)
+                {
+                    _node = value;
+                    OnPropertyChanged(nameof(Node));
+                    OnPropertyChanged(nameof(Header));
+                }
+            }
         }
-      }
-    }
 
-    public bool IsDetailsTab { get; set; }
-    public string Header => IsDetailsTab ? "Details" : Node?.Name;
+        public bool IsDetailsTab { get; set; }
+        public string Header => IsDetailsTab ? "Details" : Node?.Name;
 
-    private bool _isSelected;
-    public bool IsSelected
-    {
-      get => _isSelected;
-      set
-      {
-        if (_isSelected != value)
+        private bool _isSelected;
+        public bool IsSelected
         {
-          _isSelected = value;
-          OnPropertyChanged(nameof(IsSelected));
+            get => _isSelected;
+            set
+            {
+                if (_isSelected != value)
+                {
+                    _isSelected = value;
+                    OnPropertyChanged(nameof(IsSelected));
+                }
+            }
         }
-      }
-    }
 
-    public PinnedFileModel(FileSystemNodeModel node)
-    {
-      Node = node;
-    }
+        public PinnedFileModel(FileSystemNodeModel node)
+        {
+            Node = node;
+        }
 
-    public event PropertyChangedEventHandler PropertyChanged;
-    protected virtual void OnPropertyChanged(string propertyName)
-    {
-      PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
-  }
 }

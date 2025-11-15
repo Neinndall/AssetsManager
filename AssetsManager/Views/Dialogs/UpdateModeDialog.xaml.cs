@@ -2,43 +2,43 @@ using System.Windows;
 
 namespace AssetsManager.Views.Dialogs
 {
-  public enum UpdateMode
-  {
-    None,
-    CleanWithoutSaving,
-    CleanWithSaving
-  }
-
-  public partial class UpdateModeDialog : Window
-  {
-    public UpdateMode SelectedMode { get; private set; } = UpdateMode.None;
-
-    public UpdateModeDialog()
+    public enum UpdateMode
     {
-      InitializeComponent();
+        None,
+        CleanWithoutSaving,
+        CleanWithSaving
     }
 
-    private void CleanUpdateNoSaveButton_Click(object sender, RoutedEventArgs e)
+    public partial class UpdateModeDialog : Window
     {
-      SelectedMode = UpdateMode.CleanWithoutSaving;
-      DialogResult = true;
-    }
+        public UpdateMode SelectedMode { get; private set; } = UpdateMode.None;
 
-    private void CleanUpdateWithSaveButton_Click(object sender, RoutedEventArgs e)
-    {
-      SelectedMode = UpdateMode.CleanWithSaving;
-      DialogResult = true;
-    }
+        public UpdateModeDialog()
+        {
+            InitializeComponent();
+        }
 
-    private void CancelButton_Click(object sender, RoutedEventArgs e)
-    {
-      DialogResult = false;
-    }
+        private void CleanUpdateNoSaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            SelectedMode = UpdateMode.CleanWithoutSaving;
+            DialogResult = true;
+        }
 
-    private void TitleBar_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-      if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
-        this.DragMove();
+        private void CleanUpdateWithSaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            SelectedMode = UpdateMode.CleanWithSaving;
+            DialogResult = true;
+        }
+
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+        }
+
+        private void TitleBar_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+                this.DragMove();
+        }
     }
-  }
 }
