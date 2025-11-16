@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models;
 using AssetsManager.Utils;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 
 namespace AssetsManager.Services.Api
@@ -32,25 +33,30 @@ namespace AssetsManager.Services.Api
             _remoteEndpoints = Endpoints.GetRemoteEndpoints();
         }
 
-        public async Task<bool> ReadLockfileAsync()
+        public async Task<bool> ReadLockfileAsync(bool logErrorOnFailure = true)
         {
-            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi 
-                ? _appSettings.LolPbeDirectory 
+            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi
+                ? _appSettings.LolPbeDirectory
                 : _appSettings.LolLiveDirectory;
 
             string clientType = _appSettings.ApiSettings.UsePbeForApi ? "PBE" : "Live";
 
             if (string.IsNullOrEmpty(lolDirectory) || !Directory.Exists(lolDirectory))
             {
-                _logService.LogError($"LoL {clientType} Directory is not configured or does not exist.");
+                if (logErrorOnFailure)
+                {
+                    _logService.LogWarning($"LoL {clientType} Directory is not configured or does not exist.");
+                }
                 return false;
             }
-
             var lockfilePath = Path.Combine(lolDirectory, "lockfile");
 
             if (!File.Exists(lockfilePath))
             {
-                _logService.LogError($"Lockfile not found at {lockfilePath}. Make sure the {clientType} client is running.");
+                if (logErrorOnFailure)
+                {
+                    _logService.LogWarning($"Lockfile not found. Make sure the {clientType} client is running.");
+                }
                 return false;
             }
 
@@ -74,11 +80,17 @@ namespace AssetsManager.Services.Api
                     AppSettings.SaveSettings(_appSettings);
                     return true;
                 }
-                _logService.LogError("The lockfile format is incorrect. Could not extract necessary data.");
+                if (logErrorOnFailure)
+                {
+                    _logService.LogError("The lockfile format is incorrect. Could not extract necessary data.");
+                }
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Error reading or processing lockfile.");
+                if (logErrorOnFailure)
+                {
+                    _logService.LogError(ex, "Error reading or processing lockfile.");
+                }
                 return false;
             }
 
@@ -100,49 +112,77 @@ namespace AssetsManager.Services.Api
             return $"Basic {base64String}";
         }
 
-        public async Task<bool> AquireJwtAsync()
+        public async Task<bool> AuthenticateForUiDisplayAsync()
         {
-            if (!_localEndpoints.TryGetValue("entitlementsToken", out var tokenEndpointPath))
+            string token = await GetTokenFromEndpoint("entitlementsToken");
+            if (!string.IsNullOrEmpty(token))
             {
-                _logService.LogError("Internal Error: The 'entitlementsToken' endpoint is not defined in the service.");
-                return false;
+                // This token's parsed info will be the one displayed in the UI.
+                _appSettings.ApiSettings.Token.Jwt = token;
+                ParseJwtPayload(token); // This method already saves the settings
+                _logService.LogSuccess("UI authentication token has been set from entitlements endpoint.");
+                return true;
+            }
+            
+            _logService.LogError("Failed to acquire a token for UI display.");
+            return false;
+        }
+
+        private async Task<string> GetTokenFromEndpoint(string endpointKey)
+        {
+            if (!_localEndpoints.TryGetValue(endpointKey, out var tokenEndpointPath))
+            {
+                _logService.LogError($"Internal Error: The '{endpointKey}' endpoint is not defined in the service.");
+                return null;
             }
 
             try
             {
                 var response = await MakeLocalRequestAsync(tokenEndpointPath);
                 response.EnsureSuccessStatusCode();
+                var rawResponse = await response.Content.ReadAsStringAsync();
+                string token = null;
 
-                var jsonResponse = await response.Content.ReadAsStringAsync();
-                var jsonDoc = JsonDocument.Parse(jsonResponse);
-                if (jsonDoc.RootElement.TryGetProperty("accessToken", out var accessTokenElement))
+                try
                 {
-                    var token = accessTokenElement.GetString();
-                    _appSettings.ApiSettings.Token.Jwt = token;
-
-                    // Parse the JWT to get real expiration and region
-                    ParseJwtPayload(token);
-
-                    AppSettings.SaveSettings(_appSettings);
-                    _logService.LogSuccess("JWT acquired and saved successfully.");
-                    return true;
+                    using (var jsonDoc = JsonDocument.Parse(rawResponse))
+                    {
+                        if (jsonDoc.RootElement.ValueKind == JsonValueKind.Object &&
+                            jsonDoc.RootElement.TryGetProperty("accessToken", out var accessTokenElement))
+                        {
+                            token = accessTokenElement.GetString();
+                        }
+                        else if (jsonDoc.RootElement.ValueKind == JsonValueKind.String)
+                        {
+                            token = jsonDoc.RootElement.GetString();
+                        }
+                        else
+                        {
+                            token = rawResponse.Trim('"');
+                        }
+                    }
                 }
-                _logService.LogError("The 'accessToken' not found in the JSON response when acquiring JWT.");
+                catch (JsonException)
+                {
+                    token = rawResponse.Trim('"');
+                }
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    return token;
+                }
+                _logService.LogWarning($"Token was null or empty after processing response from {endpointKey}.");
             }
             catch (HttpRequestException httpEx)
             {
-                _logService.LogError(httpEx, "HTTP error while acquiring JWT.");
-            }
-            catch (JsonException jsonEx)
-            {
-                _logService.LogError(jsonEx, "JSON error while acquiring JWT.");
+                _logService.LogWarning($"HTTP error while acquiring token from {endpointKey}: {httpEx.Message}");
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Unexpected error while acquiring JWT.");
+                _logService.LogError(ex, $"Unexpected error while acquiring token from {endpointKey}.");
             }
 
-            return false;
+            return null;
         }
 
         private void ParseJwtPayload(string token)
@@ -190,6 +230,8 @@ namespace AssetsManager.Services.Api
                     _appSettings.ApiSettings.Token.SummonerId = pvpId;
                 else if (root.TryGetProperty("dat", out var datIdElement) && datIdElement.TryGetProperty("u", out var uElement) && uElement.TryGetInt64(out var uId))
                     _appSettings.ApiSettings.Token.SummonerId = uId;
+                
+                AppSettings.SaveSettings(_appSettings);
             }
             catch (Exception ex)
             {
@@ -231,6 +273,38 @@ namespace AssetsManager.Services.Api
             return null;
         }
 
+        public async Task<string> GetMythicShopAsync()
+        {
+            var response = await MakeRemoteRequestAsync("mythic_shop");
+            if (response != null && response.IsSuccessStatusCode)
+            {
+                var mythicShopJson = await response.Content.ReadAsStringAsync();
+
+                // Save to API cache
+                await _directoriesCreator.CreateDirApiCacheAsync();
+                var fileName = "mythic_shop.json";
+                var filePath = Path.Combine(_directoriesCreator.ApiCachePath, fileName);
+                await File.WriteAllTextAsync(filePath, mythicShopJson);
+                return mythicShopJson;
+            }
+            else if (response != null)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logService.LogWarning($"Mythic Shop request failed with status code: {response.StatusCode}. Content: {errorContent}");
+            }
+            return null;
+        }
+
+        public async Task<MythicShopResponse> GetMythicShopResponseAsync()
+        {
+            var mythicShopJson = await GetMythicShopAsync();
+            if (!string.IsNullOrEmpty(mythicShopJson))
+            {
+                return JsonSerializer.Deserialize<MythicShopResponse>(mythicShopJson);
+            }
+            return null;
+        }
+
         private async Task<HttpResponseMessage> MakeLocalRequestAsync(string endpointPath)
         {
             if (string.IsNullOrEmpty(_appSettings.ApiSettings.Connection.LocalApiUrl))
@@ -256,22 +330,41 @@ namespace AssetsManager.Services.Api
 
         private async Task<HttpResponseMessage> MakeRemoteRequestAsync(string endpointKey, int retryCount = 1)
         {
-            if (string.IsNullOrEmpty(_appSettings.ApiSettings.Token.Jwt))
+            string tokenEndpointKey;
+            if (endpointKey == "sales")
             {
-                _logService.LogError("JWT not available to make remote request.");
+                tokenEndpointKey = "entitlementsToken";
+            }
+            else if (endpointKey == "mythic_shop")
+            {
+                tokenEndpointKey = "leagueSessionToken";
+            }
+            else
+            {
+                _logService.LogError($"No token acquisition strategy defined for endpoint key: {endpointKey}");
                 return null;
             }
 
+            string jwt = await GetTokenFromEndpoint(tokenEndpointKey);
+
+            if (string.IsNullOrEmpty(jwt))
+            {
+                _logService.LogError($"Failed to acquire necessary token ('{tokenEndpointKey}') for remote request.");
+                return null;
+            }
+
+            // We need to parse the token to get region info for the URL and for the UI.
+            _appSettings.ApiSettings.Token.Jwt = jwt;
+            ParseJwtPayload(jwt);
             var region = _appSettings.ApiSettings.Token.Region?.ToLower();
+
             if (string.IsNullOrEmpty(region) || region == "unknown")
             {
                 _logService.LogError("Could not determine region from JWT. Cannot make remote request.");
                 return null;
             }
 
-            // Remove trailing digits from the region string (e.g., "euw1" -> "euw")
             region = Regex.Replace(region, @"\d+$", "");
-
             var baseUrl = Endpoints.BaseUrlLive.Replace("{region}", region);
 
             if (!_remoteEndpoints.TryGetValue(endpointKey, out var endpointPath))
@@ -281,9 +374,8 @@ namespace AssetsManager.Services.Api
             }
 
             var requestUri = $"{baseUrl}{endpointPath}";
-
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-            request.Headers.Add("Authorization", $"Bearer {_appSettings.ApiSettings.Token.Jwt}");
+            request.Headers.Add("Authorization", $"Bearer {jwt}");
             request.Headers.Add("User-Agent", "LeagueOfLegendsClient/15.1.645.4557 (rcp-be-lol-ranked)");
             request.Headers.Add("Accept", "application/json");
 
@@ -293,11 +385,14 @@ namespace AssetsManager.Services.Api
 
                 if ((response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden) && retryCount > 0)
                 {
-                    _logService.Log("Token expired or invalid. Attempting to refresh and retry...");
-                    bool refreshed = await AquireJwtAsync();
-                    if (refreshed)
+                    _logService.Log($"Token for {endpointKey} was rejected. Attempting to refresh and retry...");
+                    // Re-acquire the specific token needed
+                    string refreshedJwt = await GetTokenFromEndpoint(tokenEndpointKey);
+                    if (!string.IsNullOrEmpty(refreshedJwt))
                     {
-                        return await MakeRemoteRequestAsync(endpointKey, retryCount - 1);
+                        // Update the header with the new token for the retry
+                        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", refreshedJwt);
+                        return await _httpClient.SendAsync(request); // Use the same request object with the updated header
                     }
                 }
 

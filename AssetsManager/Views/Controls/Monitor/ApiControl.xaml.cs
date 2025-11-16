@@ -3,6 +3,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -10,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging; // Added for RenderTargetBitmap
 using Microsoft.WindowsAPICodePack.Dialogs; // Added for CommonSaveFileDialog
@@ -25,6 +27,8 @@ namespace AssetsManager.Views.Controls.Monitor
         public LogService LogService { get; set; }
         public DirectoriesCreator DirectoriesCreator { get; set; }
 
+        private DispatcherTimer _lcuConnectionTimer;
+
         // The state model for this view
         public ApiModel Status { get; } = new ApiModel();
 
@@ -33,13 +37,55 @@ namespace AssetsManager.Views.Controls.Monitor
             InitializeComponent();
             this.DataContext = this;
             this.Loaded += ApiControl_Loaded;
+            this.Unloaded += ApiControl_Unloaded; // Added
+
+            // Initialize the timer
+            _lcuConnectionTimer = new DispatcherTimer();
+            _lcuConnectionTimer.Interval = TimeSpan.FromSeconds(2); // Check every 2 seconds
+            _lcuConnectionTimer.Tick += LcuConnectionTimer_Tick;
         }
 
         private async void ApiControl_Loaded(object sender, RoutedEventArgs e)
         {
-            // Check authentication state when the control is loaded and AppSettings should be available
-            CheckAuthenticationState();
+            UpdateAuthenticationStatus();
+
+            bool isCurrentlyConnected = await RiotApiService.ReadLockfileAsync(false); // Silenciosa
+            UpdateConnectionStatus(isCurrentlyConnected);
+            if (isCurrentlyConnected)
+            {
+                _lcuConnectionTimer.Start();
+            }
+
             await LoadSalesFromCacheAsync();
+            await LoadMythicShopFromCacheAsync();
+        }
+
+        private async Task LoadMythicShopFromCacheAsync()
+        {
+            if (DirectoriesCreator == null || !Directory.Exists(DirectoriesCreator.ApiCachePath))
+            {
+                return;
+            }
+
+            try
+            {
+                var mythicShopFilePath = Path.Combine(DirectoriesCreator.ApiCachePath, "mythic_shop.json");
+
+                if (File.Exists(mythicShopFilePath))
+                {
+                    var jsonContent = await File.ReadAllTextAsync(mythicShopFilePath);
+                    var mythicShopResponse = JsonSerializer.Deserialize<MythicShopResponse>(jsonContent);
+
+                    if (mythicShopResponse != null)
+                    {
+                        ProcessMythicShopData(mythicShopResponse);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Failed to load mythic shop data from cache.");
+            }
         }
 
         private async Task LoadSalesFromCacheAsync()
@@ -72,37 +118,89 @@ namespace AssetsManager.Views.Controls.Monitor
             }
         }
 
-        private async void GetTokenButton_Click(object sender, RoutedEventArgs e)
+
+
+        private async void ConnectButton_Click(object sender, RoutedEventArgs e)
         {
             if (RiotApiService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "RiotApiService no está disponible.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
                 return;
             }
 
             Status.IsBusy = true;
-            Status.StatusText = "Status: Authenticating...";
-            Status.IsAuthenticated = false;
+            Status.StatusText = "Status: Connecting to LCU...";
 
-            bool lockfileRead = await RiotApiService.ReadLockfileAsync();
-            if (!lockfileRead)
+            if (AppSettings != null)
             {
-                Status.StatusText = "Status: Error - Could not read lockfile. Is the game client running?";
-                Status.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
-                Status.IsBusy = false;
-                return;
+                AppSettings.ApiSettings.Token = new TokenInfo();
+                UpdateAuthenticationStatus(); // Update UI to show "Not Authenticated" immediately
             }
 
-            await RiotApiService.AquireJwtAsync();
-            CheckAuthenticationState(); // Update status after acquiring JWT
+            bool lockfileRead = await RiotApiService.ReadLockfileAsync(true); // Con log de error
+            
+            UpdateConnectionStatus(lockfileRead); // This will set Status.IsConnected
+
+            if (lockfileRead)
+            {
+                _lcuConnectionTimer.Stop(); // Stop any existing timer
+                _lcuConnectionTimer.Start(); // Start monitoring
+            }
+            else
+            {
+                _lcuConnectionTimer.Stop(); // Stop if connection failed
+            }
+
             Status.IsBusy = false;
+        }
+
+        private void UpdateConnectionStatus(bool isConnected)
+        {
+            if (isConnected)
+            {
+                Status.StatusText = "Status: LCU Connected";
+                Status.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                Status.ButtonContent = "Reconnect";
+                Status.IsConnected = true;
+            }
+            else
+            {
+                Status.StatusText = "Status: Disconnected";
+                Status.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                Status.ButtonContent = "Connect";
+                Status.IsConnected = false;
+                _lcuConnectionTimer.Stop(); // Stop the timer if disconnected
+
+                if (AppSettings != null)
+                {
+                    AppSettings.ApiSettings.Token = new TokenInfo();
+                    UpdateAuthenticationStatus(); 
+                }
+            }
+        }
+
+        private void UpdateAuthenticationStatus()
+        {
+            if (AppSettings != null && !string.IsNullOrEmpty(AppSettings.ApiSettings.Token.Jwt) && AppSettings.ApiSettings.Token.Expiration > DateTime.UtcNow)
+            {
+                Status.AuthenticationStatusText = "Status: Authenticated";
+                Status.AuthenticationStatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                Status.IsAuthenticated = true;
+            }
+            else
+            {
+                Status.AuthenticationStatusText = "Status: Not Authenticated";
+                Status.AuthenticationStatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                Status.IsAuthenticated = false;
+            }
+            Status.Update(this.AppSettings); // Ensure computed properties (RegionText, etc.) are refreshed
         }
 
         private async void RequestsSales_Click(object sender, RoutedEventArgs e)
         {
             if (RiotApiService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "RiotApiService no está disponible.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
                 return;
             }
 
@@ -112,6 +210,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (salesCatalog != null)
             {
+                UpdateAuthenticationStatus();
                 Status.Player = salesCatalog.Player;
                 var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null);
 
@@ -263,36 +362,137 @@ namespace AssetsManager.Views.Controls.Monitor
             Status.Paginator.NextPage();
         }
 
-        private void CheckAuthenticationState()
+        private async void RequestsMythicShop_Click(object sender, RoutedEventArgs e)
         {
-            if (AppSettings != null && !string.IsNullOrEmpty(AppSettings.ApiSettings.Token.Jwt) && AppSettings.ApiSettings.Token.Expiration > DateTime.UtcNow)
+            if (RiotApiService == null)
             {
-                Status.StatusText = "Status: Authenticated";
-                Status.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
-                Status.ButtonContent = "Refresh Token";
-                Status.IsAuthenticated = true;
+                CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
+                return;
             }
-            else
+
+            Status.IsBusy = true;
+            var mythicShopResponse = await RiotApiService.GetMythicShopResponseAsync();
+            Status.IsBusy = false;
+
+            if (mythicShopResponse == null)
             {
-                Status.StatusText = "Status: Not Authenticated";
-                Status.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
-                Status.ButtonContent = "Get Token";
-                Status.IsAuthenticated = false;
+                CustomMessageBoxService.ShowError("Error", "Could not retrieve Mythic Shop data.", Window.GetWindow(this));
+                return;
             }
-            // Update the computed properties in the model
-            Status.Update(this.AppSettings);
+
+            UpdateAuthenticationStatus();
+            ProcessMythicShopData(mythicShopResponse);
+            LogService.LogSuccess("Mythic Shop data retrieved and displayed successfully.");
         }
 
-        private void RequestsMythicShop_Click(object sender, RoutedEventArgs e)
+        private void ProcessMythicShopData(MythicShopResponse mythicShopResponse)
         {
-            LogService.Log("Requests MythicShop button clicked. Functionality not yet implemented.");
-            CustomMessageBoxService.ShowInfo("Mythic Shop", "Mythic Shop functionality is not yet implemented.", Window.GetWindow(this));
+            if (mythicShopResponse?.Data == null)
+            {
+                LogService.LogWarning("Mythic Shop data is null or invalid.");
+                return;
+            }
+
+            try
+            {
+                Status.MythicShopCategories.Clear();
+                var categories = new Dictionary<string, MythicShopCategory>();
+                var categoryOrder = new[] { "FEATURED", "BIWEEKLY", "WEEKLY", "DAILY" };
+
+                // Initialize categories to maintain order
+                foreach (var catName in categoryOrder)
+                {
+                    categories[catName] = new MythicShopCategory { CategoryName = catName };
+                }
+
+                foreach (var section in mythicShopResponse.Data)
+                {
+                    var sectionNameParts = section.Name.Split('_');
+                    if (sectionNameParts.Length > 2)
+                    {
+                        var categoryKey = sectionNameParts[2].ToUpper();
+                        if (categories.TryGetValue(categoryKey, out var categoryViewModel))
+                        {
+                            foreach (var entry in section.CatalogEntries)
+                            {
+                                var purchaseUnit = entry.PurchaseUnits.FirstOrDefault();
+                                if (purchaseUnit == null) continue;
+
+                                var payment = purchaseUnit.PaymentOptions.FirstOrDefault()?.Payments.FirstOrDefault();
+                                if (payment == null) continue;
+
+                                var itemViewModel = new MythicShopModel
+                                {
+                                    Name = purchaseUnit.Fulfillment.Name,
+                                    Price = payment.Delta,
+                                    EndTime = FormatTimeRemaining(entry.EndTime)
+                                };
+                                categoryViewModel.Items.Add(itemViewModel);
+                            }
+                        }
+                    }
+                }
+
+                // Add to observable collection in the correct order
+                foreach (var catName in categoryOrder)
+                {
+                    if (categories.TryGetValue(catName, out var categoryVm) && categoryVm.Items.Any())
+                    {
+                        Status.MythicShopCategories.Add(categoryVm);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Failed to process Mythic Shop data.");
+                CustomMessageBoxService.ShowError("Error", $"An error occurred while processing Mythic Shop data: {ex.Message}", Window.GetWindow(this));
+            }
+        }
+        
+        
+        private string FormatTimeRemaining(DateTime endTime)
+        {
+            var remaining = endTime.ToLocalTime() - DateTime.Now;
+
+            if (remaining.TotalSeconds <= 0)
+            {
+                return "Expired";
+            }
+            if (remaining.TotalDays >= 1)
+            {
+                return $"Expires in {remaining.Days}d {remaining.Hours}h";
+            }
+            if (remaining.TotalHours >= 1)
+            {
+                return $"Expires in {remaining.Hours}h {remaining.Minutes}m";
+            }
+            return $"Expires in {remaining.Minutes}m";
         }
 
         private void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
         {
             LogService.Log("Save MythicShop button clicked. Functionality not yet implemented.");
             CustomMessageBoxService.ShowInfo("Mythic Shop", "Mythic Shop save functionality is not yet implemented.", Window.GetWindow(this));
+        }
+
+        private async void LcuConnectionTimer_Tick(object sender, EventArgs e)
+        {
+            if (RiotApiService == null) return;
+
+            // Only update the status if there's a change, to avoid constant UI refreshes
+            // and potential race conditions if the user clicks "Connect" at the same time.
+            bool isStillConnected = await RiotApiService.ReadLockfileAsync(false); // Silenciosa
+            if (isStillConnected != Status.IsConnected)
+            {
+                UpdateConnectionStatus(isStillConnected);
+            }        
+        }
+
+        private void ApiControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _lcuConnectionTimer.Stop();
+            // Unsubscribe to prevent potential memory leaks if the control is frequently loaded/unloaded
+            _lcuConnectionTimer.Tick -= LcuConnectionTimer_Tick;
         }
     }
 }
