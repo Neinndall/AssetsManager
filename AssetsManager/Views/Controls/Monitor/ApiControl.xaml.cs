@@ -343,7 +343,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     });
                 }
 
-                LogService.LogInteractiveSuccess($"Sales data saved as PNG to {filePath}", filePath, Path.GetFileName(filePath));
+                LogService.LogInteractiveSuccess($"Sales data saved as PNG to {Path.GetFileName(filePath)}", filePath, Path.GetFileName(filePath));
             }
             catch (Exception ex)
             {

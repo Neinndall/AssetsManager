@@ -121,8 +121,8 @@ namespace AssetsManager.Views.Controls.Monitor
                             await AssetDownloader.DownloadAssetToCustomPathAsync(asset.Url, fullDestinationPath);
                             downloadedCount++;
                         }
-                        CustomMessageBoxService.ShowSuccess("Success", $"Successfully saved {downloadedCount} assets.", Window.GetWindow(this));
-                        LogService.LogInteractiveSuccess($"Successfully saved {downloadedCount} assets to '{destinationPath}'.", destinationPath, Path.GetFileName(destinationPath));
+                        
+                        LogService.LogInteractiveSuccess($"Successfully saved {downloadedCount} assets to '{Path.GetFileName(destinationPath)}'.", destinationPath, Path.GetFileName(destinationPath));
                     }
                     catch (Exception ex)
                     {
