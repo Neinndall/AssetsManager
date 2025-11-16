@@ -229,8 +229,10 @@
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
                                         <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,5,0,0">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="{Binding FormattedOriginalPrice, Mode=OneWay}" TextDecorations="Strikethrough" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center"/>                                            <TextBlock Text="{Binding Sale.FormattedSaleDetails, Mode=OneWay}" Foreground="{StaticResource AccentGreen}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center"/>                                            <TextBlock Text="{Binding Sale.FormattedEndDate, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding FormattedOriginalPrice, Mode=OneWay}" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Sale.FormattedSaleDetails, Mode=OneWay}" Foreground="{StaticResource AccentGreen}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Sale.FormattedEndDate, Mode=OneWay}" FontSize="12" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -334,10 +336,11 @@
                                                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding Name}" 
                                                                    FontWeight="SemiBold" 
-                                                                   FontSize="14" 
+                                                                   FontSize="13" 
                                                                    Foreground="{StaticResource TextPrimary}" 
-                                                                   TextTrimming="CharacterEllipsis" 
+                                                                   TextWrapping="Wrap" 
                                                                    HorizontalAlignment="Center"
+                                                                   TextAlignment="Center"
                                                                    Margin="0,5,0,0"/>
                                                         <TextBlock Foreground="{StaticResource AccentPurple}" 
                                                                    FontWeight="SemiBold" 
@@ -346,7 +349,7 @@
                                                             <Run Text="{Binding Price}"/>
                                                             <Run Text=" ME"/>
                                                         </TextBlock>
-                                                        <TextBlock FontSize="11" 
+                                                        <TextBlock FontSize="12" 
                                                                    Foreground="{StaticResource TextMuted}" 
                                                                    HorizontalAlignment="Center">
                                                             <Run Text="{Binding EndTime}"/>
