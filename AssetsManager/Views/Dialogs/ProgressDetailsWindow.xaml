@@ -29,7 +29,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" Width="16" Height="16" Foreground="White" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" Width="16" Height="16" Foreground="White" VerticalAlignment="Center" Margin="10,0,5,0"/>
                         <TextBlock Text="{Binding HeaderText}" FontWeight="Medium" FontSize="13" Foreground="White" VerticalAlignment="Center" Margin="5,10"/>
                     </StackPanel>
 
