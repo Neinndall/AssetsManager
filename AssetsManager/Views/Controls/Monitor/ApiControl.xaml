@@ -222,7 +222,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="10">
+                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="5">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
@@ -230,19 +230,7 @@
                                         </Grid.RowDefinitions>
                                         <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,5,0,0">
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center"/>
-                                            <TextBlock Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center">
-                                                <Run Text="Original Price: "/>
-                                                <Run Text="{Binding Rp}" TextDecorations="Strikethrough"/>
-                                                <Run Text=" RP"/>
-                                            </TextBlock>
-                                            <TextBlock Foreground="{StaticResource AccentGreen}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center">
-                                                <Run Text="Sale: "/>
-                                                <Run Text="{Binding Sale.Rp}"/><Run Text=" RP ("/><Run Text="{Binding Sale.PercentOff}"/><Run Text="% dto)"/>
-                                            </TextBlock>
-                                            <TextBlock FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center">
-                                                <Run Text="Ends:"/>
-                                                <Run Text="{Binding Sale.EndDate}"/>
-                                            </TextBlock>
+                                            <TextBlock Text="{Binding FormattedOriginalPrice, Mode=OneWay}" TextDecorations="Strikethrough" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center"/>                                            <TextBlock Text="{Binding Sale.FormattedSaleDetails, Mode=OneWay}" Foreground="{StaticResource AccentGreen}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center"/>                                            <TextBlock Text="{Binding Sale.FormattedEndDate, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -320,57 +308,55 @@
                     <ItemsControl ItemsSource="{Binding Status.MythicShopCategories}" Margin="0,16,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,10">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                        </Grid.RowDefinitions>
-                                        <TextBlock Text="{Binding CategoryName}" 
-                                                   FontSize="16" 
-                                                   FontWeight="SemiBold"
-                                                   Margin="0,0,0,10"
-                                                   Foreground="{StaticResource TextPrimary}"/>
-                                        <ItemsControl Grid.Row="1" ItemsSource="{Binding Items}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <UniformGrid Columns="4"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border BorderBrush="{StaticResource BorderColor}" 
-                                                            BorderThickness="1" 
-                                                            CornerRadius="4"
-                                                            Padding="10" 
-                                                            Margin="5">
-                                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding Name}" 
-                                                                       FontWeight="SemiBold" 
-                                                                       FontSize="14" 
-                                                                       Foreground="{StaticResource TextPrimary}" 
-                                                                       TextTrimming="CharacterEllipsis" 
-                                                                       HorizontalAlignment="Center"
-                                                                       Margin="0,5,0,0"/>
-                                                            <TextBlock Foreground="{StaticResource AccentPurple}" 
-                                                                       FontWeight="SemiBold" 
-                                                                       FontSize="12" 
-                                                                       HorizontalAlignment="Center">
-                                                                <Run Text="{Binding Price}"/>
-                                                                <Run Text=" ME"/>
-                                                            </TextBlock>
-                                                            <TextBlock FontSize="11" 
-                                                                       Foreground="{StaticResource TextMuted}" 
-                                                                       HorizontalAlignment="Center">
-                                                                <Run Text="{Binding EndTime}"/>
-                                                            </TextBlock>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </Grid>
-                                </Border>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="{Binding CategoryName}" 
+                                               FontSize="16" 
+                                               FontWeight="SemiBold"
+                                               Margin="10,0,0,10"
+                                               Foreground="{StaticResource TextPrimary}"/>
+                                    <ItemsControl Grid.Row="1" ItemsSource="{Binding Items}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Columns="4"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource BorderColor}" 
+                                                        BorderThickness="1" 
+                                                        CornerRadius="4"
+                                                        Padding="10" 
+                                                        Margin="5">
+                                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" 
+                                                                   FontWeight="SemiBold" 
+                                                                   FontSize="14" 
+                                                                   Foreground="{StaticResource TextPrimary}" 
+                                                                   TextTrimming="CharacterEllipsis" 
+                                                                   HorizontalAlignment="Center"
+                                                                   Margin="0,5,0,0"/>
+                                                        <TextBlock Foreground="{StaticResource AccentPurple}" 
+                                                                   FontWeight="SemiBold" 
+                                                                   FontSize="12" 
+                                                                   HorizontalAlignment="Center">
+                                                            <Run Text="{Binding Price}"/>
+                                                            <Run Text=" ME"/>
+                                                        </TextBlock>
+                                                        <TextBlock FontSize="11" 
+                                                                   Foreground="{StaticResource TextMuted}" 
+                                                                   HorizontalAlignment="Center">
+                                                            <Run Text="{Binding EndTime}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

@@ -217,7 +217,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 if (salesItems.Any())
                 {
                     Status.SetFullSalesCatalog(salesItems);
-                    LogService.LogSuccess("Sales data retrieved and displayed successfully.");
+                    LogService.LogSuccess("Sales data retrieved and displayed successfully!");
                 }
                 else
                 {
@@ -425,7 +425,7 @@ namespace AssetsManager.Views.Controls.Monitor
                                 {
                                     Name = purchaseUnit.Fulfillment.Name,
                                     Price = payment.Delta,
-                                    EndTime = FormatTimeRemaining(entry.EndTime)
+                                    EndTime = FormatUtils.FormatTimeRemaining(entry.EndTime)
                                 };
                                 categoryViewModel.Items.Add(itemViewModel);
                             }
@@ -450,24 +450,7 @@ namespace AssetsManager.Views.Controls.Monitor
         }
         
         
-        private string FormatTimeRemaining(DateTime endTime)
-        {
-            var remaining = endTime.ToLocalTime() - DateTime.Now;
 
-            if (remaining.TotalSeconds <= 0)
-            {
-                return "Expired";
-            }
-            if (remaining.TotalDays >= 1)
-            {
-                return $"Expires in {remaining.Days}d {remaining.Hours}h";
-            }
-            if (remaining.TotalHours >= 1)
-            {
-                return $"Expires in {remaining.Hours}h {remaining.Minutes}m";
-            }
-            return $"Expires in {remaining.Minutes}m";
-        }
 
         private void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
         {

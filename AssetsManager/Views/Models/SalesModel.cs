@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models
 {
@@ -45,7 +47,9 @@ namespace AssetsManager.Views.Models
         public int MaxQuantity { get; set; }
 
         [JsonPropertyName("rp")]
-        public int? Rp { get; set; }
+        public int? Rp { get; set; } // This is the original price RP
+
+        public string FormattedOriginalPrice => Rp.HasValue ? $"Original Price: {Rp.Value} RP" : "Original Price: N/A";
 
         [JsonPropertyName("ip")]
         public int? Ip { get; set; }
@@ -81,6 +85,9 @@ namespace AssetsManager.Views.Models
         public int PercentOff { get; set; }
 
         [JsonPropertyName("endDate")]
-        public string EndDate { get; set; }
+        public DateTime EndDateValue { get; set; }
+
+        public string FormattedEndDate => FormatUtils.FormatTimeRemaining(EndDateValue);
+        public string FormattedSaleDetails => $"Sale: {Rp} RP ({PercentOff}% dto)";
     }
 }
