@@ -189,48 +189,15 @@ namespace AssetsManager.Services.Api
         {
             try
             {
-                var payload = token.Split('.')[1];
-                var padding = 4 - payload.Length % 4;
-                if (padding < 4)
-                {
-                    payload += new string('=', padding);
-                }
-                var bytes = Convert.FromBase64String(payload.Replace('-', '+').Replace('_', '/'));
-                var jsonPayload = System.Text.Encoding.UTF8.GetString(bytes);
+                var parsedInfo = JwtUtils.ParsePayload(token);
 
-                using var jsonDoc = JsonDocument.Parse(jsonPayload);
-                var root = jsonDoc.RootElement;
+                _appSettings.ApiSettings.Token.Expiration = parsedInfo.Expiration;
+                _appSettings.ApiSettings.Token.IssuedAt = parsedInfo.IssuedAt;
+                _appSettings.ApiSettings.Token.Puuid = parsedInfo.Puuid ?? "Unknown";
+                _appSettings.ApiSettings.Token.Platform = parsedInfo.Platform ?? "Unknown";
+                _appSettings.ApiSettings.Token.Region = parsedInfo.Region ?? "Unknown";
+                _appSettings.ApiSettings.Token.SummonerId = parsedInfo.SummonerId;
 
-                // Expiration & Issued At
-                if (root.TryGetProperty("exp", out var expElement) && expElement.TryGetInt64(out var expValue))
-                    _appSettings.ApiSettings.Token.Expiration = DateTimeOffset.FromUnixTimeSeconds(expValue).UtcDateTime;
-                if (root.TryGetProperty("iat", out var iatElement) && iatElement.TryGetInt64(out var iatValue))
-                    _appSettings.ApiSettings.Token.IssuedAt = DateTimeOffset.FromUnixTimeSeconds(iatValue).UtcDateTime;
-
-                // PUUID
-                if (root.TryGetProperty("sub", out var subElement))
-                    _appSettings.ApiSettings.Token.Puuid = subElement.GetString();
-
-                // Platform
-                if (root.TryGetProperty("plt", out var pltElement) && pltElement.TryGetProperty("id", out var idElement))
-                    _appSettings.ApiSettings.Token.Platform = idElement.GetString();
-                else if (root.TryGetProperty("lol.pvpnet.platform", out var pvpPltElement))
-                    _appSettings.ApiSettings.Token.Platform = pvpPltElement.GetString();
-
-                // Region (with multiple fallbacks)
-                if (root.TryGetProperty("lol.pvpnet.region", out var pvpRegElement))
-                    _appSettings.ApiSettings.Token.Region = pvpRegElement.GetString();
-                else if (root.TryGetProperty("dat", out var datRegElement) && datRegElement.TryGetProperty("r", out var rElement))
-                    _appSettings.ApiSettings.Token.Region = rElement.GetString();
-                else if (root.TryGetProperty("reg", out var regElement))
-                    _appSettings.ApiSettings.Token.Region = regElement.GetString();
-
-                // Summoner ID (with fallback)
-                if (root.TryGetProperty("lol.pvpnet.summoner.id", out var pvpIdElement) && pvpIdElement.TryGetInt64(out var pvpId))
-                    _appSettings.ApiSettings.Token.SummonerId = pvpId;
-                else if (root.TryGetProperty("dat", out var datIdElement) && datIdElement.TryGetProperty("u", out var uElement) && uElement.TryGetInt64(out var uId))
-                    _appSettings.ApiSettings.Token.SummonerId = uId;
-                
                 AppSettings.SaveSettings(_appSettings);
             }
             catch (Exception ex)
