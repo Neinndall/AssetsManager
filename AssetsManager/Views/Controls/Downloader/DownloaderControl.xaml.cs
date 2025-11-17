@@ -95,7 +95,7 @@ namespace AssetsManager.Views.Controls.Downloader
         {
             if (string.IsNullOrEmpty(OldHashesPath) || string.IsNullOrEmpty(NewHashesPath))
             {
-                LogService.LogWarning("Please select both hash directories.");
+
                 CustomMessageBoxService.ShowWarning("Warning", "Please select both hash directories.", Window.GetWindow(this));
                 return;
             }

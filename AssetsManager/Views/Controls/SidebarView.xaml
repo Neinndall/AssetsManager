@@ -22,7 +22,7 @@
 
             <StackPanel Grid.Row="0" 
                         VerticalAlignment="Top" 
-                        Margin="8,8,8,0">
+                        Margin="8,16,8,0">
 
                 <RadioButton x:Name="ToggleExpansionButton" Style="{StaticResource SidebarRadioButtonStyle}" Click="ToggleExpansion_Click" Margin="0,0,0,8">
                     <Grid>
