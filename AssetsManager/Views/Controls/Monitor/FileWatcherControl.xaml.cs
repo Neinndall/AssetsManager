@@ -1,18 +1,18 @@
-using AssetsManager.Services;
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Monitor;
-using AssetsManager.Views.Dialogs;
 using System;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
-using AssetsManager.Views.Models;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Collections.Specialized;
-using AssetsManager.Utils;
 using System.Threading.Tasks;
+using AssetsManager.Utils;
+using AssetsManager.Services;
+using AssetsManager.Views.Models;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Monitor;
+using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views.Controls.Monitor
 {

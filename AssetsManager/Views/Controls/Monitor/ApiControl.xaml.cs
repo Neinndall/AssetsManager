@@ -1,7 +1,3 @@
-using AssetsManager.Services.Api;
-using AssetsManager.Services.Core;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,6 +11,10 @@ using System.Windows.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging; // Added for RenderTargetBitmap
 using Microsoft.WindowsAPICodePack.Dialogs; // Added for CommonSaveFileDialog
+using AssetsManager.Services.Api;
+using AssetsManager.Services.Core;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -117,8 +117,6 @@ namespace AssetsManager.Views.Controls.Monitor
                 LogService.LogError(ex, "Failed to load sales data from cache.");
             }
         }
-
-
 
         private async void ConnectButton_Click(object sender, RoutedEventArgs e)
         {
@@ -448,9 +446,6 @@ namespace AssetsManager.Views.Controls.Monitor
                 CustomMessageBoxService.ShowError("Error", $"An error occurred while processing Mythic Shop data: {ex.Message}", Window.GetWindow(this));
             }
         }
-        
-        
-
 
         private void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
         {

@@ -1,11 +1,7 @@
-using LeagueToolkit.Core.Wad;
-using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Core;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
@@ -13,8 +9,12 @@ using System.Windows.Media;
 using BCnEncoder.Shared;
 using System.Runtime.InteropServices;
 using LeagueToolkit.Core.Renderer;
+using LeagueToolkit.Core.Wad;
 using AssetsManager.Services.Parsers;
-using System.Threading;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Core;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Services.Explorer
 {

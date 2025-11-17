@@ -1,8 +1,3 @@
-using AssetsManager.Services;
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Services.Monitor;
-using AssetsManager.Views.Models;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -14,6 +9,11 @@ using System.Windows;
 using System.Threading;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using AssetsManager.Services;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Services.Monitor;
+using AssetsManager.Views.Models;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
