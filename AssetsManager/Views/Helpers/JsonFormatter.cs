@@ -1,10 +1,9 @@
 using System;
-using Newtonsoft.Json;
 using System.Collections.Generic;
 using DiffPlex.DiffBuilder.Model;
-using System.IO;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace AssetsManager.Views.Helpers
 {
@@ -29,14 +28,13 @@ namespace AssetsManager.Views.Helpers
             return FormatJsonAsync(jsonInput, null);
         }
 
-        public static Task<string> FormatJsonAsync(object jsonInput, JsonSerializerSettings settings)
+        public static Task<string> FormatJsonAsync(object jsonInput, JsonSerializerOptions options)
         {
             if (jsonInput == null)
                 return Task.FromResult(string.Empty);
 
-            settings ??= new JsonSerializerSettings();
-            // Ensure Indented formatting is always applied for consistency, but allow other settings to be customized.
-            settings.Formatting = Formatting.Indented;
+            var localOptions = options == null ? new JsonSerializerOptions() : new JsonSerializerOptions(options);
+            localOptions.WriteIndented = true;
 
             return Task.Run(() =>
             {
@@ -44,19 +42,16 @@ namespace AssetsManager.Views.Helpers
                 {
                     if (jsonInput is string jsonString)
                     {
-                        // If it's a string, parse and re-serialize with settings
-                        var parsedJson = JToken.Parse(jsonString);
-                        return parsedJson.ToString(settings.Formatting);
+                        var parsedJson = JsonNode.Parse(jsonString);
+                        return parsedJson.ToJsonString(localOptions);
                     }
                     else
                     {
-                        // If it's an object, serialize it directly with the given settings
-                        return JsonConvert.SerializeObject(jsonInput, settings);
+                        return JsonSerializer.Serialize(jsonInput, localOptions);
                     }
                 }
                 catch (Exception)
                 {
-                    // Fallback for invalid JSON strings or serialization errors
                     return jsonInput.ToString();
                 }
             });

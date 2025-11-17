@@ -1,6 +1,5 @@
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -56,12 +55,11 @@ namespace AssetsManager.Services.Formatting
                     result = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsBnkData);
                 }
 
-                var settings = new JsonSerializerSettings
+                var options = new System.Text.Json.JsonSerializerOptions
                 {
-                    Formatting = Newtonsoft.Json.Formatting.Indented,
-                    NullValueHandling = NullValueHandling.Ignore
+                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
                 };
-                return JsonConvert.SerializeObject(result, settings);
+                return await JsonFormatter.FormatJsonAsync(result, options);
             }
             catch (Exception ex)
             {

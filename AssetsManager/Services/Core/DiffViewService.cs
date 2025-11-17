@@ -13,7 +13,7 @@ using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
+using System.Text.Json;
 using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Services.Core
@@ -184,7 +184,7 @@ namespace AssetsManager.Services.Core
                 result = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsBnkData);
             }
 
-            var settings = new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore };
+            var settings = new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
             return await JsonFormatter.FormatJsonAsync(result, settings);
         }
 
