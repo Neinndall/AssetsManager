@@ -189,13 +189,13 @@
                                                            FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
-                                            <Border Grid.Column="1" Margin="5,0,10,0">
+                                            <Border Grid.Column="1" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding Date}" 
                                                            Style="{StaticResource CellTextStyle}"
                                                            FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
-                                            <Grid Grid.Column="2">
+                                            <Grid Grid.Column="2" Margin="10,0,0,0">
                                                 <TextBlock Text="{Binding Content}" 
                                                            Style="{StaticResource CellTextStyle}"
                                                            FontWeight="Normal"
@@ -322,13 +322,13 @@
                                                            FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
-                                            <Border Grid.Column="1" Margin="5,0,10,0">
+                                            <Border Grid.Column="1" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding Date}"
                                                            Style="{StaticResource CellTextStyle}"
                                                            FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
-                                            <Grid Grid.Column="2">
+                                            <Grid Grid.Column="2" Margin="10,0,0,0">
                                                 <TextBlock Text="{Binding Content}" 
                                                            Style="{StaticResource CellTextStyle}"
                                                            FontWeight="Normal"
