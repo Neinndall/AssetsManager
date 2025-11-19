@@ -13,7 +13,7 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -122,7 +122,7 @@ namespace AssetsManager.Views.Controls.Monitor
                             downloadedCount++;
                         }
                         
-                        LogService.LogInteractiveSuccess($"Successfully saved {downloadedCount} assets to '{Path.GetFileName(destinationPath)}'.", destinationPath, Path.GetFileName(destinationPath));
+                        LogService.LogInteractiveSuccess($"Successfully saved {downloadedCount} assets to {Path.GetFileName(destinationPath)}.", destinationPath, Path.GetFileName(destinationPath));
                     }
                     catch (Exception ex)
                     {
@@ -268,7 +268,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 try
                 {
                     await AssetDownloader.DownloadAssetToCustomPathAsync(asset.Url, saveFileDialog.FileName);
-                    CustomMessageBoxService.ShowSuccess("Success", $"Asset '{asset.DisplayName}' saved successfully.", Window.GetWindow(this));
+                    LogService.LogInteractiveSuccess($"Asset saved successfully", saveFileDialog.FileName, asset.DisplayName);
                 }
                 catch (Exception ex)
                 {

@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Versions
 {
     public class VersionFileInfo : INotifyPropertyChanged
     {

@@ -11,7 +11,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Audio;
 using LeagueToolkit.Core.Meta;
 
 namespace AssetsManager.Services.Formatting

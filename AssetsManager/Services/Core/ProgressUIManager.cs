@@ -7,7 +7,7 @@ using Material.Icons.WPF;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Core

@@ -1,7 +1,7 @@
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Versions;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Versions;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;

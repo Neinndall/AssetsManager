@@ -1,14 +1,15 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using System.Windows;
 using System.Collections.Generic;
 using AssetsManager.Utils;
+using AssetsManager.Views.Models.Shared;
+using AssetsManager.Views.Models.Monitor;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Monitor
 {
     public class ApiModel : INotifyPropertyChanged
     {
@@ -40,9 +41,6 @@ namespace AssetsManager.Views.Models
 
         private string _authButtonContent;
         public string AuthButtonContent { get => _authButtonContent; set => SetProperty(ref _authButtonContent, value); }
-
-        private PlayerInfo _player;
-        public PlayerInfo Player { get => _player; set => SetProperty(ref _player, value); }
 
         public PaginationModel<CatalogItem> Paginator { get; }
 
@@ -118,41 +116,4 @@ namespace AssetsManager.Views.Models
         }
     }
 
-    public class MythicShopCategory : INotifyPropertyChanged
-    {
-        public string CategoryName { get; set; }
-        public ObservableCollection<MythicShopModel> Items { get; set; }
-
-        public MythicShopCategory()
-        {
-            Items = new ObservableCollection<MythicShopModel>();
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    public class MythicShopModel : INotifyPropertyChanged
-    {
-        private string _name;
-        public string Name { get => _name; set => SetProperty(ref _name, value); }
-
-        private int _price;
-        public int Price { get => _price; set => SetProperty(ref _price, value); }
-
-        private string _endTime;
-        public string EndTime { get => _endTime; set => SetProperty(ref _endTime, value); }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-            field = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            return true;
-        }
-    }
 }

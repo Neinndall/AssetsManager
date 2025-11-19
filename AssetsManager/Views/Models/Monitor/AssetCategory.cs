@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Monitor
 {
     public enum CategoryStatus { Idle, Checking, CompletedSuccess }
 

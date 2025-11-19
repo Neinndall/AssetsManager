@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:models="clr-namespace:AssetsManager.Views.Models"
+             xmlns:models="clr-namespace:AssetsManager.Views.Models.Explorer"
              xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
              mc:Ignorable="d">

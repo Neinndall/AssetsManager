@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Audio
 {
     public enum BnkObjectType
     {

@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using AssetsManager.Utils;
+using AssetsManager.Views.Models.Shared;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Monitor
 {
     public class HistoryModel : INotifyPropertyChanged
     {

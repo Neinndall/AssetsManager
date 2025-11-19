@@ -1,5 +1,5 @@
 using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Shared;
 using System;
 using System.Windows.Controls;
 

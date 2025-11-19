@@ -1,23 +1,17 @@
-using System; // Added for StringComparison
-using LeagueToolkit.Core.Wad;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using AssetsManager.Views.Models;
+using LeagueToolkit.Core.Wad;
+using LeagueToolkit.Hashing;
+using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
-using LeagueToolkit.Hashing;
+using AssetsManager.Views.Models.Audio;
 
 namespace AssetsManager.Services.Comparator
 {
-    public enum BinType
-    {
-        Unknown,
-        Champion,
-        Map
-    }
-
     public class WadPackagingService
     {
         private readonly LogService _logService;

@@ -13,7 +13,9 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Audio;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Services.Audio
 {

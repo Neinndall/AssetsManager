@@ -2,10 +2,10 @@ using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 using System.Collections.Generic;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Models3D
 {
     public class AnimationModel : INotifyPropertyChanged
     {

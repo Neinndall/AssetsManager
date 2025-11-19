@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services.Explorer;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Explorer
 {
     public class PinnedFilesManager : INotifyPropertyChanged
     {

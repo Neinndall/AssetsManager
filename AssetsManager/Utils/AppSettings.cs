@@ -3,8 +3,8 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
-using AssetsManager.Views.Models;
 using Newtonsoft.Json.Linq;
+using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Utils
 {

@@ -5,7 +5,8 @@ using System.IO;
 using Material.Icons;
 using System.Windows.Data;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Converters
 {

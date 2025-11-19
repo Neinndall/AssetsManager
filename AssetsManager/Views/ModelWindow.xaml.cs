@@ -11,7 +11,7 @@ using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Animation;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 
 namespace AssetsManager.Views
 {

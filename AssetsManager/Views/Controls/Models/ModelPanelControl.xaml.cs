@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 using AssetsManager.Services.Models;
 using AssetsManager.Services.Core;
 using Material.Icons;

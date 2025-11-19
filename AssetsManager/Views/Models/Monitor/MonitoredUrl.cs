@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Windows.Media;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Monitor
 {
     public class MonitoredUrl : INotifyPropertyChanged
     {

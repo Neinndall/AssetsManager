@@ -6,7 +6,7 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Services.Audio;
 
 using AssetsManager.Services.Explorer.Tree;

@@ -1,6 +1,6 @@
 using System;
 using AssetsManager.Services.Comparator;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;

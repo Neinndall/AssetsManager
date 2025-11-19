@@ -13,7 +13,7 @@ using System.Collections.Generic;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Models;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
 using System.Windows.Threading;

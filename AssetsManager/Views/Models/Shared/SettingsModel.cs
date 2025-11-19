@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using AssetsManager.Utils;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Shared
 {
     public class SettingsModel : INotifyPropertyChanged
     {

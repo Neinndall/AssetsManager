@@ -4,11 +4,11 @@ using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
-using AssetsManager.Services.Core;
-using AssetsManager.Views.Models;
-using AssetsManager.Utils;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
+using AssetsManager.Utils;
+using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Services.Api
 {

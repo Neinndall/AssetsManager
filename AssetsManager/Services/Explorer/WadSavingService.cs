@@ -1,6 +1,8 @@
 
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Audio;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 using System.Threading.Tasks;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;

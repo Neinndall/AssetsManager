@@ -8,7 +8,7 @@ using System.Windows.Media;
 using System.Collections.Generic;
 using AssetsManager.Utils;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Models3D
 {
     public class ModelPart : INotifyPropertyChanged, IDisposable
     {

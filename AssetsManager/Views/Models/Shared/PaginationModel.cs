@@ -5,7 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Shared
 {
     public class PaginationModel<T> : INotifyPropertyChanged
     {

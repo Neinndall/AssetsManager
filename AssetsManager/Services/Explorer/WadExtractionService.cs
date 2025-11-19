@@ -14,7 +14,7 @@ using AssetsManager.Services.Parsers;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Services.Explorer
 {

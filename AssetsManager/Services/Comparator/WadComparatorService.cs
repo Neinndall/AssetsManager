@@ -7,7 +7,7 @@ using System.Linq;
 using Serilog;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Wad;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Comparator

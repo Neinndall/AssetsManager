@@ -7,7 +7,10 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Versions;
 
-namespace AssetsManager.Views.Models
+using AssetsManager.Views.Models.Shared;
+using AssetsManager.Views.Models.Versions;
+
+namespace AssetsManager.Views.Models.Versions
 {
     public class ManageVersions : INotifyPropertyChanged
     {

@@ -1,6 +1,6 @@
 using System;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Monitor
 {
     public class JsonDiffHistoryEntry
     {

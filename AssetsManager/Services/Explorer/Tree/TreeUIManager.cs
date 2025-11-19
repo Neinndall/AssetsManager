@@ -1,4 +1,4 @@
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;

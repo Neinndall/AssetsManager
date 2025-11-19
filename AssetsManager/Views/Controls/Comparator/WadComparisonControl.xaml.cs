@@ -9,7 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 
 using Microsoft.WindowsAPICodePack.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services;

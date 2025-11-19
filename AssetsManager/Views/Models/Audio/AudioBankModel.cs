@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using AssetsManager.Views.Models.Explorer;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Audio
 {
     public abstract class AudioBankNode
     {

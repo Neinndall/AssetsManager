@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using LeagueToolkit.Core.Wad;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Wad
 {
     public enum ChunkDiffType
     {

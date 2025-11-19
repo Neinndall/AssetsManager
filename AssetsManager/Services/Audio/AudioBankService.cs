@@ -6,7 +6,7 @@ using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 using AssetsManager.Services.Parsers;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Audio;
 using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Audio

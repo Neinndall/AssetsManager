@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.WindowsAPICodePack.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Settings
 {

@@ -1,5 +1,6 @@
 using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 using LeagueToolkit.Core.Wad;
 using System;
 using System.Collections.Generic;

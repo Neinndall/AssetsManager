@@ -14,7 +14,8 @@ using Microsoft.WindowsAPICodePack.Dialogs; // Added for CommonSaveFileDialog
 using AssetsManager.Services.Api;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -106,7 +107,6 @@ namespace AssetsManager.Views.Controls.Monitor
 
                     if (salesCatalog != null)
                     {
-                        Status.Player = salesCatalog.Player;
                         var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null);
                         Status.SetFullSalesCatalog(salesItems);
                     }
@@ -209,7 +209,6 @@ namespace AssetsManager.Views.Controls.Monitor
             if (salesCatalog != null)
             {
                 UpdateAuthenticationStatus();
-                Status.Player = salesCatalog.Player;
                 var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null);
 
                 if (salesItems.Any())

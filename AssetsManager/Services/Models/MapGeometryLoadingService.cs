@@ -15,7 +15,7 @@ using LeagueToolkit.Core.Memory;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Models

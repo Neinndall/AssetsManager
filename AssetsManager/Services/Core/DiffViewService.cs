@@ -11,10 +11,12 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Audio;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
-using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Services.Core
 {

@@ -3,8 +3,9 @@ using System.IO;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using AssetsManager.Utils;
+using AssetsManager.Views.Models.Wad;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Explorer
 {
     public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, WemFile, SoundBank }
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted }

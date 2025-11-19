@@ -9,7 +9,7 @@ using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Hashing;
 using LeagueToolkit.Core.Memory;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using Quaternion = System.Numerics.Quaternion;

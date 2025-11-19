@@ -9,7 +9,7 @@ using System.Collections.Specialized;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
 using AssetsManager.Services;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Views.Dialogs;

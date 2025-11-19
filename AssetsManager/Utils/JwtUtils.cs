@@ -1,7 +1,7 @@
-using AssetsManager.Views.Models;
 using System;
 using System.Text;
 using System.Text.Json;
+using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Utils
 {

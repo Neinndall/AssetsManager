@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 
 using System.Threading;
 

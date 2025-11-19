@@ -9,7 +9,7 @@ using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Models3D
 {
     public class SceneModel : INotifyPropertyChanged, IDisposable
     {

@@ -3,48 +3,18 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using AssetsManager.Utils;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Monitor
 {
     public class SalesCatalog
     {
-        [JsonPropertyName("player")]
-        public PlayerInfo Player { get; set; }
-
         [JsonPropertyName("catalog")]
         public List<CatalogItem> Catalog { get; set; }
     }
 
-    public class PlayerInfo
-    {
-        [JsonPropertyName("accountId")]
-        public long AccountId { get; set; }
-
-        [JsonPropertyName("rp")]
-        public int Rp { get; set; }
-
-        [JsonPropertyName("ip")]
-        public int Ip { get; set; }
-
-        [JsonPropertyName("summonerLevel")]
-        public int SummonerLevel { get; set; }
-    }
-
     public class CatalogItem
     {
-        [JsonPropertyName("itemId")]
-        public int ItemId { get; set; }
-
         [JsonPropertyName("inventoryType")]
         public string InventoryType { get; set; }
-
-        [JsonPropertyName("iconUrl")]
-        public string IconUrl { get; set; }
-
-        [JsonPropertyName("ownedQuantity")]
-        public int OwnedQuantity { get; set; }
-
-        [JsonPropertyName("maxQuantity")]
-        public int MaxQuantity { get; set; }
 
         [JsonPropertyName("rp")]
         public int? Rp { get; set; } // This is the original price RP
@@ -54,23 +24,8 @@ namespace AssetsManager.Views.Models
         [JsonPropertyName("ip")]
         public int? Ip { get; set; }
 
-        [JsonPropertyName("releaseDate")]
-        public long ReleaseDate { get; set; }
-
         [JsonPropertyName("name")]
         public string Name { get; set; }
-
-        [JsonPropertyName("description")]
-        public string Description { get; set; }
-
-        [JsonPropertyName("tags")]
-        public List<string> Tags { get; set; }
-
-        [JsonPropertyName("purchaseLimitReached")]
-        public bool PurchaseLimitReached { get; set; }
-
-        [JsonPropertyName("owned")]
-        public bool? Owned { get; set; }
 
         [JsonPropertyName("sale")]
         public SaleInfo Sale { get; set; }
