@@ -88,17 +88,7 @@ namespace AssetsManager.Services.Explorer
                     
                     if (soundNode.Type == NodeType.WemFile)
                     {
-                        var wemData = await _wadExtractionService.GetWemFileBytesAsync(soundNode, cancellationToken);
-                        if (wemData != null)
-                        {
-                            byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData, cancellationToken);
-                            if (oggData != null)
-                            {
-                                string fileName = Path.ChangeExtension(soundNode.Name, ".ogg");
-                                string filePath = Path.Combine(eventPath, _wadExtractionService.SanitizeName(fileName));
-                                await File.WriteAllBytesAsync(filePath, oggData, cancellationToken);
-                            }
-                        }
+                        await HandleWemFileAsync(soundNode, eventPath, cancellationToken);
                     }
                 }
                 return;
