@@ -17,46 +17,6 @@ namespace AssetsManager.Utils
             _logService = logService;
         }
 
-        public async Task<string> HandleBackUpAsync(bool createBackUp)
-        {
-            if (createBackUp)
-            {
-                return await CopyFilesToBackUp();
-            }
-            else
-            {
-                return string.Empty;
-            }
-        }
-
-        public async Task<string> CopyFilesToBackUp()
-        {
-            try
-            {
-                // Llamamos para la creacion de la carpeta de BackUp si es necesario
-                _directoriesCreator.GenerateNewBackUpOldHashesPath();
-
-                string backupDirectory = _directoriesCreator.BackUpOldHashesPath;
-                var filesToCopy = new[] { "hashes.game.txt", "hashes.lcu.txt" };
-
-                foreach (var fileName in filesToCopy)
-                {
-                    string sourceFilePath = Path.Combine("hashes", "olds", fileName);
-                    string destinationFilePath = Path.Combine(backupDirectory, fileName);
-
-                    if (File.Exists(sourceFilePath))
-                    {
-                        await Task.Run(() => File.Copy(sourceFilePath, destinationFilePath, true));
-                    }
-                }
-                return backupDirectory;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Error occurred while creating hash backup");
-                return string.Empty;
-            }
-        }
 
         public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath)
         {

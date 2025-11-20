@@ -155,15 +155,6 @@
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
-                        <CheckBox IsChecked="{Binding Settings.CreateBackUpOldHashes, Mode=TwoWay}" 
-                                  Content="Create hashes backups" 
-                                  Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Back up hash files before updates to prevent data loss"
-                                     Foreground="{StaticResource TextMuted}" 
-                                     FontSize="12" 
-                                     Margin="27,0,0,6" 
-                                     TextWrapping="Wrap"/>
-
                         <!-- NEW CHECKBOX FOR EXTRACT NEW FILES -->
                         <CheckBox IsChecked="{Binding Settings.ExtractNewFilesAfterComparison, Mode=TwoWay}" 
                                   Content="Auto-extract new files" 

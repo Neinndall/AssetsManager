@@ -296,7 +296,6 @@ namespace AssetsManager.Views
         private bool IsAnySettingActive()
         {
             return _appSettings.SyncHashesWithCDTB ||
-                   _appSettings.CreateBackUpOldHashes ||
                    _appSettings.ExtractNewFilesAfterComparison ||
                    _appSettings.OnlyCheckDifferences ||
                    _appSettings.CheckJsonDataUpdates ||
