@@ -10,7 +10,6 @@ namespace AssetsManager.Utils
     {
         private readonly LogService _logService;
 
-        public string ResourcesPath { get; private set; }
         public string HashesNewPath { get; private set; }
         public string HashesOldPath { get; private set; }
         public string JsonCacheNewPath { get; private set; }
@@ -69,13 +68,6 @@ namespace AssetsManager.Utils
 
             WadComparisonSavePath = Path.Combine(appFolderPath, "wadcomparison");
             VersionsPath = Path.Combine(appFolderPath, "versions");
-        }
-
-        public void GenerateNewResourcesPath()
-        {
-            string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
-            ResourcesPath = Path.Combine("Resources", date);
-            CreateDirectoryInternal(ResourcesPath, false);
         }
 
         public void GenerateNewSubAssetsDownloadedPath()
