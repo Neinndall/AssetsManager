@@ -22,6 +22,7 @@ namespace AssetsManager.Services.Core
         private readonly WadDifferenceService _wadDifferenceService;
         private readonly WadPackagingService _wadPackagingService;
         private readonly DiffViewService _diffViewService;
+        private readonly TaskCancellationManager _taskCancellationManager; // New field
 
         private Button _progressSummaryButton;
         private MaterialIcon _progressIcon;
@@ -39,7 +40,8 @@ namespace AssetsManager.Services.Core
             AssetDownloader assetDownloader,
             WadDifferenceService wadDifferenceService,
             WadPackagingService wadPackagingService,
-            DiffViewService diffViewService
+            DiffViewService diffViewService,
+            TaskCancellationManager taskCancellationManager // New parameter
             )
         {
             _logService = logService;
@@ -50,6 +52,7 @@ namespace AssetsManager.Services.Core
             _wadDifferenceService = wadDifferenceService;
             _wadPackagingService = wadPackagingService;
             _diffViewService = diffViewService;
+            _taskCancellationManager = taskCancellationManager; // Assign new dependency
         }
 
         public void Initialize(Button progressSummaryButton, MaterialIcon progressIcon, Window owner)
@@ -110,7 +113,7 @@ namespace AssetsManager.Services.Core
                 }
                 _spinningIconAnimationStoryboard?.Begin();
 
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Comparator");
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Comparator", _taskCancellationManager);
                 _progressDetailsWindow.Owner = _owner;
                 _progressDetailsWindow.OperationVerb = "Comparing";
                 _progressDetailsWindow.HeaderIconKind = "Compare";
@@ -155,7 +158,7 @@ namespace AssetsManager.Services.Core
                 }
                 _spinningIconAnimationStoryboard?.Begin();
 
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Extractor");
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Extractor", _taskCancellationManager);
                 _progressDetailsWindow.Owner = _owner;
                 _progressDetailsWindow.OperationVerb = "Extracting";
                 _progressDetailsWindow.HeaderIconKind = "PackageDown";
@@ -200,11 +203,11 @@ namespace AssetsManager.Services.Core
                 }
                 _spinningIconAnimationStoryboard?.Begin();
 
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Downloader");
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Versions Update", _taskCancellationManager);
                 _progressDetailsWindow.Owner = _owner;
-                _progressDetailsWindow.OperationVerb = "Downloading";
+                _progressDetailsWindow.OperationVerb = "Updating";
                 _progressDetailsWindow.HeaderIconKind = "Download";
-                _progressDetailsWindow.HeaderText = taskName;
+                _progressDetailsWindow.HeaderText = "Versions Update";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, 0, "Initializing...", true, null);

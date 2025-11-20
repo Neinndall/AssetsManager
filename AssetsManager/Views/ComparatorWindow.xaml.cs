@@ -25,7 +25,8 @@ namespace AssetsManager.Views
             AppSettings appSettings,
             DiffViewService diffViewService,
             IServiceProvider serviceProvider,
-            HashResolverService hashResolverService
+            HashResolverService hashResolverService,
+            TaskCancellationManager taskCancellationManager // Added this line
             )
         {
             InitializeComponent();
@@ -47,6 +48,7 @@ namespace AssetsManager.Views
             WadComparisonControl.ServiceProvider = serviceProvider;
             WadComparisonControl.DiffViewService = diffViewService;
             WadComparisonControl.HashResolverService = hashResolverService;
+            WadComparisonControl.TaskCancellationManager = taskCancellationManager; // Added this line
         }
     }
 }

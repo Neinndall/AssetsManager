@@ -47,6 +47,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public AudioBankService AudioBankService { get; set; }
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
         public HashResolverService HashResolverService { get; set; }
+        public TaskCancellationManager TaskCancellationManager { get; set; }
 
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
@@ -57,7 +58,6 @@ namespace AssetsManager.Views.Controls.Explorer
         private bool _isWadMode = true;
         private bool _isBackupMode = false;
         private string _backupJsonPath;
-        private CancellationTokenSource _cancellationTokenSource;
 
         public FileExplorerControl()
         {
@@ -73,7 +73,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void CleanupResources()
         {
-            _cancellationTokenSource?.Cancel();
+            TaskCancellationManager.CancelCurrentOperation(); // Use the manager
 
             // 1. Detener el timer PRIMERO
             if (_searchTimer != null)
@@ -213,9 +213,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task BuildWadTreeAsync(string rootPath)
         {
             _isBackupMode = false;
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource = new CancellationTokenSource();
-            var token = _cancellationTokenSource.Token;
+            var token = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
             NewLolPath = null;
@@ -263,9 +261,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
             _isBackupMode = false;
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource = new CancellationTokenSource();
-            var token = _cancellationTokenSource.Token;
+            var token = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
             NewLolPath = null;
@@ -286,8 +282,6 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, token);
                 token.ThrowIfCancellationRequested();
-
-                _cancellationTokenSource.Cancel();
 
                 RootNodes.Clear();
                 foreach (var node in newNodes)
@@ -321,9 +315,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             _isBackupMode = true;
             _backupJsonPath = jsonPath;
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource = new CancellationTokenSource();
-            var token = _cancellationTokenSource.Token;
+            var token = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
@@ -786,7 +778,5 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             await TreeBuilderService.LoadAllChildren(node, _currentRootPath);
         }
-
-
     }
 }

@@ -7,6 +7,12 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Input;
+using Microsoft.Toolkit.Uwp.Notifications;
+using Microsoft.Extensions.DependencyInjection;
+using Windows.Data.Xml.Dom;
+using Windows.UI.Notifications;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
@@ -15,15 +21,9 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Versions;
-using AssetsManager.Utils;
 using AssetsManager.Views.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Models.Wad;
-using Microsoft.Toolkit.Uwp.Notifications;
-using Microsoft.Extensions.DependencyInjection;
-using Windows.Data.Xml.Dom;
-using Windows.UI.Notifications;
 
 namespace AssetsManager.Views
 {

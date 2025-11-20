@@ -4,8 +4,10 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using System.Threading; // Added for CancellationToken and OperationCanceledException
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils; // Added for TaskCancellationManager
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -22,10 +24,13 @@ namespace AssetsManager.Views.Dialogs
         public string HeaderIconKind { get; set; }
         public string HeaderText { get; set; }
 
-        public ProgressDetailsWindow(LogService logService, string windowTitle) // Add windowTitle parameter
+        private readonly TaskCancellationManager _taskCancellationManager; // New field
+
+        public ProgressDetailsWindow(LogService logService, string windowTitle, TaskCancellationManager taskCancellationManager) // Add new parameter
         {
             InitializeComponent();
             _logService = logService;
+            _taskCancellationManager = taskCancellationManager; // Assign new dependency
             _startTime = DateTime.Now;
 
             this.Title = windowTitle; // Set the window title from parameter
@@ -116,6 +121,16 @@ namespace AssetsManager.Views.Dialogs
             {
                 this.DragMove();
             }
+        }
+
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            _taskCancellationManager.CancelCurrentOperation();
+            if (sender is Button button)
+            {
+                button.IsEnabled = false;
+            }
+            // The comparison logic will handle closing the window after full cancellation.
         }
     }
 }

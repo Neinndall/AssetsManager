@@ -1,7 +1,3 @@
-using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models.Explorer;
-using AssetsManager.Views.Models.Wad;
-using LeagueToolkit.Core.Wad;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,6 +8,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
+using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -314,7 +314,8 @@ namespace AssetsManager.Services.Explorer
         private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            foreach (var directory in Directory.GetDirectories(path).OrderBy(d => d))
+            // Use EnumerateDirectories for better cancellation responsiveness
+            foreach (var directory in Directory.EnumerateDirectories(path).OrderBy(d => d))
             {
                 token.ThrowIfCancellationRequested();
                 var dirNode = new FileSystemNodeModel(directory);
@@ -324,8 +325,10 @@ namespace AssetsManager.Services.Explorer
             }
 
             token.ThrowIfCancellationRequested();
-            foreach (var file in Directory.GetFiles(path).OrderBy(f => f))
+            // Use EnumerateFiles and add cancellation check inside the loop
+            foreach (var file in Directory.EnumerateFiles(path).OrderBy(f => f))
             {
+                token.ThrowIfCancellationRequested();
                 var fileNode = new FileSystemNodeModel(file);
                 parentNode.Children.Add(fileNode);
             }

@@ -64,6 +64,7 @@ namespace AssetsManager
       // Core Services
       services.AddSingleton<PbeStatusService>();
       services.AddSingleton<LogService>();
+      services.AddSingleton<TaskCancellationManager>(); // Added for managing task cancellations
 
       // Configure and register HttpClient for LCU API (ignoring self-signed cert for loopback)
       services.AddSingleton<HttpClient>(sp =>
