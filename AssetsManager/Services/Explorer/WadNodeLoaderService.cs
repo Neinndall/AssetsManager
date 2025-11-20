@@ -6,12 +6,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using LeagueToolkit.Core.Wad;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
-using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -26,7 +26,7 @@ namespace AssetsManager.Services.Explorer
             _logService = logService;
         }
 
-        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, CancellationToken token)
+        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, CancellationToken cancellationToken)
         {
             var options = new JsonSerializerOptions
             {
@@ -34,8 +34,8 @@ namespace AssetsManager.Services.Explorer
                 Converters = { new JsonStringEnumConverter() }
             };
 
-            string jsonContent = await File.ReadAllTextAsync(jsonPath, token);
-            token.ThrowIfCancellationRequested();
+            string jsonContent = await File.ReadAllTextAsync(jsonPath, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
 
@@ -50,7 +50,7 @@ namespace AssetsManager.Services.Explorer
 
             foreach (var wadGroup in diffsByWad)
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
 
                 foreach (var file in wadGroup)
@@ -192,18 +192,18 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken token)
+        public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken cancellationToken)
         {
             var childrenToAdd = await Task.Run(() =>
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 string pathToWad = wadNode.Type == NodeType.WadFile ? wadNode.FullPath : wadNode.SourceWadPath;
                 var rootVirtualNode = new FileSystemNodeModel(wadNode.Name, true, wadNode.FullPath, pathToWad);
                 using (var wadFile = new WadFile(pathToWad))
                 {
                     foreach (var chunk in wadFile.Chunks.Values)
                     {
-                        token.ThrowIfCancellationRequested();
+                        cancellationToken.ThrowIfCancellationRequested();
                         string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
 
                         bool isUnresolved = virtualPath == chunk.PathHash.ToString("x16");
@@ -230,7 +230,7 @@ namespace AssetsManager.Services.Explorer
 
                 SortChildrenRecursively(rootVirtualNode);
                 return rootVirtualNode.Children.ToList();
-            }, token);
+            }, cancellationToken);
 
             return childrenToAdd;
         }
@@ -299,36 +299,36 @@ namespace AssetsManager.Services.Explorer
             return fileNode;
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken token)
+        public async Task<List<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
         {
             return await Task.Run(() =>
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 var rootNode = new FileSystemNodeModel(rootPath);
                 rootNode.Children.Clear(); // Clear dummy node
-                AddNodeToRealTree(rootNode, rootPath, token);
+                AddNodeToRealTree(rootNode, rootPath, cancellationToken);
                 return rootNode.Children.ToList();
-            }, token);
+            }, cancellationToken);
         }
 
-        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken token)
+        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken cancellationToken)
         {
-            token.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
             // Use EnumerateDirectories for better cancellation responsiveness
             foreach (var directory in Directory.EnumerateDirectories(path).OrderBy(d => d))
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 var dirNode = new FileSystemNodeModel(directory);
                 dirNode.Children.Clear(); // Clear dummy node
                 parentNode.Children.Add(dirNode);
-                AddNodeToRealTree(dirNode, directory, token);
+                AddNodeToRealTree(dirNode, directory, cancellationToken);
             }
 
-            token.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
             // Use EnumerateFiles and add cancellation check inside the loop
             foreach (var file in Directory.EnumerateFiles(path).OrderBy(f => f))
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 var fileNode = new FileSystemNodeModel(file);
                 parentNode.Children.Add(fileNode);
             }

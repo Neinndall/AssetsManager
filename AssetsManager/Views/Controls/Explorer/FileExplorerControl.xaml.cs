@@ -213,7 +213,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task BuildWadTreeAsync(string rootPath)
         {
             _isBackupMode = false;
-            var token = TaskCancellationManager.PrepareNewOperation(); // Use the manager
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
             NewLolPath = null;
@@ -224,8 +224,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, token);
-                token.ThrowIfCancellationRequested();
+                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 RootNodes.Clear();
                 foreach (var node in newNodes)
@@ -261,7 +261,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
             _isBackupMode = false;
-            var token = TaskCancellationManager.PrepareNewOperation(); // Use the manager
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
             NewLolPath = null;
@@ -270,7 +270,7 @@ namespace AssetsManager.Views.Controls.Explorer
             FileTreeView.Visibility = Visibility.Collapsed;
 
             // Delayed loading indicator logic
-            var indicatorTask = Task.Delay(100, token).ContinueWith(t =>
+            var indicatorTask = Task.Delay(100, cancellationToken).ContinueWith(t =>
             {
                 if (!t.IsCanceled)
                 {
@@ -280,8 +280,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, token);
-                token.ThrowIfCancellationRequested();
+                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 RootNodes.Clear();
                 foreach (var node in newNodes)
@@ -315,7 +315,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             _isBackupMode = true;
             _backupJsonPath = jsonPath;
-            var token = TaskCancellationManager.PrepareNewOperation(); // Use the manager
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
@@ -323,8 +323,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, token);
-                token.ThrowIfCancellationRequested();
+                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 RootNodes.Clear();
                 NewLolPath = newLolPath;
@@ -384,6 +384,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (destinationPath != null)
             {
+                ExtractMenuItem.IsEnabled = false;
+                SaveMenuItem.IsEnabled = false;
+                CancellationToken cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Get new token for this operation
+
                 try
                 {
                     LogService.Log("Extracting selected files...");
@@ -394,14 +398,25 @@ namespace AssetsManager.Views.Controls.Explorer
                         logPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
 
-                    await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath);
+                    await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath, cancellationToken);
 
                     LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name}.", logPath, selectedNode.Name);
+                }
+                catch (OperationCanceledException)
+                {
+                    LogService.LogWarning("Extraction was cancelled by the user.");
+                    CustomMessageBoxService.ShowInfo("Cancelled", "Extraction was cancelled.", Window.GetWindow(this));
                 }
                 catch (Exception ex)
                 {
                     LogService.LogError(ex, $"Failed to extract '{selectedNode.Name}'.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred during extraction: {ex.Message}", Window.GetWindow(this));
+                }
+                finally
+                {
+                    // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
+                    ExtractMenuItem.IsEnabled = true;
+                    SaveMenuItem.IsEnabled = true;
                 }
             }
         }
@@ -437,10 +452,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (destinationPath != null)
             {
+                ExtractMenuItem.IsEnabled = false;
+                SaveMenuItem.IsEnabled = false;
+                CancellationToken cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Get new token for this operation
+
                 try
                 {
                     LogService.Log("Processing and saving selected files...");
-                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath);
+                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken);
 
                     if (selectedNode.Type == NodeType.SoundBank)
                     {
@@ -453,10 +472,21 @@ namespace AssetsManager.Views.Controls.Explorer
 
                     LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name}.", destinationPath, selectedNode.Name);
                 }
+                catch (OperationCanceledException)
+                {
+                    LogService.LogWarning("Save operation was cancelled by the user.");
+                    CustomMessageBoxService.ShowInfo("Cancelled", "Save operation was cancelled.", Window.GetWindow(this));
+                }
                 catch (Exception ex)
                 {
                     LogService.LogError(ex, $"Failed to save '{selectedNode.Name}'.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred during save: {ex.Message}", Window.GetWindow(this));
+                }
+                finally
+                {
+                    // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
+                    ExtractMenuItem.IsEnabled = true;
+                    SaveMenuItem.IsEnabled = true;
                 }
             }
         }

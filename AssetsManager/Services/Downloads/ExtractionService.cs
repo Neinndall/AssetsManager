@@ -18,6 +18,7 @@ namespace AssetsManager.Services.Downloads
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly WadSavingService _wadSavingService;
         private readonly WadExtractionService _wadExtractionService;
+        private readonly TaskCancellationManager _taskCancellationManager;
 
         public event EventHandler<(string message, int totalFiles)> ExtractionStarted;
         public event EventHandler<(int extractedCount, int totalFiles, string message)> ExtractionProgressChanged;
@@ -27,19 +28,22 @@ namespace AssetsManager.Services.Downloads
             LogService logService,
             DirectoriesCreator directoriesCreator,
             WadSavingService wadSavingService,
-            WadExtractionService wadExtractionService)
+            WadExtractionService wadExtractionService,
+            TaskCancellationManager taskCancellationManager)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _wadSavingService = wadSavingService;
             _wadExtractionService = wadExtractionService;
+            _taskCancellationManager = taskCancellationManager;
         }
 
         public async Task ExtractNewFilesFromComparisonAsync(
             List<SerializableChunkDiff> allDiffs,
-            string newLolPath,
-            CancellationToken cancellationToken)
+            string newLolPath)
         {
+            CancellationToken cancellationToken = _taskCancellationManager.PrepareNewOperation();
+
             var newDiffs = allDiffs.Where(d => d.Type == ChunkDiffType.New).ToList();
 
             if (!newDiffs.Any())
@@ -61,20 +65,16 @@ namespace AssetsManager.Services.Downloads
 
             _logService.Log($"Starting extraction of {totalFiles} new files.");
 
-            foreach (var diff in newDiffs)
+            try
             {
-                if (cancellationToken.IsCancellationRequested)
+                foreach (var diff in newDiffs)
                 {
-                    _logService.LogWarning("Extraction was cancelled by the user.");
-                    break; 
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                extractedCount++;
-                string progressMessage = $"{diff.FileName}";
-                ExtractionProgressChanged?.Invoke(this, (extractedCount, totalFiles, progressMessage));
-                
-                try
-                {
+                    extractedCount++;
+                    string progressMessage = $"{diff.FileName}";
+                    ExtractionProgressChanged?.Invoke(this, (extractedCount, totalFiles, progressMessage));
+
                     string sourceWadFullPath = Path.Combine(newLolPath, diff.SourceWadFile);
                     var node = new FileSystemNodeModel(diff.FileName, false, diff.NewPath, sourceWadFullPath)
                     {
@@ -91,23 +91,28 @@ namespace AssetsManager.Services.Downloads
                     if (extension == ".wpk" || extension == ".bnk")
                     {
                         // Raw copy for audio banks, ensuring it goes to the correct subdirectory
-                        await _wadExtractionService.ExtractNodeAsync(node, fileDestinationDirectory);
+                        await _wadExtractionService.ExtractNodeAsync(node, fileDestinationDirectory, cancellationToken);
                     }
                     else
                     {
                         // Smart saving for all other files, ensuring it goes to the correct subdirectory
-                        await _wadSavingService.ProcessAndSaveAsync(node, fileDestinationDirectory, null, newLolPath);
+                        await _wadSavingService.ProcessAndSaveAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken);
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Failed to extract new file: {diff.FileName}");
-                    // Continue with other files even if one fails
-                }
+                _logService.LogSuccess($"Extraction completed. {extractedCount} files processed.");
             }
-            
-            _logService.LogSuccess($"Extraction completed. {extractedCount} files processed.");
-            ExtractionCompleted?.Invoke(this, EventArgs.Empty);
+            catch (OperationCanceledException)
+            {
+                _logService.LogWarning("Extraction was cancelled by the user.");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "An unexpected error occurred during extraction.");
+            }
+            finally
+            {
+                ExtractionCompleted?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 }

@@ -11,6 +11,7 @@ using System;
 using System.Windows.Media.Imaging;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Threading; // Added to resolve CancellationToken
 using AssetsManager.Services.Parsers;
 using System.Linq;
 using LeagueToolkit.Toolkit;
@@ -43,8 +44,10 @@ namespace AssetsManager.Services.Explorer
             _wemConversionService = wemConversionService;
         }
 
-        public async Task ProcessAndSaveDiffAsync(SerializableChunkDiff diff, string destinationPath, string oldLolPath, string newLolPath)
+        public async Task ProcessAndSaveDiffAsync(SerializableChunkDiff diff, string destinationPath, string oldLolPath, string newLolPath, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             string basePath = (diff.Type == ChunkDiffType.Removed) ? oldLolPath : newLolPath;
             string sourceWadPath = Path.Combine(basePath, diff.SourceWadFile);
 
@@ -55,11 +58,13 @@ namespace AssetsManager.Services.Explorer
                 Status = (DiffStatus)diff.Type
             };
 
-            await ProcessAndSaveAsync(node, destinationPath, null, basePath);
+            await ProcessAndSaveAsync(node, destinationPath, null, basePath, cancellationToken);
         }
 
-        public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
+        public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
             {
                 string currentDestinationPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
@@ -67,7 +72,8 @@ namespace AssetsManager.Services.Explorer
 
                 foreach (var child in node.Children)
                 {
-                    await ProcessAndSaveAsync(child, currentDestinationPath, rootNodes, currentRootPath);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await ProcessAndSaveAsync(child, currentDestinationPath, rootNodes, currentRootPath, cancellationToken);
                 }
                 return;
             }
@@ -78,51 +84,55 @@ namespace AssetsManager.Services.Explorer
             {
                 case ".wpk":
                 case ".bnk":
-                    await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath);
+                    await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, cancellationToken);
                     break;
 
                 case ".tex":
                 case ".dds":
-                    await HandleTextureFile(node, destinationPath);
+                    await HandleTextureFile(node, destinationPath, cancellationToken);
                     break;
 
                 case ".bin":
-                    await HandleDataFile(node, destinationPath, "bin");
+                    await HandleDataFile(node, destinationPath, "bin", cancellationToken);
                     break;
 
                 case ".stringtable":
-                    await HandleDataFile(node, destinationPath, "stringtable");
+                    await HandleDataFile(node, destinationPath, "stringtable", cancellationToken);
                     break;
 
                 case ".css":
-                    await HandleDataFile(node, destinationPath, "css");
+                    await HandleDataFile(node, destinationPath, "css", cancellationToken);
                     break;
 
                 case ".js":
-                    await HandleJsFile(node, destinationPath);
+                    await HandleJsFile(node, destinationPath, cancellationToken);
                     break;
 
                 default:
                     // For any other file, just extract it raw
-                    await _wadExtractionService.ExtractNodeAsync(node, destinationPath);
+                    await _wadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken);
                     break;
             }
         }
 
-        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath)
+        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
         {
-            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync("js", fileBytes);
 
             string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
 
-            await File.WriteAllTextAsync(filePath, formattedContent);
+            await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
         }
 
-        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
+        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
             if (linkedBank == null) return;
 
@@ -141,10 +151,11 @@ namespace AssetsManager.Services.Explorer
             string audioBankPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(audioBankName));
             Directory.CreateDirectory(audioBankPath);
 
-            var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
-            byte[] wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
-
+            cancellationToken.ThrowIfCancellationRequested();
+            var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;
+            byte[] wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode, cancellationToken) : null;
+            byte[] audioBnkFileData = linkedBank.WpkNode == null && linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode, cancellationToken) : null;
+            
             List<AudioEventNode> audioTree;
             if (linkedBank.BinData != null)
             {
@@ -164,11 +175,13 @@ namespace AssetsManager.Services.Explorer
 
             foreach (var eventNode in audioTree)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string eventPath = Path.Combine(audioBankPath, _wadExtractionService.SanitizeName(eventNode.Name));
                 Directory.CreateDirectory(eventPath);
 
                 foreach (var soundNode in eventNode.Sounds)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     byte[] wemData = null;
                     if (linkedBank.WpkNode != null)
                     {
@@ -190,21 +203,23 @@ namespace AssetsManager.Services.Explorer
 
                     if (wemData != null)
                     {
-                        byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData);
+                        byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData, cancellationToken);
                         if (oggData != null)
                         {
                             string fileName = Path.ChangeExtension(soundNode.Name, ".ogg");
                             string filePath = Path.Combine(eventPath, _wadExtractionService.SanitizeName(fileName));
-                            await File.WriteAllBytesAsync(filePath, oggData);
+                            await File.WriteAllBytesAsync(filePath, oggData, cancellationToken);
                         }
                     }
                 }
             }
         }
 
-        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath)
+        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
         {
-            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
             using (var memoryStream = new MemoryStream(fileBytes))
@@ -226,9 +241,11 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type)
+        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken)
         {
-            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync(type, fileBytes);
@@ -236,7 +253,7 @@ namespace AssetsManager.Services.Explorer
             string fileName = Path.ChangeExtension(node.Name, ".json");
             string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
 
-            await File.WriteAllTextAsync(filePath, formattedContent);
+            await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
         }
     }
 }

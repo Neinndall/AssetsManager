@@ -41,8 +41,7 @@ namespace AssetsManager.Services.Core
             WadDifferenceService wadDifferenceService,
             WadPackagingService wadPackagingService,
             DiffViewService diffViewService,
-            TaskCancellationManager taskCancellationManager // New parameter
-            )
+            TaskCancellationManager taskCancellationManager)
         {
             _logService = logService;
             _serviceProvider = serviceProvider;

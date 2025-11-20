@@ -241,7 +241,7 @@ namespace AssetsManager.Views
 
         private async void StartExtractionAsync()
         {
-            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, CancellationToken.None);
+            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath);
         }
         
         private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)

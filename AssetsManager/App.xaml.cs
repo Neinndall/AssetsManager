@@ -131,7 +131,7 @@ namespace AssetsManager
       services.AddSingleton<AudioBankLinkerService>();
 
       // Main Application Logic Service
-      services.AddTransient<ExtractionService>();
+      services.AddSingleton<ExtractionService>();
 
       // Windows, Views, and Dialogs
       services.AddTransient<MainWindow>();
