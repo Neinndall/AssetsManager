@@ -116,6 +116,7 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "Compare";
                 _progressDetailsWindow.HeaderText = "Comparing WADs";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
             });
         }
@@ -160,6 +161,7 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "PackageDown";
                 _progressDetailsWindow.HeaderText = "Extracting New Assets";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, data.totalFiles, data.message, true, null);
             });
         }
@@ -204,6 +206,7 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "Download";
                 _progressDetailsWindow.HeaderText = taskName;
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, 0, "Initializing...", true, null);
             });
         }
