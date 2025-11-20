@@ -11,7 +11,6 @@ namespace AssetsManager.Utils
     public class AppSettings
     {
         public bool SyncHashesWithCDTB { get; set; }
-        public bool AutoCopyHashes { get; set; }
         public bool CreateBackUpOldHashes { get; set; }
         public bool ExtractNewFilesAfterComparison { get; set; } // NEW PROPERTY
         public bool OnlyCheckDifferences { get; set; }
@@ -141,7 +140,6 @@ namespace AssetsManager.Utils
             return new AppSettings
             {
                 SyncHashesWithCDTB = true,
-                AutoCopyHashes = false,
                 CreateBackUpOldHashes = false,
                 ExtractNewFilesAfterComparison = false, // NEW DEFAULT
                 OnlyCheckDifferences = false,
@@ -190,7 +188,6 @@ namespace AssetsManager.Utils
             var defaultSettings = GetDefaultSettings();
 
             CheckJsonDataUpdates = defaultSettings.CheckJsonDataUpdates;
-            AutoCopyHashes = defaultSettings.AutoCopyHashes;
             CreateBackUpOldHashes = defaultSettings.CreateBackUpOldHashes;
             ExtractNewFilesAfterComparison = defaultSettings.ExtractNewFilesAfterComparison; // NEW RESET
             OnlyCheckDifferences = defaultSettings.OnlyCheckDifferences;

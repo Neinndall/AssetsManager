@@ -66,10 +66,6 @@ namespace AssetsManager.Services.Core
             {
                 _progressSummaryButton.Click -= ProgressSummaryButton_Click;
             }
-            if (_progressDetailsWindow != null)
-            {
-                _progressDetailsWindow.Closed -= ProgressDetailsWindow_Closed;
-            }
             _spinningIconAnimationStoryboard?.Stop();
             _spinningIconAnimationStoryboard = null;
             _progressDetailsWindow?.Close();
@@ -77,37 +73,6 @@ namespace AssetsManager.Services.Core
             _progressSummaryButton = null;
             _progressIcon = null;
             _owner = null;
-        }
-
-        public void OnDownloadStarted(int totalFiles)
-        {
-            _owner.Dispatcher.Invoke(() =>
-            {
-                _totalFiles = totalFiles;
-                _progressSummaryButton.Visibility = Visibility.Visible;
-                _progressSummaryButton.ToolTip = "Click to see download details";
-
-                if (_spinningIconAnimationStoryboard == null)
-                {
-                    var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
-                    _spinningIconAnimationStoryboard = originalStoryboard?.Clone();
-                    if (_spinningIconAnimationStoryboard != null) Storyboard.SetTarget(_spinningIconAnimationStoryboard, _progressIcon);
-                }
-                _spinningIconAnimationStoryboard?.Begin();
-
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Downloader");
-                _progressDetailsWindow.Owner = _owner;
-                _progressDetailsWindow.OperationVerb = "Downloading";
-                _progressDetailsWindow.HeaderIconKind = "Download";
-                _progressDetailsWindow.HeaderText = "Downloading Assets";
-                _progressDetailsWindow.Closed += ProgressDetailsWindow_Closed;
-                _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
-            });
-        }
-
-        private void ProgressDetailsWindow_Closed(object sender, EventArgs e)
-        {
-            _progressDetailsWindow = null;
         }
 
         public void OnDownloadProgressChanged(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage)
@@ -167,9 +132,6 @@ namespace AssetsManager.Services.Core
         {
             _owner.Dispatcher.Invoke(() =>
             {
-                // In the new flow, this might not hide the UI if an extraction phase follows.
-                // MainWindow will now control when to finally hide the progress UI.
-                // For now, we leave this as is, and the new OnExtractionStarted will re-show it.
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
                 _spinningIconAnimationStoryboard?.Stop();
                 _spinningIconAnimationStoryboard = null;

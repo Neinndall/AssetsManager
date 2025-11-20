@@ -90,10 +90,7 @@ namespace AssetsManager
       services.AddSingleton<Status>();
       services.AddSingleton<UpdateManager>();
       services.AddSingleton<UpdateExtractor>();
-      services.AddSingleton<Resources>();
-      services.AddSingleton<DirectoryCleaner>();
       services.AddSingleton<BackupManager>();
-      services.AddSingleton<HashCopier>();
       services.AddSingleton<UpdateCheckService>();
       services.AddSingleton<ProgressUIManager>();
       services.AddTransient<ExplorerPreviewService>();
@@ -115,7 +112,6 @@ namespace AssetsManager
       services.AddSingleton<VersionService>();
 
       // Hashes Services
-      services.AddSingleton<HashesManager>();
       services.AddSingleton<HashResolverService>();
 
       // Comparator Services
@@ -138,7 +134,6 @@ namespace AssetsManager
 
       // Windows, Views, and Dialogs
       services.AddTransient<MainWindow>();
-      services.AddTransient<DownloaderWindow>();
       services.AddTransient<ExplorerWindow>();
       services.AddTransient<ComparatorWindow>();
       services.AddTransient<ModelWindow>();

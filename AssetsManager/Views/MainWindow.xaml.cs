@@ -110,10 +110,6 @@ namespace AssetsManager.Views
 
             _logService.SetLogOutput(LogView.richTextBoxLogs);
 
-            _assetDownloader.DownloadStarted += _progressUIManager.OnDownloadStarted;
-            _assetDownloader.DownloadProgressChanged += _progressUIManager.OnDownloadProgressChanged;
-            _assetDownloader.DownloadCompleted += _progressUIManager.OnDownloadCompleted;
-
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
             _wadComparatorService.ComparisonCompleted += _progressUIManager.OnComparisonCompleted;
@@ -130,7 +126,7 @@ namespace AssetsManager.Views
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
             Sidebar.NavigationRequested += OnSidebarNavigationRequested;
-            LoadDownloaderWindow();
+            LoadComparatorWindow();
 
             if (IsAnySettingActive())
             {
@@ -316,7 +312,6 @@ namespace AssetsManager.Views
         private bool IsAnySettingActive()
         {
             return _appSettings.SyncHashesWithCDTB ||
-                   _appSettings.AutoCopyHashes ||
                    _appSettings.CreateBackUpOldHashes ||
                    _appSettings.ExtractNewFilesAfterComparison ||
                    _appSettings.OnlyCheckDifferences ||
@@ -375,7 +370,6 @@ namespace AssetsManager.Views
 
             switch (viewTag)
             {
-                case "Downloader": LoadDownloaderWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Models": LoadModelWindow(); break;
@@ -383,11 +377,6 @@ namespace AssetsManager.Views
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
-        }
-
-        private void LoadDownloaderWindow()
-        {
-            MainContentArea.Content = _serviceProvider.GetRequiredService<DownloaderWindow>();
         }
 
         private void LoadExplorerWindow()
@@ -427,10 +416,6 @@ namespace AssetsManager.Views
 
         private void OnSettingsChanged(object sender, SettingsChangedEventArgs e)
         {
-            if (MainContentArea.Content is DownloaderWindow downloaderView)
-            {
-                downloaderView.UpdateSettings(_appSettings, e.WasResetToDefaults);
-            }
             _updateCheckService.Stop();
             _updateCheckService.Start();
         }

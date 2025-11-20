@@ -76,25 +76,27 @@ namespace AssetsManager.Services.Downloads
                 try
                 {
                     string sourceWadFullPath = Path.Combine(newLolPath, diff.SourceWadFile);
-                var node = new FileSystemNodeModel(diff.FileName, false, diff.NewPath, sourceWadFullPath)
-                {
-                    SourceChunkPathHash = diff.NewPathHash,
-                    Status = DiffStatus.New
-                };
+                    var node = new FileSystemNodeModel(diff.FileName, false, diff.NewPath, sourceWadFullPath)
+                    {
+                        SourceChunkPathHash = diff.NewPathHash,
+                        Status = DiffStatus.New
+                    };
+
+                    // This calculation is now done for ALL files beforehand.
+                    string fileDestinationDirectory = Path.Combine(destinationRootPath, Path.GetDirectoryName(diff.NewPath));
+                    Directory.CreateDirectory(fileDestinationDirectory);
 
                     string extension = Path.GetExtension(node.Name).ToLower();
 
                     if (extension == ".wpk" || extension == ".bnk")
                     {
-                        // Raw copy for audio banks
-                        string fileDestinationDirectory = Path.Combine(destinationRootPath, Path.GetDirectoryName(diff.NewPath));
-                        Directory.CreateDirectory(fileDestinationDirectory);
+                        // Raw copy for audio banks, ensuring it goes to the correct subdirectory
                         await _wadExtractionService.ExtractNodeAsync(node, fileDestinationDirectory);
                     }
                     else
                     {
-                        // Smart saving for all other files
-                        await _wadSavingService.ProcessAndSaveAsync(node, destinationRootPath, null, newLolPath);
+                        // Smart saving for all other files, ensuring it goes to the correct subdirectory
+                        await _wadSavingService.ProcessAndSaveAsync(node, fileDestinationDirectory, null, newLolPath);
                     }
                 }
                 catch (Exception ex)
