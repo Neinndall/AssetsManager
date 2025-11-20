@@ -27,11 +27,11 @@ namespace AssetsManager.Services.Comparator
 
         private BinFileStrategy GetBinFileSearchStrategy(string fullPath, string sourceWadPath)
         {
-            _logService.Log($"[GetBinFileSearchStrategy] Searching for BIN strategy. FullPath: '{fullPath}', SourceWad: '{sourceWadPath}'");
+            _logService.LogDebug($"[GetBinFileSearchStrategy] Searching for BIN strategy. FullPath: '{fullPath}', SourceWad: '{sourceWadPath}'");
             string sourceWadName = Path.GetFileName(sourceWadPath);
 
             // Strategy 1: Infer from full path structure
-            _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 1: Infer from full path structure.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 1: Infer from full path structure.");
             if (fullPath.Contains("/characters/") && fullPath.Contains("/skins/"))
             {
                 var pathParts = fullPath.Split('/');
@@ -49,15 +49,15 @@ namespace AssetsManager.Services.Comparator
                         string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
                         string targetWadName = $"{championName.ToLower()}.wad.client";
                         var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
-                        _logService.Log($"[GetBinFileSearchStrategy] Strategy 1 successful. Found: {strategy}");
+                        _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 1 successful. Found: {strategy}");
                         return strategy;
                     }
                 }
             }
-            _logService.Log("[GetBinFileSearchStrategy] Strategy 1 failed or was not applicable.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 1 failed or was not applicable.");
 
             // Strategy 2: Infer from WAD file name (for champions)
-            _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 2: Infer from WAD file name (for champions).");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 2: Infer from WAD file name (for champions).");
             var wadNameParts = sourceWadName.Split('.');
             if (wadNameParts.Length > 0)
             {
@@ -71,14 +71,14 @@ namespace AssetsManager.Services.Comparator
                     string binPath = $"data/characters/{championName.ToLower()}/skins/{skinName}.bin";
                     string targetWadName = $"{championName.ToLower()}.wad.client";
                     var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
-                    _logService.Log($"[GetBinFileSearchStrategy] Strategy 2 successful. Found: {strategy}");
+                    _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 2 successful. Found: {strategy}");
                     return strategy;
                 }
             }
-            _logService.Log("[GetBinFileSearchStrategy] Strategy 2 failed or was not applicable.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 2 failed or was not applicable.");
 
             // Strategy 3: Infer from WAD file name (for maps)
-            _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 3: Infer from WAD file name (for maps).");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 3: Infer from WAD file name (for maps).");
             if (sourceWadName.StartsWith("Map", StringComparison.OrdinalIgnoreCase) || sourceWadName.StartsWith("Common", StringComparison.OrdinalIgnoreCase))
             {
                 string mapName = wadNameParts[0];
@@ -87,11 +87,11 @@ namespace AssetsManager.Services.Comparator
                     string binPath = $"data/maps/shipping/{mapName.ToLower()}/{mapName.ToLower()}.bin";
                     string targetWadName = $"{mapName.ToLower()}.wad.client";
                     var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Map);
-                    _logService.Log($"[GetBinFileSearchStrategy] Strategy 3 successful. Found: {strategy}");
+                    _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 3 successful. Found: {strategy}");
                     return strategy;
                 }
             }
-            _logService.Log("[GetBinFileSearchStrategy] Strategy 3 failed or was not applicable.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 3 failed or was not applicable.");
 
             _logService.LogWarning($"[GetBinFileSearchStrategy] No BIN file strategy found for '{fullPath}'.");
             return null;

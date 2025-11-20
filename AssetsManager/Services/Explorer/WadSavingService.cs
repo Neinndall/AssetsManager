@@ -1,22 +1,21 @@
-
-using AssetsManager.Services.Core;
-using AssetsManager.Views.Models.Audio;
-using AssetsManager.Views.Models.Explorer;
-using AssetsManager.Views.Models.Wad;
-using System.Threading.Tasks;
-using AssetsManager.Services.Formatting;
-using AssetsManager.Services.Audio;
-using System.IO;
 using System;
+using System.IO;
 using System.Windows.Media.Imaging;
 using System.Collections.ObjectModel;
+using System.Threading.Tasks;
 using System.Collections.Generic;
-using System.Threading; // Added to resolve CancellationToken
-using AssetsManager.Services.Parsers;
+using System.Threading;
 using System.Linq;
 using LeagueToolkit.Toolkit;
 using AssetsManager.Utils;
+using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.Audio;
+using AssetsManager.Services.Parsers;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 
+using AssetsManager.Services.Formatting;
+using AssetsManager.Services.Audio;
 namespace AssetsManager.Services.Explorer
 {
     public class WadSavingService
