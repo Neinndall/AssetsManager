@@ -166,9 +166,9 @@
 
                         <!-- NEW CHECKBOX FOR EXTRACT NEW FILES -->
                         <CheckBox IsChecked="{Binding Settings.ExtractNewFilesAfterComparison, Mode=TwoWay}" 
-                                  Content="Extract new files after comparison" 
+                                  Content="Auto-extract new files" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Automatically extract new files found during comparison to the Assets Downloaded folder"
+                        <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder."
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
                                      Margin="27,0,0,8" 
@@ -177,7 +177,7 @@
                 </StackPanel>
 
                 <!-- Scan Mode Section -->
-                <StackPanel>
+                <StackPanel Margin="0,0,0,24">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                         <materialIcons:MaterialIcon Kind="Magnify" 
                                                    Foreground="{StaticResource TextPrimary}"
@@ -201,7 +201,7 @@
                         <TextBlock Text="Only identify differences without downloading or modifying files"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,0" 
+                                     Margin="27,0,0,8" 
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
