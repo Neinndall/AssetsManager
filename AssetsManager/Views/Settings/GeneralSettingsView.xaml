@@ -172,6 +172,16 @@
                                      FontSize="12" 
                                      Margin="27,0,0,8" 
                                      TextWrapping="Wrap"/>
+
+                        <!-- NEW CHECKBOX FOR EXTRACT NEW FILES -->
+                        <CheckBox IsChecked="{Binding Settings.ExtractNewFilesAfterComparison, Mode=TwoWay}" 
+                                  Content="Extract new files after comparison" 
+                                  Style="{StaticResource ModernCheckBox}"/>
+                        <TextBlock Text="Automatically extract new files found during comparison to the Assets Downloaded folder"
+                                     Foreground="{StaticResource TextMuted}" 
+                                     FontSize="12" 
+                                     Margin="27,0,0,8" 
+                                     TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
 

@@ -51,6 +51,8 @@ namespace AssetsManager.Views.Controls.Comparator
         public DiffViewService DiffViewService { get; set; }
         public HashResolverService HashResolverService { get; set; }
 
+
+
         private string _oldLolPath;
         private string _newLolPath;
 

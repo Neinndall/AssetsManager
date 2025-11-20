@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
@@ -47,10 +48,18 @@ namespace AssetsManager.Views
         private readonly DiffViewService _diffViewService;
         private readonly MonitorService _monitorService;
         private readonly VersionService _versionService;
+        private readonly ExtractionService _extractionService;
 
         private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
         private readonly List<string> _notificationMessages = new List<string>();
+
+        // New fields to manage the state of the extraction after comparison
+        private bool _isExtractingAfterComparison = false;
+        private string _extractionOldLolPath;
+        private string _extractionNewLolPath;
+        private List<SerializableChunkDiff> _diffsForExtraction;
+        private CancellationTokenSource _extractionCts;
 
         public MainWindow(
             IServiceProvider serviceProvider,
@@ -71,7 +80,8 @@ namespace AssetsManager.Views
             ProgressUIManager progressUIManager,
             DiffViewService diffViewService,
             MonitorService monitorService,
-            VersionService versionService)
+            VersionService versionService,
+            ExtractionService extractionService)
         {
             InitializeComponent();
 
@@ -94,6 +104,7 @@ namespace AssetsManager.Views
             _diffViewService = diffViewService;
             _monitorService = monitorService;
             _versionService = versionService;
+            _extractionService = extractionService;
 
             _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, this);
 
@@ -107,6 +118,10 @@ namespace AssetsManager.Views
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
             _wadComparatorService.ComparisonCompleted += _progressUIManager.OnComparisonCompleted;
             _wadComparatorService.ComparisonCompleted += OnWadComparisonCompleted;
+            
+            _extractionService.ExtractionStarted += OnExtractionStarted;
+            _extractionService.ExtractionProgressChanged += OnExtractionProgressChanged;
+            _extractionService.ExtractionCompleted += OnExtractionCompleted;
 
             _versionService.VersionDownloadStarted += (sender, e) => _progressUIManager.OnVersionDownloadStarted(sender, e);
             _versionService.VersionDownloadProgressChanged += (sender, e) => _progressUIManager.OnDownloadProgressChanged(e.CurrentValue, e.TotalValue, e.CurrentFile, true, null);
@@ -215,32 +230,87 @@ namespace AssetsManager.Views
 
             ShowNotification(true, message);
         }
-
-        private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
+        
+        private void OnExtractionStarted(object sender, string message)
         {
             Dispatcher.Invoke(() =>
             {
-                if (allDiffs != null && allDiffs.Any())
-                {
-                    var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
-                    {
-                        Type = d.Type,
-                        OldPath = d.OldPath,
-                        NewPath = d.NewPath,
-                        SourceWadFile = d.SourceWadFile,
-                        OldPathHash = d.OldChunk.PathHash,
-                        NewPathHash = d.NewChunk.PathHash,
-                        OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
-                        NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
-                        OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
-                        NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
-                    }).ToList();
+                _progressUIManager.OnExtractionStarted(sender, message);
+            });
+        }
 
-                    var resultWindow = new WadComparisonResultWindow(serializableDiffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, _appSettings, oldLolPath, newLolPath);
-                    resultWindow.Owner = this;
-                    resultWindow.Show();
+        private void OnExtractionProgressChanged(object sender, (double percentage, string message) progress)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                _progressUIManager.OnExtractionProgressChanged(progress.percentage, progress.message);
+            });
+        }
+
+        private void OnExtractionCompleted(object sender, EventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                _progressUIManager.OnExtractionCompleted();
+                if (_isExtractingAfterComparison)
+                {
+                    ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath);
+                    _isExtractingAfterComparison = false; // Reset flag
                 }
             });
+        }
+
+        private async void StartExtractionAsync()
+        {
+            _extractionCts = new CancellationTokenSource();
+            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, _extractionCts.Token);
+        }
+        
+        private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
+        {
+            var serializableDiffs = allDiffs?.Select(d => new SerializableChunkDiff
+            {
+                Type = d.Type,
+                OldPath = d.OldPath,
+                NewPath = d.NewPath,
+                SourceWadFile = d.SourceWadFile,
+                OldPathHash = d.OldChunk.PathHash,
+                NewPathHash = d.NewChunk.PathHash,
+                OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
+                NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
+                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
+                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
+            }).ToList();
+
+            if (serializableDiffs == null || !serializableDiffs.Any())
+            {
+                _logService.Log("Comparison completed with no differences found.");
+                return;
+            }
+
+            if (_appSettings.ExtractNewFilesAfterComparison)
+            {
+                _isExtractingAfterComparison = true;
+                _diffsForExtraction = serializableDiffs;
+                _extractionOldLolPath = oldLolPath;
+                _extractionNewLolPath = newLolPath;
+                
+                Dispatcher.Invoke(StartExtractionAsync);
+            }
+            else
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
+                });
+            }
+        }
+
+        private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
+        {
+            var resultWindow = new WadComparisonResultWindow(diffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, _appSettings, oldPath, newPath);
+            resultWindow.Owner = this;
+            resultWindow.Show();
         }
 
         private bool IsAnySettingActive()
@@ -248,6 +318,7 @@ namespace AssetsManager.Views
             return _appSettings.SyncHashesWithCDTB ||
                    _appSettings.AutoCopyHashes ||
                    _appSettings.CreateBackUpOldHashes ||
+                   _appSettings.ExtractNewFilesAfterComparison ||
                    _appSettings.OnlyCheckDifferences ||
                    _appSettings.CheckJsonDataUpdates ||
                    _appSettings.SaveDiffHistory ||

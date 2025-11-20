@@ -225,6 +225,8 @@
                                    Foreground="{StaticResource TextMuted}"
                                    Margin="0,2,0,12"/>
 
+
+
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="createLolBackupButton" 
                                 Content="Create LoL Backup"

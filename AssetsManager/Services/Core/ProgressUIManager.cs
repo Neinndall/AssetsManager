@@ -167,6 +167,57 @@ namespace AssetsManager.Services.Core
         {
             _owner.Dispatcher.Invoke(() =>
             {
+                // In the new flow, this might not hide the UI if an extraction phase follows.
+                // MainWindow will now control when to finally hide the progress UI.
+                // For now, we leave this as is, and the new OnExtractionStarted will re-show it.
+                _progressSummaryButton.Visibility = Visibility.Collapsed;
+                _spinningIconAnimationStoryboard?.Stop();
+                _spinningIconAnimationStoryboard = null;
+                _progressDetailsWindow?.Close();
+            });
+        }
+
+        public void OnExtractionStarted(object sender, string message)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                _progressSummaryButton.Visibility = Visibility.Visible;
+                _progressSummaryButton.ToolTip = "Click to see extraction details";
+
+                if (_spinningIconAnimationStoryboard == null)
+                {
+                    var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
+                    _spinningIconAnimationStoryboard = originalStoryboard?.Clone();
+                    if (_spinningIconAnimationStoryboard != null) Storyboard.SetTarget(_spinningIconAnimationStoryboard, _progressIcon);
+                }
+                _spinningIconAnimationStoryboard?.Begin();
+
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Extractor");
+                _progressDetailsWindow.Owner = _owner;
+                _progressDetailsWindow.OperationVerb = "Extracting";
+                _progressDetailsWindow.HeaderIconKind = "PackageDown";
+                _progressDetailsWindow.HeaderText = "Extracting New Assets";
+                _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.UpdateProgress(0, 100, message, true, null); // Start with 0%
+            });
+        }
+
+        public void OnExtractionProgressChanged(double percentage, string currentFile)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                // The progress bar in ProgressDetailsWindow takes (completed, total).
+                // We'll simulate this with the percentage.
+                int completed = (int)percentage;
+                int total = 100;
+                _progressDetailsWindow?.UpdateProgress(completed, total, currentFile, true, null);
+            });
+        }
+
+        public void OnExtractionCompleted()
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
                 _spinningIconAnimationStoryboard?.Stop();
                 _spinningIconAnimationStoryboard = null;

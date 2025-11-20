@@ -100,7 +100,7 @@ namespace AssetsManager.Views.Controls.Downloader
                 return;
             }
 
-            await ExtractionService.ExecuteAsync(OldHashesPath, NewHashesPath);
+            // await ExtractionService.ExecuteAsync(OldHashesPath, NewHashesPath);
         }
     }
 }

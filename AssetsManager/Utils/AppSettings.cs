@@ -13,6 +13,7 @@ namespace AssetsManager.Utils
         public bool SyncHashesWithCDTB { get; set; }
         public bool AutoCopyHashes { get; set; }
         public bool CreateBackUpOldHashes { get; set; }
+        public bool ExtractNewFilesAfterComparison { get; set; } // NEW PROPERTY
         public bool OnlyCheckDifferences { get; set; }
         public bool CheckJsonDataUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
@@ -142,6 +143,7 @@ namespace AssetsManager.Utils
                 SyncHashesWithCDTB = true,
                 AutoCopyHashes = false,
                 CreateBackUpOldHashes = false,
+                ExtractNewFilesAfterComparison = false, // NEW DEFAULT
                 OnlyCheckDifferences = false,
                 CheckJsonDataUpdates = false,
                 AssetTrackerTimer = false,
@@ -190,6 +192,7 @@ namespace AssetsManager.Utils
             CheckJsonDataUpdates = defaultSettings.CheckJsonDataUpdates;
             AutoCopyHashes = defaultSettings.AutoCopyHashes;
             CreateBackUpOldHashes = defaultSettings.CreateBackUpOldHashes;
+            ExtractNewFilesAfterComparison = defaultSettings.ExtractNewFilesAfterComparison; // NEW RESET
             OnlyCheckDifferences = defaultSettings.OnlyCheckDifferences;
             NewHashesPath = defaultSettings.NewHashesPath;
             OldHashesPath = defaultSettings.OldHashesPath;

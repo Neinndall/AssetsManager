@@ -1,63 +1,112 @@
-using System;
-using System.Threading.Tasks;
-using AssetsManager.Services.Hashes;
-using AssetsManager.Utils;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace AssetsManager.Services.Downloads
 {
     public class ExtractionService
     {
-        private readonly HashesManager _hashesManager;
-        private readonly Resources _resources;
-        private readonly DirectoryCleaner _directoryCleaner;
-        private readonly BackupManager _backupManager;
-        private readonly HashCopier _hashCopier;
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly AppSettings _appSettings;
+        private readonly WadSavingService _wadSavingService;
+        private readonly WadExtractionService _wadExtractionService;
+
+        public event EventHandler<string> ExtractionStarted;
+        public event EventHandler<(double percentage, string message)> ExtractionProgressChanged;
+        public event EventHandler ExtractionCompleted;
 
         public ExtractionService(
-            HashesManager hashesManager,
-            Resources resources,
-            DirectoryCleaner directoryCleaner,
-            BackupManager backupManager,
-            HashCopier hashCopier,
             LogService logService,
             DirectoriesCreator directoriesCreator,
-            AppSettings appSettings)
+            WadSavingService wadSavingService,
+            WadExtractionService wadExtractionService)
         {
-            _hashesManager = hashesManager;
-            _resources = resources;
-            _directoryCleaner = directoryCleaner;
-            _backupManager = backupManager;
-            _hashCopier = hashCopier;
             _logService = logService;
             _directoriesCreator = directoriesCreator;
-            _appSettings = appSettings;
+            _wadSavingService = wadSavingService;
+            _wadExtractionService = wadExtractionService;
         }
 
-        public async Task ExecuteAsync(string oldHashesPath, string newHashesPath)
+        public async Task ExtractNewFilesFromComparisonAsync(
+            List<SerializableChunkDiff> allDiffs,
+            string newLolPath,
+            CancellationToken cancellationToken)
         {
-            try
-            {
-                int diffCount = await _hashesManager.CompareHashesAsync(oldHashesPath, newHashesPath);
+            ExtractionStarted?.Invoke(this, "Extraction of new assets started...");
 
-                if (diffCount == 0)
+            var newDiffs = allDiffs.Where(d => d.Type == ChunkDiffType.New).ToList();
+
+            if (!newDiffs.Any())
+            {
+                _logService.Log("No new files to extract from the comparison.");
+                ExtractionCompleted?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+
+            // Create a unique destination directory for this extraction session
+            _directoriesCreator.GenerateNewSubAssetsDownloadedPath();
+            string destinationRootPath = _directoriesCreator.SubAssetsDownloadedPath;
+
+            int totalFiles = newDiffs.Count;
+            int extractedCount = 0;
+
+            _logService.Log($"Starting extraction of {totalFiles} new files.");
+
+            foreach (var diff in newDiffs)
+            {
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    return;
+                    _logService.LogWarning("Extraction was cancelled by the user.");
+                    break; 
                 }
 
-                await _resources.GetResourcesFiles();
-                _directoryCleaner.CleanEmptyDirectories();
-                await _backupManager.HandleBackUpAsync(_appSettings.CreateBackUpOldHashes);
-                await _hashCopier.HandleCopyAsync(_appSettings.AutoCopyHashes);
-                // No pondremos ningun log aqui
+                extractedCount++;
+                double percentage = (double)extractedCount / totalFiles * 100;
+                string progressMessage = $"Extracting: {diff.FileName}";
+                ExtractionProgressChanged?.Invoke(this, (percentage, progressMessage));
+                
+                try
+                {
+                    string sourceWadFullPath = Path.Combine(newLolPath, diff.SourceWadFile);
+                var node = new FileSystemNodeModel(diff.FileName, false, diff.NewPath, sourceWadFullPath)
+                {
+                    SourceChunkPathHash = diff.NewPathHash,
+                    Status = DiffStatus.New
+                };
+
+                    string extension = Path.GetExtension(node.Name).ToLower();
+
+                    if (extension == ".wpk" || extension == ".bnk")
+                    {
+                        // Raw copy for audio banks
+                        string fileDestinationDirectory = Path.Combine(destinationRootPath, Path.GetDirectoryName(diff.NewPath));
+                        Directory.CreateDirectory(fileDestinationDirectory);
+                        await _wadExtractionService.ExtractNodeAsync(node, fileDestinationDirectory);
+                    }
+                    else
+                    {
+                        // Smart saving for all other files
+                        await _wadSavingService.ProcessAndSaveAsync(node, destinationRootPath, null, newLolPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to extract new file: {diff.FileName}");
+                    // Continue with other files even if one fails
+                }
             }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "A critical error occurred during the extraction process");
-            }
+            
+            _logService.LogSuccess($"Extraction completed. {extractedCount} files processed.");
+            ExtractionCompleted?.Invoke(this, EventArgs.Empty);
         }
     }
 }
+
