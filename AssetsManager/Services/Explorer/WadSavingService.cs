@@ -77,6 +77,33 @@ namespace AssetsManager.Services.Explorer
                 return;
             }
 
+            if (node.Type == NodeType.AudioEvent)
+            {
+                string eventPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
+                Directory.CreateDirectory(eventPath);
+
+                foreach (var soundNode in node.Children)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
+                    if (soundNode.Type == NodeType.WemFile)
+                    {
+                        var wemData = await _wadExtractionService.GetWemFileBytesAsync(soundNode, cancellationToken);
+                        if (wemData != null)
+                        {
+                            byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData, cancellationToken);
+                            if (oggData != null)
+                            {
+                                string fileName = Path.ChangeExtension(soundNode.Name, ".ogg");
+                                string filePath = Path.Combine(eventPath, _wadExtractionService.SanitizeName(fileName));
+                                await File.WriteAllBytesAsync(filePath, oggData, cancellationToken);
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
             string extension = Path.GetExtension(node.Name).ToLower();
 
             switch (extension)
@@ -107,10 +134,30 @@ namespace AssetsManager.Services.Explorer
                     await HandleJsFile(node, destinationPath, cancellationToken);
                     break;
 
+                case ".wem":
+                    await HandleWemFileAsync(node, destinationPath, cancellationToken);
+                    break;
+
                 default:
                     // For any other file, just extract it raw
                     await _wadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken);
                     break;
+            }
+        }
+
+        private async Task HandleWemFileAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var wemData = await _wadExtractionService.GetWemFileBytesAsync(node, cancellationToken);
+            if (wemData == null) return;
+
+            byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData, cancellationToken);
+            if (oggData != null)
+            {
+                string fileName = Path.ChangeExtension(node.Name, ".ogg");
+                string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
+                await File.WriteAllBytesAsync(filePath, oggData, cancellationToken);
             }
         }
 

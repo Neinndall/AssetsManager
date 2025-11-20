@@ -42,9 +42,45 @@ namespace AssetsManager.Services.Explorer
                 case NodeType.WadFile:
                     await ExtractVirtualDirectoryAsync(node, destinationPath, cancellationToken);
                     break;
+                case NodeType.AudioEvent:
+                    await ExtractAudioEventDirectoryAsync(node, destinationPath, cancellationToken);
+                    break;
+                case NodeType.WemFile:
+                    await ExtractWemFileAsync(node, destinationPath, cancellationToken);
+                    break;
                 case NodeType.RealDirectory:
                     await ExtractRealDirectoryAsync(node, destinationPath, cancellationToken);
                     break;
+            }
+        }
+
+        // Extrae el contenido de una carpeta de evento de audio (.wem) a un nuevo directorio.
+        private async Task ExtractAudioEventDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
+            Directory.CreateDirectory(newDirPath);
+
+            foreach (var childNode in dirNode.Children)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (childNode.Type == NodeType.WemFile)
+                {
+                    await ExtractWemFileAsync(childNode, newDirPath, cancellationToken);
+                }
+            }
+        }
+
+        // Extrae un único fichero .wem y lo guarda en el disco.
+        private async Task ExtractWemFileAsync(FileSystemNodeModel fileNode, string destinationPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var wemData = await GetWemFileBytesAsync(fileNode, cancellationToken);
+            if (wemData != null)
+            {
+                string destFilePath = Path.Combine(destinationPath, SanitizeName(fileNode.Name));
+                await File.WriteAllBytesAsync(destFilePath, wemData, cancellationToken);
             }
         }
 

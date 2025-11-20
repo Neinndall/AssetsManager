@@ -393,7 +393,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     LogService.Log("Extracting selected files...");
 
                     string logPath = destinationPath;
-                    if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile)
+                    if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
                     {
                         logPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
@@ -459,18 +459,20 @@ namespace AssetsManager.Views.Controls.Explorer
                 try
                 {
                     LogService.Log("Processing and saving selected files...");
-                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken);
 
+                    string finalLogPath = destinationPath;
                     if (selectedNode.Type == NodeType.SoundBank)
                     {
-                        destinationPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
+                        finalLogPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
                     }
-                    else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile)
+                    else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
                     {
-                        destinationPath = Path.Combine(destinationPath, selectedNode.Name);
+                        finalLogPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
 
-                    LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name}.", destinationPath, selectedNode.Name);
+                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken);
+
+                    LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name}.", finalLogPath, selectedNode.Name);
                 }
                 catch (OperationCanceledException)
                 {
