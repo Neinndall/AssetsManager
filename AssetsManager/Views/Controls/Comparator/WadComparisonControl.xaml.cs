@@ -179,6 +179,7 @@ namespace AssetsManager.Views.Controls.Comparator
 
             try
             {
+                var cancellationToken = TaskCancellationManager.PrepareNewOperation();
                 if (wadComparatorTabControl.SelectedIndex == 0) // By Directory
                 {
                     if (string.IsNullOrEmpty(oldLolPbeDirectoryTextBox.Text) || string.IsNullOrEmpty(newLolPbeDirectoryTextBox.Text))
@@ -188,7 +189,7 @@ namespace AssetsManager.Views.Controls.Comparator
                     }
                     _oldLolPath = oldLolPbeDirectoryTextBox.Text;
                     _newLolPath = newLolPbeDirectoryTextBox.Text;
-                    await WadComparatorService.CompareWadsAsync(_oldLolPath, _newLolPath);
+                    await WadComparatorService.CompareWadsAsync(_oldLolPath, _newLolPath, cancellationToken);
                 }
                 else // By File
                 {
@@ -197,7 +198,7 @@ namespace AssetsManager.Views.Controls.Comparator
                         CustomMessageBoxService.ShowWarning("Warning", "Please select both WAD files.", Window.GetWindow(this));
                         return; // Return directly as button.IsEnabled will be set in finally
                     }
-                    await WadComparatorService.CompareSingleWadAsync(oldWadFileTextBox.Text, newWadFileTextBox.Text);
+                    await WadComparatorService.CompareSingleWadAsync(oldWadFileTextBox.Text, newWadFileTextBox.Text, cancellationToken);
                 }
             }
             catch (OperationCanceledException)

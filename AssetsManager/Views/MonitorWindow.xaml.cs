@@ -24,7 +24,8 @@ namespace AssetsManager.Views
             JsonDataService jsonDataService,
             VersionService versionService,
             DirectoriesCreator directoriesCreator,
-            RiotApiService riotApiService) // Added RiotApiService
+            RiotApiService riotApiService,
+            TaskCancellationManager taskCancellationManager) // Added RiotApiService
         {
             InitializeComponent();
 
@@ -54,6 +55,7 @@ namespace AssetsManager.Views
             ManageVersionsControl.LogService = logService;
             ManageVersionsControl.AppSettings = appSettings;
             ManageVersionsControl.CustomMessageBoxService = customMessageBoxService;
+            ManageVersionsControl.TaskCancellationManager = taskCancellationManager;
 
             // Setup and inject dependencies for ApiControl
             ApiControl.LogService = logService;

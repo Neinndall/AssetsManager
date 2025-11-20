@@ -16,6 +16,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public TaskCancellationManager TaskCancellationManager { get; set; }
         private ManageVersions _viewModel;
 
         public ManageVersionsControl()
@@ -85,7 +86,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            await VersionService.DownloadPluginsAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales);
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation();
+            await VersionService.DownloadPluginsAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
         }
 
         private async void GetLoLGameClient_Click(object sender, RoutedEventArgs e)
@@ -119,7 +121,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales);
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation();
+            await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
         }
 
         private void ListView_SelectionChanged(object sender, SelectionChangedEventArgs e)

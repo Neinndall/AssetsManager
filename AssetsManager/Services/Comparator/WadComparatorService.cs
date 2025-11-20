@@ -23,13 +23,10 @@ namespace AssetsManager.Services.Comparator
         public event Action<int, string, bool, string> ComparisonProgressChanged;
         public event Action<List<ChunkDiff>, string, string> ComparisonCompleted;
 
-        private readonly TaskCancellationManager _taskCancellationManager; // New field
-
-        public WadComparatorService(HashResolverService hashResolverService, LogService logService, TaskCancellationManager taskCancellationManager)
+        public WadComparatorService(HashResolverService hashResolverService, LogService logService)
         {
             _hashResolverService = hashResolverService;
             _logService = logService;
-            _taskCancellationManager = taskCancellationManager; // Assign new dependency
         }
 
         public void NotifyComparisonStarted(int totalFiles)
@@ -47,12 +44,11 @@ namespace AssetsManager.Services.Comparator
             ComparisonCompleted?.Invoke(allDiffs, oldPbePath, newPbePath);
         }
 
-        public async Task CompareSingleWadAsync(string oldWadFile, string newWadFile)
+        public async Task CompareSingleWadAsync(string oldWadFile, string newWadFile, CancellationToken cancellationToken)
         {
             List<ChunkDiff> allDiffs = new List<ChunkDiff>();
             string oldDir = Path.GetDirectoryName(oldWadFile);
             string newDir = Path.GetDirectoryName(newWadFile);
-            CancellationToken cancellationToken = _taskCancellationManager.PrepareNewOperation(); // Get new token for this operation
 
             try
             {
@@ -112,10 +108,9 @@ namespace AssetsManager.Services.Comparator
             }
         }
 
-        public async Task CompareWadsAsync(string oldDir, string newDir)
+        public async Task CompareWadsAsync(string oldDir, string newDir, CancellationToken cancellationToken)
         {
             List<ChunkDiff> allDiffs = new List<ChunkDiff>();
-            CancellationToken cancellationToken = _taskCancellationManager.PrepareNewOperation(); // Get new token for this operation
             try
             {
                 cancellationToken.ThrowIfCancellationRequested(); // Check for cancellation at the start
