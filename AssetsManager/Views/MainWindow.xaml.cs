@@ -49,6 +49,7 @@ namespace AssetsManager.Views
         private readonly MonitorService _monitorService;
         private readonly VersionService _versionService;
         private readonly ExtractionService _extractionService;
+        private readonly TaskCancellationManager _taskCancellationManager;
 
         private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
@@ -80,7 +81,8 @@ namespace AssetsManager.Views
             DiffViewService diffViewService,
             MonitorService monitorService,
             VersionService versionService,
-            ExtractionService extractionService)
+            ExtractionService extractionService,
+            TaskCancellationManager taskCancellationManager)
         {
             InitializeComponent();
 
@@ -104,6 +106,7 @@ namespace AssetsManager.Views
             _monitorService = monitorService;
             _versionService = versionService;
             _extractionService = extractionService;
+            _taskCancellationManager = taskCancellationManager;
 
             _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, this);
 
@@ -241,7 +244,8 @@ namespace AssetsManager.Views
 
         private async void StartExtractionAsync()
         {
-            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath);
+            var cancellationToken = _taskCancellationManager.PrepareNewOperation();
+            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
         }
         
         private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)

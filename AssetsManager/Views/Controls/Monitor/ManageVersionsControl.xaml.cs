@@ -1,12 +1,12 @@
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Versions;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models.Versions;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Versions;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Versions;
 
 namespace AssetsManager.Views.Controls.Monitor
 {

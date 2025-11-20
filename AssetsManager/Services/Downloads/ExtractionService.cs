@@ -1,14 +1,14 @@
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Explorer;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models.Explorer;
-using AssetsManager.Views.Models.Wad;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Services.Downloads
 {
@@ -18,7 +18,6 @@ namespace AssetsManager.Services.Downloads
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly WadSavingService _wadSavingService;
         private readonly WadExtractionService _wadExtractionService;
-        private readonly TaskCancellationManager _taskCancellationManager;
 
         public event EventHandler<(string message, int totalFiles)> ExtractionStarted;
         public event EventHandler<(int extractedCount, int totalFiles, string message)> ExtractionProgressChanged;
@@ -28,22 +27,19 @@ namespace AssetsManager.Services.Downloads
             LogService logService,
             DirectoriesCreator directoriesCreator,
             WadSavingService wadSavingService,
-            WadExtractionService wadExtractionService,
-            TaskCancellationManager taskCancellationManager)
+            WadExtractionService wadExtractionService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _wadSavingService = wadSavingService;
             _wadExtractionService = wadExtractionService;
-            _taskCancellationManager = taskCancellationManager;
         }
 
         public async Task ExtractNewFilesFromComparisonAsync(
             List<SerializableChunkDiff> allDiffs,
-            string newLolPath)
+            string newLolPath,
+            CancellationToken cancellationToken)
         {
-            CancellationToken cancellationToken = _taskCancellationManager.PrepareNewOperation();
-
             var newDiffs = allDiffs.Where(d => d.Type == ChunkDiffType.New).ToList();
 
             if (!newDiffs.Any())
