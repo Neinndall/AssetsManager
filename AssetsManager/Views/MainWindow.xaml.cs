@@ -114,10 +114,10 @@ namespace AssetsManager.Views
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
             _wadComparatorService.ComparisonCompleted += _progressUIManager.OnComparisonCompleted;
             _wadComparatorService.ComparisonCompleted += OnWadComparisonCompleted;
-            
-            _extractionService.ExtractionStarted += OnExtractionStarted;
-            _extractionService.ExtractionProgressChanged += OnExtractionProgressChanged;
-            _extractionService.ExtractionCompleted += OnExtractionCompleted;
+
+            _extractionService.ExtractionStarted += _progressUIManager.OnExtractionStarted;
+            _extractionService.ExtractionProgressChanged += (sender, progress) => _progressUIManager.OnExtractionProgressChanged(progress.extractedCount, progress.totalFiles, progress.message);
+            _extractionService.ExtractionCompleted += (sender, e) => OnExtractionCompleted(sender, e);
 
             _versionService.VersionDownloadStarted += (sender, e) => _progressUIManager.OnVersionDownloadStarted(sender, e);
             _versionService.VersionDownloadProgressChanged += (sender, e) => _progressUIManager.OnDownloadProgressChanged(e.CurrentValue, e.TotalValue, e.CurrentFile, true, null);
@@ -227,22 +227,6 @@ namespace AssetsManager.Views
             ShowNotification(true, message);
         }
         
-        private void OnExtractionStarted(object sender, (string message, int totalFiles) data)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                _progressUIManager.OnExtractionStarted(sender, data);
-            });
-        }
-
-        private void OnExtractionProgressChanged(object sender, (int extractedCount, int totalFiles, string message) progress)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                _progressUIManager.OnExtractionProgressChanged(progress.extractedCount, progress.totalFiles, progress.message);
-            });
-        }
-
         private void OnExtractionCompleted(object sender, EventArgs e)
         {
             Dispatcher.Invoke(() =>
