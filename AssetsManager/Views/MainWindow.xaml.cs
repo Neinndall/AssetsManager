@@ -59,7 +59,6 @@ namespace AssetsManager.Views
         private string _extractionOldLolPath;
         private string _extractionNewLolPath;
         private List<SerializableChunkDiff> _diffsForExtraction;
-        private CancellationTokenSource _extractionCts;
 
         public MainWindow(
             IServiceProvider serviceProvider,
@@ -242,8 +241,7 @@ namespace AssetsManager.Views
 
         private async void StartExtractionAsync()
         {
-            _extractionCts = new CancellationTokenSource();
-            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, _extractionCts.Token);
+            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, CancellationToken.None);
         }
         
         private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
