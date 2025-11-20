@@ -19,8 +19,8 @@ namespace AssetsManager.Services.Downloads
         private readonly WadSavingService _wadSavingService;
         private readonly WadExtractionService _wadExtractionService;
 
-        public event EventHandler<string> ExtractionStarted;
-        public event EventHandler<(double percentage, string message)> ExtractionProgressChanged;
+        public event EventHandler<(string message, int totalFiles)> ExtractionStarted;
+        public event EventHandler<(int extractedCount, int totalFiles, string message)> ExtractionProgressChanged;
         public event EventHandler ExtractionCompleted;
 
         public ExtractionService(
@@ -40,8 +40,6 @@ namespace AssetsManager.Services.Downloads
             string newLolPath,
             CancellationToken cancellationToken)
         {
-            ExtractionStarted?.Invoke(this, "Extraction of new assets started...");
-
             var newDiffs = allDiffs.Where(d => d.Type == ChunkDiffType.New).ToList();
 
             if (!newDiffs.Any())
@@ -51,11 +49,14 @@ namespace AssetsManager.Services.Downloads
                 return;
             }
 
+            int totalFiles = newDiffs.Count;
+
+            ExtractionStarted?.Invoke(this, ("Extraction of new assets started...", totalFiles));
+
             // Create a unique destination directory for this extraction session
             _directoriesCreator.GenerateNewSubAssetsDownloadedPath();
             string destinationRootPath = _directoriesCreator.SubAssetsDownloadedPath;
 
-            int totalFiles = newDiffs.Count;
             int extractedCount = 0;
 
             _logService.Log($"Starting extraction of {totalFiles} new files.");
@@ -69,9 +70,8 @@ namespace AssetsManager.Services.Downloads
                 }
 
                 extractedCount++;
-                double percentage = (double)extractedCount / totalFiles * 100;
-                string progressMessage = $"Extracting: {diff.FileName}";
-                ExtractionProgressChanged?.Invoke(this, (percentage, progressMessage));
+                string progressMessage = $"{diff.FileName}";
+                ExtractionProgressChanged?.Invoke(this, (extractedCount, totalFiles, progressMessage));
                 
                 try
                 {

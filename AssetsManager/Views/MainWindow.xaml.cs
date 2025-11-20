@@ -227,19 +227,19 @@ namespace AssetsManager.Views
             ShowNotification(true, message);
         }
         
-        private void OnExtractionStarted(object sender, string message)
+        private void OnExtractionStarted(object sender, (string message, int totalFiles) data)
         {
             Dispatcher.Invoke(() =>
             {
-                _progressUIManager.OnExtractionStarted(sender, message);
+                _progressUIManager.OnExtractionStarted(sender, data);
             });
         }
 
-        private void OnExtractionProgressChanged(object sender, (double percentage, string message) progress)
+        private void OnExtractionProgressChanged(object sender, (int extractedCount, int totalFiles, string message) progress)
         {
             Dispatcher.Invoke(() =>
             {
-                _progressUIManager.OnExtractionProgressChanged(progress.percentage, progress.message);
+                _progressUIManager.OnExtractionProgressChanged(progress.extractedCount, progress.totalFiles, progress.message);
             });
         }
 

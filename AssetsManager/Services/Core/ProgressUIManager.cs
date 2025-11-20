@@ -139,7 +139,7 @@ namespace AssetsManager.Services.Core
             });
         }
 
-        public void OnExtractionStarted(object sender, string message)
+        public void OnExtractionStarted(object sender, (string message, int totalFiles) data)
         {
             _owner.Dispatcher.Invoke(() =>
             {
@@ -160,19 +160,15 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "PackageDown";
                 _progressDetailsWindow.HeaderText = "Extracting New Assets";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.UpdateProgress(0, 100, message, true, null); // Start with 0%
+                _progressDetailsWindow.UpdateProgress(0, data.totalFiles, data.message, true, null);
             });
         }
 
-        public void OnExtractionProgressChanged(double percentage, string currentFile)
+        public void OnExtractionProgressChanged(int completedFiles, int totalFiles, string currentFile)
         {
             _owner.Dispatcher.Invoke(() =>
             {
-                // The progress bar in ProgressDetailsWindow takes (completed, total).
-                // We'll simulate this with the percentage.
-                int completed = (int)percentage;
-                int total = 100;
-                _progressDetailsWindow?.UpdateProgress(completed, total, currentFile, true, null);
+                _progressDetailsWindow?.UpdateProgress(completedFiles, totalFiles, currentFile, true, null);
             });
         }
 
