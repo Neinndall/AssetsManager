@@ -24,8 +24,8 @@
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Asset Tracker Section -->
-                <StackPanel Margin="0,0,0,24">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="TimerCogOutline" 
                                                    Foreground="{StaticResource AccentOrange}"
                                                    FontSize="20" 
@@ -50,7 +50,7 @@
                         <TextBlock Text="When enabled, the application will periodically check for new assets"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
 
                         <!-- Interval Settings Container -->
@@ -89,8 +89,8 @@
                 </StackPanel>
 
                 <!-- PBE Status Checker Section -->
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="LanPending"
                                                    Foreground="{StaticResource AccentPurple}"
                                                    FontSize="20"
@@ -115,7 +115,7 @@
                         <TextBlock Text="When enabled, the application will periodically check for PBE updates"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
-                                     Margin="27,0,0,8"
+                                     Margin="27,0,0,6"
                                      TextWrapping="Wrap"/>
 
                         <!-- Interval Settings Container -->
@@ -154,8 +154,8 @@
                 </StackPanel>
 
                 <!-- API Settings Section -->
-                <StackPanel Margin="0,24,0,0">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="Api"
                                                    Foreground="{StaticResource AccentGreen}"
                                                    FontSize="20"
@@ -178,14 +178,14 @@
                         <TextBlock Text="When enabled, the application will use the PBE client's lockfile"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
-                                     Margin="27,0,0,0"
+                                     Margin="27,0,0,6"
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Application Behavior Section -->
-                <StackPanel Margin="0,24,0,0">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="ApplicationCog" 
                                                    Foreground="{StaticResource AccentBlue}"
                                                    FontSize="20" 
@@ -205,10 +205,10 @@
                         <CheckBox IsChecked="{Binding Settings.MinimizeToTrayOnClose, Mode=TwoWay}" 
                                   Content="Minimize to tray" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="When closing the app, the application will be minimized to the system tray"
-                                     Foreground="{StaticResource TextMuted}" 
-                                     FontSize="12" 
-                                     Margin="27,0,0,0" 
+                                                <TextBlock Text="When closing the app, the application will be minimized to the system tray"
+                                     Foreground="{StaticResource TextMuted}"
+                                     FontSize="12"
+                                     Margin="27,0,0,6"
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>

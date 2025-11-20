@@ -35,8 +35,8 @@
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Data & History Section -->
-                <StackPanel Margin="0,0,0,24">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="Database" 
                                                    Foreground="{StaticResource AccentPurple}"
                                                    FontSize="20" 
@@ -59,7 +59,7 @@
                         <TextBlock Text="Automatically sync with the latest hash database from CDTB servers"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
 
                         <CheckBox IsChecked="{Binding Settings.SaveDiffHistory, Mode=TwoWay}" 
@@ -68,14 +68,14 @@
                         <TextBlock Text="Save a history of all JSON file differences detected during updates"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
-                                     Margin="27,0,0,8"
+                                     Margin="27,0,0,6"
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Automatic Checks Section -->
-                <StackPanel Margin="0,0,0,24">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="Sync" 
                                                    Foreground="{StaticResource AccentBrush}"
                                                    FontSize="20" 
@@ -99,7 +99,7 @@
                         <TextBlock Text="Periodically check for updates while the application is running"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
 
                         <!-- Frequency Selector - Visible only when background updates are enabled -->
@@ -131,14 +131,14 @@
                         <TextBlock Text="Check for updates to json files and their differences"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- File Management Section -->
-                <StackPanel Margin="0,0,0,24">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="FolderSync" 
                                                    Foreground="{StaticResource AccentGreen}"
                                                    FontSize="20" 
@@ -161,24 +161,24 @@
                         <TextBlock Text="Back up hash files before updates to prevent data loss"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
 
                         <!-- NEW CHECKBOX FOR EXTRACT NEW FILES -->
                         <CheckBox IsChecked="{Binding Settings.ExtractNewFilesAfterComparison, Mode=TwoWay}" 
                                   Content="Auto-extract new files" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder."
+                        <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Scan Mode Section -->
-                <StackPanel Margin="0,0,0,24">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="Magnify" 
                                                    Foreground="{StaticResource TextPrimary}"
                                                    FontSize="20" 
@@ -201,7 +201,7 @@
                         <TextBlock Text="Only identify differences without downloading or modifying files"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
