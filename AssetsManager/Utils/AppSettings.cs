@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Utils
 {

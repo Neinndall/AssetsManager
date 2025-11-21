@@ -198,9 +198,9 @@
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox x:Name="ReportGenerationCheckBox"
                                   IsChecked="{Binding Settings.ReportGeneration.Enabled, Mode=TwoWay}" 
-                                  Content="Generate asset report after comparison" 
+                                  Content="Generate asset report" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="If enabled, an assets.log file will be created instead of extracting the files."
+                        <TextBlock Text="An assets.log file will be created instead of extracting the assets"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
                                      Margin="27,0,0,6" 
