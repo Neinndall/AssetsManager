@@ -250,7 +250,12 @@ namespace AssetsManager.Views
         
         private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
         {
-            var serializableDiffs = allDiffs?.Select(d => new SerializableChunkDiff
+            if (allDiffs == null)
+            {
+                return;
+            }
+
+            var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
             {
                 Type = d.Type,
                 OldPath = d.OldPath,
@@ -264,7 +269,7 @@ namespace AssetsManager.Views
                 NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
             }).ToList();
 
-            if (serializableDiffs == null || !serializableDiffs.Any())
+            if (!serializableDiffs.Any())
             {
                 _logService.Log("Comparison completed with no differences found.");
                 return;
