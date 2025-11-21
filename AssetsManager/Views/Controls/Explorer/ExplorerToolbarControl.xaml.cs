@@ -10,6 +10,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public event RoutedEventHandler LoadComparisonClicked;
         public event RoutedEventHandler SwitchModeClicked;
         public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
+        public event RoutedPropertyChangedEventHandler<bool> SortStateChanged;
 
         public string SearchText => SearchTextBox.Text;
 
@@ -43,6 +44,14 @@ namespace AssetsManager.Views.Controls.Explorer
             if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
             {
                 BreadcrumbVisibilityChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
+            }
+        }
+
+        private void SortToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                SortStateChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
             }
         }
     }

@@ -64,9 +64,9 @@ namespace AssetsManager.Services.Explorer.Tree
             return new ObservableCollection<FileSystemNodeModel>(nodes);
         }
 
-        public async Task<(ObservableCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath, CancellationToken cancellationToken)
+        public async Task<(ObservableCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
         {
-            var (nodes, newLolPath, oldLolPath) = await _wadNodeLoaderService.LoadFromBackupAsync(jsonPath, cancellationToken);
+            var (nodes, newLolPath, oldLolPath) = await _wadNodeLoaderService.LoadFromBackupAsync(jsonPath, isSortingEnabled, cancellationToken);
             return (new ObservableCollection<FileSystemNodeModel>(nodes), newLolPath, oldLolPath);
         }
 

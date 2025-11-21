@@ -26,7 +26,7 @@ namespace AssetsManager.Services.Explorer
             _logService = logService;
         }
 
-        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, CancellationToken cancellationToken)
+        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
         {
             var options = new JsonSerializerOptions
             {
@@ -53,51 +53,115 @@ namespace AssetsManager.Services.Explorer
                 cancellationToken.ThrowIfCancellationRequested();
                 var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
 
-                foreach (var file in wadGroup)
+                if (isSortingEnabled)
                 {
-                    string chunkPath = GetBackupChunkPath(backupRoot, file);
-                    file.BackupChunkPath = chunkPath; // Ensure the main diff object has the path
-                    var status = GetDiffStatus(file.Type);
-
-                    string statusPrefix = GetStatusPrefix(file.Type);
-                    string prefixedPath = $"{statusPrefix}/{file.Path}";
-
-                    var node = AddNodeToVirtualTree(wadNode, prefixedPath, wadGroup.Key, file.NewPathHash, status);
-                    node.ChunkDiff = file;
-                    node.BackupChunkPath = chunkPath;
-                    if (file.Type == ChunkDiffType.Renamed)
+                    foreach (var file in wadGroup)
                     {
-                        node.OldPath = file.OldPath;
+                        string chunkPath = GetBackupChunkPath(backupRoot, file);
+                        file.BackupChunkPath = chunkPath; // Ensure the main diff object has the path
+                        var status = GetDiffStatus(file.Type);
+
+                        string statusPrefix = GetStatusPrefix(file.Type);
+                        string prefixedPath = $"{statusPrefix}/{file.Path}";
+
+                        var node = AddNodeToVirtualTree(wadNode, prefixedPath, wadGroup.Key, file.NewPathHash, status);
+                        node.ChunkDiff = file;
+                        node.BackupChunkPath = chunkPath;
+                        if (file.Type == ChunkDiffType.Renamed)
+                        {
+                            node.OldPath = file.OldPath;
+                        }
+
+                        if (file.Dependencies != null)
+                        {
+                            foreach (var dep in file.Dependencies)
+                            {
+                                var depStatus = GetDiffStatus(ChunkDiffType.Modified); // Treat as modified for node creation
+                                var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
+
+                                string depStatusPrefix = GetStatusPrefix(ChunkDiffType.Modified);
+                                string depPrefixedPath = $"{depStatusPrefix}/{dep.Path}";
+
+                                var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, wadGroup.Key, dep.NewPathHash, depStatus);
+                                depNode.ChunkDiff = new SerializableChunkDiff
+                                {
+                                    Type = ChunkDiffType.Modified, // For consistency
+                                    OldPath = dep.Path,
+                                    NewPath = dep.Path,
+                                    OldPathHash = dep.OldPathHash,
+                                    NewPathHash = dep.NewPathHash,
+                                    OldCompressionType = dep.CompressionType,
+                                    NewCompressionType = dep.CompressionType,
+                                    BackupChunkPath = depChunkPath
+                                };
+                                depNode.BackupChunkPath = depChunkPath;
+                            }
+                        }
                     }
 
-                    if (file.Dependencies != null)
+                    SortChildrenRecursively(wadNode);
+                }
+                else
+                {
+                    var statusGroups = wadGroup.GroupBy(d => d.Type).ToDictionary(g => g.Key, g => g.ToList());
+
+                    var statusOrder = new[] { ChunkDiffType.New, ChunkDiffType.Modified, ChunkDiffType.Renamed, ChunkDiffType.Removed };
+
+                    foreach (var statusType in statusOrder)
                     {
-                        foreach (var dep in file.Dependencies)
+                        if (statusGroups.TryGetValue(statusType, out var filesInStatus))
                         {
-                            var depStatus = GetDiffStatus(ChunkDiffType.Modified); // Treat as modified for node creation
-                            var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
+                            var statusNode = new FileSystemNodeModel(GetStatusPrefix(statusType), true, GetStatusPrefix(statusType), wadGroup.Key);
+                            statusNode.Status = GetDiffStatus(statusType);
+                            wadNode.Children.Add(statusNode);
 
-                            string depStatusPrefix = GetStatusPrefix(ChunkDiffType.Modified);
-                            string depPrefixedPath = $"{depStatusPrefix}/{dep.Path}";
-
-                            var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, wadGroup.Key, dep.NewPathHash, depStatus);
-                            depNode.ChunkDiff = new SerializableChunkDiff
+                            foreach (var file in filesInStatus.OrderBy(f => f.Path))
                             {
-                                Type = ChunkDiffType.Modified, // For consistency
-                                OldPath = dep.Path,
-                                NewPath = dep.Path,
-                                OldPathHash = dep.OldPathHash,
-                                NewPathHash = dep.NewPathHash,
-                                OldCompressionType = dep.CompressionType,
-                                NewCompressionType = dep.CompressionType,
-                                BackupChunkPath = depChunkPath
-                            };
-                            depNode.BackupChunkPath = depChunkPath;
+                                string chunkPath = GetBackupChunkPath(backupRoot, file);
+                                file.BackupChunkPath = chunkPath;
+                                var status = GetDiffStatus(file.Type);
+
+                                var node = new FileSystemNodeModel(Path.GetFileName(file.Path), false, file.Path, wadGroup.Key)
+                                {
+                                    SourceChunkPathHash = file.NewPathHash,
+                                    Status = status,
+                                    ChunkDiff = file,
+                                    BackupChunkPath = chunkPath,
+                                    OldPath = file.Type == ChunkDiffType.Renamed ? file.OldPath : null
+                                };
+
+                                statusNode.Children.Add(node);
+
+                                if (file.Dependencies != null)
+                                {
+                                    foreach (var dep in file.Dependencies)
+                                    {
+                                        var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
+
+                                        var depNode = new FileSystemNodeModel(Path.GetFileName(dep.Path), false, dep.Path, wadGroup.Key)
+                                        {
+                                            SourceChunkPathHash = dep.NewPathHash,
+                                            Status = GetDiffStatus(ChunkDiffType.Modified),
+                                            ChunkDiff = new SerializableChunkDiff
+                                            {
+                                                Type = ChunkDiffType.Modified,
+                                                OldPath = dep.Path,
+                                                NewPath = dep.Path,
+                                                OldPathHash = dep.OldPathHash,
+                                                NewPathHash = dep.NewPathHash,
+                                                OldCompressionType = dep.CompressionType,
+                                                NewCompressionType = dep.CompressionType,
+                                                BackupChunkPath = depChunkPath
+                                            },
+                                            BackupChunkPath = depChunkPath
+                                        };
+                                        statusNode.Children.Add(depNode);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-
-                SortChildrenRecursively(wadNode);
                 rootNodes.Add(wadNode);
             }
 

@@ -22,6 +22,15 @@
                     Click="LoadComparisonButton_Click">
                 <materialIcons:MaterialIcon Kind="FileUpload" Width="18" Height="18"/>
             </Button>
+            <ToggleButton x:Name="SortToggleButton"
+                          Style="{StaticResource TransparentIconToggleButton}"
+                          Click="SortToggleButton_Click"
+                          ToolTip="Group by paths/categories"
+                          Margin="5,0"
+                          IsChecked="True"
+                          Visibility="Collapsed">
+                <materialIcons:MaterialIcon Kind="SortAlphabeticalAscending" Width="18" Height="18"/>
+            </ToggleButton>
             <Button x:Name="SwitchModeButton" 
                     Style="{StaticResource TransparentIconButton}" 
                     ToolTip="Switch Mode" 

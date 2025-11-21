@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.Windows.Controls.Primitives;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
@@ -57,6 +58,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private string _currentRootPath;
         private bool _isWadMode = true;
         private bool _isBackupMode = false;
+        private bool _isSortingEnabled = true;
         private string _backupJsonPath;
 
         public FileExplorerControl()
@@ -90,6 +92,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.LoadComparisonClicked -= Toolbar_LoadComparisonClicked;
                 Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
                 Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
+                Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
             }
 
             // Desuscribir eventos del Breadcrumbs
@@ -136,6 +139,7 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;
             Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
+            Toolbar.SortStateChanged += Toolbar_SortStateChanged;
 
             if (_isWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
             {
@@ -156,6 +160,15 @@ namespace AssetsManager.Views.Controls.Explorer
         private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
             Breadcrumbs.Visibility = e.NewValue ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private async void Toolbar_SortStateChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        {
+            _isSortingEnabled = e.NewValue;
+            if (_isBackupMode)
+            {
+                await BuildTreeFromBackupAsync(_backupJsonPath);
+            }
         }
 
         public async Task ReloadTreeAsync()
@@ -221,6 +234,9 @@ namespace AssetsManager.Views.Controls.Explorer
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
 
+            var sortToggleButton = (ToggleButton)Toolbar.FindName("SortToggleButton");
+            sortToggleButton.Visibility = Visibility.Collapsed;
+
             try
             {
                 var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, cancellationToken);
@@ -267,6 +283,9 @@ namespace AssetsManager.Views.Controls.Explorer
             OldLolPath = null;
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
+
+            var sortToggleButton = (ToggleButton)Toolbar.FindName("SortToggleButton");
+            sortToggleButton.Visibility = Visibility.Collapsed;
 
             // Delayed loading indicator logic
             var indicatorTask = Task.Delay(100, cancellationToken).ContinueWith(t =>
@@ -320,9 +339,12 @@ namespace AssetsManager.Views.Controls.Explorer
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
 
+            var sortToggleButton = (ToggleButton)Toolbar.FindName("SortToggleButton");
+            sortToggleButton.Visibility = Visibility.Visible;
+
             try
             {
-                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, cancellationToken);
+                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _isSortingEnabled, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 RootNodes.Clear();
