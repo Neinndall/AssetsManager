@@ -27,6 +27,7 @@ namespace AssetsManager.Services.Hashes
 
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
+        private Task _loadingTask = null;
 
         public HashResolverService(DirectoriesCreator directoriesCreator, LogService logService)
         {
@@ -34,7 +35,16 @@ namespace AssetsManager.Services.Hashes
             _logService = logService;
         }
 
-        public async Task LoadAllHashesAsync()
+        public Task LoadAllHashesAsync()
+        {
+            if (_loadingTask == null)
+            {
+                _loadingTask = LoadAllHashesInternalAsync();
+            }
+            return _loadingTask;
+        }
+
+        private async Task LoadAllHashesInternalAsync()
         {
             try
             {
@@ -184,12 +194,13 @@ namespace AssetsManager.Services.Hashes
             var rstXxh64HashesFile = Path.Combine(rstHashesDir, "hashes.rst.xxh64.txt");
             await LoadHashesFromFile(rstXxh64HashesFile, _rstXxh64HashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
         }
-        public async Task ForceReloadHashesAsync()
+        public Task ForceReloadHashesAsync()
         {
             _gameLcuHashesLoaded = false;
             _binHashesLoaded = false;
             _rstHashesLoaded = false;
-            await LoadAllHashesAsync();
+            _loadingTask = null; 
+            return LoadAllHashesAsync();
         }
     }
 }

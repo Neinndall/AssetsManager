@@ -131,6 +131,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
+            LoadingIndicator.Visibility = Visibility.Visible;
             await HashResolverService.LoadAllHashesAsync();
 
             // Now proceed with the original logic
