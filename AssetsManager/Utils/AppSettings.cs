@@ -11,7 +11,8 @@ namespace AssetsManager.Utils
     public class AppSettings
     {
         public bool SyncHashesWithCDTB { get; set; }
-        public bool ExtractNewFilesAfterComparison { get; set; } // NEW PROPERTY
+        public bool EnableExtraction { get; set; } 
+        public bool OrganizeExtractedAssets { get; set; }// NEW PROPERTY
         public bool OnlyCheckDifferences { get; set; }
         public bool CheckJsonDataUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
@@ -139,7 +140,8 @@ namespace AssetsManager.Utils
             return new AppSettings
             {
                 SyncHashesWithCDTB = true,
-                ExtractNewFilesAfterComparison = false, // NEW DEFAULT
+                EnableExtraction = false,
+                OrganizeExtractedAssets = true,
                 OnlyCheckDifferences = false,
                 CheckJsonDataUpdates = false,
                 AssetTrackerTimer = false,
@@ -186,7 +188,8 @@ namespace AssetsManager.Utils
             var defaultSettings = GetDefaultSettings();
 
             CheckJsonDataUpdates = defaultSettings.CheckJsonDataUpdates;
-            ExtractNewFilesAfterComparison = defaultSettings.ExtractNewFilesAfterComparison; // NEW RESET
+            EnableExtraction = defaultSettings.EnableExtraction;
+            OrganizeExtractedAssets = defaultSettings.OrganizeExtractedAssets;
             OnlyCheckDifferences = defaultSettings.OnlyCheckDifferences;
             NewHashesPath = defaultSettings.NewHashesPath;
             OldHashesPath = defaultSettings.OldHashesPath;

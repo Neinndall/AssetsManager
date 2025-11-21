@@ -156,13 +156,23 @@
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
                         <!-- NEW CHECKBOX FOR EXTRACT NEW FILES -->
-                        <CheckBox IsChecked="{Binding Settings.ExtractNewFilesAfterComparison, Mode=TwoWay}" 
+                        <CheckBox IsChecked="{Binding Settings.EnableExtraction, Mode=TwoWay}"
+                                  x:Name="EnableExtractionCheckBox"
                                   Content="Auto-extract new files" 
                                   Style="{StaticResource ModernCheckBox}"/>
                         <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
                                      Margin="27,0,0,6" 
+                                     TextWrapping="Wrap"/>
+
+                        <CheckBox IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}"
+                                  Content="Organize extracted files into folders"
+                                  Style="{StaticResource ModernCheckBox}"/>
+                        <TextBlock Text="If enabled, extracted assets will be organized into folders"
+                                     Foreground="{StaticResource TextMuted}"
+                                     FontSize="12"
+                                     Margin="27,0,0,6"
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>

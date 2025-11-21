@@ -14,6 +14,7 @@ namespace AssetsManager.Services.Downloads
 {
     public class ExtractionService
     {
+        private readonly AppSettings _appSettings;
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly WadSavingService _wadSavingService;
@@ -24,11 +25,13 @@ namespace AssetsManager.Services.Downloads
         public event EventHandler ExtractionCompleted;
 
         public ExtractionService(
+            AppSettings appSettings,
             LogService logService,
             DirectoriesCreator directoriesCreator,
             WadSavingService wadSavingService,
             WadExtractionService wadExtractionService)
         {
+            _appSettings = appSettings;
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _wadSavingService = wadSavingService;
@@ -44,7 +47,7 @@ namespace AssetsManager.Services.Downloads
 
             if (!newDiffs.Any())
             {
-                _logService.Log("No new files to extract from the comparison.");
+                _logService.Log("No new assets to extract from the comparison.");
                 ExtractionCompleted?.Invoke(this, EventArgs.Empty);
                 return;
             }
@@ -59,7 +62,7 @@ namespace AssetsManager.Services.Downloads
 
             int extractedCount = 0;
 
-            _logService.Log($"Starting extraction of {totalFiles} new files.");
+            _logService.Log($"Starting extraction of {totalFiles} new assets.");
 
             try
             {
@@ -78,8 +81,16 @@ namespace AssetsManager.Services.Downloads
                         Status = DiffStatus.New
                     };
 
-                    // This calculation is now done for ALL files beforehand.
-                    string fileDestinationDirectory = Path.Combine(destinationRootPath, Path.GetDirectoryName(diff.NewPath));
+                    string fileDestinationDirectory;
+                    if (_appSettings.OrganizeExtractedAssets)
+                    {
+                        fileDestinationDirectory = Path.Combine(destinationRootPath, Path.GetDirectoryName(diff.NewPath));
+                    }
+                    else
+                    {
+                        fileDestinationDirectory = destinationRootPath;
+                    }
+
                     Directory.CreateDirectory(fileDestinationDirectory);
 
                     string extension = Path.GetExtension(node.Name).ToLower();
@@ -95,7 +106,7 @@ namespace AssetsManager.Services.Downloads
                         await _wadSavingService.ProcessAndSaveAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken);
                     }
                 }
-                _logService.LogSuccess($"Extraction completed. {extractedCount} files processed.");
+                _logService.LogInteractiveSuccess($"Extraction completed of {extractedCount} assets in {_directoriesCreator.SubAssetsDownloadedPath}", _directoriesCreator.SubAssetsDownloadedPath, _directoriesCreator.SubAssetsDownloadedPath);
             }
             catch (OperationCanceledException)
             {

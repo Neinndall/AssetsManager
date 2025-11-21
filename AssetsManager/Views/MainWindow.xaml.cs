@@ -270,7 +270,7 @@ namespace AssetsManager.Views
                 return;
             }
 
-            if (_appSettings.ExtractNewFilesAfterComparison)
+            if (_appSettings.EnableExtraction)
             {
                 _isExtractingAfterComparison = true;
                 _diffsForExtraction = serializableDiffs;
@@ -298,7 +298,7 @@ namespace AssetsManager.Views
         private bool IsAnySettingActive()
         {
             return _appSettings.SyncHashesWithCDTB ||
-                   _appSettings.ExtractNewFilesAfterComparison ||
+                   _appSettings.EnableExtraction ||
                    _appSettings.OnlyCheckDifferences ||
                    _appSettings.CheckJsonDataUpdates ||
                    _appSettings.SaveDiffHistory ||
