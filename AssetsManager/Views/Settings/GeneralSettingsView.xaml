@@ -158,8 +158,17 @@
                         <!-- NEW CHECKBOX FOR EXTRACT NEW FILES -->
                         <CheckBox IsChecked="{Binding Settings.EnableExtraction, Mode=TwoWay}"
                                   x:Name="EnableExtractionCheckBox"
-                                  Content="Auto-extract new files" 
-                                  Style="{StaticResource ModernCheckBox}"/>
+                                  Content="Auto-extract new files">
+                            <CheckBox.Style>
+                                <Style TargetType="CheckBox" BasedOn="{StaticResource ModernCheckBox}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ElementName=ReportGenerationCheckBox, Path=IsChecked}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </CheckBox.Style>
+                        </CheckBox>
                         <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
@@ -198,8 +207,17 @@
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox x:Name="ReportGenerationCheckBox"
                                   IsChecked="{Binding Settings.ReportGeneration.Enabled, Mode=TwoWay}" 
-                                  Content="Generate asset report" 
-                                  Style="{StaticResource ModernCheckBox}"/>
+                                  Content="Generate asset report">
+                            <CheckBox.Style>
+                                <Style TargetType="CheckBox" BasedOn="{StaticResource ModernCheckBox}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ElementName=EnableExtractionCheckBox, Path=IsChecked}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </CheckBox.Style>
+                        </CheckBox>
                         <TextBlock Text="An assets.log file will be created instead of extracting the assets"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 

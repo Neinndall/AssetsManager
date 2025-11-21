@@ -278,7 +278,11 @@ namespace AssetsManager.Views
                 return;
             }
 
-            if (_appSettings.EnableExtraction)
+            if (_appSettings.ReportGeneration.Enabled) // Prioritize report generation
+            {
+                await _reportGenerationService.GenerateReportAsync(serializableDiffs);
+            }
+            else if (_appSettings.EnableExtraction) // Only extract if report generation is NOT enabled
             {
                 _isExtractingAfterComparison = true;
                 _diffsForExtraction = serializableDiffs;
@@ -286,10 +290,6 @@ namespace AssetsManager.Views
                 _extractionNewLolPath = newLolPath;
                 
                 Dispatcher.Invoke(StartExtractionAsync);
-            }
-            else if (_appSettings.ReportGeneration.Enabled)
-            {
-                await _reportGenerationService.GenerateReportAsync(serializableDiffs);
             }
             else
             {
