@@ -149,7 +149,7 @@
                                      FontSize="18" 
                                      FontWeight="Normal"
                                      Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Control how hash files are handled during updates" 
+                            <TextBlock Text="Manage asset extraction and organization" 
                                      FontSize="12" 
                                      Foreground="{StaticResource TextMuted}"/>
                         </StackPanel>
