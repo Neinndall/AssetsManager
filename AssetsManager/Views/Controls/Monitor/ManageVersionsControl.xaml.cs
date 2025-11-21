@@ -131,6 +131,50 @@ namespace AssetsManager.Views.Controls.Monitor
             // The selection is bound to the IsSelected property of the VersionFileInfo model
         }
 
+        private void ListViewItem_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (!(sender is ListViewItem item) || !(item.DataContext is VersionFileInfo clickedVersion)) return;
+
+            // Handle right-click: prevent selection and stop the event from propagating.
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Right)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // Handle left-click for selection logic
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+            {
+                // If Ctrl is pressed, toggle selection (for multi-select delete)
+                if (System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+                {
+                    clickedVersion.IsSelected = !clickedVersion.IsSelected;
+                }
+                else // If Ctrl is not pressed, behave like a radio button (toggle)
+                {
+                    bool wasSelected = clickedVersion.IsSelected;
+
+                    // 1. Deselect all items in both lists
+                    foreach (var version in _viewModel.AllLeagueClientVersions)
+                    {
+                        version.IsSelected = false;
+                    }
+                    foreach (var version in _viewModel.AllLoLGameClientVersions)
+                    {
+                        version.IsSelected = false;
+                    }
+
+                    // 2. If the item was not already selected, select it.
+                    //    If it was selected, the loop above has already deselected it.
+                    if (!wasSelected)
+                    {
+                        clickedVersion.IsSelected = true;
+                    }
+                }
+                e.Handled = true;
+            }
+        }
+
         private void DeleteSelectedVersions_Click(object sender, RoutedEventArgs e)
         {
             var selectedVersions = _viewModel.AllLeagueClientVersions.Where(v => v.IsSelected).ToList();

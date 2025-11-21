@@ -101,10 +101,6 @@ namespace AssetsManager.Services.Comparator
                 {
                     _logService.LogError("Single WAD comparison completed with errors.");
                 }
-                else // allDiffs is null and it was cancelled
-                {
-                    _logService.LogSuccess("Single WAD comparison was cancelled.");
-                }
             }
         }
 
@@ -176,10 +172,6 @@ namespace AssetsManager.Services.Comparator
                 else if (allDiffs == null && !cancellationToken.IsCancellationRequested) // Only log error if not cancelled
                 {
                     _logService.LogError("WADs comparison completed with errors.");
-                }
-                else // allDiffs is null and it was cancelled
-                {
-                    _logService.LogSuccess("WADs comparison was cancelled.");
                 }
             }
         }
