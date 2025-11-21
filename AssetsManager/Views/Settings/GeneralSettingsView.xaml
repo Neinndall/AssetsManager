@@ -177,33 +177,69 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Scan Mode Section -->
+                <!-- Report Generation Section -->
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <materialIcons:MaterialIcon Kind="Magnify" 
+                        <materialIcons:MaterialIcon Kind="FileDocumentOutline" 
                                                    Foreground="{StaticResource TextPrimary}"
                                                    FontSize="20" 
                                                    Margin="0,0,12,0" 
                                                    VerticalAlignment="Center"/>
                         <StackPanel>
-                            <TextBlock Text="Scan Mode" 
+                            <TextBlock Text="Report Generation" 
                                      FontSize="18" 
                                      FontWeight="Normal"
                                      Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Configure scanning behavior" 
+                            <TextBlock Text="Generate a log file with asset changes after a comparison" 
                                      FontSize="12" 
                                      Foreground="{StaticResource TextMuted}"/>
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
-                        <CheckBox IsChecked="{Binding Settings.OnlyCheckDifferences, Mode=TwoWay}" 
-                                  Content="Scan-only mode (no downloads)" 
+                        <CheckBox x:Name="ReportGenerationCheckBox"
+                                  IsChecked="{Binding Settings.ReportGeneration.Enabled, Mode=TwoWay}" 
+                                  Content="Generate asset report after comparison" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Only identify differences without downloading or modifying files"
+                        <TextBlock Text="If enabled, an assets.log file will be created instead of extracting the files."
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
                                      Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
+
+                        <!-- Filter Options -->
+                        <StackPanel Margin="27,5,0,8">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=ReportGenerationCheckBox}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Include in report:" 
+                                       Foreground="{StaticResource TextSecondary}" 
+                                       FontSize="12" 
+                                       Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterNew, Mode=TwoWay}" 
+                                          Content="New" 
+                                          Style="{StaticResource ModernCheckBox}"
+                                          Margin="0,0,15,0"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterModified, Mode=TwoWay}" 
+                                          Content="Modified" 
+                                          Style="{StaticResource ModernCheckBox}"
+                                          Margin="0,0,15,0"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRenamed, Mode=TwoWay}" 
+                                          Content="Renamed" 
+                                          Style="{StaticResource ModernCheckBox}"
+                                          Margin="0,0,15,0"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRemoved, Mode=TwoWay}" 
+                                          Content="Removed" 
+                                          Style="{StaticResource ModernCheckBox}"/>
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </StackPanel>

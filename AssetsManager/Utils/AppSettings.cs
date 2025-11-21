@@ -12,8 +12,8 @@ namespace AssetsManager.Utils
     {
         public bool SyncHashesWithCDTB { get; set; }
         public bool EnableExtraction { get; set; } 
-        public bool OrganizeExtractedAssets { get; set; }// NEW PROPERTY
-        public bool OnlyCheckDifferences { get; set; }
+        public bool OrganizeExtractedAssets { get; set; }
+        public ReportGenerationSettings ReportGeneration { get; set; }
         public bool CheckJsonDataUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
         public bool SaveDiffHistory { get; set; }
@@ -141,8 +141,15 @@ namespace AssetsManager.Utils
             {
                 SyncHashesWithCDTB = true,
                 EnableExtraction = false,
-                OrganizeExtractedAssets = true,
-                OnlyCheckDifferences = false,
+                OrganizeExtractedAssets = false,
+                ReportGeneration = new ReportGenerationSettings
+                {
+                    Enabled = false,
+                    FilterNew = false,
+                    FilterModified = false,
+                    FilterRenamed = false,
+                    FilterRemoved = false
+                },
                 CheckJsonDataUpdates = false,
                 AssetTrackerTimer = false,
                 SaveDiffHistory = false,
@@ -190,7 +197,7 @@ namespace AssetsManager.Utils
             CheckJsonDataUpdates = defaultSettings.CheckJsonDataUpdates;
             EnableExtraction = defaultSettings.EnableExtraction;
             OrganizeExtractedAssets = defaultSettings.OrganizeExtractedAssets;
-            OnlyCheckDifferences = defaultSettings.OnlyCheckDifferences;
+            ReportGeneration = defaultSettings.ReportGeneration;
             NewHashesPath = defaultSettings.NewHashesPath;
             OldHashesPath = defaultSettings.OldHashesPath;
             LolPbeDirectory = defaultSettings.LolPbeDirectory;

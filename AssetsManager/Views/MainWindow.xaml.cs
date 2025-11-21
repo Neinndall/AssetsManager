@@ -49,6 +49,7 @@ namespace AssetsManager.Views
         private readonly MonitorService _monitorService;
         private readonly VersionService _versionService;
         private readonly ExtractionService _extractionService;
+        private readonly ReportGenerationService _reportGenerationService;
         private readonly TaskCancellationManager _taskCancellationManager;
 
         private NotifyIcon _notifyIcon;
@@ -82,6 +83,7 @@ namespace AssetsManager.Views
             MonitorService monitorService,
             VersionService versionService,
             ExtractionService extractionService,
+            ReportGenerationService reportGenerationService,
             TaskCancellationManager taskCancellationManager)
         {
             InitializeComponent();
@@ -106,6 +108,7 @@ namespace AssetsManager.Views
             _monitorService = monitorService;
             _versionService = versionService;
             _extractionService = extractionService;
+            _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
 
             _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, this);
@@ -248,7 +251,7 @@ namespace AssetsManager.Views
             await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
         }
         
-        private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
+        private async void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
         {
             if (allDiffs == null)
             {
@@ -284,6 +287,10 @@ namespace AssetsManager.Views
                 
                 Dispatcher.Invoke(StartExtractionAsync);
             }
+            else if (_appSettings.ReportGeneration.Enabled)
+            {
+                await _reportGenerationService.GenerateReportAsync(serializableDiffs);
+            }
             else
             {
                 Dispatcher.Invoke(() =>
@@ -304,7 +311,7 @@ namespace AssetsManager.Views
         {
             return _appSettings.SyncHashesWithCDTB ||
                    _appSettings.EnableExtraction ||
-                   _appSettings.OnlyCheckDifferences ||
+                   _appSettings.ReportGeneration.Enabled ||
                    _appSettings.CheckJsonDataUpdates ||
                    _appSettings.SaveDiffHistory ||
                    _appSettings.BackgroundUpdates;

@@ -119,6 +119,7 @@ namespace AssetsManager
       services.AddSingleton<WadComparatorService>();
       services.AddSingleton<WadDifferenceService>();
       services.AddSingleton<WadPackagingService>();
+      services.AddSingleton<ReportGenerationService>();
       services.AddSingleton<WadNodeLoaderService>();
       services.AddSingleton<WadExtractionService>();
 
