@@ -149,7 +149,8 @@ namespace AssetsManager.Services.Versions
                     try
                     {
                         Directory.CreateDirectory(tempDir);
-                        await ExtractAndRunManifestDownloader(url, tempDir);
+                        var process = await ExtractAndRunManifestDownloader(url, tempDir);
+                        await process.WaitForExitAsync();
 
                         string exePath = Path.Combine(tempDir, TargetFilename);
                         string version = GetExeVersion(exePath);
