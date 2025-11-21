@@ -149,7 +149,7 @@ namespace AssetsManager.Views
         private async void InitializeApplicationAsync()
         {
             await _updateCheckService.CheckForAllUpdatesAsync();
-            await _hashResolverService.StartupTask;
+            await _hashResolverService.LoadAllHashesAsync();
         }
 
         protected override void OnSourceInitialized(EventArgs e)

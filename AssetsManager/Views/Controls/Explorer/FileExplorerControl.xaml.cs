@@ -128,8 +128,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
-            // Await hashes BEFORE any UI logic that depends on them.
-            await HashResolverService.StartupTask;
+            await HashResolverService.LoadAllHashesAsync();
 
             // Now proceed with the original logic
             Toolbar.SearchTextChanged += Toolbar_SearchTextChanged;

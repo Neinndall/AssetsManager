@@ -28,16 +28,13 @@ namespace AssetsManager.Services.Hashes
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
 
-        public Task StartupTask { get; private set; }
-
         public HashResolverService(DirectoriesCreator directoriesCreator, LogService logService)
         {
             _directoriesCreator = directoriesCreator;
             _logService = logService;
-            StartupTask = LoadAllHashesOnStartupAsync();
         }
 
-        private async Task LoadAllHashesOnStartupAsync()
+        public async Task LoadAllHashesAsync()
         {
             try
             {
@@ -192,8 +189,7 @@ namespace AssetsManager.Services.Hashes
             _gameLcuHashesLoaded = false;
             _binHashesLoaded = false;
             _rstHashesLoaded = false;
-            StartupTask = LoadAllHashesOnStartupAsync();
-            await StartupTask;
+            await LoadAllHashesAsync();
         }
     }
 }

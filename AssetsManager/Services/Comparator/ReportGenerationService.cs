@@ -1,12 +1,12 @@
-using AssetsManager.Services.Core;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models.Wad;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AssetsManager.Services.Core;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Services.Comparator
 {
@@ -78,7 +78,7 @@ namespace AssetsManager.Services.Comparator
 
             await File.WriteAllTextAsync(logFilePath, reportContent.ToString());
 
-            _logService.LogInteractiveSuccess($"Successfully generated asset report with {filteredDiffs.Count} entries at ", logFilePath, logFilePath);
+            _logService.LogInteractiveSuccess($"Successfully generated asset report with {filteredDiffs.Count} entries at", logFilePath, logFilePath);
         }
     }
 }
