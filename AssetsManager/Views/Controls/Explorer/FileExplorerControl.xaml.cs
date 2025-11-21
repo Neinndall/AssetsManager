@@ -234,8 +234,7 @@ namespace AssetsManager.Views.Controls.Explorer
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
 
-            var sortToggleButton = (ToggleButton)Toolbar.FindName("SortToggleButton");
-            sortToggleButton.Visibility = Visibility.Collapsed;
+            Toolbar.IsSortButtonVisible = false;
 
             try
             {
@@ -284,17 +283,9 @@ namespace AssetsManager.Views.Controls.Explorer
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
 
-            var sortToggleButton = (ToggleButton)Toolbar.FindName("SortToggleButton");
-            sortToggleButton.Visibility = Visibility.Collapsed;
+            Toolbar.IsSortButtonVisible = false;
 
-            // Delayed loading indicator logic
-            var indicatorTask = Task.Delay(100, cancellationToken).ContinueWith(t =>
-            {
-                if (!t.IsCanceled)
-                {
-                    Dispatcher.Invoke(() => LoadingIndicator.Visibility = Visibility.Visible);
-                }
-            }, TaskScheduler.Default);
+            LoadingIndicator.Visibility = Visibility.Visible;
 
             try
             {
@@ -339,8 +330,7 @@ namespace AssetsManager.Views.Controls.Explorer
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
 
-            var sortToggleButton = (ToggleButton)Toolbar.FindName("SortToggleButton");
-            sortToggleButton.Visibility = Visibility.Visible;
+            Toolbar.IsSortButtonVisible = true;
 
             try
             {

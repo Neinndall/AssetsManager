@@ -14,6 +14,12 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public string SearchText => SearchTextBox.Text;
 
+        public bool IsSortButtonVisible
+        {
+            get => SortToggleButton.Visibility == Visibility.Visible;
+            set => SortToggleButton.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         public ExplorerToolbarControl()
         {
             InitializeComponent();
