@@ -154,7 +154,8 @@ namespace AssetsManager.Services.Models
                                             if (textureNamePropKvp.Value is BinTreeString textureNameString &&
                                                 (textureNameString.Value.Equals("Diffuse_Texture", StringComparison.OrdinalIgnoreCase) ||
                                                  textureNameString.Value.Equals("DiffuseTexture", StringComparison.OrdinalIgnoreCase) ||
-                                                 textureNameString.Value.Equals("ColorTexture", StringComparison.OrdinalIgnoreCase)))
+                                                 textureNameString.Value.Equals("ColorTexture", StringComparison.OrdinalIgnoreCase) ||
+                                                 textureNameString.Value.Equals("NoiseTexture", StringComparison.OrdinalIgnoreCase)))
                                             {
                                                 var texturePathKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
                                                     _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("texturePath", StringComparison.OrdinalIgnoreCase)
