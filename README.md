@@ -12,8 +12,7 @@ AssetsManager is a tool for League of Legends enthusiasts who need to analyze, m
 
 ## ✨ Key Features
 
-*   **Download automatically new assets**: Automatically detects and downloads new assets from PBE updates.
-*   **Advanced WAD Comparator**: Compares WAD files between different versions to identify new, modified, or deleted assets.
+*   **Advanced WAD Comparator**: Compares WAD files between different versions to identify new, modified, or deleted assets and obtain automatically the new assets.
 *   **Powerful File Explorer**: Explore WAD with powerful tools with archives with a file tree interface and previews dozens of formats.
 *   **3D Model Viewer**: Visualize 3D Models of champions with their animations and MapGeometry Environments with a built-in viewer.
 *   **Asset Monitoring**: Tracks remote assets, JSON files, and the PBE server status for real-time updates.
@@ -51,16 +50,11 @@ Explore League of Legends 3D Models like never before.
 2.  **Extract the contents:** Unzip the downloaded file to your desired location (e.g., `C:\AssetsManager`).
 3.  **Run the application:** Navigate to the extracted folder and run `AssetsManager.exe`.
 
-## 📖 Usage
-
-1.  **Configure Settings:** Open the `Settings` tab to set up your preferences, including hash synchronization, auto-copy, and backup options.
-2.  **Select Directories:** In the `Home` tab, specify your "New Hashes Directory" and "Old Hashes Directory".
-3.  **Start Download:** Click the "Start Download" button to begin the asset extraction and download process. The application will compare hashes and download only the necessary files.
-5.  **Explore & Monitor:** Use the `Explorer`, `Comparator`, `Monitor`, and `Model Viewer` tabs to access the advanced features of the application.
-
 ## ⚙️ Configuration
 
-All application settings are managed through a dedicated `Settings` window and persisted in the `config.json` file. This allows for deep customization of the application's behavior to fit your workflow. Key configuration areas include setting default paths, automating core processes like hash management and backups, and fine-tuning the behavior of advanced features such as background monitoring services and application updates.
+All application settings are managed through a dedicated `Settings` window and persisted in the `config.json` file. This allows for deep customization of the application's behavior to fit your workflow. Key configuration areas include setting default paths and fine-tuning the behavior of advanced features such as background monitoring services and application updates.
+
+* **Configure Settings:** Open the `Settings` tab to set up your usage preferences.
 
 ## 🤝 Contributing
 
