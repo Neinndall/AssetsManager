@@ -11,10 +11,12 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Audio;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
-using AssetsManager.Views.Helpers; // Added this line
+using System.Text.Json;
 
 namespace AssetsManager.Services.Core
 {
@@ -41,7 +43,7 @@ namespace AssetsManager.Services.Core
             _wadExtractionService = wadExtractionService;
         }
 
-        public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string backupChunkPath = null)
+        public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath = null)
         {
             if (diff == null) return;
 
@@ -61,7 +63,7 @@ namespace AssetsManager.Services.Core
             {
                 if (SupportedFileTypes.AudioBank.Contains(extension))
                 {
-                    await HandleAudioBankDiffAsync(diff, oldPbePath, newPbePath, owner, backupChunkPath, loadingWindow);
+                    await HandleAudioBankDiffAsync(diff, oldPbePath, newPbePath, owner, sourceJsonPath, loadingWindow);
                 }
                 else if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
                 {
@@ -80,56 +82,89 @@ namespace AssetsManager.Services.Core
             }
         }
 
-        private async Task HandleAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string backupChunkPath, LoadingDiffWindow loadingWindow)
+        private async Task HandleAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath, LoadingDiffWindow loadingWindow)
         {
+            _logService.Log("[HandleAudioBankDiffAsync] Starting audio bank diff process.");
             string oldJson = "{}";
             string newJson = "{}";
 
             if (string.IsNullOrEmpty(diff.SourceWadFile))
             {
-                _logService.LogWarning("[AUDIO-DIFF] SerializableChunkDiff.SourceWadFile is null. Audio event name resolution will likely fail.");
+                _logService.LogWarning("[HandleAudioBankDiffAsync] SerializableChunkDiff.SourceWadFile is null. Audio event name resolution will likely fail.");
+            }
+
+            string backupRootDir = null;
+            if (sourceJsonPath != null)
+            {
+                backupRootDir = Path.GetDirectoryName(sourceJsonPath);
             }
 
             if (diff.Type is ChunkDiffType.Modified or ChunkDiffType.Renamed or ChunkDiffType.Removed)
             {
-                var tempNodeOld = new FileSystemNodeModel { Name = Path.GetFileName(diff.OldPath), FullPath = diff.OldPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPath };
-                var linkedBankOld = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeOld, oldPbePath, true);
+                _logService.Log("[HandleAudioBankDiffAsync] Linking OLD version of the audio bank.");
+                string backupChunkPathOld = null;
+                if (backupRootDir != null)
+                {
+                    backupChunkPathOld = Path.Combine(backupRootDir, "wad_chunks", "old", $"{diff.OldPathHash:X16}.chunk");
+                }
+                var tempNodeOld = new FileSystemNodeModel { Name = Path.GetFileName(diff.OldPath), FullPath = diff.OldPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPathOld, Type = NodeType.SoundBank };
+                var linkedBankOld = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeOld, oldPbePath, true, backupRootDir);
                 if (linkedBankOld != null)
                 {
+                    _logService.Log("[HandleAudioBankDiffAsync] OLD version linked successfully. Converting to string.");
                     oldJson = await AudioBankToStringAsync(linkedBankOld);
                 }
                 else
                 {
-                    _logService.LogWarning("[AUDIO-DIFF] Failed to link old version.");
+                    _logService.LogWarning("[HandleAudioBankDiffAsync] Failed to link OLD version.");
                 }
             }
 
             if (diff.Type is ChunkDiffType.Modified or ChunkDiffType.Renamed or ChunkDiffType.New)
             {
-                var tempNodeNew = new FileSystemNodeModel { Name = Path.GetFileName(diff.NewPath), FullPath = diff.NewPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPath };
-                var linkedBankNew = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeNew, newPbePath, false);
+                _logService.Log("[HandleAudioBankDiffAsync] Linking NEW version of the audio bank.");
+                string backupChunkPathNew = null;
+                if (backupRootDir != null)
+                {
+                    backupChunkPathNew = Path.Combine(backupRootDir, "wad_chunks", "new", $"{diff.NewPathHash:X16}.chunk");
+                }
+                var tempNodeNew = new FileSystemNodeModel { Name = Path.GetFileName(diff.NewPath), FullPath = diff.NewPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPathNew, Type = NodeType.SoundBank };
+                var linkedBankNew = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeNew, newPbePath, false, backupRootDir);
                 if (linkedBankNew != null)
                 {
+                    _logService.Log("[HandleAudioBankDiffAsync] NEW version linked successfully. Converting to string.");
                     newJson = await AudioBankToStringAsync(linkedBankNew);
                 }
                 else
                 {
-                    _logService.LogWarning("[AUDIO-DIFF] Failed to link new version.");
+                    _logService.LogWarning("[HandleAudioBankDiffAsync] Failed to link NEW version.");
                 }
             }
+
+            _logService.Log($"[HandleAudioBankDiffAsync] JSON for old version (first 100 chars): {(oldJson.Length > 100 ? oldJson.Substring(0, 100) : oldJson)}");
+            _logService.Log($"[HandleAudioBankDiffAsync] JSON for new version (first 100 chars): {(newJson.Length > 100 ? newJson.Substring(0, 100) : newJson)}");
 
             if (oldJson == newJson)
             {
                 loadingWindow.Close();
-                _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
+                if (diff.Type == ChunkDiffType.Modified)
+                {
+                    _customMessageBoxService.ShowInfo("Info", "The file is marked as modified and has binary differences, but its parsed content is identical. No semantic changes were found.", owner);
+                }
+                else
+                {
+                    _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
+                }
+                _logService.Log("[HandleAudioBankDiffAsync] Parsed content is identical. Aborting diff view.");
                 return;
             }
 
             var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
             diffWindow.Owner = owner;
             await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, diff.OldPath, diff.NewPath);
-            
+
             loadingWindow.Close();
+            _logService.Log("[HandleAudioBankDiffAsync] Displaying diff window.");
             diffWindow.ShowDialog();
         }
 
@@ -151,7 +186,7 @@ namespace AssetsManager.Services.Core
                 result = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsBnkData);
             }
 
-            var settings = new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore };
+            var settings = new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
             return await JsonFormatter.FormatJsonAsync(result, settings);
         }
 
@@ -231,7 +266,7 @@ namespace AssetsManager.Services.Core
                 _logService.LogError(ex, "Error showing file diff");
             }
         }
-        
+
         private async Task<(string oldText, string newText)> ProcessDataAsync(string dataType, byte[] oldData, byte[] newData)
         {
             var oldTextTask = _contentFormatterService.GetFormattedStringAsync(dataType, oldData);

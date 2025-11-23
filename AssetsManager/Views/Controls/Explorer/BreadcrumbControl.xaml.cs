@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Views.Controls.Explorer
 {

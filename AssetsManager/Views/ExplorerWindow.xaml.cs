@@ -6,7 +6,7 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Services.Audio;
 
 using AssetsManager.Services.Explorer.Tree;
@@ -29,11 +29,12 @@ namespace AssetsManager.Views
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
             WadSavingService wadSavingService,
-            HashResolverService hashResolverService // Added HashResolverService
+            HashResolverService hashResolverService,
+            TaskCancellationManager taskCancellationManager // Added this line
         )
         {
             InitializeComponent();
-            
+
             FileExplorer.LogService = logService;
             FileExplorer.CustomMessageBoxService = customMessageBoxService;
             FileExplorer.WadExtractionService = wadExtractionService;
@@ -46,7 +47,8 @@ namespace AssetsManager.Views
             FileExplorer.TreeUIManager = treeUIManager;
             FileExplorer.AudioBankService = audioBankService;
             FileExplorer.AudioBankLinkerService = audioBankLinkerService;
-            FileExplorer.HashResolverService = hashResolverService; // Assign the service
+            FileExplorer.HashResolverService = hashResolverService;
+            FileExplorer.TaskCancellationManager = taskCancellationManager; // Added this line
 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;
@@ -71,7 +73,7 @@ namespace AssetsManager.Views
                 await FilePreviewer.ShowPreviewAsync(selectedNode);
             }
         }
-        
+
         public void CleanupResources()
         {
             // Desuscribir evento
@@ -79,10 +81,10 @@ namespace AssetsManager.Views
             {
                 FileExplorer.FileSelected -= FileExplorer_FileSelected;
             }
-            
+
             // Limpiar controles hijo
             FileExplorer?.CleanupResources();
-            
+
             // Romper referencia cruzada
             if (FileExplorer != null)
             {

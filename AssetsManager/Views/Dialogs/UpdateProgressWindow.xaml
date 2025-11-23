@@ -4,14 +4,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        mc:Ignorable="d"
+        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Downloading Update" Height="150" Width="400"
-        WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
-        ShowInTaskbar="False"
-        WindowStyle="None"
-        AllowsTransparency="True"
-        Background="Transparent">
+        ResizeMode="NoResize" WindowStyle="None"
+        AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterScreen">
 
     <Border Background="{StaticResource CardBackground}" CornerRadius="5" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
         <Grid>
@@ -24,11 +21,23 @@
             <Border Grid.Row="0" Background="{StaticResource AccentBrush}" CornerRadius="5,5,0,0" MouseDown="TitleBar_MouseDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <materialIcons:MaterialIcon Kind="Download" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Bold" Margin="5,10" Foreground="White"/>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <materialIcons:MaterialIcon Kind="Download" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White" Width="16" Height="16"/>
+                        <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Medium" FontSize="13" Margin="5,10" Foreground="White"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,5,0">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click">
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Margin="5,0,0,0">
+                            <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -36,7 +45,7 @@
                 <TextBlock x:Name="MessageTextBlock" Margin="0,0,0,10"
                            HorizontalAlignment="Center" TextWrapping="Wrap"
                            Text="Initializing download..." Foreground="{DynamicResource TextSecondary}"/>
-
+                           
                 <ProgressBar x:Name="DownloadProgressBar" Height="20" Minimum="0" Maximum="100" HorizontalAlignment="Stretch" Style="{DynamicResource ModernProgressBar}"/>
             </StackPanel>
         </Grid>

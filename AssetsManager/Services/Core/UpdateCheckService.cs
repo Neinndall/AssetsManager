@@ -25,7 +25,7 @@ namespace AssetsManager.Services.Core
         private bool _isCheckingAssets = false;
 
         public event Action<string, string> UpdatesFound;
-        
+
         public UpdateCheckService(AppSettings appSettings, Status status, JsonDataService jsonDataService, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService)
         {
             _appSettings = appSettings;
@@ -196,7 +196,7 @@ namespace AssetsManager.Services.Core
             {
                 UpdatesFound?.Invoke($"Version {newVersion} is available", newVersion);
             }
-            
+
             if (_appSettings.SyncHashesWithCDTB)
             {
                 await _status.SyncHashesIfNeeds(_appSettings.SyncHashesWithCDTB, silent, () =>
@@ -220,10 +220,10 @@ namespace AssetsManager.Services.Core
         /// Each individual check method is responsible for firing its own notification event.
         /// </summary>
         public async Task CheckForAllUpdatesAsync(bool silent = false)
-        {   
+        {
             // Checkeo al arrancar de Json Updates, Hashes and New Version App
             await CheckForGeneralUpdatesAsync(silent);
-            
+
             // Checkeo al arrancar de PbeStatus
             if (_appSettings.CheckPbeStatus)
             {

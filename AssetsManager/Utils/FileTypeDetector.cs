@@ -22,7 +22,7 @@ namespace AssetsManager.Utils
         private static readonly byte[] ANM_R3D2ANMD_SIGNATURE = { 0x72, 0x33, 0x64, 0x32, 0x61, 0x6E, 0x6D, 0x64 }; // "r3d2anmd"
         private static readonly byte[] ANM_R3D2CANM_SIGNATURE = { 0x72, 0x33, 0x64, 0x32, 0x63, 0x61, 0x6E, 0x6D }; // "r3d2canm"
         private static readonly byte[] MAPGEO_SIGNATURE = { 0x4F, 0x45, 0x47, 0x4D }; // "OEGM"
-        
+
         private static readonly byte[] SCO_SIGNATURE = { 0x5B, 0x4F, 0x62, 0x6A }; // "[Obj"
         private static readonly byte[] LUAQ_SIGNATURE = { 0x4C, 0x75, 0x61, 0x51 }; // "LuaQ"
         private static readonly byte[] PRELOAD_SIGNATURE = { 0x50, 0x72, 0x65, 0x4C, 0x6F, 0x61, 0x64 }; // "PreLoad"
@@ -53,7 +53,7 @@ namespace AssetsManager.Utils
             if (Contains(data, LUAQ_SIGNATURE, 1)) return "luaobj";
             if (StartsWith(data, PRELOAD_SIGNATURE)) return "preload";
             if (StartsWith(data, RST_SIGNATURE)) return "stringtable";
-            
+
             if (StartsWith(data, BIN_PROP_SIGNATURE) || StartsWith(data, BIN_PTCH_SIGNATURE)) return "bin";
             if (StartsWith(data, ICO_SIGNATURE)) return "ico";
 

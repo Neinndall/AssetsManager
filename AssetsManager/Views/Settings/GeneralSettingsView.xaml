@@ -22,7 +22,7 @@
         <StackPanel Margin="0,0,0,32">
             <TextBlock Text="General Settings" 
                          FontSize="28" 
-                         FontWeight="Light" 
+                         FontWeight="Medium" 
                          Foreground="{StaticResource TextPrimary}"
                          Margin="0,4,0,0"/>
             <TextBlock Text="Configure basic application behavior and synchronization options" 
@@ -35,8 +35,8 @@
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Data & History Section -->
-                <StackPanel Margin="0,0,0,24">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="Database" 
                                                    Foreground="{StaticResource AccentPurple}"
                                                    FontSize="20" 
@@ -45,7 +45,7 @@
                         <StackPanel>
                             <TextBlock Text="Data and History" 
                                      FontSize="18" 
-                                     FontWeight="SemiBold"
+                                     FontWeight="Normal"
                                      Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Manage data synchronization and saving differences" 
                                      FontSize="12" 
@@ -59,7 +59,7 @@
                         <TextBlock Text="Automatically sync with the latest hash database from CDTB servers"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
 
                         <CheckBox IsChecked="{Binding Settings.SaveDiffHistory, Mode=TwoWay}" 
@@ -68,14 +68,14 @@
                         <TextBlock Text="Save a history of all JSON file differences detected during updates"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
-                                     Margin="27,0,0,8"
+                                     Margin="27,0,0,6"
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Automatic Checks Section -->
-                <StackPanel Margin="0,0,0,24">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="Sync" 
                                                    Foreground="{StaticResource AccentBrush}"
                                                    FontSize="20" 
@@ -84,7 +84,7 @@
                         <StackPanel>
                             <TextBlock Text="Automatic Checks" 
                                      FontSize="18" 
-                                     FontWeight="SemiBold"
+                                     FontWeight="Normal"
                                      Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Configure what to look for and how often" 
                                      FontSize="12" 
@@ -99,7 +99,7 @@
                         <TextBlock Text="Periodically check for updates while the application is running"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
 
                         <!-- Frequency Selector - Visible only when background updates are enabled -->
@@ -131,14 +131,14 @@
                         <TextBlock Text="Check for updates to json files and their differences"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- File Management Section -->
-                <StackPanel Margin="0,0,0,24">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <StackPanel Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <materialIcons:MaterialIcon Kind="FolderSync" 
                                                    Foreground="{StaticResource AccentGreen}"
                                                    FontSize="20" 
@@ -147,61 +147,117 @@
                         <StackPanel>
                             <TextBlock Text="File Management" 
                                      FontSize="18" 
-                                     FontWeight="SemiBold"
+                                     FontWeight="Normal"
                                      Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Control how hash files are handled during updates" 
+                            <TextBlock Text="Manage asset extraction and organization" 
                                      FontSize="12" 
                                      Foreground="{StaticResource TextMuted}"/>
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
-                        <CheckBox IsChecked="{Binding Settings.AutoCopyHashes, Mode=TwoWay}" 
-                                  Content="Auto-replace outdated hashes" 
-                                  Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Automatically replace old hash files with newer versions"
+                        <!-- NEW CHECKBOX FOR EXTRACT NEW FILES -->
+                        <CheckBox IsChecked="{Binding Settings.EnableExtraction, Mode=TwoWay}"
+                                  x:Name="EnableExtractionCheckBox"
+                                  Content="Auto-extract new files">
+                            <CheckBox.Style>
+                                <Style TargetType="CheckBox" BasedOn="{StaticResource ModernCheckBox}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ElementName=ReportGenerationCheckBox, Path=IsChecked}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </CheckBox.Style>
+                        </CheckBox>
+                        <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,8" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
 
-                        <CheckBox IsChecked="{Binding Settings.CreateBackUpOldHashes, Mode=TwoWay}" 
-                                  Content="Create hashes backups" 
+                        <CheckBox IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}"
+                                  Content="Organize extracted files into folders"
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Back up hash files before updates to prevent data loss"
-                                     Foreground="{StaticResource TextMuted}" 
-                                     FontSize="12" 
-                                     Margin="27,0,0,8" 
+                        <TextBlock Text="If enabled, extracted assets will be organized into folders"
+                                     Foreground="{StaticResource TextMuted}"
+                                     FontSize="12"
+                                     Margin="27,0,0,6"
                                      TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Scan Mode Section -->
+                <!-- Report Generation Section -->
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                        <materialIcons:MaterialIcon Kind="Magnify" 
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <materialIcons:MaterialIcon Kind="FileDocumentOutline" 
                                                    Foreground="{StaticResource TextPrimary}"
                                                    FontSize="20" 
                                                    Margin="0,0,12,0" 
                                                    VerticalAlignment="Center"/>
                         <StackPanel>
-                            <TextBlock Text="Scan Mode" 
+                            <TextBlock Text="Report Generation" 
                                      FontSize="18" 
-                                     FontWeight="SemiBold"
+                                     FontWeight="Normal"
                                      Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Configure scanning behavior" 
+                            <TextBlock Text="Generate a log file with asset changes after a comparison" 
                                      FontSize="12" 
                                      Foreground="{StaticResource TextMuted}"/>
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
-                        <CheckBox IsChecked="{Binding Settings.OnlyCheckDifferences, Mode=TwoWay}" 
-                                  Content="Scan-only mode (no downloads)" 
-                                  Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Only identify differences without downloading or modifying files"
+                        <CheckBox x:Name="ReportGenerationCheckBox"
+                                  IsChecked="{Binding Settings.ReportGeneration.Enabled, Mode=TwoWay}" 
+                                  Content="Generate asset report">
+                            <CheckBox.Style>
+                                <Style TargetType="CheckBox" BasedOn="{StaticResource ModernCheckBox}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ElementName=EnableExtractionCheckBox, Path=IsChecked}" Value="True">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </CheckBox.Style>
+                        </CheckBox>
+                        <TextBlock Text="An assets.log file will be created instead of extracting the assets"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
-                                     Margin="27,0,0,0" 
+                                     Margin="27,0,0,6" 
                                      TextWrapping="Wrap"/>
+
+                        <!-- Filter Options -->
+                        <StackPanel Margin="27,5,0,8">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=ReportGenerationCheckBox}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Include in report:" 
+                                       Foreground="{StaticResource TextSecondary}" 
+                                       FontSize="12" 
+                                       Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterNew, Mode=TwoWay}" 
+                                          Content="New" 
+                                          Style="{StaticResource ModernCheckBox}"
+                                          Margin="0,0,15,0"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterModified, Mode=TwoWay}" 
+                                          Content="Modified" 
+                                          Style="{StaticResource ModernCheckBox}"
+                                          Margin="0,0,15,0"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRenamed, Mode=TwoWay}" 
+                                          Content="Renamed" 
+                                          Style="{StaticResource ModernCheckBox}"
+                                          Margin="0,0,15,0"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRemoved, Mode=TwoWay}" 
+                                          Content="Removed" 
+                                          Style="{StaticResource ModernCheckBox}"/>
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </StackPanel>

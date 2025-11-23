@@ -1,4 +1,3 @@
-// AssetsManager/Utils/UpdateExtractor.cs
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -25,7 +24,7 @@ namespace AssetsManager.Services.Updater
             _customMessageBoxService = customMessageBoxService ?? throw new ArgumentNullException(nameof(customMessageBoxService));
         }
 
-        public void ExtractAndRestart(string zipPath, bool preserveConfig)
+        public void ExtractAndRestart(string zipPath, bool preserveConfig, Window owner = null)
         {
             try
             {
@@ -53,7 +52,7 @@ namespace AssetsManager.Services.Updater
                             if (stream == null)
                             {
                                 _logService.LogError(null, $"Resource stream for {resource} is null!");
-                                _customMessageBoxService.ShowError("Update Error", $"Could not find the updater resource: {resource}!");
+                                _customMessageBoxService.ShowError("Update Error", $"Could not find the updater resource: {resource}!", owner);
                                 return;
                             }
 
@@ -99,7 +98,7 @@ namespace AssetsManager.Services.Updater
             catch (Exception ex)
             {
                 _logService.LogError(ex, "An error occurred during the update extraction process.");
-                _customMessageBoxService.ShowError("Update Error", $"Error during update: {ex.Message}");
+                _customMessageBoxService.ShowError("Update Error", $"Error during update: {ex.Message}", owner);
             }
         }
     }

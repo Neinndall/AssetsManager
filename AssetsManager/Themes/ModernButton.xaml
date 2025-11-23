@@ -70,7 +70,7 @@
                             <TextBlock x:Name="Text" 
                                       Text="{TemplateBinding Content}"
                                       FontSize="13"
-                                      FontWeight="Medium"
+                                      FontWeight="Normal"
                                       VerticalAlignment="Center"/>
                         </StackPanel>
                     </Border>
@@ -101,7 +101,7 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="12,10"/>
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -133,7 +133,7 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding" Value="12,10"/>
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -393,6 +393,14 @@
                     </Setter.Value>
                 </Setter>
                 <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="TitleBarButtonStyle" TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="White"/>
             </Trigger>
         </Style.Triggers>
     </Style>

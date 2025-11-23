@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        mc:Ignorable="d"
+        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Difference Viewer" Height="900" Width="1400" MinHeight="900" MinWidth="1400"
         WindowStartupLocation="CenterScreen">
     <Grid>

@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
@@ -52,7 +52,7 @@ namespace AssetsManager.Views.Controls.Monitor
             if (DiffHistoryListView.SelectedItems.Count > 0)
             {
                 var itemsToRemove = DiffHistoryListView.SelectedItems.Cast<JsonDiffHistoryEntry>().ToList();
-                
+
                 string message = itemsToRemove.Count == 1
                     ? $"Are you sure you want to delete the history entry for '{itemsToRemove.First().FileName}' from {itemsToRemove.First().Timestamp}? This will delete the backup files and cannot be undone."
                     : $"Are you sure you want to delete the {itemsToRemove.Count} selected history entries? This will delete their backup files and cannot be undone.";

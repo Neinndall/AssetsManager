@@ -10,7 +10,6 @@ namespace AssetsManager.Utils
     {
         private readonly LogService _logService;
 
-        public string ResourcesPath { get; private set; }
         public string HashesNewPath { get; private set; }
         public string HashesOldPath { get; private set; }
         public string JsonCacheNewPath { get; private set; }
@@ -36,7 +35,7 @@ namespace AssetsManager.Utils
         public string WebView2DataPath { get; private set; }
         public string TempPreviewPath { get; private set; }
         public string ApiCachePath { get; private set; }
-        
+
         public string WadComparisonDirName { get; private set; }
         public string WadComparisonFullPath { get; private set; }
         public string OldChunksPath { get; private set; }
@@ -55,7 +54,7 @@ namespace AssetsManager.Utils
             string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
 
             AssetsDownloadedPath = "AssetsDownloaded";
-            
+
             JsonCacheNewPath = Path.Combine(appFolderPath, "json_cache", "new");
             JsonCacheOldPath = Path.Combine(appFolderPath, "json_cache", "old");
             JsonCacheHistoryPath = Path.Combine(appFolderPath, "json_cache", "history");
@@ -66,16 +65,9 @@ namespace AssetsManager.Utils
             WebView2DataPath = Path.Combine(appFolderPath, "webview2data");
             TempPreviewPath = Path.Combine(WebView2DataPath, "TempPreview");
             ApiCachePath = Path.Combine(appFolderPath, "api_cache");
-            
+
             WadComparisonSavePath = Path.Combine(appFolderPath, "wadcomparison");
             VersionsPath = Path.Combine(appFolderPath, "versions");
-        }
-
-        public void GenerateNewResourcesPath()
-        {
-            string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
-            ResourcesPath = Path.Combine("Resources", date);
-            CreateDirectoryInternal(ResourcesPath, false);
         }
 
         public void GenerateNewSubAssetsDownloadedPath()
@@ -110,22 +102,22 @@ namespace AssetsManager.Utils
             UpdaterExePath = Path.Combine(UpdaterDirectoryPath, "Updater.exe");
             CreateDirectoryInternal(UpdaterDirectoryPath, false);
         }
-                                                                                                                                                                                                                          
-        public Task CreateDirJsonCacheNewAsync() => CreateDirectoryInternal(JsonCacheNewPath, false);                                                                                 
-        public Task CreateDirJsonCacheOldAsync() => CreateDirectoryInternal(JsonCacheOldPath, false);                                                                                 
-        public Task CreateDirVersionsAsync() => CreateDirectoryInternal(VersionsPath, false); 
-        public Task CreateDirTempPreviewAsync() => CreateDirectoryInternal(TempPreviewPath, false);                                                                                 
-        public Task CreateDirWebView2DataAsync() => CreateDirectoryInternal(WebView2DataPath, false);                                                                                 
-        public Task CreateDirApiCacheAsync() => CreateDirectoryInternal(ApiCachePath, false);                                                                                 
+
+        public Task CreateDirJsonCacheNewAsync() => CreateDirectoryInternal(JsonCacheNewPath, false);
+        public Task CreateDirJsonCacheOldAsync() => CreateDirectoryInternal(JsonCacheOldPath, false);
+        public Task CreateDirVersionsAsync() => CreateDirectoryInternal(VersionsPath, false);
+        public Task CreateDirTempPreviewAsync() => CreateDirectoryInternal(TempPreviewPath, false);
+        public Task CreateDirWebView2DataAsync() => CreateDirectoryInternal(WebView2DataPath, false);
+        public Task CreateDirApiCacheAsync() => CreateDirectoryInternal(ApiCachePath, false);
 
         public Task CreateHashesDirectories()
         {
             CreateDirectoryInternal(HashesNewPath, false);
             CreateDirectoryInternal(HashesOldPath, false);
             return Task.CompletedTask;
-        }                                                                                 
- 
-        public string CreateAssetDirectoryPath(string url, string downloadDirectory) 
+        }
+
+        public string CreateAssetDirectoryPath(string url, string downloadDirectory)
         {
             string path = new Uri(url).AbsolutePath;
 

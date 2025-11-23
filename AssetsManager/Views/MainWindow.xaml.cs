@@ -2,11 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Input;
-using System.IO; // Added for Path and Directory
+using Microsoft.Toolkit.Uwp.Notifications;
+using Microsoft.Extensions.DependencyInjection;
+using Windows.Data.Xml.Dom;
+using Windows.UI.Notifications;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
@@ -15,15 +21,9 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Versions;
-using AssetsManager.Utils;
 using AssetsManager.Views.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Models;
-using Microsoft.Toolkit.Uwp.Notifications;
-using Microsoft.Extensions.DependencyInjection;
-using Windows.Data.Xml.Dom;
-using Windows.UI.Notifications;
 
 namespace AssetsManager.Views
 {
@@ -48,10 +48,19 @@ namespace AssetsManager.Views
         private readonly DiffViewService _diffViewService;
         private readonly MonitorService _monitorService;
         private readonly VersionService _versionService;
+        private readonly ExtractionService _extractionService;
+        private readonly ReportGenerationService _reportGenerationService;
+        private readonly TaskCancellationManager _taskCancellationManager;
 
         private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
         private readonly List<string> _notificationMessages = new List<string>();
+
+        // New fields to manage the state of the extraction after comparison
+        private bool _isExtractingAfterComparison = false;
+        private string _extractionOldLolPath;
+        private string _extractionNewLolPath;
+        private List<SerializableChunkDiff> _diffsForExtraction;
 
         public MainWindow(
             IServiceProvider serviceProvider,
@@ -72,7 +81,10 @@ namespace AssetsManager.Views
             ProgressUIManager progressUIManager,
             DiffViewService diffViewService,
             MonitorService monitorService,
-            VersionService versionService)
+            VersionService versionService,
+            ExtractionService extractionService,
+            ReportGenerationService reportGenerationService,
+            TaskCancellationManager taskCancellationManager)
         {
             InitializeComponent();
 
@@ -95,19 +107,22 @@ namespace AssetsManager.Views
             _diffViewService = diffViewService;
             _monitorService = monitorService;
             _versionService = versionService;
+            _extractionService = extractionService;
+            _reportGenerationService = reportGenerationService;
+            _taskCancellationManager = taskCancellationManager;
 
             _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, this);
 
             _logService.SetLogOutput(LogView.richTextBoxLogs);
 
-            _assetDownloader.DownloadStarted += _progressUIManager.OnDownloadStarted;
-            _assetDownloader.DownloadProgressChanged += _progressUIManager.OnDownloadProgressChanged;
-            _assetDownloader.DownloadCompleted += _progressUIManager.OnDownloadCompleted;
-
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
             _wadComparatorService.ComparisonCompleted += _progressUIManager.OnComparisonCompleted;
             _wadComparatorService.ComparisonCompleted += OnWadComparisonCompleted;
+
+            _extractionService.ExtractionStarted += _progressUIManager.OnExtractionStarted;
+            _extractionService.ExtractionProgressChanged += (sender, progress) => _progressUIManager.OnExtractionProgressChanged(progress.extractedCount, progress.totalFiles, progress.message);
+            _extractionService.ExtractionCompleted += (sender, e) => OnExtractionCompleted(sender, e);
 
             _versionService.VersionDownloadStarted += (sender, e) => _progressUIManager.OnVersionDownloadStarted(sender, e);
             _versionService.VersionDownloadProgressChanged += (sender, e) => _progressUIManager.OnDownloadProgressChanged(e.CurrentValue, e.TotalValue, e.CurrentFile, true, null);
@@ -116,7 +131,7 @@ namespace AssetsManager.Views
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
             Sidebar.NavigationRequested += OnSidebarNavigationRequested;
-            LoadDownloaderWindow();
+            LoadComparatorWindow();
 
             if (IsAnySettingActive())
             {
@@ -127,9 +142,6 @@ namespace AssetsManager.Views
             InitializeApplicationAsync();
 
             InitializeNotifyIcon();
-            
-            this.Loaded += MainWindow_Loaded;
-            
             StateChanged += MainWindow_StateChanged;
             Closing += MainWindow_Closing;
         }
@@ -137,51 +149,7 @@ namespace AssetsManager.Views
         private async void InitializeApplicationAsync()
         {
             await _updateCheckService.CheckForAllUpdatesAsync();
-            await _hashResolverService.StartupTask;
-        }
-
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
-        {
-            // TEMPORARY: Check for old AppData folder structure and prompt for deletion
-            // This code is temporary and should be removed in a future version after users have updated.
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string oldAppFolderPath = Path.Combine(appDataPath, "AssetsManager");
-
-            if (Directory.Exists(oldAppFolderPath))
-            {
-                bool shouldDelete = _customMessageBoxService.ShowYesNo(
-                    "Directory Update",
-                    "An old AssetsManager directory structure has been detected in AppData. " +
-                    "To ensure consistency and avoid issues, would you like to delete the old folder " +
-                    $"'{oldAppFolderPath}'?\n\n" +
-                    "IMPORTANT: Please ensure you have manually backed up any important files from this folder " +
-                    "before proceeding, as this action cannot be undone. " +
-                    "This action is recommended and will not affect your current settings, " +
-                    "as they are saved in a different location. " +
-                    "This message is temporary and will be removed in future versions.",
-                    this
-                ).GetValueOrDefault(false);
-
-                if (shouldDelete)
-                {
-                    try
-                    {
-                        Directory.Delete(oldAppFolderPath, true); // true for recursive deletion
-                        _logService.LogSuccess($"Old AssetsManager folder deleted: {oldAppFolderPath}");
-                        _customMessageBoxService.ShowInfo("Deletion Complete", "The old folder has been successfully deleted.", this);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, $"Error attempting to delete old AssetsManager folder: {oldAppFolderPath}");
-                        _customMessageBoxService.ShowError("Deletion Error", $"Could not delete the old folder: {ex.Message}", this);
-                    }
-                }
-                else
-                {
-                    _logService.LogWarning($"User chose not to delete the old AssetsManager folder: {oldAppFolderPath}");
-                }
-            }
-            // END TEMPORARY CODE
+            await _hashResolverService.LoadAllHashesAsync();
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -251,7 +219,7 @@ namespace AssetsManager.Views
             {
                 _latestAppVersionAvailable = latestVersion;
             }
-            
+
             // Use the compat manager for robust notification support in WPF
             if (Visibility != Visibility.Visible)
             {
@@ -264,39 +232,86 @@ namespace AssetsManager.Views
             ShowNotification(true, message);
         }
         
-        private void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
+        private void OnExtractionCompleted(object sender, EventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
-                if (allDiffs != null && allDiffs.Any())
+                _progressUIManager.OnExtractionCompleted();
+                if (_isExtractingAfterComparison)
                 {
-                    var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
-                    {
-                        Type = d.Type,
-                        OldPath = d.OldPath,
-                        NewPath = d.NewPath,
-                        SourceWadFile = d.SourceWadFile,
-                        OldPathHash = d.OldChunk.PathHash,
-                        NewPathHash = d.NewChunk.PathHash,
-                        OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
-                        NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
-                        OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
-                        NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
-                    }).ToList();
-
-                    var resultWindow = new WadComparisonResultWindow(serializableDiffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, _appSettings, oldLolPath, newLolPath);
-                    resultWindow.Owner = this;
-                    resultWindow.Show();
+                    ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath);
+                    _isExtractingAfterComparison = false; // Reset flag
                 }
             });
+        }
+
+        private async void StartExtractionAsync()
+        {
+            var cancellationToken = _taskCancellationManager.PrepareNewOperation();
+            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
+        }
+        
+        private async void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
+        {
+            if (allDiffs == null)
+            {
+                return;
+            }
+
+            var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
+            {
+                Type = d.Type,
+                OldPath = d.OldPath,
+                NewPath = d.NewPath,
+                SourceWadFile = d.SourceWadFile,
+                OldPathHash = d.OldChunk.PathHash,
+                NewPathHash = d.NewChunk.PathHash,
+                OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
+                NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
+                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
+                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
+            }).ToList();
+
+            if (!serializableDiffs.Any())
+            {
+                _logService.Log("Comparison completed with no differences found.");
+                return;
+            }
+
+            if (_appSettings.ReportGeneration.Enabled) // Prioritize report generation
+            {
+                await _reportGenerationService.GenerateReportAsync(serializableDiffs);
+            }
+            else if (_appSettings.EnableExtraction) // Only extract if report generation is NOT enabled
+            {
+                _isExtractingAfterComparison = true;
+                _diffsForExtraction = serializableDiffs;
+                _extractionOldLolPath = oldLolPath;
+                _extractionNewLolPath = newLolPath;
+                
+                Dispatcher.Invoke(StartExtractionAsync);
+            }
+            else
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
+                });
+            }
+        }
+
+        private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
+        {
+            var resultWindow = new WadComparisonResultWindow(diffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, _appSettings, oldPath, newPath);
+            resultWindow.Owner = this;
+            resultWindow.Show();
         }
 
         private bool IsAnySettingActive()
         {
             return _appSettings.SyncHashesWithCDTB ||
-                   _appSettings.AutoCopyHashes ||
-                   _appSettings.CreateBackUpOldHashes ||
-                   _appSettings.OnlyCheckDifferences ||
+                   _appSettings.EnableExtraction ||
+                   _appSettings.ReportGeneration.Enabled ||
                    _appSettings.CheckJsonDataUpdates ||
                    _appSettings.SaveDiffHistory ||
                    _appSettings.BackgroundUpdates;
@@ -349,10 +364,9 @@ namespace AssetsManager.Views
                     modelWindow.CleanupResources();
                 }
             }
-            
+
             switch (viewTag)
             {
-                case "Downloader": LoadDownloaderWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Models": LoadModelWindow(); break;
@@ -360,11 +374,6 @@ namespace AssetsManager.Views
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
-        }
-
-        private void LoadDownloaderWindow()
-        {
-            MainContentArea.Content = _serviceProvider.GetRequiredService<DownloaderWindow>();
         }
 
         private void LoadExplorerWindow()
@@ -404,10 +413,6 @@ namespace AssetsManager.Views
 
         private void OnSettingsChanged(object sender, SettingsChangedEventArgs e)
         {
-            if (MainContentArea.Content is DownloaderWindow downloaderView)
-            {
-                downloaderView.UpdateSettings(_appSettings, e.WasResetToDefaults);
-            }
             _updateCheckService.Stop();
             _updateCheckService.Start();
         }

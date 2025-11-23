@@ -172,7 +172,8 @@
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
-                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=OneWay}"/>
+                                        <EventSetter Event="PreviewMouseDown" Handler="ListViewItem_PreviewMouseDown"/>
                                     </Style>
                                 </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
@@ -186,19 +187,19 @@
                                             <Border Grid.Column="0" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding FileName}"
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
-                                            <Border Grid.Column="1" Margin="5,0,10,0">
+                                            <Border Grid.Column="1" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding Date}" 
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
-                                            <Grid Grid.Column="2">
+                                            <Grid Grid.Column="2" Margin="10,0,0,0">
                                                 <TextBlock Text="{Binding Content}" 
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Grid>
                                         </Grid>
@@ -305,7 +306,8 @@
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
-                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=OneWay}"/>
+                                        <EventSetter Event="PreviewMouseDown" Handler="ListViewItem_PreviewMouseDown"/>
                                     </Style>
                                 </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
@@ -319,19 +321,19 @@
                                             <Border Grid.Column="0" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding FileName}"
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
-                                            <Border Grid.Column="1" Margin="5,0,10,0">
+                                            <Border Grid.Column="1" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding Date}"
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Border>
-                                            <Grid Grid.Column="2">
+                                            <Grid Grid.Column="2" Margin="10,0,0,0">
                                                 <TextBlock Text="{Binding Content}" 
                                                            Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Medium"
+                                                           FontWeight="Normal"
                                                            TextAlignment="Center" />
                                             </Grid>
                                         </Grid>

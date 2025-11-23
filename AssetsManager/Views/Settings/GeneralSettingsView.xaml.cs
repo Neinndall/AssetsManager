@@ -1,5 +1,5 @@
 using System.Windows.Controls;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Settings
 {
@@ -9,7 +9,7 @@ namespace AssetsManager.Views.Settings
         {
             InitializeComponent();
         }
-        
+
         public void ApplySettingsToUI(SettingsModel model)
         {
             this.DataContext = model;

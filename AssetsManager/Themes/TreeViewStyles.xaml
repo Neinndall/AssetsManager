@@ -125,6 +125,8 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="5"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="ItemContainerStyle" Value="{StaticResource ModernTreeViewItem}"/>
 
         <!-- Virtualization for performance with large item counts -->

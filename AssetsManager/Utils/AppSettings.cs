@@ -3,17 +3,18 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
-using AssetsManager.Views.Models;
 using Newtonsoft.Json.Linq;
+using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Utils
 {
     public class AppSettings
     {
         public bool SyncHashesWithCDTB { get; set; }
-        public bool AutoCopyHashes { get; set; }
-        public bool CreateBackUpOldHashes { get; set; }
-        public bool OnlyCheckDifferences { get; set; }
+        public bool EnableExtraction { get; set; } 
+        public bool OrganizeExtractedAssets { get; set; }
+        public ReportGenerationSettings ReportGeneration { get; set; }
         public bool CheckJsonDataUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
         public bool SaveDiffHistory { get; set; }
@@ -36,7 +37,7 @@ namespace AssetsManager.Utils
 
         // Dictionary for File Watcher
         public Dictionary<string, DateTime> JsonDataModificationDates { get; set; }
-        
+
         // New structure for monitored files and directories
         public List<string> MonitoredJsonFiles { get; set; }
         public List<JsonDiffHistoryEntry> DiffHistory { get; set; }
@@ -140,9 +141,16 @@ namespace AssetsManager.Utils
             return new AppSettings
             {
                 SyncHashesWithCDTB = true,
-                AutoCopyHashes = false,
-                CreateBackUpOldHashes = false,
-                OnlyCheckDifferences = false,
+                EnableExtraction = false,
+                OrganizeExtractedAssets = false,
+                ReportGeneration = new ReportGenerationSettings
+                {
+                    Enabled = false,
+                    FilterNew = false,
+                    FilterModified = false,
+                    FilterRenamed = false,
+                    FilterRemoved = false
+                },
                 CheckJsonDataUpdates = false,
                 AssetTrackerTimer = false,
                 SaveDiffHistory = false,
@@ -171,7 +179,8 @@ namespace AssetsManager.Utils
                 ApiSettings = new ApiSettings
                 {
                     Connection = new ConnectionInfo(),
-                    Token = new TokenInfo()
+                    Token = new TokenInfo(),
+                    UsePbeForApi = false
                 },
             };
         }
@@ -187,9 +196,9 @@ namespace AssetsManager.Utils
             var defaultSettings = GetDefaultSettings();
 
             CheckJsonDataUpdates = defaultSettings.CheckJsonDataUpdates;
-            AutoCopyHashes = defaultSettings.AutoCopyHashes;
-            CreateBackUpOldHashes = defaultSettings.CreateBackUpOldHashes;
-            OnlyCheckDifferences = defaultSettings.OnlyCheckDifferences;
+            EnableExtraction = defaultSettings.EnableExtraction;
+            OrganizeExtractedAssets = defaultSettings.OrganizeExtractedAssets;
+            ReportGeneration = defaultSettings.ReportGeneration;
             NewHashesPath = defaultSettings.NewHashesPath;
             OldHashesPath = defaultSettings.OldHashesPath;
             LolPbeDirectory = defaultSettings.LolPbeDirectory;
@@ -213,6 +222,7 @@ namespace AssetsManager.Utils
             AssetTrackerProgress = defaultSettings.AssetTrackerProgress;
             AssetTrackerUrlOverrides = defaultSettings.AssetTrackerUrlOverrides;
             AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
+            ApiSettings = defaultSettings.ApiSettings;
             // SyncHashesWithCDTB and HashesSizes are intentionally not reset.
         }
     }

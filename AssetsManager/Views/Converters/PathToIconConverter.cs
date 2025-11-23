@@ -5,7 +5,8 @@ using System.IO;
 using Material.Icons;
 using System.Windows.Data;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Converters
 {
@@ -59,9 +60,13 @@ namespace AssetsManager.Views.Converters
                 return MaterialIconKind.FileQuestionOutline; // Default icon for nodes without a path
             }
 
-            if (node.Status != DiffStatus.Unchanged && node.Type == NodeType.VirtualDirectory && node.FullPath == node.Status.ToString())
+            if (node.Type == NodeType.VirtualDirectory)
             {
-                return GetDiffStatusIcon(node.Status);
+                string name = node.Name;
+                if (name.StartsWith("[+]")) return MaterialIconKind.FilePlusOutline;
+                if (name.StartsWith("[~]")) return MaterialIconKind.FileEditOutline;
+                if (name.StartsWith("[»]")) return MaterialIconKind.FileMoveOutline;
+                if (name.StartsWith("[-]")) return MaterialIconKind.FileRemoveOutline;
             }
 
             switch (node.Type)
@@ -82,18 +87,6 @@ namespace AssetsManager.Views.Converters
                 default:
                     return GetIcon(node.Extension, node.FullPath);
             }
-        }
-
-        private static MaterialIconKind GetDiffStatusIcon(DiffStatus status)
-        {
-            return status switch
-            {
-                DiffStatus.New => MaterialIconKind.FilePlusOutline,
-                DiffStatus.Deleted => MaterialIconKind.FileRemoveOutline,
-                DiffStatus.Modified => MaterialIconKind.FileEditOutline,
-                DiffStatus.Renamed => MaterialIconKind.FileMoveOutline,
-                _ => MaterialIconKind.FileQuestionOutline,
-            };
         }
 
         private static MaterialIconKind GetDiffTypeIcon(ChunkDiffType type)
@@ -143,3 +136,4 @@ namespace AssetsManager.Views.Converters
         }
     }
 }
+

@@ -1,12 +1,12 @@
-using System.Collections.Generic;
-using System.IO;
 using System;
+using System.IO;
 using System.Linq;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
+using System.Collections.Generic;
 using AssetsManager.Services.Parsers;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Audio;
 using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Audio
@@ -54,7 +54,7 @@ namespace AssetsManager.Services.Audio
                 if (audioBnk?.Didx?.Wems != null && audioBnk.Data != null)
                 {
                     long dataOffset = audioBnk.Data.Offset;
-                    foreach(var wem in audioBnk.Didx.Wems)
+                    foreach (var wem in audioBnk.Didx.Wems)
                     {
                         // The offset in DIDX is relative to the start of the DATA section, so we calculate the absolute offset.
                         allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = (uint)(wem.Offset + dataOffset), Size = wem.Size };
@@ -176,9 +176,9 @@ namespace AssetsManager.Services.Audio
                             {
                                 var wemInfo = wemMetadata[soundData.WemId];
                                 _logService.LogDebug($"[AUDIO] Linking sound: {soundData.WemId}");
-                                audioEventNode.Sounds.Add(new WemFileNode 
+                                audioEventNode.Sounds.Add(new WemFileNode
                                 {
-                                    Id = soundData.WemId, 
+                                    Id = soundData.WemId,
                                     Name = $"{soundData.WemId}.wem",
                                     Offset = wemInfo.Offset,
                                     Size = wemInfo.Size
@@ -259,9 +259,9 @@ namespace AssetsManager.Services.Audio
                                 {
                                     var wemInfo = wemMetadata[wemId];
                                     _logService.LogDebug($"[AUDIO] Linking WEM from MusicTrack: {wemId}");
-                                    audioEventNode.Sounds.Add(new WemFileNode 
+                                    audioEventNode.Sounds.Add(new WemFileNode
                                     {
-                                        Id = wemId, 
+                                        Id = wemId,
                                         Name = $"{wemId}.wem",
                                         Offset = wemInfo.Offset,
                                         Size = wemInfo.Size

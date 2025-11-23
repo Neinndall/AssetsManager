@@ -34,14 +34,16 @@ namespace AssetsManager.Services.Core
             public LogLevel Level { get; }
             public Exception Exception { get; }
             public string ClickablePath { get; }
+            public string ClickableText { get; } // New property
             public DateTime Timestamp { get; }
 
-            public LogEntry(string message, LogLevel level, Exception exception = null, string clickablePath = null)
+            public LogEntry(string message, LogLevel level, Exception exception = null, string clickablePath = null, string clickableText = null)
             {
                 Message = message;
                 Level = level;
                 Exception = exception;
                 ClickablePath = clickablePath;
+                ClickableText = clickableText; // Assign new property
                 Timestamp = DateTime.Now;
             }
         }
@@ -123,9 +125,9 @@ namespace AssetsManager.Services.Core
             // This method now only logs to the fatal error file, not to the UI.
         }
 
-        private void LogInteractive(LogLevel level, string message, string clickablePath)
+        private void LogInteractive(LogLevel level, string message, string clickablePath, string clickableText)
         {
-            var logEntry = new LogEntry(message, level, clickablePath: clickablePath);
+            var logEntry = new LogEntry(message, level, clickablePath: clickablePath, clickableText: clickableText);
             switch (level)
             {
                 case LogLevel.Warning:
@@ -141,24 +143,24 @@ namespace AssetsManager.Services.Core
             WriteLog(logEntry);
         }
 
-        public void LogInteractiveSuccess(string message, string clickablePath)
+        public void LogInteractiveSuccess(string message, string clickablePath, string clickableText = null)
         {
-            LogInteractive(LogLevel.Success, message, clickablePath);
+            LogInteractive(LogLevel.Success, message, clickablePath, clickableText);
         }
 
-        public void LogInteractiveWarning(string message, string clickablePath)
+        public void LogInteractiveWarning(string message, string clickablePath, string clickableText = null)
         {
-            LogInteractive(LogLevel.Warning, message, clickablePath);
+            LogInteractive(LogLevel.Warning, message, clickablePath, clickableText);
         }
 
-        public void LogInteractiveError(string message, string clickablePath)
+        public void LogInteractiveError(string message, string clickablePath, string clickableText = null)
         {
-            LogInteractive(LogLevel.Error, message, clickablePath);
+            LogInteractive(LogLevel.Error, message, clickablePath, clickableText);
         }
 
-        public void LogInteractiveInfo(string message, string clickablePath)
+        public void LogInteractiveInfo(string message, string clickablePath, string clickableText = null)
         {
-            LogInteractive(LogLevel.Info, message, clickablePath);
+            LogInteractive(LogLevel.Info, message, clickablePath, clickableText);
         }
 
         private void WriteLog(LogEntry logEntry)
@@ -219,25 +221,36 @@ namespace AssetsManager.Services.Core
             }
 
             var timestampRun = new Run($"[{logEntry.Timestamp:HH:mm:ss}] ") { Foreground = Brushes.LightGray };
-            var levelRun = new Run($"[{levelTag}] ") { Foreground = levelColor, FontWeight = FontWeights.Bold };
+            var levelRun = new Run($"[{levelTag}] ") { Foreground = levelColor, FontWeight = FontWeights.Medium };
 
             paragraph.Inlines.Add(timestampRun);
             paragraph.Inlines.Add(levelRun);
 
             if (!string.IsNullOrEmpty(logEntry.ClickablePath) && (File.Exists(logEntry.ClickablePath) || Directory.Exists(logEntry.ClickablePath)))
             {
-                int pathIndex = logEntry.Message.IndexOf(logEntry.ClickablePath, StringComparison.OrdinalIgnoreCase);
+                string linkText = string.IsNullOrEmpty(logEntry.ClickableText) ? logEntry.ClickablePath : logEntry.ClickableText;
+                string fullMessage = logEntry.Message;
+
+                // Find where the clickable text/path should be inserted in the message
+                // For simplicity, we'll assume the clickable text is at the end of the message for now,
+                // or we'll just append it if not found.
+                int pathIndex = fullMessage.IndexOf(linkText, StringComparison.OrdinalIgnoreCase);
+                if (pathIndex == -1)
+                {
+                    pathIndex = fullMessage.IndexOf(logEntry.ClickablePath, StringComparison.OrdinalIgnoreCase);
+                }
+
                 if (pathIndex != -1)
                 {
                     // Text before the path
-                    paragraph.Inlines.Add(new Run(logEntry.Message.Substring(0, pathIndex)));
+                    paragraph.Inlines.Add(new Run(fullMessage.Substring(0, pathIndex)));
 
                     // The hyperlink
-                    var link = new Hyperlink(new Run(logEntry.ClickablePath));
+                    var link = new Hyperlink(new Run(linkText));
                     link.Foreground = Application.Current.FindResource("AccentBrush") as SolidColorBrush;
                     link.NavigateUri = new Uri(Path.GetFullPath(logEntry.ClickablePath));
-                    link.RequestNavigate += (sender, e) => {
-                        
+                    link.RequestNavigate += (sender, e) =>
+                    {
                         try
                         {
                             Process.Start("explorer.exe", $"\"{e.Uri.LocalPath}\"");
@@ -251,11 +264,28 @@ namespace AssetsManager.Services.Core
                     paragraph.Inlines.Add(link);
 
                     // Text after the path
-                    paragraph.Inlines.Add(new Run(logEntry.Message.Substring(pathIndex + logEntry.ClickablePath.Length)));
+                    paragraph.Inlines.Add(new Run(fullMessage.Substring(pathIndex + linkText.Length)));
                 }
                 else
                 {
-                    paragraph.Inlines.Add(new Run(logEntry.Message));
+                    // If the linkText/ClickablePath is not found in the message, just append the message and the link
+                    paragraph.Inlines.Add(new Run(fullMessage + " "));
+                    var link = new Hyperlink(new Run(linkText));
+                    link.Foreground = Application.Current.FindResource("AccentBrush") as SolidColorBrush;
+                    link.NavigateUri = new Uri(Path.GetFullPath(logEntry.ClickablePath));
+                    link.RequestNavigate += (sender, e) =>
+                    {
+                        try
+                        {
+                            Process.Start("explorer.exe", $"\"{e.Uri.LocalPath}\"");
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Error(ex, "Failed to open file path from log.");
+                        }
+                        e.Handled = true;
+                    };
+                    paragraph.Inlines.Add(link);
                 }
             }
             else

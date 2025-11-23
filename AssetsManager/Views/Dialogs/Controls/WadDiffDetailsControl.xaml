@@ -5,8 +5,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:AssetsManager.Views.Dialogs.Controls"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="400">
+             mc:Ignorable="d">
+             
     <Border Style="{StaticResource SettingsCard}">
         <Grid>
             <Grid.RowDefinitions>
@@ -16,9 +16,9 @@
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
                 <materialIcons:MaterialIcon Kind="FileDocumentOutline" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                 <TextBlock Text="Difference Details" 
-                             FontSize="16" 
-                             FontWeight="SemiBold"
-                             Foreground="{StaticResource TextPrimary}"/>
+                           FontSize="16" 
+                           FontWeight="Medium"
+                           Foreground="{StaticResource TextPrimary}"/>
             </StackPanel>
 
             <Border Grid.Row="1" x:Name="detailsPanel"
@@ -46,7 +46,7 @@
 
                         <!-- COMMON DETAILS -->
                         <StackPanel x:Name="pathPanel" Margin="0,0,0,12">
-                            <TextBlock Text="Path" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="Path" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="Medium"/>
                             <TextBlock x:Name="pathTextBlock" 
                                        Foreground="{StaticResource TextPrimary}"
                                        FontSize="14"
@@ -56,7 +56,7 @@
 
                         <!-- RENAME-SPECIFIC -->
                         <StackPanel x:Name="renamedOldNamePanel" Visibility="Collapsed" Margin="0,0,0,12">
-                            <TextBlock Text="Old Path" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="Old Path" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="Medium"/>
                             <TextBlock x:Name="renamedOldNameTextBlock" 
                                        Foreground="{StaticResource TextPrimary}"
                                        FontSize="14"
@@ -64,7 +64,7 @@
                                        TextWrapping="Wrap"/>
                         </StackPanel>
                         <StackPanel x:Name="renamedNewNamePanel" Visibility="Collapsed" Margin="0,0,0,12">
-                            <TextBlock Text="New Path" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="New Path" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="Medium"/>
                             <TextBlock x:Name="renamedNewNameTextBlock" 
                                        Foreground="{StaticResource TextPrimary}"
                                        FontSize="14"
@@ -74,31 +74,31 @@
 
                         <!-- GENERIC FILENAME -->
                         <StackPanel x:Name="genericFileNamePanel" Margin="0,0,0,12">
-                            <TextBlock Text="File Name" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="File Name" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="Medium"/>
                             <TextBlock x:Name="genericFileNameTextBlock" 
-                                   Foreground="{StaticResource TextPrimary}"
-                                   FontSize="14"
-                                   Margin="0,4,0,0"
-                                   TextWrapping="Wrap"/>
+                                       Foreground="{StaticResource TextPrimary}"
+                                       FontSize="14"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
 
                         <StackPanel Margin="0,0,0,12">
-                            <TextBlock Text="Change Type" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="Change Type" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="Medium"/>
                             <TextBlock x:Name="changeTypeTextBlock" Foreground="{StaticResource TextPrimary}" FontSize="14" Margin="0,4,0,0"/>
                         </StackPanel>
 
                         <StackPanel x:Name="oldSizePanel" Margin="0,0,0,12">
-                            <TextBlock Text="Old Size" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="Old Size" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="Medium"/>
                             <TextBlock x:Name="oldSizeTextBlock" Foreground="{StaticResource TextPrimary}" FontSize="14" Margin="0,4,0,0"/>
                         </StackPanel>
 
                         <StackPanel x:Name="newSizePanel" Margin="0,0,0,12">
-                            <TextBlock Text="New Size" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="New Size" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="Medium"/>
                             <TextBlock x:Name="newSizeTextBlock" Foreground="{StaticResource TextPrimary}" FontSize="14" Margin="0,4,0,0"/>
                         </StackPanel>
 
                         <StackPanel>
-                            <TextBlock Text="Source WAD" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="Source WAD" Foreground="{StaticResource TextMuted}" FontSize="12" FontWeight="Medium"/>
                             <TextBlock x:Name="sourceWadTextBlock" Foreground="{StaticResource TextPrimary}" FontSize="14" Margin="0,4,0,0"/>
                         </StackPanel>
                     </StackPanel>

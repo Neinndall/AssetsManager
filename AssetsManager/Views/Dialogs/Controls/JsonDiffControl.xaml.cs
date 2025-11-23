@@ -34,7 +34,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         public JsonDiffControl()
         {
             InitializeComponent();
-            ConfigureEditors();
             LoadJsonSyntaxHighlighting();
             SetupScrollSync();
         }
@@ -103,29 +102,11 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
             catch (Exception ex)
             {
-                CustomMessageBoxService.ShowError("Error", $"Failed to load comparison: {ex.Message}. Check logs for details.");
+                CustomMessageBoxService.ShowError("Error", $"Failed to load comparison: {ex.Message}. Check logs for details.", Window.GetWindow(this));
                 OnComparisonFinished(false);
             }
         }
 
-        private void ConfigureEditors()
-        {
-            var editors = new[] { OldJsonContent, NewJsonContent };
-            foreach (var editor in editors)
-            {
-                editor.Options.EnableHyperlinks = false;
-                editor.Options.EnableEmailHyperlinks = false;
-                editor.Options.ShowEndOfLine = false;
-                editor.Options.ShowSpaces = false;
-                editor.Options.ShowTabs = false;
-                editor.Options.ConvertTabsToSpaces = true;
-                editor.Options.IndentationSize = 2;
-                editor.FontFamily = new FontFamily("Consolas, Courier New, monospace");
-                editor.FontSize = 13;
-                editor.ShowLineNumbers = true;
-                editor.WordWrap = false;
-            }
-        }
 
         private void LoadJsonSyntaxHighlighting()
         {
@@ -343,7 +324,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
             catch (Exception ex)
             {
-                CustomMessageBoxService.ShowError("Error", $"Failed to update view: {ex.Message}");
+                CustomMessageBoxService.ShowError("Error", $"Failed to update view: {ex.Message}", Window.GetWindow(this));
             }
         }
 

@@ -1,11 +1,11 @@
-using LeagueToolkit.Core.Meta;
-using LeagueToolkit.Core.Meta.Properties;
-using AssetsManager.Services.Hashes;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
+using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Utils
 {
@@ -61,7 +61,7 @@ namespace AssetsManager.Utils
                 case BinPropertyType.F32: writer.WriteNumberValue(((BinTreeF32)prop).Value); break;
                 case BinPropertyType.Bool: writer.WriteBooleanValue(((BinTreeBool)prop).Value); break;
                 case BinPropertyType.BitBool: writer.WriteBooleanValue(((BinTreeBitBool)prop).Value); break;
-                
+
                 case BinPropertyType.Vector2:
                     var v2 = ((BinTreeVector2)prop).Value;
                     writer.WriteStartObject();
@@ -69,7 +69,7 @@ namespace AssetsManager.Utils
                     writer.WriteNumber("y", v2.Y);
                     writer.WriteEndObject();
                     break;
-                
+
                 case BinPropertyType.Vector3:
                     var v3 = ((BinTreeVector3)prop).Value;
                     writer.WriteStartObject();
@@ -92,7 +92,8 @@ namespace AssetsManager.Utils
                 case BinPropertyType.Matrix44:
                     var m44 = ((BinTreeMatrix44)prop).Value;
                     writer.WriteStartArray();
-                    for(int i = 0; i < 4; i++) {
+                    for (int i = 0; i < 4; i++)
+                    {
                         writer.WriteStartArray();
                         writer.WriteNumberValue(m44[i, 0]);
                         writer.WriteNumberValue(m44[i, 1]);
@@ -115,7 +116,7 @@ namespace AssetsManager.Utils
 
                 case BinPropertyType.ObjectLink: writer.WriteStringValue(hashResolver.ResolveBinHashGeneral(((BinTreeObjectLink)prop).Value)); break;
                 case BinPropertyType.WadChunkLink: writer.WriteStringValue(hashResolver.ResolveHash(((BinTreeWadChunkLink)prop).Value)); break;
-                
+
                 case BinPropertyType.Container:
                 case BinPropertyType.UnorderedContainer:
                     writer.WriteStartArray();

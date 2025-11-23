@@ -13,7 +13,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         public event TextChangedEventHandler SearchTextChanged;
         public event RoutedEventHandler WadContextMenuOpening;
         public object SelectedItem => resultsTreeView.SelectedItem;
-        
+
         public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
 
         public static readonly RoutedEvent ViewDifferencesClickEvent = EventManager.RegisterRoutedEvent(
@@ -86,7 +86,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         }
 
         private static TreeViewItem VisualUpwardSearch(DependencyObject source)
-        { 
+        {
             while (source != null && !(source is TreeViewItem))
             {
                 source = VisualTreeHelper.GetParent(source);

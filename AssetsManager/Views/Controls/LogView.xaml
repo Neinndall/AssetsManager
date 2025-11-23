@@ -19,22 +19,9 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal" Grid.Column="0">
-                    <materialIcons:MaterialIcon Kind="Console" 
-                                                Width="16" 
-                                                Height="16" 
-                                                Foreground="{StaticResource TextPrimary}" 
-                                                VerticalAlignment="Center"
-                                                Margin="4,0,0,0"/>
-                    <TextBlock Text="Logger" 
-                               FontWeight="Medium" 
-                               FontSize="13" 
-                               Foreground="{StaticResource TextPrimary}" 
-                               VerticalAlignment="Center" 
-                               Margin="6,0,0,0"
-                               FontFamily="Consolas, Courier New"/>
-                </StackPanel>
 
+
+                <!-- Icono y texto "Logger" eliminados. Se pueden volver a añadir aquí si es necesario. -->
                 <Button Grid.Column="1"
                         Style="{StaticResource TransparentIconButton}"
                         Click="ClearLogs_Click"

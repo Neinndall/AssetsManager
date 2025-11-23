@@ -14,17 +14,18 @@ namespace AssetsManager.Views
     public partial class MonitorWindow : UserControl
     {
         public MonitorWindow(
-            MonitorService monitorService, 
+            MonitorService monitorService,
             AssetDownloader assetDownloader,
-            IServiceProvider serviceProvider, 
-            DiffViewService diffViewService, 
-            AppSettings appSettings, 
-            LogService logService, 
+            IServiceProvider serviceProvider,
+            DiffViewService diffViewService,
+            AppSettings appSettings,
+            LogService logService,
             CustomMessageBoxService customMessageBoxService,
             JsonDataService jsonDataService,
             VersionService versionService,
             DirectoriesCreator directoriesCreator,
-            RiotApiService riotApiService) // Added RiotApiService
+            RiotApiService riotApiService,
+            TaskCancellationManager taskCancellationManager) // Added RiotApiService
         {
             InitializeComponent();
 
@@ -54,6 +55,7 @@ namespace AssetsManager.Views
             ManageVersionsControl.LogService = logService;
             ManageVersionsControl.AppSettings = appSettings;
             ManageVersionsControl.CustomMessageBoxService = customMessageBoxService;
+            ManageVersionsControl.TaskCancellationManager = taskCancellationManager;
 
             // Setup and inject dependencies for ApiControl
             ApiControl.LogService = logService;

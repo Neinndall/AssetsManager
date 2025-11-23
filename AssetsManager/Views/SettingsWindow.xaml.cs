@@ -2,7 +2,7 @@ using System;
 using System.Windows;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Settings;
 using Microsoft.Extensions.DependencyInjection;
 

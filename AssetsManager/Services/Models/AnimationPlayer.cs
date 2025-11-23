@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Media.Media3D;
 using HelixToolkit.Wpf;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Hashing;
 using LeagueToolkit.Core.Memory;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using Quaternion = System.Numerics.Quaternion;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace AssetsManager.Services.Models
 {
@@ -100,9 +100,9 @@ namespace AssetsManager.Services.Models
                     var i3 = idx3 < boneCount ? idx3 : 0;
 
                     Matrix4x4 skinningMatrix = finalBoneTransforms[i0] * weights.X +
-                                             finalBoneTransforms[i1] * weights.Y +
-                                             finalBoneTransforms[i2] * weights.Z +
-                                             finalBoneTransforms[i3] * weights.W;
+                                               finalBoneTransforms[i1] * weights.Y +
+                                               finalBoneTransforms[i2] * weights.Z +
+                                               finalBoneTransforms[i3] * weights.W;
 
                     skinnedVertices[i] = Vector3.Transform(pos, skinningMatrix);
                 });
@@ -119,7 +119,7 @@ namespace AssetsManager.Services.Models
                         var vertexIndex = range.StartVertex + j;
                         if (vertexIndex < 0 || vertexIndex >= skinnedVertices.Length)
                         {
-                            _logService.LogError($"[ERROR] Invalid vertexIndex {vertexIndex} for skinnedVertices. Range: {range.StartVertex}-{range.StartVertex + range.VertexCount -1}, SkinnedVerticesLength: {skinnedVertices.Length}");
+                            _logService.LogError($"[ERROR] Invalid vertexIndex {vertexIndex} for skinnedVertices. Range: {range.StartVertex}-{range.StartVertex + range.VertexCount - 1}, SkinnedVerticesLength: {skinnedVertices.Length}");
                             continue;
                         }
 

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using System.Threading; // Added to resolve CancellationToken
 using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Formatting
@@ -25,7 +26,7 @@ namespace AssetsManager.Services.Formatting
             _tempConversionPath = Path.Combine(tempBasePath, "WemPreview");
 
             EnsureVgmstreamIsExtracted();
-            
+
             if (!Directory.Exists(_tempConversionPath))
             {
                 Directory.CreateDirectory(_tempConversionPath);
@@ -68,7 +69,7 @@ namespace AssetsManager.Services.Formatting
                             stream.CopyTo(fileStream);
                         }
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         _logService.LogError(ex, $"Failed to extract embedded resource: {resourceName}");
                         // If extraction fails, we can't proceed.
@@ -80,7 +81,7 @@ namespace AssetsManager.Services.Formatting
             }
         }
 
-        public async Task<byte[]> ConvertWemToOggAsync(byte[] wemData)
+        public async Task<byte[]> ConvertWemToOggAsync(byte[] wemData, CancellationToken cancellationToken = default)
         {
             if (!_isExtracted || !File.Exists(_vgmstreamExePath))
             {
@@ -93,7 +94,7 @@ namespace AssetsManager.Services.Formatting
 
             try
             {
-                await File.WriteAllBytesAsync(tempWemFile, wemData);
+                await File.WriteAllBytesAsync(tempWemFile, wemData, cancellationToken);
 
                 var processStartInfo = new ProcessStartInfo
                 {
@@ -109,11 +110,11 @@ namespace AssetsManager.Services.Formatting
                 using (var process = new Process { StartInfo = processStartInfo })
                 {
                     process.Start();
-                    await process.WaitForExitAsync();
+                    await process.WaitForExitAsync(cancellationToken);
 
                     if (process.ExitCode != 0)
                     {
-                        var error = await process.StandardError.ReadToEndAsync();
+                        var error = await process.StandardError.ReadToEndAsync(cancellationToken);
                         _logService.LogError(new Exception(error), $"Vgmstream process failed with exit code {process.ExitCode}");
                         return null;
                     }
@@ -121,11 +122,16 @@ namespace AssetsManager.Services.Formatting
 
                 if (File.Exists(tempOggFile))
                 {
-                    return await File.ReadAllBytesAsync(tempOggFile);
+                    return await File.ReadAllBytesAsync(tempOggFile, cancellationToken);
                 }
 
                 _logService.LogWarning("Vgmstream process succeeded but the output OGG file was not found.");
                 return null;
+            }
+            catch (OperationCanceledException)
+            {
+                _logService.LogWarning("WEM to OGG conversion was cancelled.");
+                throw;
             }
             catch (Exception ex)
             {

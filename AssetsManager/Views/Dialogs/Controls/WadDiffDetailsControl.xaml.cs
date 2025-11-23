@@ -1,4 +1,4 @@
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Wad;
 using System;
 using System.IO;
 using System.Windows;

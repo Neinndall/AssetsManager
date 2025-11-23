@@ -1,7 +1,7 @@
-using HelixToolkit.Wpf;
 using System;
 using System.Windows;
 using System.Windows.Input;
+using HelixToolkit.Wpf;
 using System.Windows.Media.Media3D;
 
 namespace AssetsManager.Views.Helpers

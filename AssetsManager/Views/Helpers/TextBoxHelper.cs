@@ -80,7 +80,7 @@ namespace AssetsManager.Views.Helpers
             }
         }
 
-        
+
 
         private static void TextBox_TextChanged(object sender, TextChangedEventArgs e)
         {

@@ -6,7 +6,7 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Core;
 
@@ -24,7 +24,7 @@ namespace AssetsManager.Services.Monitor
     public class JsonDataService
     {
         public event Action<FileUpdateInfo> FileUpdated;
-        
+
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
         private readonly DirectoriesCreator _directoriesCreator;
@@ -48,7 +48,7 @@ namespace AssetsManager.Services.Monitor
             _diffViewService = diffViewService;
             _httpClient = httpClient;
         }
-        
+
         public async Task<List<(string Url, DateTime Timestamp)>> GetFileUrlsFromDirectoryAsync(string directoryUrl)
         {
             var fileUrls = new List<(string Url, DateTime Timestamp)>();
@@ -110,12 +110,12 @@ namespace AssetsManager.Services.Monitor
                         Uri fileUri = new Uri(url);
                         parentDirectoryUrl = new Uri(fileUri, ".").ToString();
                         string html = await _httpClient.GetStringAsync(parentDirectoryUrl);
-                        
+
                         var regex = new Regex(
                             @"<a href=""(?<filename>[^""]+)""[^>]*>.*?<\/a><\/td><td class=""size"">.*?<\/td><td class=""date"">(?<date>[^<]+)<\/td>",
                             RegexOptions.Singleline
                         );
-                        
+
                         bool foundInParent = false;
                         foreach (Match match in regex.Matches(html))
                         {
@@ -203,7 +203,7 @@ namespace AssetsManager.Services.Monitor
                         if (fileBytes != null && fileBytes.Length > 0)
                         {
                             await File.WriteAllBytesAsync(newFilePath, fileBytes);
-                            
+
                             if (_appSettings.SaveDiffHistory && isUpdate)
                             {
                                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
@@ -237,7 +237,7 @@ namespace AssetsManager.Services.Monitor
                                 Timestamp = serverDate
                             });
 
-                            
+
                         }
                         else
                         {

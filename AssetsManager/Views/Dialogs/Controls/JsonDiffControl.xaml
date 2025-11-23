@@ -7,10 +7,7 @@
              xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
              xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:jsonDiff="clr-namespace:AssetsManager.Views.Dialogs.Controls"
-             mc:Ignorable="d" 
-             d:DesignHeight="960" d:DesignWidth="1500"
-             Background="{StaticResource SidebarBackground}"
-             FontFamily="Consolas, Courier New">
+             mc:Ignorable="d" Background="{StaticResource SidebarBackground}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -66,7 +63,7 @@
                             <TextBlock Text="VIEW OPTIONS"
                                        Foreground="{StaticResource TextSecondary}"
                                        FontSize="10"
-                                       FontWeight="Bold"
+                                       FontWeight="SemiBold"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
 
@@ -162,16 +159,7 @@
                                 BorderBrush="{StaticResource BorderColor}"
                                 BorderThickness="1"
                                 CornerRadius="6">
-                            <avalonEdit:TextEditor x:Name="OldJsonContent"
-                                                 IsReadOnly="True"
-                                                 Background="Transparent"
-                                                 BorderThickness="0"
-                                                 Foreground="{StaticResource TextPrimary}"
-                                                 Padding="0,8"
-                                                 ShowLineNumbers="True"
-                                                 WordWrap="False"
-                                                 HorizontalScrollBarVisibility="Visible"
-                                                 VerticalScrollBarVisibility="Auto"/>
+                            <avalonEdit:TextEditor x:Name="OldJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
                         </Border>
                     </Grid>
                 </Border>
@@ -213,16 +201,7 @@
                                 BorderBrush="{StaticResource BorderColor}"
                                 BorderThickness="1"
                                 CornerRadius="6">
-                            <avalonEdit:TextEditor x:Name="NewJsonContent"
-                                                 IsReadOnly="True"
-                                                 Background="Transparent"
-                                                 BorderThickness="0"
-                                                 Foreground="{StaticResource TextPrimary}"
-                                                 Padding="0,8"
-                                                 ShowLineNumbers="True"
-                                                 WordWrap="False"
-                                                 HorizontalScrollBarVisibility="Visible"
-                                                 VerticalScrollBarVisibility="Auto"/>
+                            <avalonEdit:TextEditor x:Name="NewJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
                         </Border>
                     </Grid>
                 </Border>
@@ -241,7 +220,5 @@
                 </Border>
             </Grid>
         </Grid>
-
-        
     </Grid>
 </UserControl>

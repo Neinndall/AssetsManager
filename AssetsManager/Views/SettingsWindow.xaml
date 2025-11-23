@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="{StaticResource SidebarBackground}"
-        FontFamily="Consolas, Courier New">
+        FontFamily="{StaticResource AppFontFamily}">
 
     <Grid>
         <Grid.ColumnDefinitions>

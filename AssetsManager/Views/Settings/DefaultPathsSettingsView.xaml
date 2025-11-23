@@ -12,7 +12,7 @@
         <StackPanel Margin="0,0,0,24">
             <TextBlock Text="Default Paths" 
                          FontSize="28" 
-                         FontWeight="Light" 
+                         FontWeight="Medium" 
                          Foreground="{StaticResource TextPrimary}"
                          Margin="0,4,0,0"/>
             <TextBlock Text="Configure default directories for the application" 
@@ -33,7 +33,7 @@
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderPlus" Foreground="{StaticResource AccentGreen}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="New Hash Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="New Hash Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Location where new hash files will be stored" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
@@ -56,7 +56,7 @@
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderMinus" Foreground="{StaticResource AccentOrange}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="Old Hash Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Old Hash Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Location where existing hash files are located" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
@@ -79,7 +79,7 @@
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderSearch" Foreground="{StaticResource AccentBrush}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="LoL PBE Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="LoL PBE Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Directory where League of Legends PBE is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
@@ -102,7 +102,7 @@
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderHeart" Foreground="{StaticResource AccentBrush}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="LoL Live Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="LoL Live Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Directory where League of Legends LIVE is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
@@ -125,7 +125,7 @@
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="Image" Foreground="{StaticResource AccentBlue}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="Custom Floor Texture" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Custom Floor Texture" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Path to a custom image file for the 3D viewer's floor" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
@@ -148,7 +148,7 @@
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Foreground="{StaticResource AccentPurple}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="Default Extracted Directory" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Default Extracted Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="Default directory for extracted files from Explorer" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>

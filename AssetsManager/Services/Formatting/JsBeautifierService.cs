@@ -63,7 +63,7 @@ namespace AssetsManager.Services.Formatting
             {
                 return await Task.Run(() => BeautifyInternal(jsContent));
             }
-            
+
             return BeautifyInternal(jsContent);
         }
 
@@ -73,17 +73,17 @@ namespace AssetsManager.Services.Formatting
             {
                 // Paso 1: Intentar con NUglify SIN preprocesamiento (más seguro)
                 var result = Uglify.Js(jsContent, _beautifySettings);
-                
+
                 if (!result.HasErrors && !string.IsNullOrEmpty(result.Code))
                 {
                     return PostprocessBeautified(result.Code);
                 }
-                
+
                 // Paso 2: Intentar con configuración más permisiva
                 try
                 {
                     result = Uglify.Js(jsContent, _fallbackSettings);
-                    
+
                     // Incluso si hay errores menores, intentar usar el resultado si tiene código
                     if (!string.IsNullOrEmpty(result.Code))
                     {
@@ -94,7 +94,7 @@ namespace AssetsManager.Services.Formatting
                 {
                     // Continuar al fallback manual
                 }
-                
+
                 // Paso 3: Fallback con beautificación manual mejorada
                 return ApplyAdvancedBeautification(jsContent);
             }
@@ -111,17 +111,17 @@ namespace AssetsManager.Services.Formatting
         private string PostprocessBeautified(string beautified)
         {
             var result = beautified;
-            
+
             // Mejorar espaciado en operadores
             result = Regex.Replace(result, @"(\w+)([=!<>+\-*/%])(\w+)", "$1 $2 $3");
-            
+
             // Mejorar espaciado en funciones
             result = Regex.Replace(result, @"function\s*\(", "function (");
             result = Regex.Replace(result, @"\)\s*\{", ") {");
-            
+
             // Separar elementos de arrays largos
             result = Regex.Replace(result, @",(\w)", ", $1");
-            
+
             return result;
         }
 
@@ -134,10 +134,10 @@ namespace AssetsManager.Services.Formatting
                 return string.Empty;
 
             var result = jsContent;
-            
+
             // Transformaciones mejoradas con mejor detección de contexto
             result = ApplyContextAwareFormatting(result);
-            
+
             // Aplicar indentación inteligente
             return ApplyIntelligentIndentation(result);
         }
@@ -148,29 +148,29 @@ namespace AssetsManager.Services.Formatting
         private string ApplyContextAwareFormatting(string jsContent)
         {
             var result = jsContent;
-            
+
             // Mejorar separación de statements (evitar romper strings)
             result = Regex.Replace(result, @";(?=\s*[a-zA-Z_$])", ";\n");
-            
+
             // Mejorar apertura de bloques
             result = Regex.Replace(result, @"(?<![""])\{(?!\s*[""])", " {\n");
-            
+
             // Mejorar cierre de bloques (evitar dentro de strings)
             result = Regex.Replace(result, @"(?<![""])\}(?!\s*[,;""\]])", "\n}\n");
-            
+
             // Mejorar separación de elementos en arrays/objetos (evitar strings largas base64)
             result = Regex.Replace(result, @",(?=\s*[a-zA-Z_$""\[])(?!.{100,})", ",\n");
-            
+
             // Espaciado en operadores (evitar dentro de strings)
             result = Regex.Replace(result, @"(?<![""])([=!<>+\-*/%])(?![""])", " $1 ");
-            
+
             // Funciones
             result = Regex.Replace(result, @"(\w+)\s*=\s*function\s*\(", "$1 = function(");
             result = Regex.Replace(result, @"function\s*\(", "function (");
-            
+
             // Clases
             result = Regex.Replace(result, @"\bclass\s+(\w+)\s*\{", "class $1 {\n");
-            
+
             return result;
         }
 
@@ -190,7 +190,7 @@ namespace AssetsManager.Services.Formatting
             {
                 var line = lines[i];
                 var trimmed = line.Trim();
-                
+
                 if (string.IsNullOrEmpty(trimmed))
                 {
                     result.AppendLine();

@@ -6,8 +6,41 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <DataTemplate x:Key="MythicShopItemTemplate">
+            <Border BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="1" 
+                    CornerRadius="4"
+                    Padding="10" 
+                    Margin="5">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" 
+                               FontWeight="SemiBold" 
+                               FontSize="13" 
+                               Foreground="{StaticResource TextPrimary}" 
+                               TextWrapping="Wrap" 
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center"
+                               Margin="0,5,0,0"/>
+                    <TextBlock Foreground="{StaticResource AccentPurple}" 
+                               FontWeight="SemiBold" 
+                               FontSize="12" 
+                               HorizontalAlignment="Center">
+                        <Run Text="{Binding Price}"/>
+                        <Run Text=" ME"/>
+                    </TextBlock>
+                    <TextBlock FontSize="12" 
+                               Foreground="{StaticResource TextMuted}" 
+                               HorizontalAlignment="Center">
+                        <Run Text="{Binding EndTime}"/>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
     <Grid Margin="15">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -35,7 +68,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Auth Status Card -->
+        <!-- Connection Status Card -->
         <Border Grid.Row="1"
                 Style="{StaticResource SettingsCard}"
                 Margin="0,0,0,16">
@@ -46,21 +79,21 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <materialIcons:MaterialIcon Grid.Column="0" VerticalAlignment="Top" Margin="0,0,10,0" Height="16" Width="16">
+                <materialIcons:MaterialIcon Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0" Height="16" Width="16">
                     <materialIcons:MaterialIcon.Style>
                         <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
                             <Setter Property="Kind" Value="HelpCircleOutline" /> <!-- Default/Unknown state -->
                             <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: Authenticated">
+                                <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: LCU Connected">
                                     <Setter Property="Kind" Value="CheckCircle" />
                                     <Setter Property="Foreground" Value="{StaticResource AccentGreen}" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: Not Authenticated">
+                                <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: Disconnected">
                                     <Setter Property="Kind" Value="AlertCircle" />
                                     <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: Authenticating...">
+                                <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: Connecting to LCU...">
                                     <Setter Property="Kind" Value="Sync" />
                                     <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
                                 </DataTrigger>
@@ -69,47 +102,25 @@
                                     <Setter Property="Kind" Value="AlertCircle" />
                                     <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: Error - Failed to acquire token.">
-                                    <Setter Property="Kind" Value="AlertCircle" />
-                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
-                                </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </materialIcons:MaterialIcon.Style>
                 </materialIcons:MaterialIcon>
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                    <TextBlock Text="{Binding Status.StatusText}"
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Vertical">
+                    <TextBlock Text="LCU Connection" 
+                               FontSize="16" 
+                               FontWeight="SemiBold"
                                Foreground="{StaticResource TextPrimary}"/>
-                    <WrapPanel Margin="0,4,0,0">
-                        <WrapPanel.Style>
-                            <Style TargetType="WrapPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Status.IsAuthenticated}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </WrapPanel.Style>
-                        <TextBlock Text="{Binding Status.RegionText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text=" | " Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text="{Binding Status.PlatformText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text=" | " Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text="{Binding Status.SummonerIdText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text=" | " Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text="{Binding Status.PuuidText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text=" | " Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text="{Binding Status.IssuedAtText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text=" | " Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                        <TextBlock Text="{Binding Status.ExpirationText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
-                    </WrapPanel>
+                    <TextBlock Text="{Binding Status.StatusText}"
+                               FontSize="12"
+                               Foreground="{Binding Status.StatusColor}"/>
                 </StackPanel>
 
                 <Button Grid.Column="2"
                         VerticalAlignment="Center"
                         Content="{Binding Status.ButtonContent}"
-                        Click="GetTokenButton_Click">
+                        Click="ConnectButton_Click">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
                             <Setter Property="IsEnabled" Value="True"/>
@@ -124,8 +135,79 @@
             </Grid>
         </Border>
 
+        <!-- Authentication Status Card -->
+        <Border Grid.Row="2"
+                Style="{StaticResource SettingsCard}"
+                Margin="0,0,0,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <materialIcons:MaterialIcon Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" Height="16" Width="16">
+                    <materialIcons:MaterialIcon.Style>
+                        <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
+                            <Setter Property="Kind" Value="HelpCircleOutline" /> <!-- Default/Unknown state -->
+                            <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Status.AuthenticationStatusText}" Value="Status: Authenticated">
+                                    <Setter Property="Kind" Value="CheckCircle" />
+                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status.AuthenticationStatusText}" Value="Status: Not Authenticated">
+                                    <Setter Property="Kind" Value="AlertCircle" />
+                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status.AuthenticationStatusText}" Value="Status: Authenticating...">
+                                    <Setter Property="Kind" Value="Sync" />
+                                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </materialIcons:MaterialIcon.Style>
+                </materialIcons:MaterialIcon>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Vertical">
+                    <TextBlock Text="API Authentication" 
+                               FontSize="16" 
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="{Binding Status.AuthenticationStatusText}"
+                               FontSize="12"
+                               Foreground="{Binding Status.AuthenticationStatusColor}"/>
+                    <StackPanel Margin="0,4,0,0">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Status.IsAuthenticated}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <WrapPanel>
+                            <TextBlock Text="{Binding Status.RegionText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                            <TextBlock Text=" | " Foreground="{StaticResource TextMuted}" FontSize="11" Margin="3,0"/>
+                            <TextBlock Text="{Binding Status.PlatformText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                            <TextBlock Text=" | " Foreground="{StaticResource TextMuted}" FontSize="11" Margin="3,0"/>
+                            <TextBlock Text="{Binding Status.SummonerIdText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                            <TextBlock Text=" | " Foreground="{StaticResource TextMuted}" FontSize="11" Margin="3,0"/>
+                            <TextBlock Text="{Binding Status.IssuedAtText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                            <TextBlock Text=" | " Foreground="{StaticResource TextMuted}" FontSize="11" Margin="3,0"/>
+                            <TextBlock Text="{Binding Status.ExpirationText}" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding Status.PuuidText}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+
+            </Grid>
+        </Border>
+
         <!-- Body -->
-        <TabControl Grid.Row="2" Style="{StaticResource CustomTabControlStyle}">
+        <TabControl Grid.Row="3" Style="{StaticResource CustomTabControlStyle}">
             <TabItem Header="Sales">
                 <StackPanel>
                     <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,0">
@@ -142,11 +224,11 @@
                                                             Margin="0,0,12,0"
                                                             VerticalAlignment="Center"/>
                                 <StackPanel>
-                                    <TextBlock Text="Available Requests" 
+                                    <TextBlock Text="Sales Request" 
                                                FontSize="16" 
                                                FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Perform requests to external APIs" 
+                                    <TextBlock Text="Request and view current sales from the LCU" 
                                                FontSize="11" 
                                                Foreground="{StaticResource TextMuted}"/>
                                 </StackPanel>
@@ -155,7 +237,8 @@
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <Button Content="Requests Sales"
                                         Style="{StaticResource ModernButton}"
-                                        Click="RequestsSales_Click"/>
+                                        Click="RequestsSales_Click"
+                                        IsEnabled="{Binding Status.IsConnected}"/>
                                 <Button Content="Save"
                                         Style="{StaticResource ModernButton}"
                                         Margin="10,0,0,0"
@@ -171,27 +254,17 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="10">
+                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="5">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
                                         <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,5,0,0">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
-                                            <TextBlock Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center">
-                                                <Run Text="Original Price: "/>
-                                                <Run Text="{Binding Rp}" TextDecorations="Strikethrough"/>
-                                                <Run Text=" RP"/>
-                                            </TextBlock>
-                                            <TextBlock Foreground="{StaticResource AccentGreen}" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center">
-                                                <Run Text="Sale: "/>
-                                                <Run Text="{Binding Sale.Rp}"/><Run Text=" RP ("/><Run Text="{Binding Sale.PercentOff}"/><Run Text="% dto)"/>
-                                            </TextBlock>
-                                            <TextBlock FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center">
-                                                <Run Text="Ends:"/>
-                                                <Run Text="{Binding Sale.EndDate}"/>
-                                            </TextBlock>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding FormattedOriginalPrice, Mode=OneWay}" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Sale.FormattedSaleDetails, Mode=OneWay}" Foreground="{StaticResource AccentGreen}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Sale.FormattedEndDate, Mode=OneWay}" FontSize="12" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -229,14 +302,71 @@
                 </StackPanel>
             </TabItem>
             <TabItem Header="Mythic Shop">
-                <Grid>
+                <StackPanel>
                     <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,0">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="Construction" Height="48" Width="48" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                            <TextBlock Text="Soon" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="24" Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="DiamondStone" 
+                                                            FontSize="20" 
+                                                            Foreground="{StaticResource AccentPurple}"
+                                                            Margin="0,0,12,0"
+                                                            VerticalAlignment="Center"/>
+                                <StackPanel>
+                                    <TextBlock Text="Mythic Shop Request" 
+                                               FontSize="16" 
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Request and view current mythic shop items from the LCU" 
+                                               FontSize="11" 
+                                               Foreground="{StaticResource TextMuted}"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Content="Requests MythicShop"
+                                        Style="{StaticResource ModernButton}"
+                                        Click="RequestsMythicShop_Click"
+                                        IsEnabled="{Binding Status.IsConnected}"/>
+                                <Button Content="Save"
+                                        Style="{StaticResource ModernButton}"
+                                        Margin="10,0,0,0"
+                                        Click="SaveMythicShopButton_Click"/>
+                            </StackPanel>
+                        </Grid>
                     </Border>
-                </Grid>
+                    <ItemsControl x:Name="MythicShopCategoriesItemsControl" ItemsSource="{Binding Status.MythicShopCategories}" Margin="0,16,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="{Binding CategoryName}" 
+                                               FontSize="16" 
+                                               FontWeight="SemiBold"
+                                               Margin="10,0,0,10"
+                                               Foreground="{StaticResource TextPrimary}"/>
+                                    <ItemsControl Grid.Row="1" ItemsSource="{Binding Items}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Columns="4"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <StaticResource ResourceKey="MythicShopItemTemplate"/>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
             </TabItem>
         </TabControl>
     </Grid>

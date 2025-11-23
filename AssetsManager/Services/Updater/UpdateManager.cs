@@ -25,11 +25,11 @@ namespace AssetsManager.Services.Updater
 
         public UpdateManager(LogService logService, DirectoriesCreator directoriesCreator, HttpClient httpClient, UpdateExtractor updateExtractor, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService)
         {
-            _logService = logService ?? throw new ArgumentNullException(nameof(logService));
-            _directoriesCreator = directoriesCreator ?? throw new ArgumentNullException(nameof(directoriesCreator));
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _updateExtractor = updateExtractor ?? throw new ArgumentNullException(nameof(updateExtractor));
-            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            _logService = logService;
+            _directoriesCreator = directoriesCreator;
+            _httpClient = httpClient;
+            _updateExtractor = updateExtractor;
+            _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
         }
 
@@ -125,7 +125,7 @@ namespace AssetsManager.Services.Updater
                                                 progressWindow.Dispatcher.Invoke(() =>
                                                 {
                                                     progressWindow.SetProgress(progressPercentage,
-                                                        $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
+                                                                                $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
                                                 });
                                             }
                                         }
@@ -145,11 +145,11 @@ namespace AssetsManager.Services.Updater
                         {
                             if (dialog.SelectedMode == UpdateMode.CleanWithSaving)
                             {
-                                _updateExtractor.ExtractAndRestart(downloadPath, true);
+                                _updateExtractor.ExtractAndRestart(downloadPath, true, owner);
                             }
                             else if (dialog.SelectedMode == UpdateMode.CleanWithoutSaving)
                             {
-                                _updateExtractor.ExtractAndRestart(downloadPath, false);
+                                _updateExtractor.ExtractAndRestart(downloadPath, false, owner);
                             }
                         }
                         else

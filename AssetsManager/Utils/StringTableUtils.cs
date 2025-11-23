@@ -130,7 +130,7 @@ namespace AssetsManager.Utils
                 // The rest of the stream is the data block
                 long dataOffset = reader.BaseStream.Position;
                 byte[] data = reader.ReadBytes((int)(reader.BaseStream.Length - dataOffset));
-                
+
                 foreach (var (offset, hash) in entryInfos)
                 {
                     long relativeOffset = (long)offset;

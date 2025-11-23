@@ -10,7 +10,7 @@ using Microsoft.Web.WebView2.Core;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Views.Controls.Explorer
 {

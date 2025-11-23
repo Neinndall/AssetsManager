@@ -226,7 +226,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                     bool typeChanged = currentLineNew.Type != lastChangeTypeNew || currentLineOld.Type != lastChangeTypeOld;
 
                     bool gapDetected = (currentLineNew.Position.HasValue && prevLineNew.Position.HasValue && currentLineNew.Position.Value != prevLineNew.Position.Value + 1) ||
-                                       (currentLineOld.Position.HasValue && prevLineOld.Position.HasValue && currentLineOld.Position.Value != prevLineOld.Position.Value + 1);
+                                     (currentLineOld.Position.HasValue && prevLineOld.Position.HasValue && currentLineOld.Position.Value != prevLineOld.Position.Value + 1);
 
                     if (typeChanged || gapDetected)
                     {

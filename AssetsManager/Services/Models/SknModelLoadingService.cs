@@ -16,7 +16,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 
 namespace AssetsManager.Services.Models
 {

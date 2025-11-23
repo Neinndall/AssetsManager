@@ -7,7 +7,7 @@ using Material.Icons.WPF;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Core
@@ -22,6 +22,7 @@ namespace AssetsManager.Services.Core
         private readonly WadDifferenceService _wadDifferenceService;
         private readonly WadPackagingService _wadPackagingService;
         private readonly DiffViewService _diffViewService;
+        private readonly TaskCancellationManager _taskCancellationManager; // New field
 
         private Button _progressSummaryButton;
         private MaterialIcon _progressIcon;
@@ -32,15 +33,15 @@ namespace AssetsManager.Services.Core
         private int _totalFiles;
 
         public ProgressUIManager(
-            LogService logService, 
-            IServiceProvider serviceProvider, 
+            LogService logService,
+            IServiceProvider serviceProvider,
             CustomMessageBoxService customMessageBoxService,
-            DirectoriesCreator directoriesCreator, 
-            AssetDownloader assetDownloader, 
+            DirectoriesCreator directoriesCreator,
+            AssetDownloader assetDownloader,
             WadDifferenceService wadDifferenceService,
             WadPackagingService wadPackagingService,
-            DiffViewService diffViewService
-            )
+            DiffViewService diffViewService,
+            TaskCancellationManager taskCancellationManager)
         {
             _logService = logService;
             _serviceProvider = serviceProvider;
@@ -50,6 +51,7 @@ namespace AssetsManager.Services.Core
             _wadDifferenceService = wadDifferenceService;
             _wadPackagingService = wadPackagingService;
             _diffViewService = diffViewService;
+            _taskCancellationManager = taskCancellationManager; // Assign new dependency
         }
 
         public void Initialize(Button progressSummaryButton, MaterialIcon progressIcon, Window owner)
@@ -66,10 +68,6 @@ namespace AssetsManager.Services.Core
             {
                 _progressSummaryButton.Click -= ProgressSummaryButton_Click;
             }
-            if (_progressDetailsWindow != null)
-            {
-                _progressDetailsWindow.Closed -= ProgressDetailsWindow_Closed;
-            }
             _spinningIconAnimationStoryboard?.Stop();
             _spinningIconAnimationStoryboard = null;
             _progressDetailsWindow?.Close();
@@ -77,37 +75,6 @@ namespace AssetsManager.Services.Core
             _progressSummaryButton = null;
             _progressIcon = null;
             _owner = null;
-        }
-
-        public void OnDownloadStarted(int totalFiles)
-        {
-            _owner.Dispatcher.Invoke(() =>
-            {
-                _totalFiles = totalFiles;
-                _progressSummaryButton.Visibility = Visibility.Visible;
-                _progressSummaryButton.ToolTip = "Click to see download details";
-
-                if (_spinningIconAnimationStoryboard == null)
-                {
-                    var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
-                    _spinningIconAnimationStoryboard = originalStoryboard?.Clone();
-                    if (_spinningIconAnimationStoryboard != null) Storyboard.SetTarget(_spinningIconAnimationStoryboard, _progressIcon);
-                }
-                _spinningIconAnimationStoryboard?.Begin();
-
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Downloader");
-                _progressDetailsWindow.Owner = _owner;
-                _progressDetailsWindow.OperationVerb = "Downloading";
-                _progressDetailsWindow.HeaderIconKind = "Download";
-                _progressDetailsWindow.HeaderText = "Downloading Assets";
-                _progressDetailsWindow.Closed += ProgressDetailsWindow_Closed;
-                _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
-            });
-        }
-
-        private void ProgressDetailsWindow_Closed(object sender, EventArgs e)
-        {
-            _progressDetailsWindow = null;
         }
 
         public void OnDownloadProgressChanged(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage)
@@ -145,12 +112,13 @@ namespace AssetsManager.Services.Core
                 }
                 _spinningIconAnimationStoryboard?.Begin();
 
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Comparator");
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Comparator", _taskCancellationManager);
                 _progressDetailsWindow.Owner = _owner;
                 _progressDetailsWindow.OperationVerb = "Comparing";
                 _progressDetailsWindow.HeaderIconKind = "Compare";
                 _progressDetailsWindow.HeaderText = "Comparing WADs";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
             });
         }
@@ -164,6 +132,51 @@ namespace AssetsManager.Services.Core
         }
 
         public void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                _progressSummaryButton.Visibility = Visibility.Collapsed;
+                _spinningIconAnimationStoryboard?.Stop();
+                _spinningIconAnimationStoryboard = null;
+                _progressDetailsWindow?.Close();
+            });
+        }
+
+        public void OnExtractionStarted(object sender, (string message, int totalFiles) data)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                _progressSummaryButton.Visibility = Visibility.Visible;
+                _progressSummaryButton.ToolTip = "Click to see extraction details";
+
+                if (_spinningIconAnimationStoryboard == null)
+                {
+                    var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
+                    _spinningIconAnimationStoryboard = originalStoryboard?.Clone();
+                    if (_spinningIconAnimationStoryboard != null) Storyboard.SetTarget(_spinningIconAnimationStoryboard, _progressIcon);
+                }
+                _spinningIconAnimationStoryboard?.Begin();
+
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Extractor", _taskCancellationManager);
+                _progressDetailsWindow.Owner = _owner;
+                _progressDetailsWindow.OperationVerb = "Extracting";
+                _progressDetailsWindow.HeaderIconKind = "PackageDown";
+                _progressDetailsWindow.HeaderText = "Extracting New Assets";
+                _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.Show();
+                _progressDetailsWindow.UpdateProgress(0, data.totalFiles, data.message, true, null);
+            });
+        }
+
+        public void OnExtractionProgressChanged(int completedFiles, int totalFiles, string currentFile)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                _progressDetailsWindow?.UpdateProgress(completedFiles, totalFiles, currentFile, true, null);
+            });
+        }
+
+        public void OnExtractionCompleted()
         {
             _owner.Dispatcher.Invoke(() =>
             {
@@ -189,12 +202,13 @@ namespace AssetsManager.Services.Core
                 }
                 _spinningIconAnimationStoryboard?.Begin();
 
-                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Downloader");
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Versions Update", _taskCancellationManager);
                 _progressDetailsWindow.Owner = _owner;
-                _progressDetailsWindow.OperationVerb = "Downloading";
+                _progressDetailsWindow.OperationVerb = "Updating";
                 _progressDetailsWindow.HeaderIconKind = "Download";
-                _progressDetailsWindow.HeaderText = taskName;
+                _progressDetailsWindow.HeaderText = "Versions Update";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, 0, "Initializing...", true, null);
             });
         }

@@ -139,7 +139,7 @@ namespace AssetsManager.Services.Monitor
                 // 4. Format the final message by injecting the user's local time.
                 var localMaintenanceTime = maintenanceStartTime.ToLocalTime();
                 string newDateTimeString = $"{match.Value} ({localMaintenanceTime:HH:mm} your timezone)";
-                
+
                 return originalContent.Replace(match.Value, newDateTimeString);
 
             }

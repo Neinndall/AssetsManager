@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Converters
 {

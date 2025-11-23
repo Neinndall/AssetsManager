@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 
 using System.Threading;
 
@@ -24,29 +24,29 @@ namespace AssetsManager.Services.Explorer.Tree
             _logService = logService;
         }
 
-        public async Task<ObservableCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken token)
+        public async Task<ObservableCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken)
         {
             var rootNodes = new ObservableCollection<FileSystemNodeModel>();
 
             string gamePath = Path.Combine(rootPath, "Game");
             if (Directory.Exists(gamePath))
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 var gameNode = new FileSystemNodeModel(gamePath);
                 rootNodes.Add(gameNode);
-                await LoadAllChildren(gameNode, rootPath, token);
+                await LoadAllChildren(gameNode, rootPath, cancellationToken);
             }
 
             string pluginsPath = Path.Combine(rootPath, "Plugins");
             if (Directory.Exists(pluginsPath))
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 var pluginsNode = new FileSystemNodeModel(pluginsPath);
                 rootNodes.Add(pluginsNode);
-                await LoadAllChildren(pluginsNode, rootPath, token);
+                await LoadAllChildren(pluginsNode, rootPath, cancellationToken);
             }
 
-            token.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
             for (int i = rootNodes.Count - 1; i >= 0; i--)
             {
                 if (!PruneEmptyDirectories(rootNodes[i]))
@@ -58,21 +58,21 @@ namespace AssetsManager.Services.Explorer.Tree
             return rootNodes;
         }
 
-        public async Task<ObservableCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken token)
+        public async Task<ObservableCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken cancellationToken)
         {
-            var nodes = await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, token);
+            var nodes = await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, cancellationToken);
             return new ObservableCollection<FileSystemNodeModel>(nodes);
         }
 
-        public async Task<(ObservableCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath, CancellationToken token)
+        public async Task<(ObservableCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
         {
-            var (nodes, newLolPath, oldLolPath) = await _wadNodeLoaderService.LoadFromBackupAsync(jsonPath, token);
+            var (nodes, newLolPath, oldLolPath) = await _wadNodeLoaderService.LoadFromBackupAsync(jsonPath, isSortingEnabled, cancellationToken);
             return (new ObservableCollection<FileSystemNodeModel>(nodes), newLolPath, oldLolPath);
         }
 
-        public async Task LoadAllChildren(FileSystemNodeModel node, string currentRootPath, CancellationToken token = default)
+        public async Task LoadAllChildren(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
         {
-            token.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (node.Children.Count == 1 && node.Children[0].Name == "Loading...")
             {
@@ -81,7 +81,7 @@ namespace AssetsManager.Services.Explorer.Tree
 
             if (node.Type == NodeType.WadFile)
             {
-                var children = await _wadNodeLoaderService.LoadChildrenAsync(node, token);
+                var children = await _wadNodeLoaderService.LoadChildrenAsync(node, cancellationToken);
                 foreach (var child in children)
                 {
                     node.Children.Add(child);
@@ -96,16 +96,16 @@ namespace AssetsManager.Services.Explorer.Tree
                     var directories = Directory.GetDirectories(node.FullPath);
                     foreach (var dir in directories.OrderBy(d => d))
                     {
-                        token.ThrowIfCancellationRequested();
+                        cancellationToken.ThrowIfCancellationRequested();
                         var childNode = new FileSystemNodeModel(dir);
                         node.Children.Add(childNode);
-                        await LoadAllChildren(childNode, currentRootPath, token);
+                        await LoadAllChildren(childNode, currentRootPath, cancellationToken);
                     }
 
                     var files = Directory.GetFiles(node.FullPath);
                     foreach (var file in files.OrderBy(f => f))
                     {
-                        token.ThrowIfCancellationRequested();
+                        cancellationToken.ThrowIfCancellationRequested();
                         string lowerFile = file.ToLowerInvariant();
 
                         bool keepFile = false;
@@ -124,7 +124,7 @@ namespace AssetsManager.Services.Explorer.Tree
                         {
                             var childNode = new FileSystemNodeModel(file);
                             node.Children.Add(childNode);
-                            await LoadAllChildren(childNode, currentRootPath, token); // Eager load WAD content
+                            await LoadAllChildren(childNode, currentRootPath, cancellationToken); // Eager load WAD content
                         }
                     }
                 }

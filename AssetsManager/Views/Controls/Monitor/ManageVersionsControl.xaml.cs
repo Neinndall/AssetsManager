@@ -1,13 +1,12 @@
-
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Versions;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Versions;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Versions;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -17,6 +16,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public TaskCancellationManager TaskCancellationManager { get; set; }
         private ManageVersions _viewModel;
 
         public ManageVersionsControl()
@@ -50,7 +50,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             else
             {
-                CustomMessageBoxService.ShowError("Error", "Services not initialized.");
+                CustomMessageBoxService.ShowError("Error", "Services not initialized.", Window.GetWindow(this));
             }
         }
 
@@ -59,19 +59,19 @@ namespace AssetsManager.Views.Controls.Monitor
             var selectedVersions = _viewModel?.AllLeagueClientVersions.Where(v => v.IsSelected).ToList();
             if (selectedVersions == null || !selectedVersions.Any())
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select a League Client version from the list first.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select a League Client version from the list first.", Window.GetWindow(this));
                 return;
             }
             if (selectedVersions.Count > 1)
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select only one League Client version at a time for this action.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select only one League Client version at a time for this action.", Window.GetWindow(this));
                 return;
             }
             var selectedVersion = selectedVersions.Single();
 
             if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
             {
-                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.");
+                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
                 return;
             }
 
@@ -82,11 +82,12 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (locales.Count == 0)
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select at least one locale to download.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select at least one locale to download.", Window.GetWindow(this));
                 return;
             }
 
-            await VersionService.DownloadPluginsAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales);
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation();
+            await VersionService.DownloadPluginsAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
         }
 
         private async void GetLoLGameClient_Click(object sender, RoutedEventArgs e)
@@ -94,19 +95,19 @@ namespace AssetsManager.Views.Controls.Monitor
             var selectedVersions = _viewModel?.AllLoLGameClientVersions.Where(v => v.IsSelected).ToList();
             if (selectedVersions == null || !selectedVersions.Any())
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select a LoL Game Client version from the list first.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select a LoL Game Client version from the list first.", Window.GetWindow(this));
                 return;
             }
             if (selectedVersions.Count > 1)
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select only one LoL Game Client version at a time for this action.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select only one LoL Game Client version at a time for this action.", Window.GetWindow(this));
                 return;
             }
             var selectedVersion = selectedVersions.Single();
 
             if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
             {
-                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.");
+                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
                 return;
             }
             var locales = _viewModel.AvailableLocales
@@ -116,17 +117,62 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (locales.Count == 0)
             {
-                CustomMessageBoxService.ShowWarning("Warning", "Please select at least one locale to download.");
+                CustomMessageBoxService.ShowWarning("Warning", "Please select at least one locale to download.", Window.GetWindow(this));
                 return;
             }
 
-            await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales);
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation();
+            await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
         }
 
         private void ListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             // Empty event handler to allow multiple selections through CheckBoxes
             // The selection is bound to the IsSelected property of the VersionFileInfo model
+        }
+
+        private void ListViewItem_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (!(sender is ListViewItem item) || !(item.DataContext is VersionFileInfo clickedVersion)) return;
+
+            // Handle right-click: prevent selection and stop the event from propagating.
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Right)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // Handle left-click for selection logic
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+            {
+                // If Ctrl is pressed, toggle selection (for multi-select delete)
+                if (System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+                {
+                    clickedVersion.IsSelected = !clickedVersion.IsSelected;
+                }
+                else // If Ctrl is not pressed, behave like a radio button (toggle)
+                {
+                    bool wasSelected = clickedVersion.IsSelected;
+
+                    // 1. Deselect all items in both lists
+                    foreach (var version in _viewModel.AllLeagueClientVersions)
+                    {
+                        version.IsSelected = false;
+                    }
+                    foreach (var version in _viewModel.AllLoLGameClientVersions)
+                    {
+                        version.IsSelected = false;
+                    }
+
+                    // 2. If the item was not already selected, select it.
+                    //    If it was selected, the loop above has already deselected it.
+                    if (!wasSelected)
+                    {
+                        clickedVersion.IsSelected = true;
+                    }
+                }
+                e.Handled = true;
+            }
         }
 
         private void DeleteSelectedVersions_Click(object sender, RoutedEventArgs e)
@@ -136,11 +182,11 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (!selectedVersions.Any())
             {
-                CustomMessageBoxService.ShowWarning("Delete Versions", "No versions selected to delete.");
+                CustomMessageBoxService.ShowWarning("Warning", "No versions selected to delete.", Window.GetWindow(this));
                 return;
             }
 
-            var result = CustomMessageBoxService.ShowYesNo("Delete Selected Versions", $"Are you sure you want to delete {selectedVersions.Count} selected version file(s)?");
+            var result = CustomMessageBoxService.ShowYesNo("Delete Versions", $"Are you sure you want to delete {selectedVersions.Count} selected version file(s)?", Window.GetWindow(this));
             if (result == true)
             {
                 _viewModel.DeleteVersions(selectedVersions);

@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.WindowsAPICodePack.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Settings
 {
@@ -11,7 +11,7 @@ namespace AssetsManager.Views.Settings
         {
             InitializeComponent();
         }
-        
+
         public void ApplySettingsToUI(SettingsModel model)
         {
             this.DataContext = model;
@@ -98,7 +98,7 @@ namespace AssetsManager.Views.Settings
             {
                 IsFolderPicker = false,
                 Title = "Select custom floor texture file",
-                Filters = { 
+                Filters = {
                     new CommonFileDialogFilter("Image Files", "*.png;*.jpg;*.jpeg;*.dds;*.tga"),
                     new CommonFileDialogFilter("All Files", "*.*")
                 }

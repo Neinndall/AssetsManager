@@ -12,7 +12,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 
 namespace AssetsManager.Utils
 {
@@ -53,7 +53,8 @@ namespace AssetsManager.Utils
             logService.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
             var separatorChars = new[] { '_', '-', ' ' };
 
-            Func<string, List<string>> getKeywords = (name) => {
+            Func<string, List<string>> getKeywords = (name) =>
+            {
                 string normalizedName = NormalizeName(name);
                 var initialSplit = normalizedName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
                 return initialSplit
@@ -164,12 +165,12 @@ namespace AssetsManager.Utils
                     TileMode = TileMode.Tile,
                     Stretch = Stretch.Fill
                 };
-                
+
                 // Mejora la calidad
                 RenderOptions.SetBitmapScalingMode(imageBrush, BitmapScalingMode.HighQuality);
                 RenderOptions.SetCachingHint(imageBrush, CachingHint.Cache);
                 RenderOptions.SetEdgeMode(imageBrush, EdgeMode.Unspecified);
-                
+
                 materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
 
                 // Reduce el brillo especular (puede causar más aliasing visible)

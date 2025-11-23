@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 using AssetsManager.Services.Models;
 using AssetsManager.Services.Core;
 using Material.Icons;
@@ -37,7 +37,7 @@ namespace AssetsManager.Views.Controls.Models
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
-        
+
         public event EventHandler<AnimationModel> AnimationReadyForDisplay;
         public event EventHandler<(AnimationModel, TimeSpan)> AnimationSeekRequested;
         public event Action<SceneModel> ModelRemovedFromViewport;
@@ -77,7 +77,7 @@ namespace AssetsManager.Views.Controls.Models
         public void ResetScene()
         {
             // 1. Limpiar animaciones (ahora se limpian con el Dispose de SceneModel)
-            
+
             // 2. CRÍTICO: Liberar recursos de TODOS los modelos
             foreach (var model in _loadedModels)
             {
@@ -85,7 +85,7 @@ namespace AssetsManager.Views.Controls.Models
             }
             _loadedModels.Clear();
             _transformData.Clear();
-            
+
             // 3. Limpiar referencias
             _currentlyPlayingAnimation = null;
 
@@ -120,7 +120,7 @@ namespace AssetsManager.Views.Controls.Models
             {
                 // Liberar recursos del modelo antes de eliminarlo
                 modelToDelete?.Dispose();
-                
+
                 _loadedModels.Remove(modelToDelete);
                 _transformData.Remove(modelToDelete);
                 ModelRemovedFromViewport?.Invoke(modelToDelete);
@@ -190,7 +190,7 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (_selectedModel == null)
             {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model to associate the skeleton with.");
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model to associate the skeleton with.", Window.GetWindow(this));
                 return;
             }
             using (var stream = File.OpenRead(filePath))
@@ -259,7 +259,7 @@ namespace AssetsManager.Views.Controls.Models
 
             if (_selectedModel == null)
             {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
                 return;
             }
 
@@ -283,13 +283,13 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (_selectedModel == null)
             {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
                 return;
             }
 
             if (_selectedModel.Skeleton == null)
             {
-                CustomMessageBoxService.ShowWarning("Missing Skeleton", "Please load a skeleton (.skl) file first.");
+                CustomMessageBoxService.ShowWarning("Missing Skeleton", "Please load a skeleton (.skl) file first.", Window.GetWindow(this));
                 return;
             }
             using (var stream = File.OpenRead(filePath))
@@ -310,7 +310,7 @@ namespace AssetsManager.Views.Controls.Models
         {
             if (_selectedModel == null)
             {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.");
+                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
                 return;
             }
 

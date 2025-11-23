@@ -20,7 +20,7 @@ using System.Reflection;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
@@ -83,7 +83,7 @@ namespace AssetsManager.Services.Explorer
             {
                 return;
             }
-            _currentlyDisplayedNode = node;      
+            _currentlyDisplayedNode = node;
 
             if (node == null || node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || SupportedFileTypes.AudioBank.Contains(node.Extension))
             {

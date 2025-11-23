@@ -1,6 +1,3 @@
-using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models;
-using LeagueToolkit.Core.Wad;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,8 +6,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using LeagueToolkit.Core.Wad;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -25,7 +26,7 @@ namespace AssetsManager.Services.Explorer
             _logService = logService;
         }
 
-        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, CancellationToken token)
+        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
         {
             var options = new JsonSerializerOptions
             {
@@ -33,8 +34,8 @@ namespace AssetsManager.Services.Explorer
                 Converters = { new JsonStringEnumConverter() }
             };
 
-            string jsonContent = await File.ReadAllTextAsync(jsonPath, token);
-            token.ThrowIfCancellationRequested();
+            string jsonContent = await File.ReadAllTextAsync(jsonPath, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
             var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
 
@@ -49,71 +50,159 @@ namespace AssetsManager.Services.Explorer
 
             foreach (var wadGroup in diffsByWad)
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
 
-                var newFiles = wadGroup.Where(d => d.Type == ChunkDiffType.New).ToList();
-                if (newFiles.Any())
+                if (isSortingEnabled)
                 {
-                    var newFilesNode = new FileSystemNodeModel($"[+] New ({newFiles.Count})", true, "New", wadGroup.Key) { Status = DiffStatus.New };
-                    foreach (var file in newFiles)
+                    foreach (var file in wadGroup)
                     {
-                        string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");
-                        var node = AddNodeToVirtualTree(newFilesNode, file.NewPath, wadGroup.Key, file.NewPathHash, DiffStatus.New);
-                        node.BackupChunkPath = chunkPath;
-                        node.ChunkDiff = file;
-                    }
-                    wadNode.Children.Add(newFilesNode);
-                }
+                        string chunkPath = GetBackupChunkPath(backupRoot, file);
+                        file.BackupChunkPath = chunkPath; // Ensure the main diff object has the path
+                        var status = GetDiffStatus(file.Type);
 
-                var modifiedFiles = wadGroup.Where(d => d.Type == ChunkDiffType.Modified).ToList();
-                if (modifiedFiles.Any())
+                        string statusPrefix = GetStatusPrefix(file.Type);
+                        string prefixedPath = $"{statusPrefix}/{file.Path}";
+
+                        var node = AddNodeToVirtualTree(wadNode, prefixedPath, wadGroup.Key, file.NewPathHash, status);
+                        node.ChunkDiff = file;
+                        node.BackupChunkPath = chunkPath;
+                        if (file.Type == ChunkDiffType.Renamed)
+                        {
+                            node.OldPath = file.OldPath;
+                        }
+
+                        if (file.Dependencies != null)
+                        {
+                            foreach (var dep in file.Dependencies)
+                            {
+                                var depStatus = GetDiffStatus(ChunkDiffType.Modified); // Treat as modified for node creation
+                                var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
+
+                                string depStatusPrefix = GetStatusPrefix(ChunkDiffType.Modified);
+                                string depPrefixedPath = $"{depStatusPrefix}/{dep.Path}";
+
+                                var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, wadGroup.Key, dep.NewPathHash, depStatus);
+                                depNode.ChunkDiff = new SerializableChunkDiff
+                                {
+                                    Type = ChunkDiffType.Modified, // For consistency
+                                    OldPath = dep.Path,
+                                    NewPath = dep.Path,
+                                    OldPathHash = dep.OldPathHash,
+                                    NewPathHash = dep.NewPathHash,
+                                    OldCompressionType = dep.CompressionType,
+                                    NewCompressionType = dep.CompressionType,
+                                    BackupChunkPath = depChunkPath
+                                };
+                                depNode.BackupChunkPath = depChunkPath;
+                            }
+                        }
+                    }
+
+                    SortChildrenRecursively(wadNode);
+                }
+                else
                 {
-                    var modifiedFilesNode = new FileSystemNodeModel($"[~] Modified ({modifiedFiles.Count})", true, "Modified", wadGroup.Key) { Status = DiffStatus.Modified };
-                    foreach (var file in modifiedFiles)
-                    {
-                        string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");
-                        var node = AddNodeToVirtualTree(modifiedFilesNode, file.NewPath, wadGroup.Key, file.NewPathHash, DiffStatus.Modified);
-                        node.BackupChunkPath = chunkPath;
-                        node.ChunkDiff = file;
-                    }
-                    wadNode.Children.Add(modifiedFilesNode);
-                }
+                    var statusGroups = wadGroup.GroupBy(d => d.Type).ToDictionary(g => g.Key, g => g.ToList());
 
-                var renamedFiles = wadGroup.Where(d => d.Type == ChunkDiffType.Renamed).ToList();
-                if (renamedFiles.Any())
-                {
-                    var renamedFilesNode = new FileSystemNodeModel($"[»] Renamed ({renamedFiles.Count})", true, "Renamed", wadGroup.Key) { Status = DiffStatus.Renamed };
-                    foreach (var file in renamedFiles)
-                    {
-                        string chunkPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{file.NewPathHash:X16}.chunk");
-                        var node = AddNodeToVirtualTree(renamedFilesNode, file.NewPath, wadGroup.Key, file.NewPathHash, DiffStatus.Renamed);
-                        node.BackupChunkPath = chunkPath;
-                        node.OldPath = file.OldPath;
-                        node.ChunkDiff = file;
-                    }
-                    wadNode.Children.Add(renamedFilesNode);
-                }
+                    var statusOrder = new[] { ChunkDiffType.New, ChunkDiffType.Modified, ChunkDiffType.Renamed, ChunkDiffType.Removed };
 
-                var deletedFiles = wadGroup.Where(d => d.Type == ChunkDiffType.Removed).ToList();
-                if (deletedFiles.Any())
-                {
-                    var deletedFilesNode = new FileSystemNodeModel($"[-] Deleted ({deletedFiles.Count})", true, "Deleted", wadGroup.Key) { Status = DiffStatus.Deleted };
-                    foreach (var file in deletedFiles)
+                    foreach (var statusType in statusOrder)
                     {
-                        string chunkPath = Path.Combine(backupRoot, "wad_chunks", "old", $"{file.OldPathHash:X16}.chunk");
-                        var node = AddNodeToVirtualTree(deletedFilesNode, file.OldPath, wadGroup.Key, file.OldPathHash, DiffStatus.Deleted);
-                        node.BackupChunkPath = chunkPath;
-                        node.ChunkDiff = file;
-                    }
-                    wadNode.Children.Add(deletedFilesNode);
-                }
+                        if (statusGroups.TryGetValue(statusType, out var filesInStatus))
+                        {
+                            var statusNode = new FileSystemNodeModel(GetStatusPrefix(statusType), true, GetStatusPrefix(statusType), wadGroup.Key);
+                            statusNode.Status = GetDiffStatus(statusType);
+                            wadNode.Children.Add(statusNode);
 
-                SortChildrenRecursively(wadNode);
+                            foreach (var file in filesInStatus.OrderBy(f => f.Path))
+                            {
+                                string chunkPath = GetBackupChunkPath(backupRoot, file);
+                                file.BackupChunkPath = chunkPath;
+                                var status = GetDiffStatus(file.Type);
+
+                                var node = new FileSystemNodeModel(Path.GetFileName(file.Path), false, file.Path, wadGroup.Key)
+                                {
+                                    SourceChunkPathHash = file.NewPathHash,
+                                    Status = status,
+                                    ChunkDiff = file,
+                                    BackupChunkPath = chunkPath,
+                                    OldPath = file.Type == ChunkDiffType.Renamed ? file.OldPath : null
+                                };
+
+                                statusNode.Children.Add(node);
+
+                                if (file.Dependencies != null)
+                                {
+                                    foreach (var dep in file.Dependencies)
+                                    {
+                                        var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
+
+                                        var depNode = new FileSystemNodeModel(Path.GetFileName(dep.Path), false, dep.Path, wadGroup.Key)
+                                        {
+                                            SourceChunkPathHash = dep.NewPathHash,
+                                            Status = GetDiffStatus(ChunkDiffType.Modified),
+                                            ChunkDiff = new SerializableChunkDiff
+                                            {
+                                                Type = ChunkDiffType.Modified,
+                                                OldPath = dep.Path,
+                                                NewPath = dep.Path,
+                                                OldPathHash = dep.OldPathHash,
+                                                NewPathHash = dep.NewPathHash,
+                                                OldCompressionType = dep.CompressionType,
+                                                NewCompressionType = dep.CompressionType,
+                                                BackupChunkPath = depChunkPath
+                                            },
+                                            BackupChunkPath = depChunkPath
+                                        };
+                                        statusNode.Children.Add(depNode);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 rootNodes.Add(wadNode);
             }
 
             return (rootNodes, comparisonData.NewLolPath, comparisonData.OldLolPath);
+        }
+
+        private string GetStatusPrefix(ChunkDiffType type) => type switch
+        {
+            ChunkDiffType.New => "[+] New",
+            ChunkDiffType.Modified => "[~] Modified",
+            ChunkDiffType.Renamed => "[»] Renamed",
+            ChunkDiffType.Removed => "[-] Deleted",
+            _ => "[?] Unknown"
+        };
+
+        private string GetBackupChunkPath(string backupRoot, SerializableChunkDiff diff)
+        {
+            if (diff.Type == ChunkDiffType.Removed)
+            {
+                return Path.Combine(backupRoot, "wad_chunks", "old", $"{diff.OldPathHash:X16}.chunk");
+            }
+
+            string newPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{diff.NewPathHash:X16}.chunk");
+            if (File.Exists(newPath))
+            {
+                return newPath;
+            }
+
+            return Path.Combine(backupRoot, "wad_chunks", "old", $"{diff.OldPathHash:X16}.chunk");
+        }
+
+        private DiffStatus GetDiffStatus(ChunkDiffType type)
+        {
+            return type switch
+            {
+                ChunkDiffType.New => DiffStatus.New,
+                ChunkDiffType.Removed => DiffStatus.Deleted,
+                ChunkDiffType.Modified => DiffStatus.Modified,
+                ChunkDiffType.Renamed => DiffStatus.Renamed,
+                _ => DiffStatus.Unchanged,
+            };
         }
 
         private void SortChildrenRecursively(FileSystemNodeModel node)
@@ -167,18 +256,18 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken token)
+        public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken cancellationToken)
         {
             var childrenToAdd = await Task.Run(() =>
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 string pathToWad = wadNode.Type == NodeType.WadFile ? wadNode.FullPath : wadNode.SourceWadPath;
                 var rootVirtualNode = new FileSystemNodeModel(wadNode.Name, true, wadNode.FullPath, pathToWad);
                 using (var wadFile = new WadFile(pathToWad))
                 {
                     foreach (var chunk in wadFile.Chunks.Values)
                     {
-                        token.ThrowIfCancellationRequested();
+                        cancellationToken.ThrowIfCancellationRequested();
                         string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
 
                         bool isUnresolved = virtualPath == chunk.PathHash.ToString("x16");
@@ -205,7 +294,7 @@ namespace AssetsManager.Services.Explorer
 
                 SortChildrenRecursively(rootVirtualNode);
                 return rootVirtualNode.Children.ToList();
-            }, token);
+            }, cancellationToken);
 
             return childrenToAdd;
         }
@@ -269,38 +358,41 @@ namespace AssetsManager.Services.Explorer
                 SourceChunkPathHash = chunkHash,
                 Status = status
             };
-            
+
             currentNode.Children.Add(fileNode);
             return fileNode;
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken token)
+        public async Task<List<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
         {
             return await Task.Run(() =>
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 var rootNode = new FileSystemNodeModel(rootPath);
                 rootNode.Children.Clear(); // Clear dummy node
-                AddNodeToRealTree(rootNode, rootPath, token);
+                AddNodeToRealTree(rootNode, rootPath, cancellationToken);
                 return rootNode.Children.ToList();
-            }, token);
+            }, cancellationToken);
         }
 
-        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken token)
+        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken cancellationToken)
         {
-            token.ThrowIfCancellationRequested();
-            foreach (var directory in Directory.GetDirectories(path).OrderBy(d => d))
+            cancellationToken.ThrowIfCancellationRequested();
+            // Use EnumerateDirectories for better cancellation responsiveness
+            foreach (var directory in Directory.EnumerateDirectories(path).OrderBy(d => d))
             {
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
                 var dirNode = new FileSystemNodeModel(directory);
                 dirNode.Children.Clear(); // Clear dummy node
                 parentNode.Children.Add(dirNode);
-                AddNodeToRealTree(dirNode, directory, token);
+                AddNodeToRealTree(dirNode, directory, cancellationToken);
             }
 
-            token.ThrowIfCancellationRequested();
-            foreach (var file in Directory.GetFiles(path).OrderBy(f => f))
+            cancellationToken.ThrowIfCancellationRequested();
+            // Use EnumerateFiles and add cancellation check inside the loop
+            foreach (var file in Directory.EnumerateFiles(path).OrderBy(f => f))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var fileNode = new FileSystemNodeModel(file);
                 parentNode.Children.Add(fileNode);
             }
@@ -313,8 +405,8 @@ namespace AssetsManager.Services.Explorer
                 string normalizedVirtualPath = virtualPath.Replace('\\', '/').ToUpperInvariant();
 
                 var wadFiles = Directory.GetFiles(gameDataPath, "*.wad", SearchOption.AllDirectories)
-                                        .Concat(Directory.GetFiles(gameDataPath, "*.wad.client", SearchOption.AllDirectories))
-                                        .ToList();
+                                              .Concat(Directory.GetFiles(gameDataPath, "*.wad.client", SearchOption.AllDirectories))
+                                              .ToList();
 
                 foreach (var wadPath in wadFiles)
                 {

@@ -10,7 +10,7 @@ namespace AssetsManager.Views.Controls
     public partial class LogView : UserControl
     {
         public RichTextBox LogRichTextBox => richTextBoxLogs;
-        
+
         public LogView()
         {
             InitializeComponent();

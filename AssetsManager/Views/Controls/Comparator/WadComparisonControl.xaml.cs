@@ -1,4 +1,3 @@
-using AssetsManager.Views.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,9 +6,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
-
+using System.Threading;
 using Microsoft.WindowsAPICodePack.Dialogs;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Dialogs;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services;
@@ -50,6 +50,7 @@ namespace AssetsManager.Views.Controls.Comparator
         public IServiceProvider ServiceProvider { get; set; }
         public DiffViewService DiffViewService { get; set; }
         public HashResolverService HashResolverService { get; set; }
+        public TaskCancellationManager TaskCancellationManager { get; set; }
 
         private string _oldLolPath;
         private string _newLolPath;
@@ -175,30 +176,35 @@ namespace AssetsManager.Views.Controls.Comparator
         private async void compareWadButton_Click(object sender, RoutedEventArgs e)
         {
             compareWadButton.IsEnabled = false;
+
             try
             {
+                var cancellationToken = TaskCancellationManager.PrepareNewOperation();
                 if (wadComparatorTabControl.SelectedIndex == 0) // By Directory
                 {
                     if (string.IsNullOrEmpty(oldLolPbeDirectoryTextBox.Text) || string.IsNullOrEmpty(newLolPbeDirectoryTextBox.Text))
                     {
                         CustomMessageBoxService.ShowWarning("Warning", "Please select both directories.", Window.GetWindow(this));
-                        compareWadButton.IsEnabled = true;
-                        return;
+                        return; // Return directly as button.IsEnabled will be set in finally
                     }
                     _oldLolPath = oldLolPbeDirectoryTextBox.Text;
                     _newLolPath = newLolPbeDirectoryTextBox.Text;
-                    await WadComparatorService.CompareWadsAsync(_oldLolPath, _newLolPath);
+                    await WadComparatorService.CompareWadsAsync(_oldLolPath, _newLolPath, cancellationToken);
                 }
                 else // By File
                 {
                     if (string.IsNullOrEmpty(oldWadFileTextBox.Text) || string.IsNullOrEmpty(newWadFileTextBox.Text))
                     {
                         CustomMessageBoxService.ShowWarning("Warning", "Please select both WAD files.", Window.GetWindow(this));
-                        compareWadButton.IsEnabled = true;
-                        return;
+                        return; // Return directly as button.IsEnabled will be set in finally
                     }
-                    await WadComparatorService.CompareSingleWadAsync(oldWadFileTextBox.Text, newWadFileTextBox.Text);
+                    await WadComparatorService.CompareSingleWadAsync(oldWadFileTextBox.Text, newWadFileTextBox.Text, cancellationToken);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                LogService.LogWarning("WAD comparison was cancelled by the user.");
+                CustomMessageBoxService.ShowInfo("Cancelled", "WAD comparison was cancelled.", Window.GetWindow(this));
             }
             catch (Exception ex)
             {

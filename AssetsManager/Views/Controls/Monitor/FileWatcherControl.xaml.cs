@@ -1,18 +1,18 @@
-using AssetsManager.Services;
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Monitor;
-using AssetsManager.Views.Dialogs;
 using System;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
-using AssetsManager.Views.Models;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Collections.Specialized;
-using AssetsManager.Utils;
 using System.Threading.Tasks;
+using AssetsManager.Utils;
+using AssetsManager.Services;
+using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Monitor;
+using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -90,7 +90,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (sender is FrameworkElement element && element.DataContext is MonitoredUrl urlToRemove && AppSettings != null && CustomMessageBoxService != null)
             {
-                if (CustomMessageBoxService.ShowYesNo("Remove URL", $"Are you sure you want to remove '{urlToRemove.Alias}'?") == true)
+                if (CustomMessageBoxService.ShowYesNo("Remove URL", $"Are you sure you want to remove '{urlToRemove.Alias}'?", Window.GetWindow(this)) == true)
                 {
                     if (urlToRemove == null) return;
 
@@ -123,7 +123,7 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 if (!IsValidUrl(url))
                 {
-                    CustomMessageBoxService.ShowWarning("Invalid URL", $"The URL '{url}' is not valid and will be ignored.");
+                    CustomMessageBoxService.ShowWarning("Invalid URL", $"The URL '{url}' is not valid and will be ignored.", Window.GetWindow(this));
                     continue;
                 }
 
@@ -132,7 +132,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     var fileInfos = await JsonDataService.GetFileUrlsFromDirectoryAsync(url);
                     if (!fileInfos.Any())
                     {
-                        CustomMessageBoxService.ShowWarning("Empty Directory", $"Could not find any .json files in '{url}'.");
+                        CustomMessageBoxService.ShowWarning("Empty Directory", $"Could not find any .json files in '{url}'.", Window.GetWindow(this));
                     }
                     else
                     {
@@ -158,13 +158,13 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (addedCount > 0)
             {
-                CustomMessageBoxService.ShowInfo("URLs Added", $"Added {addedCount} new URL(s) to be monitored.");
+                CustomMessageBoxService.ShowInfo("URLs Added", $"Added {addedCount} new URL(s) to be monitored.", Window.GetWindow(this));
                 AppSettings.SaveSettings(AppSettings);
                 MonitorService.LoadMonitoredUrls();
             }
             else
             {
-                CustomMessageBoxService.ShowInfo("No New URLs", "All specified URL(s) are already being monitored or were invalid.");
+                CustomMessageBoxService.ShowInfo("No New URLs", "All specified URL(s) are already being monitored or were invalid.", Window.GetWindow(this));
             }
         }
 

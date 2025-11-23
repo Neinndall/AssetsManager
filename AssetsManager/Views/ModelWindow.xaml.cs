@@ -11,7 +11,7 @@ using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Animation;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Models3D;
 
 namespace AssetsManager.Views
 {
@@ -69,7 +69,8 @@ namespace AssetsManager.Views
             ViewportControl.SkyboxVisibilityChanged += OnSkyboxVisibilityChanged;
             ViewportControl.AutoRotationStopped += OnAutoRotationStopped;
 
-            Unloaded += (s, e) => {
+            Unloaded += (s, e) =>
+            {
                 CleanupResources();
             };
         }
@@ -142,20 +143,20 @@ namespace AssetsManager.Views
 
             // 3. Limpiar viewport
             ViewportControl?.Cleanup();
-            
+
             // 4. Limpiar ground y sky
             if (_groundVisual != null)
             {
                 ViewportControl.Viewport.Children.Remove(_groundVisual);
                 _groundVisual = null;
             }
-            
+
             if (_skyVisual != null)
             {
                 ViewportControl.Viewport.Children.Remove(_skyVisual);
                 _skyVisual = null;
             }
-            
+
             // 5. Limpiar panel
             PanelControl?.Cleanup();
         }
@@ -305,7 +306,7 @@ namespace AssetsManager.Views
                         }
                         else
                         {
-                            _customMessageBoxService.ShowWarning("Materials.bin Not Selected", "Map geometry cannot be loaded without the materials.bin file.");
+                            _customMessageBoxService.ShowWarning("Warning", "Map geometry cannot be loaded without the materials.bin file.", Window.GetWindow(this));
                             return;
                         }
                     }
@@ -324,7 +325,7 @@ namespace AssetsManager.Views
                     }
                     else
                     {
-                        _customMessageBoxService.ShowWarning("Game Data Path Not Selected", "Map geometry cannot be loaded without the game data root folder.");
+                        _customMessageBoxService.ShowWarning("Warning", "MapGeometry cannot be loaded without the game data root folder.", Window.GetWindow(this));
                     }
                 }
             }

@@ -1,4 +1,3 @@
-using AssetsManager.Views.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -6,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Services.Explorer.Tree
 {
@@ -71,7 +71,7 @@ namespace AssetsManager.Services.Explorer.Tree
                 {
                     var path = FindNodePath(n.Children, nodeToFind);
                     if (path != null)
-                    { 
+                    {
                         path.Insert(0, n);
                         return path;
                     }
@@ -81,7 +81,7 @@ namespace AssetsManager.Services.Explorer.Tree
         }
 
         public void CollapseAll(FileSystemNodeModel node)
-        { 
+        {
             node.IsExpanded = false;
             if (node.Children == null) return;
             foreach (var child in node.Children)

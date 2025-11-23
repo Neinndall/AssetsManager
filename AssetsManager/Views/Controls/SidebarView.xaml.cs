@@ -20,7 +20,7 @@ namespace AssetsManager.Views.Controls
         public event Action<string> NavigationRequested;
 
         public SidebarView()
-        { 
+        {
             InitializeComponent();
         }
 
@@ -28,7 +28,7 @@ namespace AssetsManager.Views.Controls
         {
             var button = sender as RadioButton;
             if (button?.Tag is string viewTag)
-            { 
+            {
                 NavigationRequested?.Invoke(viewTag);
             }
         }

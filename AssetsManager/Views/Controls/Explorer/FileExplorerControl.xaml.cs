@@ -9,14 +9,17 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.Windows.Controls.Primitives;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Audio;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -45,6 +48,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public AudioBankService AudioBankService { get; set; }
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
         public HashResolverService HashResolverService { get; set; }
+        public TaskCancellationManager TaskCancellationManager { get; set; }
 
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
@@ -53,7 +57,9 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
         private bool _isWadMode = true;
-        private CancellationTokenSource _cancellationTokenSource;
+        private bool _isBackupMode = false;
+        private bool _isSortingEnabled = true;
+        private string _backupJsonPath;
 
         public FileExplorerControl()
         {
@@ -66,10 +72,10 @@ namespace AssetsManager.Views.Controls.Explorer
             _searchTimer.Interval = TimeSpan.FromMilliseconds(300);
             _searchTimer.Tick += SearchTimer_Tick;
         }
-        
+
         public void CleanupResources()
         {
-            _cancellationTokenSource?.Cancel();
+            TaskCancellationManager.CancelCurrentOperation(); // Use the manager
 
             // 1. Detener el timer PRIMERO
             if (_searchTimer != null)
@@ -86,6 +92,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.LoadComparisonClicked -= Toolbar_LoadComparisonClicked;
                 Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
                 Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
+                Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
             }
 
             // Desuscribir eventos del Breadcrumbs
@@ -124,8 +131,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
-            // Await hashes BEFORE any UI logic that depends on them.
-            await HashResolverService.StartupTask;
+            LoadingIndicator.Visibility = Visibility.Visible;
+            await HashResolverService.LoadAllHashesAsync();
 
             // Now proceed with the original logic
             Toolbar.SearchTextChanged += Toolbar_SearchTextChanged;
@@ -133,6 +140,7 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;
             Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
+            Toolbar.SortStateChanged += Toolbar_SortStateChanged;
 
             if (_isWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
             {
@@ -153,6 +161,15 @@ namespace AssetsManager.Views.Controls.Explorer
         private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
             Breadcrumbs.Visibility = e.NewValue ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private async void Toolbar_SortStateChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        {
+            _isSortingEnabled = e.NewValue;
+            if (_isBackupMode)
+            {
+                await BuildTreeFromBackupAsync(_backupJsonPath);
+            }
         }
 
         public async Task ReloadTreeAsync()
@@ -208,9 +225,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildWadTreeAsync(string rootPath)
         {
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource = new CancellationTokenSource();
-            var token = _cancellationTokenSource.Token;
+            _isBackupMode = false;
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
             NewLolPath = null;
@@ -219,10 +235,12 @@ namespace AssetsManager.Views.Controls.Explorer
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
 
+            Toolbar.IsSortButtonVisible = false;
+
             try
             {
-                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, token);
-                token.ThrowIfCancellationRequested();
+                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 RootNodes.Clear();
                 foreach (var node in newNodes)
@@ -257,9 +275,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource = new CancellationTokenSource();
-            var token = _cancellationTokenSource.Token;
+            _isBackupMode = false;
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
             NewLolPath = null;
@@ -267,19 +284,14 @@ namespace AssetsManager.Views.Controls.Explorer
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
 
-            // Delayed loading indicator logic
-            var indicatorTask = Task.Delay(100, token).ContinueWith(t =>
-            {
-                if (!t.IsCanceled)
-                {
-                    Dispatcher.Invoke(() => LoadingIndicator.Visibility = Visibility.Visible);
-                }
-            }, TaskScheduler.Default);
+            Toolbar.IsSortButtonVisible = false;
+
+            LoadingIndicator.Visibility = Visibility.Visible;
 
             try
             {
-                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, token);
-                token.ThrowIfCancellationRequested();
+                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 RootNodes.Clear();
                 foreach (var node in newNodes)
@@ -311,18 +323,20 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildTreeFromBackupAsync(string jsonPath)
         {
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource = new CancellationTokenSource();
-            var token = _cancellationTokenSource.Token;
+            _isBackupMode = true;
+            _backupJsonPath = jsonPath;
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             NoDirectoryMessage.Visibility = Visibility.Collapsed;
             FileTreeView.Visibility = Visibility.Collapsed;
             LoadingIndicator.Visibility = Visibility.Visible;
 
+            Toolbar.IsSortButtonVisible = true;
+
             try
             {
-                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, token);
-                token.ThrowIfCancellationRequested();
+                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _isSortingEnabled, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 RootNodes.Clear();
                 NewLolPath = newLolPath;
@@ -382,24 +396,39 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (destinationPath != null)
             {
+                ExtractMenuItem.IsEnabled = false;
+                SaveMenuItem.IsEnabled = false;
+                CancellationToken cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Get new token for this operation
+
                 try
                 {
                     LogService.Log("Extracting selected files...");
 
                     string logPath = destinationPath;
-                    if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile)
+                    if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
                     {
                         logPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
 
-                    await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath);
+                    await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath, cancellationToken);
 
-                    LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name} to {logPath}", logPath);
+                    LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name}.", logPath, selectedNode.Name);
+                }
+                catch (OperationCanceledException)
+                {
+                    LogService.LogWarning("Extraction was cancelled by the user.");
+                    CustomMessageBoxService.ShowInfo("Cancelled", "Extraction was cancelled.", Window.GetWindow(this));
                 }
                 catch (Exception ex)
                 {
                     LogService.LogError(ex, $"Failed to extract '{selectedNode.Name}'.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred during extraction: {ex.Message}", Window.GetWindow(this));
+                }
+                finally
+                {
+                    // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
+                    ExtractMenuItem.IsEnabled = true;
+                    SaveMenuItem.IsEnabled = true;
                 }
             }
         }
@@ -435,35 +464,61 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (destinationPath != null)
             {
+                ExtractMenuItem.IsEnabled = false;
+                SaveMenuItem.IsEnabled = false;
+                CancellationToken cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Get new token for this operation
+
                 try
                 {
                     LogService.Log("Processing and saving selected files...");
-                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath);
 
+                    string finalLogPath = destinationPath;
                     if (selectedNode.Type == NodeType.SoundBank)
                     {
-                        destinationPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
+                        finalLogPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
                     }
-                    else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile)
+                    else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
                     {
-                        destinationPath = Path.Combine(destinationPath, selectedNode.Name);
+                        finalLogPath = Path.Combine(destinationPath, selectedNode.Name);
                     }
 
-                    LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name} to {destinationPath}", destinationPath);
+                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken);
+
+                    LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name}.", finalLogPath, selectedNode.Name);
+                }
+                catch (OperationCanceledException)
+                {
+                    LogService.LogWarning("Save operation was cancelled by the user.");
+                    CustomMessageBoxService.ShowInfo("Cancelled", "Save operation was cancelled.", Window.GetWindow(this));
                 }
                 catch (Exception ex)
                 {
                     LogService.LogError(ex, $"Failed to save '{selectedNode.Name}'.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred during save: {ex.Message}", Window.GetWindow(this));
                 }
+                finally
+                {
+                    // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
+                    ExtractMenuItem.IsEnabled = true;
+                    SaveMenuItem.IsEnabled = true;
+                }
             }
         }
 
         private async void ViewChanges_Click(object sender, RoutedEventArgs e)
         {
-            if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null, BackupChunkPath: not null } selectedNode) return;
+            if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null } selectedNode) return;
 
-            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, this.OldLolPath, this.NewLolPath, Window.GetWindow(this), selectedNode.BackupChunkPath);
+            string oldPbePath = this.OldLolPath;
+            string newPbePath = this.NewLolPath;
+
+            if (_isBackupMode)
+            {
+                oldPbePath = null;
+                newPbePath = null;
+            }
+
+            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _isBackupMode ? _backupJsonPath : null);
         }
 
         private void PinSelected_Click(object sender, RoutedEventArgs e)
@@ -562,8 +617,8 @@ namespace AssetsManager.Views.Controls.Explorer
             var path = TreeUIManager.FindNodePath(RootNodes, selectedNode);
             if (path == null) return;
 
-            if (selectedNode.Type == NodeType.RealFile || 
-                selectedNode.Type == NodeType.VirtualFile || 
+            if (selectedNode.Type == NodeType.RealFile ||
+                selectedNode.Type == NodeType.VirtualFile ||
                 selectedNode.Type == NodeType.WemFile ||
                 selectedNode.Type == NodeType.AudioEvent)
             {
@@ -573,21 +628,21 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
             }
 
-            const int maxItems = 5; 
+            const int maxItems = 5;
 
             if (path.Count > maxItems)
             {
                 var truncatedPath = new List<FileSystemNodeModel>();
-                truncatedPath.Add(path[0]); 
-                truncatedPath.Add(path[1]); 
-        
+                truncatedPath.Add(path[0]);
+                truncatedPath.Add(path[1]);
+
                 truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
 
                 for (int i = path.Count - 2; i < path.Count; i++)
                 {
                     truncatedPath.Add(path[i]);
                 }
-                path = truncatedPath; 
+                path = truncatedPath;
             }
 
             foreach (var node in path)
@@ -604,7 +659,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
         {
-            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, RootNodes, _currentRootPath, NewLolPath, OldLolPath);
+            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, RootNodes, _currentRootPath);
             if (linkedBank == null)
             {
                 return; // Errors are logged by the service
@@ -767,7 +822,5 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             await TreeBuilderService.LoadAllChildren(node, _currentRootPath);
         }
-
-
     }
 }

@@ -6,14 +6,13 @@
 
     <!-- Estilo para el RichTextBox de logs -->
     <Style x:Key="LogRichTextBoxStyle" TargetType="RichTextBox">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Padding" Value="12,8"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Margin" Value="0"/>
-        <Setter Property="Padding" Value="12,8"/>
-        <Setter Property="FontFamily" Value="Consolas, Courier New"/>
-        <Setter Property="FontSize" Value="12"/>
-        <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="IsReadOnly" Value="True"/>
         <Setter Property="IsDocumentEnabled" Value="True"/>
         <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>

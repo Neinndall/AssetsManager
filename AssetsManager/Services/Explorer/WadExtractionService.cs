@@ -1,11 +1,7 @@
-using LeagueToolkit.Core.Wad;
-using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Core;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
@@ -13,8 +9,12 @@ using System.Windows.Media;
 using BCnEncoder.Shared;
 using System.Runtime.InteropServices;
 using LeagueToolkit.Core.Renderer;
+using LeagueToolkit.Core.Wad;
 using AssetsManager.Services.Parsers;
-using System.Threading;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Core;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -30,36 +30,74 @@ namespace AssetsManager.Services.Explorer
         }
 
         // Dirige el proceso de extracción al método adecuado según el tipo de nodo.
-        public async Task ExtractNodeAsync(FileSystemNodeModel node, string destinationPath)
+        public async Task ExtractNodeAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
         {
             switch (node.Type)
             {
                 case NodeType.SoundBank:
                 case NodeType.VirtualFile:
-                    await ExtractVirtualFileAsync(node, destinationPath);
+                    await ExtractVirtualFileAsync(node, destinationPath, cancellationToken);
                     break;
                 case NodeType.VirtualDirectory:
                 case NodeType.WadFile:
-                    await ExtractVirtualDirectoryAsync(node, destinationPath);
+                    await ExtractVirtualDirectoryAsync(node, destinationPath, cancellationToken);
+                    break;
+                case NodeType.AudioEvent:
+                    await ExtractAudioEventDirectoryAsync(node, destinationPath, cancellationToken);
+                    break;
+                case NodeType.WemFile:
+                    await ExtractWemFileAsync(node, destinationPath, cancellationToken);
                     break;
                 case NodeType.RealDirectory:
-                    await ExtractRealDirectoryAsync(node, destinationPath);
+                    await ExtractRealDirectoryAsync(node, destinationPath, cancellationToken);
                     break;
             }
         }
 
-        // Extrae recursivamente un directorio que existe virtualmente dentro de un archivo WAD.
-        private async Task ExtractVirtualDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath)
+        // Extrae el contenido de una carpeta de evento de audio (.wem) a un nuevo directorio.
+        private async Task ExtractAudioEventDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
+            Directory.CreateDirectory(newDirPath);
+
+            foreach (var childNode in dirNode.Children)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (childNode.Type == NodeType.WemFile)
+                {
+                    await ExtractWemFileAsync(childNode, newDirPath, cancellationToken);
+                }
+            }
+        }
+
+        // Extrae un único fichero .wem y lo guarda en el disco.
+        private async Task ExtractWemFileAsync(FileSystemNodeModel fileNode, string destinationPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var wemData = await GetWemFileBytesAsync(fileNode, cancellationToken);
+            if (wemData != null)
+            {
+                string destFilePath = Path.Combine(destinationPath, SanitizeName(fileNode.Name));
+                await File.WriteAllBytesAsync(destFilePath, wemData, cancellationToken);
+            }
+        }
+
+        // Extrae recursivamente un directorio que existe virtualmente dentro de un archivo WAD.
+        private async Task ExtractVirtualDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
             string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
             Directory.CreateDirectory(newDirPath);
 
             // If children are not loaded (i.e., it's the dummy node), load them.
             if (dirNode.Children.Count == 1 && dirNode.Children[0].Name == "Loading...")
             {
-                var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(dirNode, CancellationToken.None);
+                var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(dirNode, cancellationToken);
                 dirNode.Children.Clear(); // Remove dummy node
-                foreach(var child in loadedChildren)
+                foreach (var child in loadedChildren)
                 {
                     dirNode.Children.Add(child);
                 }
@@ -68,28 +106,34 @@ namespace AssetsManager.Services.Explorer
             // Now, recursively call ExtractNodeAsync on the actual children.
             foreach (var childNode in dirNode.Children)
             {
-                await ExtractNodeAsync(childNode, newDirPath);
+                cancellationToken.ThrowIfCancellationRequested();
+                await ExtractNodeAsync(childNode, newDirPath, cancellationToken);
             }
         }
 
         // Copia recursivamente un directorio que ya existe en el disco físico (modo directorio).
-        private async Task ExtractRealDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath)
+        private async Task ExtractRealDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
             Directory.CreateDirectory(newDirPath);
 
             // The tree is already fully loaded in memory, so we can just iterate through the children.
             foreach (var childNode in dirNode.Children)
             {
-                await ExtractNodeAsync(childNode, newDirPath);
+                cancellationToken.ThrowIfCancellationRequested();
+                await ExtractNodeAsync(childNode, newDirPath, cancellationToken);
             }
         }
 
         // Extrae un único fichero virtual (desde un WAD o un backup) y lo guarda en el disco.
-        private Task ExtractVirtualFileAsync(FileSystemNodeModel fileNode, string destinationPath)
+        private Task ExtractVirtualFileAsync(FileSystemNodeModel fileNode, string destinationPath, CancellationToken cancellationToken)
         {
             return Task.Run(() =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
                     byte[] decompressedData;
@@ -113,21 +157,30 @@ namespace AssetsManager.Services.Explorer
                         decompressedData = decompressedDataOwner.Span.ToArray();
                     }
 
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     string destFilePath = Path.Combine(destinationPath, SanitizeName(fileNode.Name));
                     File.WriteAllBytes(destFilePath, decompressedData);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logService.LogWarning("Extraction of virtual file was cancelled.");
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Failed to extract virtual file: {fileNode.FullPath}");
                 }
-            });
+            }, cancellationToken);
         }
 
         // Obtiene los bytes descomprimidos de un fichero virtual sin guardarlo, para usar en previsualizaciones.
-        public Task<byte[]> GetVirtualFileBytesAsync(FileSystemNodeModel fileNode)
+        public Task<byte[]> GetVirtualFileBytesAsync(FileSystemNodeModel fileNode, CancellationToken cancellationToken = default)
         {
             return Task.Run(() =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
                     if (fileNode.Type != NodeType.VirtualFile && fileNode.Type != NodeType.SoundBank)
@@ -159,16 +212,21 @@ namespace AssetsManager.Services.Explorer
 
                     return decompressedData;
                 }
+                catch (OperationCanceledException)
+                {
+                    _logService.LogWarning("Get virtual file bytes was cancelled.");
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.FullPath}");
                     return null;
                 }
-            });
+            }, cancellationToken);
         }
 
         // Orquesta la extracción de datos de audio .wem desde su contenedor (.bnk o .wpk).
-        public async Task<byte[]> GetWemFileBytesAsync(FileSystemNodeModel node)
+        public async Task<byte[]> GetWemFileBytesAsync(FileSystemNodeModel node, CancellationToken cancellationToken = default)
         {
             if (node.Type != NodeType.WemFile)
             {
@@ -178,7 +236,8 @@ namespace AssetsManager.Services.Explorer
 
             try
             {
-                byte[] containerData = await DecompressChunkByHashAsync(node.SourceWadPath, node.SourceChunkPathHash);
+                cancellationToken.ThrowIfCancellationRequested();
+                byte[] containerData = await DecompressChunkByHashAsync(node.SourceWadPath, node.SourceChunkPathHash, cancellationToken);
                 if (containerData == null)
                 {
                     _logService.LogWarning($"Could not extract container for WEM file {node.Name}");
@@ -199,6 +258,8 @@ namespace AssetsManager.Services.Explorer
 
                     return await Task.Run(() =>
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+
                         using var wpkStream = new MemoryStream(containerData);
                         var wpk = WpkParser.Parse(wpkStream, _logService);
                         var wem = wpk.Wems.FirstOrDefault(w => w.Id == node.WemId);
@@ -210,8 +271,13 @@ namespace AssetsManager.Services.Explorer
                         }
                         _logService.LogWarning($"WEM file with ID {node.WemId} not found inside its parent WPK.");
                         return null;
-                    });
+                    }, cancellationToken);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                _logService.LogWarning($"WEM file extraction was cancelled: {node.FullPath}");
+                throw;
             }
             catch (Exception ex)
             {
@@ -221,10 +287,12 @@ namespace AssetsManager.Services.Explorer
         }
 
         // Encuentra un chunk en un WAD por su hash y devuelve su contenido descomprimido.
-        private Task<byte[]> DecompressChunkByHashAsync(string wadPath, ulong chunkHash)
+        private Task<byte[]> DecompressChunkByHashAsync(string wadPath, ulong chunkHash, CancellationToken cancellationToken)
         {
             return Task.Run(() =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
                     using var wadFile = new WadFile(wadPath);
@@ -236,12 +304,17 @@ namespace AssetsManager.Services.Explorer
                     using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
                     return decompressedDataOwner.Span.ToArray();
                 }
+                catch (OperationCanceledException)
+                {
+                    _logService.LogWarning($"Decompression of chunk {chunkHash:x16} was cancelled.");
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Failed to get bytes for virtual file with hash: {chunkHash:x16}");
                     return null;
                 }
-            });
+            }, cancellationToken);
         }
 
         // Limpia y sanea nombres de fichero para que sean compatibles con el sistema de archivos.

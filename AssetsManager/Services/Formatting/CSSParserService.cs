@@ -156,10 +156,10 @@ namespace AssetsManager.Services.Formatting
         {
             // Eliminar comentarios CSS
             css = Regex.Replace(css, @"/\*[\s\S]*?\*/", string.Empty);
-            
+
             // Normalizar espacios en blanco
             css = Regex.Replace(css, @"\s+", " ");
-            
+
             return css.Trim();
         }
 
@@ -197,7 +197,7 @@ namespace AssetsManager.Services.Formatting
 
             var selectorsStr = block.Substring(0, openBraceIndex);
             var propertiesStr = block.Substring(openBraceIndex + 1);
-            
+
             // Remover la llave de cierre
             if (propertiesStr.EndsWith("}"))
                 propertiesStr = propertiesStr.Substring(0, propertiesStr.Length - 1);
@@ -225,7 +225,7 @@ namespace AssetsManager.Services.Formatting
         private Dictionary<string, string> ParseProperties(string propertiesStr)
         {
             var properties = new Dictionary<string, string>();
-            
+
             var props = propertiesStr
                 .Split(';')
                 .Select(p => p.Trim())
@@ -287,7 +287,7 @@ namespace AssetsManager.Services.Formatting
                 return;
 
             var key = parts[0];
-            
+
             if (parts.Count == 1)
             {
                 // Último nivel - agregar propiedades

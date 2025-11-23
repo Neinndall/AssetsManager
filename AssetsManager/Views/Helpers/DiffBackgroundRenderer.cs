@@ -1,8 +1,8 @@
-using DiffPlex.DiffBuilder.Model;
-using ICSharpCode.AvalonEdit.Rendering;
 using System.Windows;
 using System.Windows.Media;
 using ICSharpCode.AvalonEdit.Document;
+using DiffPlex.DiffBuilder.Model;
+using ICSharpCode.AvalonEdit.Rendering;
 
 namespace AssetsManager.Views.Helpers
 {
