@@ -176,8 +176,18 @@
                                      TextWrapping="Wrap"/>
 
                         <CheckBox IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}"
-                                  Content="Organize extracted files into folders"
-                                  Style="{StaticResource ModernCheckBox}"/>
+                                  Content="Organize extracted files into folders">
+                            <CheckBox.Style>
+                                <Style TargetType="CheckBox" BasedOn="{StaticResource ModernCheckBox}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ElementName=EnableExtractionCheckBox, Path=IsChecked}" Value="False">
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                            <Setter Property="IsChecked" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </CheckBox.Style>
+                        </CheckBox>
                         <TextBlock Text="If enabled, extracted assets will be organized into folders"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
