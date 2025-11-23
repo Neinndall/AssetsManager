@@ -271,82 +271,42 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async Task SaveSalesAsPngAsync(string filePath)
         {
-            try
+            var items = Status.SalesCatalog; // Use the currently displayed page
+            if (items == null || !items.Any())
             {
-                var items = Status.SalesCatalog; // Use the currently displayed page
-                if (items == null || !items.Any())
-                {
-                    CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
-                    return;
-                }
-
-                // 1. Create the container
-                var grid = new Grid
-                {
-                    Background = this.Background, // Use the control's own background
-                    SnapsToDevicePixels = true,
-                    UseLayoutRounding = true
-                };
-
-                var uniformGridFactory = new FrameworkElementFactory(typeof(UniformGrid));
-                uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, 3);
-                var itemsPanelTemplate = new ItemsPanelTemplate(uniformGridFactory);
-
-                // 2. Create the ItemsControl
-                var itemsControl = new ItemsControl
-                {
-                    ItemsSource = items,
-                    ItemTemplate = SalesItemsControl.ItemTemplate,
-                    ItemsPanel = itemsPanelTemplate
-                };
-
-                grid.Children.Add(itemsControl);
-
-                // 3. Set width and measure
-                var renderWidth = SalesItemsControl.ActualWidth;
-                grid.Width = renderWidth;
-
-                // To get the desired height, we need to run the layout pass
-                grid.Measure(new Size(renderWidth, double.PositiveInfinity));
-                grid.Arrange(new Rect(0, 0, grid.DesiredSize.Width, grid.DesiredSize.Height));
-
-                var renderHeight = grid.DesiredSize.Height;
-
-                if (renderWidth <= 0 || renderHeight <= 0)
-                {
-                    LogService.LogWarning("The size of the off-screen control for PNG capture is invalid.");
-                    return;
-                }
-
-                // 4. Render
-                RenderTargetBitmap rtb = new RenderTargetBitmap((int)renderWidth, (int)renderHeight, 96, 96, PixelFormats.Pbgra32);
-                rtb.Render(grid);
-
-                // 5. Encode and Save
-                PngBitmapEncoder pngEncoder = new PngBitmapEncoder();
-                pngEncoder.Frames.Add(BitmapFrame.Create(rtb));
-
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    pngEncoder.Save(ms);
-                    ms.Seek(0, SeekOrigin.Begin);
-
-                    await Task.Run(async () =>
-                    {
-                        using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true))
-                        {
-                            await ms.CopyToAsync(fileStream);
-                        }
-                    });
-                }
-
-                LogService.LogInteractiveSuccess($"Sales data saved as PNG to {Path.GetFileName(filePath)}", filePath, Path.GetFileName(filePath));
+                CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
+                return;
             }
-            catch (Exception ex)
+
+            // 1. Create the container
+            var grid = new Grid
             {
-                LogService.LogError(ex, $"Failed to save sales data as PNG to {filePath}.");
-                CustomMessageBoxService.ShowError("Error", $"An error occurred while saving: {ex.Message}", Window.GetWindow(this));
-            }
+                Background = this.Background, // Use the control's own background
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true
+            };
+
+            var uniformGridFactory = new FrameworkElementFactory(typeof(UniformGrid));
+            uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, 3);
+            var itemsPanelTemplate = new ItemsPanelTemplate(uniformGridFactory);
+
+            // 2. Create the ItemsControl
+            var itemsControl = new ItemsControl
+            {
+                ItemsSource = items,
+                ItemTemplate = SalesItemsControl.ItemTemplate,
+                ItemsPanel = itemsPanelTemplate
+            };
+
+            grid.Children.Add(itemsControl);
+
+            // 3. Set width and measure
+            grid.Width = SalesItemsControl.ActualWidth;
+            grid.Measure(new Size(grid.Width, double.PositiveInfinity));
+            grid.Arrange(new Rect(0, 0, grid.DesiredSize.Width, grid.DesiredSize.Height));
+
+            // 4. Call the utility to save the element
+            await ImageExportUtils.SaveAsPngAsync(grid, filePath, LogService);
         }
 
         private void PreviousPage_Click(object sender, RoutedEventArgs e)
@@ -446,10 +406,88 @@ namespace AssetsManager.Views.Controls.Monitor
             }
         }
 
-        private void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
+        private async void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
         {
-            LogService.Log("Save MythicShop button clicked. Functionality not yet implemented.");
-            CustomMessageBoxService.ShowInfo("Mythic Shop", "Mythic Shop save functionality is not yet implemented.", Window.GetWindow(this));
+            if (Status.MythicShopCategories.Count == 0)
+            {
+                CustomMessageBoxService.ShowInfo("Info", "No Mythic Shop data to save.", Window.GetWindow(this));
+                return;
+            }
+
+            var dialog = new CommonSaveFileDialog
+            {
+                Title = "Save Mythic Shop data",
+                DefaultFileName = "mythic_shop",
+                InitialDirectory = DirectoriesCreator.AssetsDownloadedPath,
+                DefaultExtension = ".png"
+            };
+            dialog.Filters.Add(new CommonFileDialogFilter("PNG Image", "*.png"));
+
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                string filePath = dialog.FileName;
+                try
+                {
+                    await SaveMythicShopAsPngAsync(filePath);
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, $"Failed to save Mythic Shop data to {filePath}.");
+                    CustomMessageBoxService.ShowError("Error", $"An error occurred while saving: {ex.Message}", Window.GetWindow(this));
+                }
+            }
+        }
+
+        private async Task SaveMythicShopAsPngAsync(string filePath)
+        {
+            var categories = Status.MythicShopCategories;
+            if (categories == null || !categories.Any())
+            {
+                CustomMessageBoxService.ShowInfo("Info", "No Mythic Shop data to save.", Window.GetWindow(this));
+                return;
+            }
+
+            var rootPanel = new StackPanel
+            {
+                Background = this.Background,
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true,
+                Orientation = Orientation.Vertical
+            };
+
+            var itemTemplate = this.FindResource("MythicShopItemTemplate") as DataTemplate;
+
+            foreach (var category in categories)
+            {
+                var categoryTitle = new TextBlock
+                {
+                    Text = category.CategoryName,
+                    FontSize = 16,
+                    FontWeight = FontWeights.SemiBold,
+                    Margin = new Thickness(10, 10, 0, 10),
+                    Foreground = (SolidColorBrush)Application.Current.FindResource("TextPrimary")
+                };
+                rootPanel.Children.Add(categoryTitle);
+
+                var uniformGridFactory = new FrameworkElementFactory(typeof(UniformGrid));
+                uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, 4);
+                var itemsPanelTemplate = new ItemsPanelTemplate(uniformGridFactory);
+
+                var itemsControl = new ItemsControl
+                {
+                    ItemsSource = category.Items,
+                    ItemTemplate = itemTemplate,
+                    ItemsPanel = itemsPanelTemplate
+                };
+
+                rootPanel.Children.Add(itemsControl);
+            }
+
+            rootPanel.Width = MythicShopCategoriesItemsControl.ActualWidth;
+            rootPanel.Measure(new Size(rootPanel.Width, double.PositiveInfinity));
+            rootPanel.Arrange(new Rect(0, 0, rootPanel.DesiredSize.Width, rootPanel.DesiredSize.Height));
+
+            await ImageExportUtils.SaveAsPngAsync(rootPanel, filePath, LogService);
         }
 
         private async void LcuConnectionTimer_Tick(object sender, EventArgs e)

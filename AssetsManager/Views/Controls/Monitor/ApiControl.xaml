@@ -6,6 +6,38 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <DataTemplate x:Key="MythicShopItemTemplate">
+            <Border BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="1" 
+                    CornerRadius="4"
+                    Padding="10" 
+                    Margin="5">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" 
+                               FontWeight="SemiBold" 
+                               FontSize="13" 
+                               Foreground="{StaticResource TextPrimary}" 
+                               TextWrapping="Wrap" 
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center"
+                               Margin="0,5,0,0"/>
+                    <TextBlock Foreground="{StaticResource AccentPurple}" 
+                               FontWeight="SemiBold" 
+                               FontSize="12" 
+                               HorizontalAlignment="Center">
+                        <Run Text="{Binding Price}"/>
+                        <Run Text=" ME"/>
+                    </TextBlock>
+                    <TextBlock FontSize="12" 
+                               Foreground="{StaticResource TextMuted}" 
+                               HorizontalAlignment="Center">
+                        <Run Text="{Binding EndTime}"/>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
     <Grid Margin="15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -307,7 +339,7 @@
                             </StackPanel>
                         </Grid>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding Status.MythicShopCategories}" Margin="0,16,0,0">
+                    <ItemsControl x:Name="MythicShopCategoriesItemsControl" ItemsSource="{Binding Status.MythicShopCategories}" Margin="0,16,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Grid Margin="0,0,0,10">
@@ -327,36 +359,7 @@
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border BorderBrush="{StaticResource BorderColor}" 
-                                                        BorderThickness="1" 
-                                                        CornerRadius="4"
-                                                        Padding="10" 
-                                                        Margin="5">
-                                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding Name}" 
-                                                                   FontWeight="SemiBold" 
-                                                                   FontSize="13" 
-                                                                   Foreground="{StaticResource TextPrimary}" 
-                                                                   TextWrapping="Wrap" 
-                                                                   HorizontalAlignment="Center"
-                                                                   TextAlignment="Center"
-                                                                   Margin="0,5,0,0"/>
-                                                        <TextBlock Foreground="{StaticResource AccentPurple}" 
-                                                                   FontWeight="SemiBold" 
-                                                                   FontSize="12" 
-                                                                   HorizontalAlignment="Center">
-                                                            <Run Text="{Binding Price}"/>
-                                                            <Run Text=" ME"/>
-                                                        </TextBlock>
-                                                        <TextBlock FontSize="12" 
-                                                                   Foreground="{StaticResource TextMuted}" 
-                                                                   HorizontalAlignment="Center">
-                                                            <Run Text="{Binding EndTime}"/>
-                                                        </TextBlock>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
+                                            <StaticResource ResourceKey="MythicShopItemTemplate"/>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                 </Grid>
