@@ -85,17 +85,7 @@ namespace AssetsManager.Views.Controls.Monitor
             return deletedCount;
         }
 
-        private async void RefreshBackups_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                await LoadBackupsAsync();
-            }
-            catch (Exception ex)
-            {
-                CustomMessageBoxService.ShowError("Error", $"Error loading backups: {ex.Message}", Window.GetWindow(this));
-            }
-        }
+
 
         private void DeleteSelectedBackups_Click(object sender, RoutedEventArgs e)
         {

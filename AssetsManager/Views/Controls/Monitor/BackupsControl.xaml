@@ -49,10 +49,7 @@
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="34,0,0,0">
-                    <Button Content="Refresh"
-                            Click="RefreshBackups_Click"
-                            Style="{StaticResource ModernButton}"
-                            HorizontalAlignment="Left"/>
+
                     <Button Content="Create LoL Backup"
                             Click="createLolBackupButton_Click"
                             Style="{StaticResource SecondaryButton}"
