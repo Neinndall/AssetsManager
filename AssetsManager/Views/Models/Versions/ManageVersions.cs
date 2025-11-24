@@ -62,23 +62,6 @@ namespace AssetsManager.Views.Models.Versions
             }
         }
 
-        public void DeleteVersions(IEnumerable<VersionFileInfo> versionsToDelete)
-        {
-            if (versionsToDelete == null || !versionsToDelete.Any()) return;
-
-            if (_versionService.DeleteVersionFiles(versionsToDelete))
-            {
-                foreach (var versionFile in versionsToDelete.ToList())
-                {
-                    AllLeagueClientVersions.Remove(versionFile);
-                    AllLoLGameClientVersions.Remove(versionFile);
-                }
-                // Recalculate total pages and update views after deletion
-                LeagueClientPaginator.SetFullList(AllLeagueClientVersions);
-                LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions);
-            }
-        }
-
         protected void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

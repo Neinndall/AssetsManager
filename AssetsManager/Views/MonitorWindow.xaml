@@ -62,6 +62,9 @@
                 <TabItem Header="Manage Versions" Style="{StaticResource CustomTabItemStyle}">
                     <monitorControls:ManageVersionsControl x:Name="ManageVersionsControl"/>
                 </TabItem>
+                <TabItem Header="Backups" Style="{StaticResource CustomTabItemStyle}">
+                    <monitorControls:BackupsControl x:Name="BackupsControl"/>
+                </TabItem>
                 <TabItem Header="API" Style="{StaticResource CustomTabItemStyle}">
                     <monitorControls:ApiControl x:Name="ApiControl"/>
                 </TabItem>
