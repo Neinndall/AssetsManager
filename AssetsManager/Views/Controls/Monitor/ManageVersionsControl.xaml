@@ -63,7 +63,7 @@
                             Style="{StaticResource ModernButton}"
                             HorizontalAlignment="Left"
                             Margin="10,0,0,0"/>
-                    <Button Content="Remove"
+                    <Button Content="Delete Selected"
                             Click="DeleteSelectedVersions_Click"
                             Style="{StaticResource DestructiveButton}"
                             HorizontalAlignment="Left"
@@ -167,9 +167,7 @@
                             </Grid>
                             <ListView Grid.Row="1" x:Name="LeagueClientVersionsListView"
                                       ItemsSource="{Binding LeagueClientPaginator.PagedItems}"
-                                      Style="{StaticResource ModernListView}"
-                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                      Style="{StaticResource ModernListView}" >
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
                                         <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=OneWay}"/>
@@ -301,9 +299,7 @@
                             </Grid>
                             <ListView Grid.Row="1" x:Name="LoLGameClientVersionsListView" 
                                       ItemsSource="{Binding LoLGameClientPaginator.PagedItems}"
-                                      Style="{StaticResource ModernListView}"
-                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                      Style="{StaticResource ModernListView}" >
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
                                         <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=OneWay}"/>

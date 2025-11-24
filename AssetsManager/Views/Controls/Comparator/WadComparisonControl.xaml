@@ -228,12 +228,6 @@
 
 
                         <StackPanel Orientation="Horizontal">
-                            <Button x:Name="createLolBackupButton" 
-                                Content="Create LoL Backup"
-                                Style="{StaticResource SecondaryButton}"
-                                Click="createLolBackupButton_Click"
-                                ToolTip="Create a backup of the current LoL directory"
-                                Margin="0,0,12,0"/>
                             <Button x:Name="compareWadButton" 
                                 Content="Comparison" 
                                 Style="{StaticResource ModernButton}"

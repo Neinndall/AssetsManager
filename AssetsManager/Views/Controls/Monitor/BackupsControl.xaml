@@ -53,6 +53,12 @@
                             Click="RefreshBackups_Click"
                             Style="{StaticResource ModernButton}"
                             HorizontalAlignment="Left"/>
+                    <Button Content="Create LoL Backup"
+                            Click="createLolBackupButton_Click"
+                            Style="{StaticResource SecondaryButton}"
+                            HorizontalAlignment="Left"
+                            Margin="10,0,0,0"
+                            ToolTip="Create a backup of the current LoL directory"/>
                     <Button Content="Delete Selected"
                             Click="DeleteSelectedBackups_Click"
                             Style="{StaticResource DestructiveButton}"
@@ -97,30 +103,38 @@
                             </Grid.RowDefinitions>
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="5*"/>
                                     <ColumnDefinition Width="20*"/>
-                                    <ColumnDefinition Width="55*"/>
-                                    <ColumnDefinition Width="20*"/>
+                                    <ColumnDefinition Width="50*"/>
+                                    <ColumnDefinition Width="30*"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
+                                <Border Grid.Column="0"
+                                        Background="{StaticResource CardBackground}"
+                                        BorderBrush="{StaticResource BorderColor}"
+                                        BorderThickness="1,1,0,1"
+                                        Padding="0,4"
+                                        CornerRadius="4,0,0,4">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="Circle" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Status" Style="{StaticResource HeaderTextStyle}"/>
+                                        <materialIcons:MaterialIcon Kind="Info" Style="{StaticResource HeaderIconStyle}"/>
+                                        <TextBlock Text="Status" Style="{StaticResource HeaderTextStyle}" Margin="0,0,10,0"/>
                                     </StackPanel>
                                 </Border>
-                                <Border Grid.Column="1" Style="{StaticResource HalfModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="File" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Name" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Grid.Column="2" Style="{StaticResource HalfModernGridViewColumnHeader}">
+                                <Border Grid.Column="1"
+                                        Background="{StaticResource CardBackground}"
+                                        BorderBrush="{StaticResource BorderColor}"
+                                        BorderThickness="1,1,1,1"
+                                        Padding="0,4"
+                                        CornerRadius="0">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                         <materialIcons:MaterialIcon Kind="Folder" Style="{StaticResource HeaderIconStyle}"/>
                                         <TextBlock Text="Path" Style="{StaticResource HeaderTextStyle}"/>
                                     </StackPanel>
                                 </Border>
-                                <Border Grid.Column="3" Style="{StaticResource LastModernGridViewColumnHeader}">
+                                <Border Grid.Column="2"
+                                        Background="{StaticResource CardBackground}"
+                                        BorderBrush="{StaticResource BorderColor}"
+                                        BorderThickness="0,1,1,1"
+                                        Padding="0,4"
+                                        CornerRadius="0,4,4,0">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                         <materialIcons:MaterialIcon Kind="Calendar" Style="{StaticResource HeaderIconStyle}"/>
                                         <TextBlock Text="Creation Date" Style="{StaticResource HeaderTextStyle}"/>
@@ -128,7 +142,7 @@
                                 </Border>
                             </Grid>
                             <ListView Grid.Row="1" x:Name="BackupsListView"
-                                      ItemsSource="{Binding BackupsPaginator.PagedItems}"
+                                      ItemsSource="{Binding AllBackups}"
                                       Style="{StaticResource ModernListView}"
                                       ScrollViewer.VerticalScrollBarVisibility="Auto"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -141,51 +155,23 @@
                                     <DataTemplate>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="5*"/>
                                                 <ColumnDefinition Width="20*"/>
-                                                <ColumnDefinition Width="55*"/>
-                                                <ColumnDefinition Width="20*"/>
+                                                <ColumnDefinition Width="50*"/>
+                                                <ColumnDefinition Width="30*"/>
                                             </Grid.ColumnDefinitions>
-                                            <Ellipse Grid.Column="0" Width="10" Height="10" Fill="{Binding StatusColor}" ToolTip="{Binding StatusText}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Name}" Style="{StaticResource CellTextStyle}" TextAlignment="Center" />
-                                            <TextBlock Grid.Column="2" Text="{Binding Path}" Style="{StaticResource CellTextStyle}" TextAlignment="Center" />
-                                            <TextBlock Grid.Column="3" Text="{Binding CreationDate, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Style="{StaticResource CellTextStyle}" TextAlignment="Center" />
+                                            <Border Grid.Column="0">
+                                                <Ellipse Width="10" Height="10" Fill="{Binding StatusColor}" ToolTip="{Binding StatusText}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            </Border>
+                                            <Border Grid.Column="1">
+                                                <TextBlock Text="{Binding Path}" Style="{StaticResource CellTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <TextBlock Grid.Column="2" Text="{Binding CreationDate, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Style="{StaticResource CellTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0,0,0" />
                                         </Grid>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
                             </ListView>
                         </Grid>
                     </Grid>
-                </StackPanel>
-
-                <!-- Pagination Controls for Backups -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,-15">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding BackupsPaginator.TotalPages}" Value="0">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
-                    <Button Style="{StaticResource TransparentIconButton}"
-                            Click="PrevPage_Click"
-                            IsEnabled="{Binding BackupsPaginator.CanGoToPreviousPage}">
-                        <materialIcons:MaterialIcon Kind="ChevronLeft" />
-                    </Button>
-
-                    <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
-                        <Run Text="{Binding BackupsPaginator.CurrentPage, Mode=OneWay}" />
-                        <Run Text="/" />
-                        <Run Text="{Binding BackupsPaginator.TotalPages, Mode=OneWay}" />
-                    </TextBlock>
-
-                    <Button Style="{StaticResource TransparentIconButton}"
-                            Click="NextPage_Click"
-                            IsEnabled="{Binding BackupsPaginator.CanGoToNextPage}">
-                        <materialIcons:MaterialIcon Kind="ChevronRight" />
-                    </Button>
                 </StackPanel>
             </StackPanel>
         </Border>

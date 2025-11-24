@@ -23,13 +23,11 @@ namespace AssetsManager.Views.Controls.Monitor
         public event PropertyChangedEventHandler PropertyChanged;
 
         public ObservableCollection<BackupModel> AllBackups { get; private set; }
-        public PaginationModel<BackupModel> BackupsPaginator { get; }
 
         public BackupsControl()
         {
             InitializeComponent();
             AllBackups = new ObservableCollection<BackupModel>();
-            BackupsPaginator = new PaginationModel<BackupModel>();
             this.DataContext = this;
             this.Loaded += BackupsControl_Loaded;
             this.Unloaded += BackupsControl_Unloaded;
@@ -62,7 +60,6 @@ namespace AssetsManager.Views.Controls.Monitor
                 {
                     AllBackups.Add(backup);
                 }
-                BackupsPaginator.SetFullList(AllBackups.ToList());
             }
             catch (Exception ex)
             {
@@ -84,11 +81,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     deletedCount++;
                 }
             }
-
-            if (deletedCount > 0)
-            {
-                BackupsPaginator.SetFullList(AllBackups.ToList());
-            }
+            
             return deletedCount;
         }
 
@@ -129,14 +122,47 @@ namespace AssetsManager.Views.Controls.Monitor
             }
         }
 
-        private void PrevPage_Click(object sender, RoutedEventArgs e)
+        private async void createLolBackupButton_Click(object sender, RoutedEventArgs e)
         {
-            BackupsPaginator.PreviousPage();
-        }
+            string sourceLolPath = AppSettings.LolPbeDirectory;
 
-        private void NextPage_Click(object sender, RoutedEventArgs e)
-        {
-            BackupsPaginator.NextPage();
+            if (string.IsNullOrEmpty(sourceLolPath))
+            {
+                CustomMessageBoxService.ShowWarning("Warning", "LoL directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
+                return;
+            }
+
+            if (!System.IO.Directory.Exists(sourceLolPath))
+            {
+                CustomMessageBoxService.ShowError("Error", $"The configured LoL directory does not exist: {sourceLolPath}", Window.GetWindow(this));
+                return;
+            }
+
+            string destinationBackupPath = sourceLolPath + "_old";
+
+            var createBackupButton = (Button)sender;
+            createBackupButton.IsEnabled = false;
+            try
+            {
+                await BackupManager.CreateLolPbeDirectoryBackupAsync(sourceLolPath, destinationBackupPath);
+                CustomMessageBoxService.ShowInfo("Info", "LoL backup completed successfully.", Window.GetWindow(this));
+                await LoadBackupsAsync();
+            }
+            catch (System.IO.DirectoryNotFoundException ex)
+            {
+                LogService.LogError(ex, "Error creating LoL backup");
+                CustomMessageBoxService.ShowError("Error", ex.Message, Window.GetWindow(this));
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Error creating LoL backup");
+                CustomMessageBoxService.ShowError("Error", $"An unexpected error occurred while creating the backup: {ex.Message}", Window.GetWindow(this));
+            }
+            finally
+            {
+                createBackupButton.IsEnabled = true;
+                LogService.LogSuccess($"LoL backup completed successfully.");
+            }
         }
         
         protected virtual void OnPropertyChanged(string propertyName)
