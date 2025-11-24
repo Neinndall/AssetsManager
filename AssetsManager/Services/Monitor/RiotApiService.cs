@@ -10,7 +10,7 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Monitor;
 
-namespace AssetsManager.Services.Api
+namespace AssetsManager.Services.Monitor
 {
     public class RiotApiService
     {

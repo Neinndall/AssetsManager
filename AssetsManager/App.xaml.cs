@@ -22,9 +22,7 @@ using AssetsManager.Services.Models;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
-using AssetsManager.Services.Versions;
 using AssetsManager.Services.Audio;
-using AssetsManager.Services.Api; // Added for RiotApiService
 
 namespace AssetsManager
 {
@@ -62,17 +60,20 @@ namespace AssetsManager
       services.AddSingleton<ILogger>(logger);
 
       // Core Services
-      services.AddSingleton<PbeStatusService>();
       services.AddSingleton<LogService>();
       services.AddSingleton<TaskCancellationManager>(); // Added for managing task cancellations
+      services.AddSingleton<DiffViewService>();
+      services.AddSingleton<CustomMessageBoxService>();
+      services.AddSingleton<ProgressUIManager>();
+      services.AddSingleton<UpdateCheckService>();
 
       // Configure and register HttpClient for LCU API (ignoring self-signed cert for loopback)
       services.AddSingleton<HttpClient>(sp =>
       {
         var handler = new HttpClientHandler();
         handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
-              {
-                // Trust the self-signed certificate for the local LCU API
+          {
+            // Trust the self-signed certificate for the local LCU API
             if (message.RequestUri.IsLoopback)
             {
               return true;
@@ -83,34 +84,42 @@ namespace AssetsManager
         return new HttpClient(handler);
       });
 
-      services.AddSingleton<DirectoriesCreator>();
+      // Utils Services
       services.AddSingleton(provider => AppSettings.LoadSettings());
-      services.AddSingleton<Requests>();
-      services.AddSingleton<AssetDownloader>();
-      services.AddSingleton<JsonDataService>();
-      services.AddSingleton<Status>();
+      services.AddSingleton<DirectoriesCreator>();
+      services.AddSingleton<BackupManager>();
+
+      // Updater Services
       services.AddSingleton<UpdateManager>();
       services.AddSingleton<UpdateExtractor>();
-      services.AddSingleton<BackupManager>();
-      services.AddSingleton<UpdateCheckService>();
-      services.AddSingleton<ProgressUIManager>();
-      services.AddTransient<ExplorerPreviewService>();
-      services.AddTransient<TreeBuilderService>();
-      services.AddTransient<TreeUIManager>();
-      services.AddSingleton<WadSearchBoxService>();
+      
+      // Formatting Services
       services.AddTransient<CSSParserService>();
       services.AddSingleton<JsBeautifierService>();
       services.AddSingleton<ContentFormatterService>();
       services.AddSingleton<WemConversionService>();
-      services.AddSingleton<DiffViewService>();
-      services.AddSingleton<MonitorService>();
+ 
+      // Explorer Services
+      services.AddTransient<ExplorerPreviewService>();
       services.AddSingleton<WadSavingService>();
-
-      // Riot API Service
+      services.AddSingleton<WadExtractionService>();
+      services.AddSingleton<WadNodeLoaderService>();
+      services.AddSingleton<WadSearchBoxService>();
+      services.AddTransient<TreeBuilderService>();
+      services.AddTransient<TreeUIManager>();
+    
+      // Downloads Services
+      services.AddSingleton<AssetDownloader>();
+      services.AddSingleton<ExtractionService>();
+      services.AddSingleton<Status>();
+      services.AddSingleton<Requests>();
+       
+      // Monitor Services
+      services.AddSingleton<MonitorService>();
+      services.AddSingleton<PbeStatusService>();
       services.AddSingleton<RiotApiService>();
-
-      // Versions Service
       services.AddSingleton<VersionService>();
+      services.AddSingleton<JsonDataService>();
 
       // Hashes Services
       services.AddSingleton<HashResolverService>();
@@ -120,19 +129,14 @@ namespace AssetsManager
       services.AddSingleton<WadDifferenceService>();
       services.AddSingleton<WadPackagingService>();
       services.AddSingleton<ReportGenerationService>();
-      services.AddSingleton<WadNodeLoaderService>();
-      services.AddSingleton<WadExtractionService>();
 
-      // Model Viewer Services
+      // Models Services
       services.AddSingleton<SknModelLoadingService>();
       services.AddSingleton<MapGeometryLoadingService>();
 
       // Audio Services
       services.AddSingleton<AudioBankService>();
       services.AddSingleton<AudioBankLinkerService>();
-
-      // Main Application Logic Service
-      services.AddSingleton<ExtractionService>();
 
       // Windows, Views, and Dialogs
       services.AddTransient<MainWindow>();
@@ -148,7 +152,7 @@ namespace AssetsManager
       services.AddTransient<UpdateModeDialog>();
       services.AddTransient<InputDialog>();
       services.AddTransient<ConfirmationDialog>();
-      services.AddSingleton<CustomMessageBoxService>();
+
 
       // Secondary Views
       services.AddTransient<LogView>();

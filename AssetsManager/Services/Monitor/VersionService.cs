@@ -13,7 +13,7 @@ using AssetsManager.Views.Models.Versions; // Add this
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 
-namespace AssetsManager.Services.Versions
+namespace AssetsManager.Services.Monitor
 {
     public class VersionService
     {

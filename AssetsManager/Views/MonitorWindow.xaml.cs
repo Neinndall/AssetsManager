@@ -1,9 +1,7 @@
 using AssetsManager.Services;
-using AssetsManager.Services.Api;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Versions;
 using AssetsManager.Utils;
 using System;
 using System.Windows.Controls;
