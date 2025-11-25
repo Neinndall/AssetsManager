@@ -188,6 +188,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     PlaceholderDescription.Text = "Choose the root folder where you installed League of Legends to browse its WAD files.";
                     SelectLolDirButton.Visibility = Visibility.Visible;
                     NoDirectoryMessage.Visibility = Visibility.Visible;
+                    LoadingIndicator.Visibility = Visibility.Collapsed;
                 }
             }
             else
@@ -204,6 +205,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     PlaceholderDescription.Text = "The application could not find the directory for downloaded assets.";
                     SelectLolDirButton.Visibility = Visibility.Collapsed;
                     NoDirectoryMessage.Visibility = Visibility.Visible;
+                    LoadingIndicator.Visibility = Visibility.Collapsed;
                 }
             }
         }
