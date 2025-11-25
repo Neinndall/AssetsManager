@@ -494,18 +494,46 @@ namespace AssetsManager.Services.Audio
 
         private (FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode) FindSiblingFilesByName(FileSystemNodeModel clickedNode, ObservableCollection<FileSystemNodeModel> rootNodes)
         {
-            var parentPath = _treeUIManager.FindNodePath(rootNodes, clickedNode);
-            if (parentPath == null || parentPath.Count < 2)
-            {
-                return (null, null, null);
-            }
-            var parentNode = parentPath[parentPath.Count - 2];
+            // A simple way to detect backup mode is to check if the node has ChunkDiff data.
+            bool isBackupMode = clickedNode.ChunkDiff != null;
 
             string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
+            string expectedWpkName = baseName + "_audio.wpk";
+            string expectedAudioBnkName = baseName + "_audio.bnk";
+            string expectedEventsBnkName = baseName + "_events.bnk";
 
-            FileSystemNodeModel wpkNode = parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_audio.wpk");
-            FileSystemNodeModel audioBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_audio.bnk");
-            FileSystemNodeModel eventsBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == baseName + "_events.bnk");
+            FileSystemNodeModel wpkNode = null;
+            FileSystemNodeModel audioBnkNode = null;
+            FileSystemNodeModel eventsBnkNode = null;
+
+            if (!isBackupMode)
+            {
+                // Keep the original, efficient logic for normal (live) mode
+                var parentPath = _treeUIManager.FindNodePath(rootNodes, clickedNode);
+                if (parentPath == null || parentPath.Count < 2)
+                {
+                    return (null, null, null);
+                }
+                var parentNode = parentPath[parentPath.Count - 2];
+
+                wpkNode = parentNode.Children.FirstOrDefault(c => c.Name == expectedWpkName);
+                audioBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == expectedAudioBnkName);
+                eventsBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == expectedEventsBnkName);
+            }
+            else // Backup Mode - search across the whole tree
+            {
+                _logService.Log("[FindSiblingFilesByName] Backup mode detected. Searching entire tree for siblings.");
+                var namesToFind = new List<string> { expectedWpkName, expectedAudioBnkName, expectedEventsBnkName };
+                var allMatches = new List<FileSystemNodeModel>();
+                
+                FindAllNodesByNameRecursive(rootNodes, namesToFind, allMatches);
+
+                wpkNode = allMatches.FirstOrDefault(n => n.Name == expectedWpkName);
+                audioBnkNode = allMatches.FirstOrDefault(n => n.Name == expectedAudioBnkName);
+                eventsBnkNode = allMatches.FirstOrDefault(n => n.Name == expectedEventsBnkName);
+
+                _logService.Log($"[FindSiblingFilesByName] Sibling search results - WPK: {wpkNode != null}, AudioBNK: {audioBnkNode != null}, EventsBNK: {eventsBnkNode != null}");
+            }
 
             return (wpkNode, audioBnkNode, eventsBnkNode);
         }
@@ -603,6 +631,22 @@ namespace AssetsManager.Services.Audio
         private async Task LoadAllChildrenForSearch(FileSystemNodeModel node, string rootPath)
         {
             await _treeBuilderService.LoadAllChildren(node, rootPath);
+        }
+
+        private void FindAllNodesByNameRecursive(IEnumerable<FileSystemNodeModel> nodes, List<string> namesToFind, List<FileSystemNodeModel> foundNodes)
+        {
+            foreach (var node in nodes)
+            {
+                if (namesToFind.Contains(node.Name))
+                {
+                    foundNodes.Add(node);
+                }
+
+                if (node.Children != null && node.Children.Any())
+                {
+                    FindAllNodesByNameRecursive(node.Children, namesToFind, foundNodes);
+                }
+            }
         }
 
         private FileSystemNodeModel FindNodeByName(IEnumerable<FileSystemNodeModel> nodes, string name)
