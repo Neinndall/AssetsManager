@@ -10,7 +10,7 @@ namespace AssetsManager.Views.Models.Wad
         Removed,
         Modified,
         Renamed,
-        Unchanged
+        Dependency // Represents a chunk that hasn't changed / an associated dependency
     }
 
     public class ChunkDiff
