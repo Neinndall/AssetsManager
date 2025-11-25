@@ -506,8 +506,36 @@ namespace AssetsManager.Services.Audio
             // Backup Mode
             if (currentRootPath == null)
             {
-                string binFileName = Path.GetFileName(strategy.BinPath);
-                var binNode = FindNodeByName(rootNodes, binFileName);
+                _logService.Log($"[FindAssociatedBinFileAsync] Backup Mode: Searching for BIN node with path: '{strategy.BinPath}'");
+                
+                // First, try to find it without any prefix (for the non-sorted/flat view)
+                var binNode = FindNodeByPath(rootNodes, strategy.BinPath);
+
+                // If not found, try with status prefixes (for the sorted/grouped by WAD view)
+                if (binNode == null)
+                {
+                    _logService.Log($"[FindAssociatedBinFileAsync] Node not found with direct path. Trying with status prefixes.");
+                    string[] prefixes = { "[~] Modified/", "[+] New/", "[»] Renamed/" };
+                    foreach (var prefix in prefixes)
+                    {
+                        string prefixedPath = prefix + strategy.BinPath;
+                        _logService.Log($"[FindAssociatedBinFileAsync] Trying prefixed path: '{prefixedPath}'");
+                        binNode = FindNodeByPath(rootNodes, prefixedPath);
+                        if (binNode != null)
+                        {
+                            break; // Found it
+                        }
+                    }
+                }
+
+                if (binNode != null)
+                {
+                    _logService.Log($"[FindAssociatedBinFileAsync] Backup Mode: Found BIN node: '{binNode.FullPath}'");
+                }
+                else
+                {
+                    _logService.Log($"[FindAssociatedBinFileAsync] Backup Mode: BIN node with path '{strategy.BinPath}' not found after all attempts.");
+                }
                 return (binNode, baseName, strategy.Type);
             }
             // Normal Mode
@@ -543,6 +571,27 @@ namespace AssetsManager.Services.Audio
                 if (node.Children != null && node.Children.Any())
                 {
                     var found = FindNodeByName(node.Children, name);
+                    if (found != null)
+                    {
+                        return found;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private FileSystemNodeModel FindNodeByPath(IEnumerable<FileSystemNodeModel> nodes, string fullPath)
+        {
+            foreach (var node in nodes)
+            {
+                if (node.FullPath != null && node.FullPath.Equals(fullPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return node;
+                }
+
+                if (node.Children != null && node.Children.Any())
+                {
+                    var found = FindNodeByPath(node.Children, fullPath);
                     if (found != null)
                     {
                         return found;
