@@ -267,7 +267,7 @@ namespace AssetsManager.Services.Comparator
                             OldPathHash = fileHash,
                             NewPathHash = fileHash,
                             CompressionType = chunk.Compression,
-                            Type = originalDiff?.Type ?? ChunkDiffType.Unchanged, // Assign Unchanged if not a top-level diff
+                            Type = originalDiff?.Type ?? ChunkDiffType.Dependency, // Assign Dependency if not a top-level diff
                             WasTopLevelDiff = true // Always true for dependencies so they are shown
                         };
                     }

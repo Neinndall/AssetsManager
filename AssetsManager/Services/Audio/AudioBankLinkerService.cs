@@ -563,7 +563,7 @@ namespace AssetsManager.Services.Audio
                 if (binNode == null)
                 {
                     _logService.Log($"[FindAssociatedBinFileAsync] Node not found with direct path. Trying with status prefixes.");
-                    string[] prefixes = { "[~] Modified/", "[+] New/", "[»] Renamed/" };
+                    string[] prefixes = { "[~] Modified/", "[+] New/", "[»] Renamed/", "[=] Dependency/" };
                     foreach (var prefix in prefixes)
                     {
                         string prefixedPath = prefix + strategy.BinPath;

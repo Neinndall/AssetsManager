@@ -67,6 +67,7 @@ namespace AssetsManager.Views.Converters
                 if (name.StartsWith("[~]")) return MaterialIconKind.FileEditOutline;
                 if (name.StartsWith("[»]")) return MaterialIconKind.FileMoveOutline;
                 if (name.StartsWith("[-]")) return MaterialIconKind.FileRemoveOutline;
+                if (name.StartsWith("[=]")) return MaterialIconKind.Link;
             }
 
             switch (node.Type)
@@ -97,6 +98,7 @@ namespace AssetsManager.Views.Converters
                 ChunkDiffType.Removed => MaterialIconKind.FileRemoveOutline,
                 ChunkDiffType.Modified => MaterialIconKind.FileEditOutline,
                 ChunkDiffType.Renamed => MaterialIconKind.FileMoveOutline,
+                ChunkDiffType.Dependency => MaterialIconKind.Link,
                 _ => MaterialIconKind.FileQuestionOutline,
             };
         }

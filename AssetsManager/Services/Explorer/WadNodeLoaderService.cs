@@ -189,7 +189,7 @@ namespace AssetsManager.Services.Explorer
                                                 Status = DiffStatus.Unchanged,
                                                 ChunkDiff = new SerializableChunkDiff
                                                 {
-                                                    Type = ChunkDiffType.Unchanged,
+                                                    Type = ChunkDiffType.Dependency,
                                                     OldPath = dep.Path,
                                                     NewPath = dep.Path,
                                                     OldPathHash = dep.OldPathHash,
@@ -220,7 +220,7 @@ namespace AssetsManager.Services.Explorer
             ChunkDiffType.Modified => "[~] Modified",
             ChunkDiffType.Renamed => "[»] Renamed",
             ChunkDiffType.Removed => "[-] Deleted",
-            ChunkDiffType.Unchanged => "[=] Unchanged",
+            ChunkDiffType.Dependency => "[=] Dependency",
             _ => "[?] Unknown"
         };
 
@@ -248,7 +248,7 @@ namespace AssetsManager.Services.Explorer
                 ChunkDiffType.Removed => DiffStatus.Deleted,
                 ChunkDiffType.Modified => DiffStatus.Modified,
                 ChunkDiffType.Renamed => DiffStatus.Renamed,
-                ChunkDiffType.Unchanged => DiffStatus.Unchanged,
+                ChunkDiffType.Dependency => DiffStatus.Unchanged,
                 _ => DiffStatus.Unchanged,
             };
         }
