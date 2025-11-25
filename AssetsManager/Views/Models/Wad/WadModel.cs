@@ -9,7 +9,8 @@ namespace AssetsManager.Views.Models.Wad
         New,
         Removed,
         Modified,
-        Renamed
+        Renamed,
+        Unchanged
     }
 
     public class ChunkDiff
