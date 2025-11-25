@@ -115,17 +115,19 @@ namespace AssetsManager.Services.Comparator
                 if (binStrategy != null)
                 {
                     _logService.Log($"[CreateLeanWadPackageAsync] Found bin strategy: {binStrategy}. Creating dependency...");
-                    var binDependency = await CreateDependencyAsync(binStrategy.BinPath, XxHash64Ext.Hash(binStrategy.BinPath.ToLower()), binStrategy.TargetWadName, oldPbePath, newPbePath, binStrategy.TargetWadName);
+                    var diffForBinDependency = finalDiffs.FirstOrDefault(d => d.NewPathHash == XxHash64Ext.Hash(binStrategy.BinPath.ToLower()) || d.OldPathHash == XxHash64Ext.Hash(binStrategy.BinPath.ToLower()));
+                    var binDependency = await CreateDependencyAsync(binStrategy.BinPath, XxHash64Ext.Hash(binStrategy.BinPath.ToLower()), binStrategy.TargetWadName, oldPbePath, newPbePath, binStrategy.TargetWadName, diffForBinDependency);
                     if (binDependency != null)
                     {
                         audioBankDiff.Dependencies.Add(binDependency);
                         _logService.Log($"[CreateLeanWadPackageAsync] Successfully created and added .bin dependency for '{binStrategy.BinPath}'.");
 
-                        var diffToRemove = finalDiffs.FirstOrDefault(d => d.NewPathHash == binDependency.NewPathHash || d.OldPathHash == binDependency.NewPathHash);
-                        if (diffToRemove != null)
+                        // Always remove the top-level diff if it was explicitly a diff.
+                        // The dependency now carries its own Type and WasTopLevelDiff flag.
+                        if (diffForBinDependency != null)
                         {
-                            finalDiffs.Remove(diffToRemove);
-                            _logService.Log($"[CreateLeanWadPackageAsync] Removed duplicate top-level diff: '{binStrategy.BinPath}'.");
+                            finalDiffs.Remove(diffForBinDependency);
+                            _logService.Log($"[CreateLeanWadPackageAsync] Removed top-level diff (now embedded as dependency): '{binStrategy.BinPath}'.");
                         }
                     }
                     else
@@ -166,17 +168,19 @@ namespace AssetsManager.Services.Comparator
                 {
                     string siblingFullPath = Path.Combine(Path.GetDirectoryName(pathForStrategy), siblingFileName).Replace('\\', '/');
                     _logService.Log($"[CreateLeanWadPackageAsync] Attempting to create dependency for sibling: '{siblingFullPath}'");
-                    var siblingDependency = await CreateDependencyAsync(siblingFullPath, XxHash64Ext.Hash(siblingFullPath.ToLower()), audioBankDiff.SourceWadFile, oldPbePath, newPbePath, audioBankDiff.SourceWadFile);
+                    var diffForSiblingDependency = finalDiffs.FirstOrDefault(d => (d.NewPath ?? d.OldPath).Equals(siblingFullPath, StringComparison.OrdinalIgnoreCase));
+                    var siblingDependency = await CreateDependencyAsync(siblingFullPath, XxHash64Ext.Hash(siblingFullPath.ToLower()), audioBankDiff.SourceWadFile, oldPbePath, newPbePath, audioBankDiff.SourceWadFile, diffForSiblingDependency);
                     if (siblingDependency != null)
                     {
                         audioBankDiff.Dependencies.Add(siblingDependency);
                         _logService.Log($"[CreateLeanWadPackageAsync] Successfully created and added sibling dependency for '{siblingFullPath}'.");
 
-                        var diffToRemove = finalDiffs.FirstOrDefault(d => d.NewPathHash == siblingDependency.NewPathHash || d.OldPathHash == siblingDependency.NewPathHash);
-                        if (diffToRemove != null)
+                        // Always remove the top-level diff if it was explicitly a diff.
+                        // The dependency now carries its own Type and WasTopLevelDiff flag.
+                        if (diffForSiblingDependency != null)
                         {
-                            finalDiffs.Remove(diffToRemove);
-                            _logService.Log($"[CreateLeanWadPackageAsync] Removed duplicate top-level diff: '{siblingFullPath}'.");
+                            finalDiffs.Remove(diffForSiblingDependency);
+                            _logService.Log($"[CreateLeanWadPackageAsync] Removed top-level diff (now embedded as dependency): '{siblingFullPath}'.");
                         }
 
                         break;
@@ -237,7 +241,7 @@ namespace AssetsManager.Services.Comparator
             return finalDiffs;
         }
 
-        private async Task<AssociatedDependency> CreateDependencyAsync(string filePath, ulong fileHash, string wadRelativePath, string oldPbePath, string newPbePath, string sourceWad)
+        private async Task<AssociatedDependency> CreateDependencyAsync(string filePath, ulong fileHash, string wadRelativePath, string oldPbePath, string newPbePath, string sourceWad, SerializableChunkDiff originalDiff)
         {
             _logService.Log($"[CreateDependencyAsync] Attempting to create dependency for file '{filePath}' (Hash: {fileHash:X16}) in WAD '{wadRelativePath}'.");
             return await Task.Run(() =>
@@ -262,7 +266,9 @@ namespace AssetsManager.Services.Comparator
                             SourceWad = sourceWad,
                             OldPathHash = fileHash,
                             NewPathHash = fileHash,
-                            CompressionType = chunk.Compression
+                            CompressionType = chunk.Compression,
+                            Type = originalDiff?.Type, // Set the Type from originalDiff
+                            WasTopLevelDiff = originalDiff != null // Set if it was originally a top-level diff
                         };
                     }
                     else

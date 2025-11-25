@@ -29,6 +29,8 @@ namespace AssetsManager.Views.Models.Wad
         public ulong OldPathHash { get; set; }
         public ulong NewPathHash { get; set; }
         public WadChunkCompression CompressionType { get; set; }
+        public ChunkDiffType? Type { get; set; }
+        public bool WasTopLevelDiff { get; set; }
     }
 
     public class SerializableChunkDiff

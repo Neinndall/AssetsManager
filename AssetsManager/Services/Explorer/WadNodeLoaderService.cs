@@ -76,25 +76,31 @@ namespace AssetsManager.Services.Explorer
                         {
                             foreach (var dep in file.Dependencies)
                             {
-                                var depStatus = GetDiffStatus(ChunkDiffType.Modified); // Treat as modified for node creation
-                                var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
-
-                                string depStatusPrefix = GetStatusPrefix(ChunkDiffType.Modified);
-                                string depPrefixedPath = $"{depStatusPrefix}/{dep.Path}";
-
-                                var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, wadGroup.Key, dep.NewPathHash, depStatus);
-                                depNode.ChunkDiff = new SerializableChunkDiff
+                                if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                 {
-                                    Type = ChunkDiffType.Modified, // For consistency
-                                    OldPath = dep.Path,
-                                    NewPath = dep.Path,
-                                    OldPathHash = dep.OldPathHash,
-                                    NewPathHash = dep.NewPathHash,
-                                    OldCompressionType = dep.CompressionType,
-                                    NewCompressionType = dep.CompressionType,
-                                    BackupChunkPath = depChunkPath
-                                };
-                                depNode.BackupChunkPath = depChunkPath;
+                                    string depStatusPrefix = GetStatusPrefix(dep.Type.Value);
+                                    string depFileName = Path.GetFileName(dep.Path);
+
+                                    // Pass the prefixed name directly to the constructor to set the 'Name' property
+                                    var depNode = new FileSystemNodeModel($"{depStatusPrefix} {depFileName}", false, dep.Path, dep.SourceWad)
+                                    {
+                                        SourceChunkPathHash = dep.NewPathHash,
+                                        Status = GetDiffStatus(dep.Type.Value),
+                                        ChunkDiff = new SerializableChunkDiff
+                                        {
+                                            Type = dep.Type.Value,
+                                            OldPath = dep.Path,
+                                            NewPath = dep.Path,
+                                            OldPathHash = dep.OldPathHash,
+                                            NewPathHash = dep.NewPathHash,
+                                            OldCompressionType = dep.CompressionType,
+                                            NewCompressionType = dep.CompressionType,
+                                            BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
+                                        },
+                                        BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
+                                    };
+                                    node.Children.Add(depNode); // Add as child of the audio bank node
+                                }
                             }
                         }
                     }
@@ -136,26 +142,30 @@ namespace AssetsManager.Services.Explorer
                                 {
                                     foreach (var dep in file.Dependencies)
                                     {
-                                        var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
-
-                                        var depNode = new FileSystemNodeModel(Path.GetFileName(dep.Path), false, dep.Path, wadGroup.Key)
+                                        if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                         {
-                                            SourceChunkPathHash = dep.NewPathHash,
-                                            Status = GetDiffStatus(ChunkDiffType.Modified),
-                                            ChunkDiff = new SerializableChunkDiff
+                                            string depStatusPrefix = GetStatusPrefix(dep.Type.Value);
+                                            string depFileName = Path.GetFileName(dep.Path);
+
+                                            var depNode = new FileSystemNodeModel($"{depStatusPrefix} {depFileName}", false, dep.Path, wadGroup.Key)
                                             {
-                                                Type = ChunkDiffType.Modified,
-                                                OldPath = dep.Path,
-                                                NewPath = dep.Path,
-                                                OldPathHash = dep.OldPathHash,
-                                                NewPathHash = dep.NewPathHash,
-                                                OldCompressionType = dep.CompressionType,
-                                                NewCompressionType = dep.CompressionType,
-                                                BackupChunkPath = depChunkPath
-                                            },
-                                            BackupChunkPath = depChunkPath
-                                        };
-                                        statusNode.Children.Add(depNode);
+                                                SourceChunkPathHash = dep.NewPathHash,
+                                                Status = GetDiffStatus(dep.Type.Value),
+                                                ChunkDiff = new SerializableChunkDiff
+                                                {
+                                                    Type = dep.Type.Value,
+                                                    OldPath = dep.Path,
+                                                    NewPath = dep.Path,
+                                                    OldPathHash = dep.OldPathHash,
+                                                    NewPathHash = dep.NewPathHash,
+                                                    OldCompressionType = dep.CompressionType,
+                                                    NewCompressionType = dep.CompressionType,
+                                                    BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
+                                                },
+                                                BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
+                                            };
+                                            node.Children.Add(depNode); // Add as child of the audio bank node
+                                        }
                                     }
                                 }
                             }
