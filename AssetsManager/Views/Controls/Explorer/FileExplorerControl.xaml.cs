@@ -131,10 +131,27 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
-            LoadingIndicator.Visibility = Visibility.Visible;
+            // First, do the synchronous checks to decide the initial UI state.
+            bool shouldLoadWadTree = _isWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory);
+            bool shouldLoadDirTree = !_isWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
+
+            if (shouldLoadWadTree || shouldLoadDirTree)
+            {
+                // If we are going to load, show the indicator immediately.
+                LoadingIndicator.Visibility = Visibility.Visible;
+                NoDirectoryMessage.Visibility = Visibility.Collapsed;
+                FileTreeView.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                // If we are not going to load, show the correct placeholder immediately.
+                ShowPlaceholder(_isWadMode);
+            }
+
+            // Now, perform the async hash loading.
             await HashResolverService.LoadAllHashesAsync();
 
-            // Now proceed with the original logic
+            // Setup toolbar events (can be done regardless of loading)
             Toolbar.SearchTextChanged += Toolbar_SearchTextChanged;
             Toolbar.CollapseToContainerClicked += Toolbar_CollapseToContainerClicked;
             Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;
@@ -142,13 +159,14 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
 
-            if (_isWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
+            // Finally, trigger the tree build if needed.
+            if (shouldLoadWadTree)
             {
                 await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
             }
-            else
+            else if (shouldLoadDirTree)
             {
-                await ReloadTreeAsync();
+                await BuildDirectoryTreeAsync(DirectoriesCreator.AssetsDownloadedPath);
             }
         }
 
@@ -182,13 +200,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    RootNodes.Clear();
-                    FileTreeView.Visibility = Visibility.Collapsed;
-                    PlaceholderTitle.Text = "Select a LoL Directory";
-                    PlaceholderDescription.Text = "Choose the root folder where you installed League of Legends to browse its WAD files.";
-                    SelectLolDirButton.Visibility = Visibility.Visible;
-                    NoDirectoryMessage.Visibility = Visibility.Visible;
-                    LoadingIndicator.Visibility = Visibility.Collapsed;
+                    ShowPlaceholder(true);
                 }
             }
             else
@@ -199,15 +211,26 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    RootNodes.Clear();
-                    FileTreeView.Visibility = Visibility.Collapsed;
-                    PlaceholderTitle.Text = "Assets Directory Not Found";
-                    PlaceholderDescription.Text = "The application could not find the directory for downloaded assets.";
-                    SelectLolDirButton.Visibility = Visibility.Collapsed;
-                    NoDirectoryMessage.Visibility = Visibility.Visible;
-                    LoadingIndicator.Visibility = Visibility.Collapsed;
+                    ShowPlaceholder(false);
                 }
             }
+        }
+
+        private void ShowPlaceholder(bool isWadMode)
+        {
+            if (isWadMode) {
+                PlaceholderTitle.Text = "Select a LoL Directory";
+                PlaceholderDescription.Text = "Choose the root folder where you installed League of Legends to browse its WAD files.";
+                SelectLolDirButton.Visibility = Visibility.Visible;
+            } else {
+                PlaceholderTitle.Text = "Assets Directory Not Found";
+                PlaceholderDescription.Text = "The application could not find the directory for downloaded assets.";
+                SelectLolDirButton.Visibility = Visibility.Collapsed;
+            }
+            RootNodes.Clear();
+            FileTreeView.Visibility = Visibility.Collapsed;
+            NoDirectoryMessage.Visibility = Visibility.Visible;
+            LoadingIndicator.Visibility = Visibility.Collapsed;
         }
 
         private async void Toolbar_LoadComparisonClicked(object sender, RoutedEventArgs e)
