@@ -224,7 +224,7 @@ namespace AssetsManager.Services.Audio
                     _logService.LogWarning($"Could not find any associated .bin file for {clickedNode.Name}. Event names will be unavailable.");
                 }
 
-                var siblingsResult = FindSiblingFilesByName(clickedNode, rootNodes);
+                var siblingsResult = await FindSiblingFilesFromWadsInternalAsync(clickedNode, clickedNode.SourceWadPath, baseName);
 
                 return new LinkedAudioBank
                 {
@@ -298,20 +298,25 @@ namespace AssetsManager.Services.Audio
             else
             {
                 string wadPath = Path.Combine(basePath, clickedNode.ChunkDiff.SourceWadFile);
-                if (!File.Exists(wadPath))
-                {
-                    _logService.LogWarning($"Source WAD file not found: {wadPath}");
-                    return (null, null, null);
-                }
-
-                var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(wadPath);
-
-                FileSystemNodeModel wpkNode = wadContent.FirstOrDefault(c => c.Name == baseName + "_audio.wpk");
-                FileSystemNodeModel audioBnkNode = wadContent.FirstOrDefault(c => c.Name == baseName + "_audio.bnk");
-                FileSystemNodeModel eventsBnkNode = wadContent.FirstOrDefault(c => c.Name == baseName + "_events.bnk");
-
-                return (wpkNode, audioBnkNode, eventsBnkNode);
+                return await FindSiblingFilesFromWadsInternalAsync(clickedNode, wadPath, baseName);
             }
+        }
+
+        private async Task<(FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode)> FindSiblingFilesFromWadsInternalAsync(FileSystemNodeModel clickedNode, string wadPath, string baseName)
+        {
+            if (!File.Exists(wadPath))
+            {
+                _logService.LogWarning($"Source WAD file not found: {wadPath}");
+                return (null, null, null);
+            }
+
+            var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(wadPath);
+
+            FileSystemNodeModel wpkNode = wadContent.FirstOrDefault(c => c.Name == baseName + "_audio.wpk");
+            FileSystemNodeModel audioBnkNode = wadContent.FirstOrDefault(c => c.Name == baseName + "_audio.bnk");
+            FileSystemNodeModel eventsBnkNode = wadContent.FirstOrDefault(c => c.Name == baseName + "_events.bnk");
+
+            return (wpkNode, audioBnkNode, eventsBnkNode);
         }
 
         private record BinFileStrategy(string BinPath, string TargetWadName, BinType Type);

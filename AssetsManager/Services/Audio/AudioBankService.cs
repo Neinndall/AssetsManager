@@ -98,9 +98,16 @@ namespace AssetsManager.Services.Audio
                         allWems[wem.Id] = new WemSoundInfo { Id = wem.Id, Offset = wem.Offset, Size = wem.Size };
                     }
                     _logService.LogDebug($"[AUDIO] Found {allWems.Count} WEM entries in WPK.");
+
+                    // If we found WEMs in a WPK, we assume this is the definitive source.
+                    if (allWems.Any())
+                    {
+                        return allWems;
+                    }
                 }
             }
 
+            // Only process the BNK if no WEMs were found in a WPK.
             if (audioBnkData != null)
             {
                 using var audioStream = new MemoryStream(audioBnkData);
