@@ -56,6 +56,12 @@ namespace AssetsManager.Services.Monitor
             // Step 3: Download executable and get its version
             var versionInfo = await DownloadAndExtractVersionAsync(configurations);
 
+            if (!versionInfo.Any() && configurations.Any())
+            {
+                // Rely on the ManifestDownloader.exe specific error for now.
+                return;
+            }
+
             // Step 4: Save the versions and their URLs
             await SaveClientVersionsAsync(versionInfo);
 
@@ -241,7 +247,7 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        private async Task<int> GetManifestFileCountAsync(string manifestUrl, string outputDirectory, string localesArgument, CancellationToken cancellationToken)
+        private async Task<(int FileCount, bool Success)> GetManifestFileCountAsync(string manifestUrl, string outputDirectory, string localesArgument, CancellationToken cancellationToken)
         {
             string arguments = $"\"{manifestUrl}\" -o \"{outputDirectory}\" -l {localesArgument} -n -t 4 --verify-only skip-existing";
             string manifestDownloader = Path.Combine(_directoriesCreator.VersionsPath, "ManifestDownloader.exe");
@@ -257,6 +263,7 @@ namespace AssetsManager.Services.Monitor
             };
 
             int filesToUpdate = 0;
+            bool success = true;
             using (Process process = Process.Start(startInfo))
             {
                 var outputReader = process.StandardOutput;
@@ -278,10 +285,17 @@ namespace AssetsManager.Services.Monitor
                     }
                 });
 
-                var errorTask = errorReader.ReadToEndAsync();
+                var errorTask = errorReader.ReadToEndAsync(); // Read all error output
+                
                 await Task.WhenAll(process.WaitForExitAsync(cancellationToken), outputTask);
+
+                if (process.ExitCode != 0)
+                {
+                    success = false;
+                    _logService.LogError($"[ManifestDownloader PRE-VERIFY] Exited with code {process.ExitCode}. Error output: {errorTask.Result}");
+                }
             }
-            return filesToUpdate;
+            return (filesToUpdate, success);
         }
 
         private async Task<Process> RunManifestDownloaderAsync(string arguments, string taskName, int totalFiles = 0, bool silent = false, CancellationToken cancellationToken = default)
@@ -309,7 +323,6 @@ namespace AssetsManager.Services.Monitor
 
                 while ((line = await process.StandardOutput.ReadLineAsync()) != null)
                 {
-                    _logService.Log($"[ManifestDownloader STDOUT] {line}");
                     if (silent) continue;
 
                     Match fixingMatch = fixingUpRegex.Match(line);
@@ -338,7 +351,7 @@ namespace AssetsManager.Services.Monitor
                 string line;
                 while ((line = await process.StandardError.ReadLineAsync()) != null)
                 {
-                    _logService.Log($"[ManifestDownloader STDERR] {line}");
+                    _logService.LogError($"[ManifestDownloader] {line}");
                 }
             }, cancellationToken);
 
@@ -391,7 +404,14 @@ namespace AssetsManager.Services.Monitor
                 VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files..."));
 
                 string localesArgument = string.Join(" ", locales);
-                int totalFiles = await GetManifestFileCountAsync(manifestUrl, lolPbeDirectory, localesArgument, cancellationToken);
+                (int totalFiles, bool preCheckSuccess) = await GetManifestFileCountAsync(manifestUrl, lolPbeDirectory, localesArgument, cancellationToken);
+
+                if (!preCheckSuccess)
+                {
+                    success = false;
+                    message = "Plugin verification failed.";
+                    return;
+                }
 
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -462,7 +482,14 @@ namespace AssetsManager.Services.Monitor
 
                 string gameDirectory = Path.Combine(lolPbeDirectory, "Game");
                 string localesArgument = string.Join(" ", locales);
-                int totalFiles = await GetManifestFileCountAsync(manifestUrl, gameDirectory, localesArgument, cancellationToken);
+                (int totalFiles, bool preCheckSuccess) = await GetManifestFileCountAsync(manifestUrl, gameDirectory, localesArgument, cancellationToken);
+
+                if (!preCheckSuccess)
+                {
+                    success = false;
+                    message = "Game client verification failed.";
+                    return;
+                }
 
                 cancellationToken.ThrowIfCancellationRequested();
 
