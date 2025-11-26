@@ -73,6 +73,23 @@ namespace AssetsManager.Utils
             {
                 var backups = new List<BackupModel>();
                 var lolPbeDirectory = _appSettings.LolPbeDirectory;
+                
+                if (!string.IsNullOrEmpty(lolPbeDirectory))
+                {
+                    var specificBackupPath = lolPbeDirectory + "_old";
+                    if (Directory.Exists(specificBackupPath))
+                    {
+                        var directoryInfo = new DirectoryInfo(specificBackupPath);
+                        backups.Add(new BackupModel
+                        {
+                            Name = directoryInfo.Name,
+                            Path = directoryInfo.FullName,
+                            CreationDate = directoryInfo.CreationTime,
+                            IsSelected = false,
+                            IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
+                        });
+                    }
+                }
 
                 if (string.IsNullOrEmpty(lolPbeDirectory))
                 {
@@ -90,6 +107,11 @@ namespace AssetsManager.Utils
                 {
                     if (dir.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
                     {
+                        if (backups.Any(b => b.Path.Equals(dir, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            continue;
+                        }
+                        
                         var directoryInfo = new DirectoryInfo(dir);
                         backups.Add(new BackupModel
                         {
