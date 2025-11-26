@@ -299,13 +299,8 @@ namespace AssetsManager.Services.Monitor
             };
 
             Process process = Process.Start(startInfo);
-            if (silent)
-            {
-                await process.WaitForExitAsync(cancellationToken);
-                return process;
-            }
-
-            _ = Task.Run(async () =>
+            
+            var outputTask = Task.Run(async () =>
             {
                 string line;
                 int fileCounter = 0;
@@ -314,7 +309,9 @@ namespace AssetsManager.Services.Monitor
 
                 while ((line = await process.StandardOutput.ReadLineAsync()) != null)
                 {
-                    _logService.LogDebug($"[ManifestDownloader DOWNLOAD] {line}");
+                    _logService.Log($"[ManifestDownloader STDOUT] {line}");
+                    if (silent) continue;
+
                     Match fixingMatch = fixingUpRegex.Match(line);
                     Match downloadingMatch = downloadingRegex.Match(line);
                     string fileName = null;
@@ -336,6 +333,20 @@ namespace AssetsManager.Services.Monitor
                 }
             }, cancellationToken);
 
+            var errorTask = Task.Run(async () =>
+            {
+                string line;
+                while ((line = await process.StandardError.ReadLineAsync()) != null)
+                {
+                    _logService.Log($"[ManifestDownloader STDERR] {line}");
+                }
+            }, cancellationToken);
+
+            if (silent)
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            
             return process;
         }
 
@@ -389,9 +400,18 @@ namespace AssetsManager.Services.Monitor
                 process = await RunManifestDownloaderAsync(arguments, taskName, totalFiles, cancellationToken: cancellationToken);
                 await process.WaitForExitAsync(cancellationToken);
 
-                _logService.LogSuccess("Plugin download process finished.");
-                success = true;
-                message = "Plugin download finished.";
+                if (process.ExitCode == 0)
+                {
+                    _logService.LogSuccess("Plugin download process finished.");
+                    success = true;
+                    message = "Plugin download finished.";
+                }
+                else
+                {
+                    _logService.LogError($"ManifestDownloader.exe exited with code {process.ExitCode} during plugin download.");
+                    success = false;
+                    message = $"Plugin download failed with exit code {process.ExitCode}.";
+                }
             }
             catch (OperationCanceledException)
             {
@@ -406,7 +426,7 @@ namespace AssetsManager.Services.Monitor
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "An error occurred during plugin download.");
+                    _logService.LogError(ex, "An error occurred during plugin download.");
                 success = false;
                 message = "Plugin download failed.";
             }
@@ -451,9 +471,18 @@ namespace AssetsManager.Services.Monitor
                 process = await RunManifestDownloaderAsync(arguments, taskName, totalFiles, cancellationToken: cancellationToken);
                 await process.WaitForExitAsync(cancellationToken);
 
-                _logService.LogSuccess("Game client download process finished.");
-                success = true;
-                message = "Game client download finished.";
+                if (process.ExitCode == 0)
+                {
+                    _logService.LogSuccess("Game client download process finished.");
+                    success = true;
+                    message = "Game client download finished.";
+                }
+                else
+                {
+                    _logService.LogError($"ManifestDownloader.exe exited with code {process.ExitCode} during game client download.");
+                    success = false;
+                    message = $"Game client download failed with exit code {process.ExitCode}.";
+                }
             }
             catch (OperationCanceledException)
             {
