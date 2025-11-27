@@ -57,7 +57,7 @@
                       Style="{StaticResource ModernTreeView}">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type models:FileSystemNodeModel}" ItemsSource="{Binding Children}">
-                        <Grid Margin="5,2,0,2">
+                        <Grid Margin="3,2,0,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
