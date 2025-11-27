@@ -30,47 +30,6 @@ namespace AssetsManager.Services.Monitor
         private static readonly string[] VersionSets = { "PBE1" };
         private static readonly Dictionary<string, string> RegionMap = new Dictionary<string, string> { { "PBE", "PBE1" } };
 
-        private class ProcessExecutionResult
-        {
-            public int ExitCode { get; set; }
-            public string StandardOutput { get; set; }
-            public string StandardError { get; set; }
-            public bool IsSuccess => ExitCode == 0 && string.IsNullOrEmpty(StandardError);
-        }
-
-        private async Task<ProcessExecutionResult> ExecuteManifestDownloaderAsync(string arguments, CancellationToken cancellationToken)
-        {
-            string manifestDownloaderPath = Path.Combine(_directoriesCreator.VersionsPath, "ManifestDownloader.exe");
-
-            ProcessStartInfo startInfo = new ProcessStartInfo
-            {
-                FileName = manifestDownloaderPath,
-                Arguments = arguments,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            using (Process process = new Process { StartInfo = startInfo })
-            {
-                process.Start();
-
-                // Read all standard output and standard error
-                string standardOutput = await process.StandardOutput.ReadToEndAsync();
-                string standardError = await process.StandardError.ReadToEndAsync();
-
-                await process.WaitForExitAsync(cancellationToken);
-
-                return new ProcessExecutionResult
-                {
-                    ExitCode = process.ExitCode,
-                    StandardOutput = standardOutput,
-                    StandardError = standardError
-                };
-            }
-        }
-
         public VersionService(LogService logService, HttpClient httpClient, DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
@@ -95,7 +54,7 @@ namespace AssetsManager.Services.Monitor
             var configurations = await FetchConfigurationsAsync();
 
             // Step 3: Download executable and get its version
-            var versionInfo = await DownloadAndExtractVersionAsync(configurations, CancellationToken.None);
+            var versionInfo = await DownloadAndExtractVersionAsync(configurations);
 
             if (!versionInfo.Any() && configurations.Any())
             {
@@ -178,7 +137,7 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        private async Task<List<(string region, string os, string version, string url)>> DownloadAndExtractVersionAsync(List<(string, string)> configs, CancellationToken cancellationToken)
+        private async Task<List<(string region, string os, string version, string url)>> DownloadAndExtractVersionAsync(List<(string, string)> configs)
         {
             var versions = new List<(string, string, string, string)>();
             var urlsSeen = new HashSet<string>();
@@ -196,13 +155,8 @@ namespace AssetsManager.Services.Monitor
                     try
                     {
                         Directory.CreateDirectory(tempDir);
-                        ProcessExecutionResult result = await ExtractAndRunManifestDownloader(url, tempDir, cancellationToken);
-
-                        if (!result.IsSuccess)
-                        {
-                            _logService.LogError($"Error downloading from LeagueClient.exe the manifests content. {result.StandardError.Trim()}");
-                            continue; // Skip to next URL if download failed
-                        }
+                        var process = await ExtractAndRunManifestDownloader(url, tempDir);
+                        await process.WaitForExitAsync();
 
                         string exePath = Path.Combine(tempDir, TargetFilename);
                         string version = GetExeVersion(exePath);
@@ -214,7 +168,7 @@ namespace AssetsManager.Services.Monitor
                     }
                     catch (Exception ex)
                     {
-                        _logService.LogError(ex, $"An unexpected error occurred while processing {url}");
+                        _logService.LogError(ex, $"Error downloading from {url}");
                     }
                     finally
                     {
@@ -249,10 +203,10 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        private async Task<ProcessExecutionResult> ExtractAndRunManifestDownloader(string manifestUrl, string outputDir, CancellationToken cancellationToken = default)
+        private async Task<Process> ExtractAndRunManifestDownloader(string manifestUrl, string outputDir, CancellationToken cancellationToken = default)
         {
             string arguments = $"\"{manifestUrl}\" -f {TargetFilename} -o \"{outputDir}\" -t 4";
-            return await ExecuteManifestDownloaderAsync(arguments, cancellationToken);
+            return await RunManifestDownloaderAsync(arguments, "Downloading League Client Executable", cancellationToken: cancellationToken);
         }
 
         private void ExtractManifestDownloader()
@@ -296,35 +250,117 @@ namespace AssetsManager.Services.Monitor
         private async Task<(int FileCount, bool Success)> GetManifestFileCountAsync(string manifestUrl, string outputDirectory, string localesArgument, CancellationToken cancellationToken)
         {
             string arguments = $"\"{manifestUrl}\" -o \"{outputDirectory}\" -l {localesArgument} -n -t 4 --verify-only skip-existing";
+            string manifestDownloader = Path.Combine(_directoriesCreator.VersionsPath, "ManifestDownloader.exe");
 
-            ProcessExecutionResult result = await ExecuteManifestDownloaderAsync(arguments, cancellationToken);
-
-            if (!result.IsSuccess)
+            ProcessStartInfo startInfo = new ProcessStartInfo
             {
-                _logService.LogError($"[ManifestDownloader PRE-VERIFY] {result.StandardError.Trim()}");
-                return (0, false);
-            }
+                FileName = manifestDownloader,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
 
             int filesToUpdate = 0;
-            // Parse StandardOutput to get the count
-            Regex incorrectRegex = new Regex(@"^File (.+?) is incorrect\.$");
-            Regex missingRegex = new Regex(@"^File (.+?) is missing\.$");
-
-            using (StringReader reader = new StringReader(result.StandardOutput))
+            bool success = true;
+            using (Process process = Process.Start(startInfo))
             {
-                string line;
-                while ((line = await reader.ReadLineAsync()) != null)
+                var outputReader = process.StandardOutput;
+                var errorReader = process.StandardError;
+
+                var outputTask = Task.Run(async () =>
                 {
-                    Match incorrectMatch = incorrectRegex.Match(line);
-                    Match missingMatch = missingRegex.Match(line);
-                    if (incorrectMatch.Success || missingMatch.Success)
+                    string line;
+                    Regex incorrectRegex = new Regex(@"^File (.+?) is incorrect\.$");
+                    Regex missingRegex = new Regex(@"^File (.+?) is missing\.$");
+
+                    while ((line = await outputReader.ReadLineAsync()) != null)
                     {
-                        filesToUpdate++;
+                        _logService.LogDebug($"[ManifestDownloader PRE-VERIFY] {line}");
+                        if (incorrectRegex.IsMatch(line) || missingRegex.IsMatch(line))
+                        {
+                            filesToUpdate++;
+                        }
                     }
+                });
+
+                var errorTask = errorReader.ReadToEndAsync(); // Read all error output
+                
+                await Task.WhenAll(process.WaitForExitAsync(cancellationToken), outputTask);
+
+                if (process.ExitCode != 0)
+                {
+                    success = false;
+                    _logService.LogError($"[ManifestDownloader PRE-VERIFY] Exited with code {process.ExitCode}. Error output: {errorTask.Result}");
                 }
             }
+            return (filesToUpdate, success);
+        }
+
+        private async Task<Process> RunManifestDownloaderAsync(string arguments, string taskName, int totalFiles = 0, bool silent = false, CancellationToken cancellationToken = default)
+        {
+            string manifestDownloader = Path.Combine(_directoriesCreator.VersionsPath, "ManifestDownloader.exe");
+
+            ProcessStartInfo startInfo = new ProcessStartInfo
+            {
+                FileName = manifestDownloader,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            Process process = Process.Start(startInfo);
             
-            return (filesToUpdate, true);
+            var outputTask = Task.Run(async () =>
+            {
+                string line;
+                int fileCounter = 0;
+                Regex fixingUpRegex = new Regex(@"^Fixing up file (.+?)\.\.\.$");
+                Regex downloadingRegex = new Regex(@"^Downloading file (.+?)\.\.\.$");
+
+                while ((line = await process.StandardOutput.ReadLineAsync()) != null)
+                {
+                    if (silent) continue;
+
+                    Match fixingMatch = fixingUpRegex.Match(line);
+                    Match downloadingMatch = downloadingRegex.Match(line);
+                    string fileName = null;
+
+                    if (fixingMatch.Success)
+                    {
+                        fileName = fixingMatch.Groups[1].Value;
+                    }
+                    else if (downloadingMatch.Success)
+                    {
+                        fileName = downloadingMatch.Groups[1].Value;
+                    }
+
+                    if (fileName != null)
+                    {
+                        fileCounter++;
+                        VersionDownloadProgressChanged?.Invoke(this, (taskName, fileCounter, totalFiles, fileName));
+                    }
+                }
+            }, cancellationToken);
+
+            var errorTask = Task.Run(async () =>
+            {
+                string line;
+                while ((line = await process.StandardError.ReadLineAsync()) != null)
+                {
+                    _logService.LogError($"[ManifestDownloader] {line}");
+                }
+            }, cancellationToken);
+
+            if (silent)
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            
+            return process;
         }
 
         private string GetExeVersion(string filePath)
@@ -345,44 +381,12 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        private void ParseAndReportProgress(string output, string taskName, int totalFiles)
-        {
-            int fileCounter = 0;
-            Regex fixingUpRegex = new Regex(@"^Fixing up file (.+?)\.\.\.$");
-            Regex downloadingRegex = new Regex(@"^Downloading file (.+?)\.\.\.$");
-
-            using (StringReader reader = new StringReader(output))
-            {
-                string line;
-                while ((line = reader.ReadLine()) != null)
-                {
-                    Match fixingMatch = fixingUpRegex.Match(line);
-                    Match downloadingMatch = downloadingRegex.Match(line);
-                    string fileName = null;
-
-                    if (fixingMatch.Success)
-                    {
-                        fileName = fixingMatch.Groups[1].Value;
-                    }
-                    else if (downloadingMatch.Success)
-                    {
-                        fileName = downloadingMatch.Groups[1].Value;
-                    }
-
-                    if (fileName != null)
-                    {
-                        fileCounter++;
-                        VersionDownloadProgressChanged?.Invoke(this, (taskName, fileCounter, totalFiles, fileName));
-                    }
-                }
-            }
-        }
-
         public async Task DownloadPluginsAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
             const string taskName = "Updating League Client";
             bool success = false;
             string message = "Plugin download failed.";
+            Process process = null;
 
             try
             {
@@ -413,11 +417,10 @@ namespace AssetsManager.Services.Monitor
 
                 string arguments = $"\"{manifestUrl}\" -o \"{lolPbeDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
 
-                ProcessExecutionResult downloadResult = await ExecuteManifestDownloaderAsync(arguments, cancellationToken);
-                
-                ParseAndReportProgress(downloadResult.StandardOutput, taskName, totalFiles);
+                process = await RunManifestDownloaderAsync(arguments, taskName, totalFiles, cancellationToken: cancellationToken);
+                await process.WaitForExitAsync(cancellationToken);
 
-                if (downloadResult.IsSuccess)
+                if (process.ExitCode == 0)
                 {
                     _logService.LogSuccess("Plugin download process finished.");
                     success = true;
@@ -425,14 +428,19 @@ namespace AssetsManager.Services.Monitor
                 }
                 else
                 {
-                    _logService.LogError($"[ManifestDownloader] {downloadResult.StandardError.Trim()}");
+                    _logService.LogError($"ManifestDownloader.exe exited with code {process.ExitCode} during plugin download.");
                     success = false;
-                    message = "Plugin download failed."; // The specific error is in StandardError
+                    message = $"Plugin download failed with exit code {process.ExitCode}.";
                 }
             }
             catch (OperationCanceledException)
             {
                 _logService.LogWarning("Plugin download was cancelled by the user.");
+                if (process != null && !process.HasExited)
+                {
+                    process.Kill(true);
+                    process.WaitForExit();
+                }
                 success = false;
                 message = "Plugin download cancelled.";
             }
@@ -444,15 +452,18 @@ namespace AssetsManager.Services.Monitor
             }
             finally
             {
+                process?.Dispose();
                 CleanupManifestDownloader();
                 VersionDownloadCompleted?.Invoke(this, (taskName, success, message));
             }
         }
+
         public async Task DownloadGameClientAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
             const string taskName = "Updating Game Client";
             bool success = false;
             string message = "Game client download failed.";
+            Process process = null;
 
             try
             {
@@ -484,11 +495,10 @@ namespace AssetsManager.Services.Monitor
 
                 string arguments = $"\"{manifestUrl}\" -o \"{gameDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
 
-                ProcessExecutionResult downloadResult = await ExecuteManifestDownloaderAsync(arguments, cancellationToken);
+                process = await RunManifestDownloaderAsync(arguments, taskName, totalFiles, cancellationToken: cancellationToken);
+                await process.WaitForExitAsync(cancellationToken);
 
-                ParseAndReportProgress(downloadResult.StandardOutput, taskName, totalFiles);
-
-                if (downloadResult.IsSuccess)
+                if (process.ExitCode == 0)
                 {
                     _logService.LogSuccess("Game client download process finished.");
                     success = true;
@@ -496,14 +506,19 @@ namespace AssetsManager.Services.Monitor
                 }
                 else
                 {
-                    _logService.LogError($"[ManifestDownloader] {downloadResult.StandardError.Trim()}");
+                    _logService.LogError($"ManifestDownloader.exe exited with code {process.ExitCode} during game client download.");
                     success = false;
-                    message = "Game client download failed."; // The specific error is in StandardError
+                    message = $"Game client download failed with exit code {process.ExitCode}.";
                 }
             }
             catch (OperationCanceledException)
             {
                 _logService.LogWarning("Game client download was cancelled by the user.");
+                if (process != null && !process.HasExited)
+                {
+                    process.Kill(true);
+                    process.WaitForExit();
+                }
                 success = false;
                 message = "Game client download cancelled.";
             }
@@ -515,6 +530,7 @@ namespace AssetsManager.Services.Monitor
             }
             finally
             {
+                process?.Dispose();
                 CleanupManifestDownloader();
                 VersionDownloadCompleted?.Invoke(this, (taskName, success, message));
             }
