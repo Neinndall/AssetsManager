@@ -305,10 +305,7 @@ namespace AssetsManager.Services.Comparator
                         Directory.CreateDirectory(targetChunkPath);
                         await File.WriteAllBytesAsync(destChunkPath, rawChunkData);
                     }
-                    else
-                    {
-                        _logService.LogWarning($"Could not find chunk with hash {hash:X16} in {sourceWadPath}");
-                    }
+
                 }
             }
             catch (System.Exception ex)
