@@ -60,9 +60,9 @@
         <!-- Main Content -->
         <Grid Grid.Row="1" Margin="24">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="3*"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0"
                                             SelectedItemChanged="ResultsTree_SelectedItemChanged"
