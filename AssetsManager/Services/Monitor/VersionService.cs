@@ -383,96 +383,29 @@ namespace AssetsManager.Services.Monitor
 
         public async Task DownloadPluginsAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
-            const string taskName = "Updating League Client";
-            bool success = false;
-            string message = "Plugin download failed.";
-            Process process = null;
-
-            try
-            {
-                _logService.Log("Starting verifying/updating the league client...");
-                ExtractManifestDownloader();
-
-                if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolPbeDirectory) || locales == null || !locales.Any())
-                {
-                    _logService.LogWarning("DownloadPluginsAsync called with invalid parameters.");
-                    VersionDownloadCompleted?.Invoke(this, (taskName, false, "Invalid parameters."));
-                    return;
-                }
-
-                VersionDownloadStarted?.Invoke(this, taskName);
-                VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files..."));
-
-                string localesArgument = string.Join(" ", locales);
-                (int totalFiles, bool preCheckSuccess) = await GetManifestFileCountAsync(manifestUrl, lolPbeDirectory, localesArgument, cancellationToken);
-
-                if (!preCheckSuccess)
-                {
-                    success = false;
-                    message = "Plugin verification failed.";
-                    return;
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
-
-                string arguments = $"\"{manifestUrl}\" -o \"{lolPbeDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
-
-                process = await RunManifestDownloaderAsync(arguments, taskName, totalFiles, cancellationToken: cancellationToken);
-                await process.WaitForExitAsync(cancellationToken);
-
-                if (process.ExitCode == 0)
-                {
-                    _logService.LogSuccess("Plugin download process finished.");
-                    success = true;
-                    message = "Plugin download finished.";
-                }
-                else
-                {
-                    _logService.LogError($"ManifestDownloader.exe exited with code {process.ExitCode} during plugin download.");
-                    success = false;
-                    message = $"Plugin download failed with exit code {process.ExitCode}.";
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                _logService.LogWarning("Plugin download was cancelled by the user.");
-                if (process != null && !process.HasExited)
-                {
-                    process.Kill(true);
-                    process.WaitForExit();
-                }
-                success = false;
-                message = "Plugin download cancelled.";
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "An error occurred during plugin download.");
-                success = false;
-                message = "Plugin download failed.";
-            }
-            finally
-            {
-                process?.Dispose();
-                CleanupManifestDownloader();
-                VersionDownloadCompleted?.Invoke(this, (taskName, success, message));
-            }
+            await ExecuteDownloadTaskAsync("Updating League Client", manifestUrl, lolPbeDirectory, locales, cancellationToken);
         }
 
         public async Task DownloadGameClientAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
-            const string taskName = "Updating Game Client";
+            string gameDirectory = Path.Combine(lolPbeDirectory, "Game");
+            await ExecuteDownloadTaskAsync("Updating Game Client", manifestUrl, gameDirectory, locales, cancellationToken);
+        }
+
+        private async Task ExecuteDownloadTaskAsync(string taskName, string manifestUrl, string targetDirectory, List<string> locales, CancellationToken cancellationToken)
+        {
             bool success = false;
-            string message = "Game client download failed.";
+            string message = $"{taskName} failed.";
             Process process = null;
 
             try
             {
-                _logService.Log("Starting verifying/updating the game client...");
+                _logService.Log($"Starting verifying/updating the {taskName.ToLower()}...");
                 ExtractManifestDownloader();
 
-                if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(lolPbeDirectory) || locales == null || !locales.Any())
+                if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(targetDirectory) || locales == null || !locales.Any())
                 {
-                    _logService.LogWarning("DownloadGameClientAsync called with invalid parameters.");
+                    _logService.LogWarning($"{taskName} called with invalid parameters.");
                     VersionDownloadCompleted?.Invoke(this, (taskName, false, "Invalid parameters."));
                     return;
                 }
@@ -480,53 +413,47 @@ namespace AssetsManager.Services.Monitor
                 VersionDownloadStarted?.Invoke(this, taskName);
                 VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verify Files..."));
 
-                string gameDirectory = Path.Combine(lolPbeDirectory, "Game");
                 string localesArgument = string.Join(" ", locales);
-                (int totalFiles, bool preCheckSuccess) = await GetManifestFileCountAsync(manifestUrl, gameDirectory, localesArgument, cancellationToken);
+                (int totalFiles, bool preCheckSuccess) = await GetManifestFileCountAsync(manifestUrl, targetDirectory, localesArgument, cancellationToken);
 
                 if (!preCheckSuccess)
                 {
-                    success = false;
-                    message = "Game client verification failed.";
-                    return;
+                    message = $"{taskName} verification failed.";
+                    return; 
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                string arguments = $"\"{manifestUrl}\" -o \"{gameDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
+                string arguments = $"\"{manifestUrl}\" -o \"{targetDirectory}\" -l {localesArgument} -n -t 4 skip-existing";
 
                 process = await RunManifestDownloaderAsync(arguments, taskName, totalFiles, cancellationToken: cancellationToken);
                 await process.WaitForExitAsync(cancellationToken);
 
                 if (process.ExitCode == 0)
                 {
-                    _logService.LogSuccess("Game client download process finished.");
+                    _logService.LogSuccess($"{taskName} process finished.");
                     success = true;
-                    message = "Game client download finished.";
+                    message = $"{taskName} finished.";
                 }
                 else
                 {
-                    _logService.LogError($"ManifestDownloader.exe exited with code {process.ExitCode} during game client download.");
-                    success = false;
-                    message = $"Game client download failed with exit code {process.ExitCode}.";
+                    // Error is already logged in real-time by RunManifestDownloaderAsync
+                    message = $"{taskName} failed with exit code {process.ExitCode}.";
                 }
             }
             catch (OperationCanceledException)
             {
-                _logService.LogWarning("Game client download was cancelled by the user.");
+                _logService.LogWarning($"{taskName} was cancelled by the user.");
                 if (process != null && !process.HasExited)
                 {
                     process.Kill(true);
                     process.WaitForExit();
                 }
-                success = false;
-                message = "Game client download cancelled.";
+                message = $"{taskName} cancelled.";
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "An error occurred during game client download.");
-                success = false;
-                message = "Game client download failed.";
+                _logService.LogError(ex, $"An error occurred during {taskName.ToLower()}.");
             }
             finally
             {
