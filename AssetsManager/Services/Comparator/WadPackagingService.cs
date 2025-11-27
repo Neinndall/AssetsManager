@@ -30,6 +30,30 @@ namespace AssetsManager.Services.Comparator
             _logService.LogDebug($"[GetBinFileSearchStrategy] Searching for BIN strategy. FullPath: '{fullPath}', SourceWad: '{sourceWadPath}'");
             string sourceWadName = Path.GetFileName(sourceWadPath);
 
+            // Strategy 0: Infer from companion path structure
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 0: Infer from companion path structure.");
+            if (fullPath.Contains("/companions/pets/"))
+            {
+                var pathParts = fullPath.Split('/');
+                int petsIndex = Array.IndexOf(pathParts, "pets");
+
+                if (petsIndex != -1 && pathParts.Length > petsIndex + 2)
+                {
+                    string petName = pathParts[petsIndex + 1];
+                    string themeName = pathParts[petsIndex + 2];
+
+                    if (!string.IsNullOrEmpty(petName) && !string.IsNullOrEmpty(themeName))
+                    {
+                        string binPath = $"data/characters/{petName}/themes/{themeName}/root.bin";
+                        string targetWadName = "companions.wad.client";
+                        var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Companion);
+                        _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 0 successful. Found: {strategy}");
+                        return strategy;
+                    }
+                }
+            }
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 0 failed or was not applicable.");
+
             // Strategy 1: Infer from full path structure
             _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 1: Infer from full path structure.");
             if (fullPath.Contains("/characters/") && fullPath.Contains("/skins/"))

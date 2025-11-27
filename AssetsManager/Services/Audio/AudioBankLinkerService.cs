@@ -326,6 +326,30 @@ namespace AssetsManager.Services.Audio
             _logService.Log($"[GetBinFileSearchStrategy] Searching for BIN strategy for node: '{clickedNode.FullPath}' in WAD: '{clickedNode.SourceWadPath}'");
             string sourceWadName = Path.GetFileName(clickedNode.SourceWadPath);
 
+            // Strategy 0: Infer from companion path structure
+            _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 0: Infer from companion path structure.");
+            if (clickedNode.FullPath.Contains("/companions/pets/"))
+            {
+                var pathParts = clickedNode.FullPath.Split('/');
+                int petsIndex = Array.IndexOf(pathParts, "pets");
+
+                if (petsIndex != -1 && pathParts.Length > petsIndex + 2)
+                {
+                    string petName = pathParts[petsIndex + 1];
+                    string themeName = pathParts[petsIndex + 2];
+
+                    if (!string.IsNullOrEmpty(petName) && !string.IsNullOrEmpty(themeName))
+                    {
+                        string binPath = $"data/characters/{petName}/themes/{themeName}/root.bin";
+                        string targetWadName = "companions.wad.client";
+                        var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Companion);
+                        _logService.Log($"[GetBinFileSearchStrategy] Strategy 0 successful. Found: {strategy}");
+                        return strategy;
+                    }
+                }
+            }
+            _logService.Log("[GetBinFileSearchStrategy] Strategy 0 failed or was not applicable.");
+
             // Strategy 1: Infer from full path structure
             _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 1: Infer from full path structure.");
             if (clickedNode.FullPath.Contains("/characters/") && clickedNode.FullPath.Contains("/skins/"))
@@ -358,7 +382,9 @@ namespace AssetsManager.Services.Audio
             if (wadNameParts.Length > 0)
             {
                 string championName = wadNameParts[0];
-                if (!championName.StartsWith("map", StringComparison.OrdinalIgnoreCase) && !championName.Equals("common", StringComparison.OrdinalIgnoreCase))
+                if (!championName.StartsWith("map", StringComparison.OrdinalIgnoreCase) && 
+                    !championName.Equals("common", StringComparison.OrdinalIgnoreCase) &&
+                    !championName.Equals("companions", StringComparison.OrdinalIgnoreCase))
                 {
                     string skinName = "skin0";
                     string binPath = $"data/characters/{championName.ToLower()}/skins/{skinName}.bin";
