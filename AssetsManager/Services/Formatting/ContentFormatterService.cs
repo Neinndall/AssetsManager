@@ -23,9 +23,9 @@ namespace AssetsManager.Services.Formatting
         private readonly HashResolverService _hashResolverService;
         private readonly AudioBankService _audioBankService;
         private readonly WadExtractionService _wadExtractionService;
-        private readonly JsonFormattingService _jsonFormattingService;
+        private readonly JsonFormatterService _jsonFormatterService;
 
-        public ContentFormatterService(LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService, HashResolverService hashResolverService, AudioBankService audioBankService, WadExtractionService wadExtractionService, JsonFormattingService jsonFormattingService)
+        public ContentFormatterService(LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService, HashResolverService hashResolverService, AudioBankService audioBankService, WadExtractionService wadExtractionService, JsonFormatterService jsonFormatterService)
         {
             _logService = logService;
             _jsBeautifierService = jsBeautifierService;
@@ -33,7 +33,7 @@ namespace AssetsManager.Services.Formatting
             _hashResolverService = hashResolverService;
             _audioBankService = audioBankService;
             _wadExtractionService = wadExtractionService;
-            _jsonFormattingService = jsonFormattingService;
+            _jsonFormatterService = jsonFormatterService;
         }
 
         public async Task<string> FormatAudioBankAsync(LinkedAudioBank linkedBank)
@@ -60,7 +60,7 @@ namespace AssetsManager.Services.Formatting
                 {
                     DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
                 };
-                return await _jsonFormattingService.FormatJsonAsync(result, options);
+                return await _jsonFormatterService.FormatJsonAsync(result, options);
             }
             catch (Exception ex)
             {
@@ -123,7 +123,7 @@ namespace AssetsManager.Services.Formatting
             {
                 using var bnkStream = new MemoryStream(data);
                 var bnkFile = BnkParser.Parse(bnkStream, _logService);
-                return await _jsonFormattingService.FormatJsonAsync(bnkFile);
+                return await _jsonFormatterService.FormatJsonAsync(bnkFile);
             }
             catch (Exception ex)
             {
@@ -201,7 +201,7 @@ namespace AssetsManager.Services.Formatting
         private async Task<string> GetFormattedJsonStringAsync(byte[] data)
         {
             var rawJson = Encoding.UTF8.GetString(data);
-            return await _jsonFormattingService.FormatJsonAsync(rawJson);
+            return await _jsonFormatterService.FormatJsonAsync(rawJson);
         }
     }
 }

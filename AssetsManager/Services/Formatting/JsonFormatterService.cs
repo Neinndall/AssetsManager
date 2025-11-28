@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 
 namespace AssetsManager.Services.Formatting
 {
-    public class JsonFormattingService
+    public class JsonFormatterService
     {
         public (string Text, List<ChangeType> LineTypes) NormalizeTextForAlignment(DiffPaneModel paneModel)
         {

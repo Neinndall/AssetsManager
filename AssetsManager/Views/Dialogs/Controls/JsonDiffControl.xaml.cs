@@ -29,7 +29,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         private bool _isWordLevelDiff = false;
         private bool _hideUnchangedLines = false;
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
-        public JsonFormattingService JsonFormattingService { get; set; }
+        public JsonFormatterService JsonFormatterService { get; set; }
         public event EventHandler<bool> ComparisonFinished;
 
         public JsonDiffControl()
@@ -143,8 +143,8 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             var (normalizedOld, normalizedNew) = await Task.Run(() =>
             {
-                var nOld = JsonFormattingService.NormalizeTextForAlignment(modelToShow.OldText);
-                var nNew = JsonFormattingService.NormalizeTextForAlignment(modelToShow.NewText);
+                var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText);
+                var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText);
                 return (nOld, nNew);
             });
 

@@ -29,9 +29,9 @@ namespace AssetsManager.Services.Core
         private readonly AudioBankLinkerService _audioBankLinkerService;
         private readonly AudioBankService _audioBankService;
         private readonly WadExtractionService _wadExtractionService;
-        private readonly JsonFormattingService _jsonFormattingService;
+        private readonly JsonFormatterService _jsonFormatterService;
 
-        public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, ContentFormatterService contentFormatterService, AudioBankLinkerService audioBankLinkerService, AudioBankService audioBankService, WadExtractionService wadExtractionService, JsonFormattingService jsonFormattingService)
+        public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, ContentFormatterService contentFormatterService, AudioBankLinkerService audioBankLinkerService, AudioBankService audioBankService, WadExtractionService wadExtractionService, JsonFormatterService jsonFormatterService)
         {
             _serviceProvider = serviceProvider;
             _wadDifferenceService = wadDifferenceService;
@@ -41,7 +41,7 @@ namespace AssetsManager.Services.Core
             _audioBankLinkerService = audioBankLinkerService;
             _audioBankService = audioBankService;
             _wadExtractionService = wadExtractionService;
-            _jsonFormattingService = jsonFormattingService;
+            _jsonFormatterService = jsonFormatterService;
         }
 
         public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath = null)
@@ -188,7 +188,7 @@ namespace AssetsManager.Services.Core
             }
 
             var settings = new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
-            return await _jsonFormattingService.FormatJsonAsync(result, settings);
+            return await _jsonFormatterService.FormatJsonAsync(result, settings);
         }
 
         private async Task HandleTextDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)

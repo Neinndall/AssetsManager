@@ -96,7 +96,7 @@ namespace AssetsManager
       // Formatting Services
       services.AddTransient<CSSParserService>();
       services.AddSingleton<JsBeautifierService>();
-      services.AddSingleton<JsonFormattingService>();
+      services.AddSingleton<JsonFormatterService>();
       services.AddSingleton<ContentFormatterService>();
       services.AddSingleton<WemConversionService>();
  
