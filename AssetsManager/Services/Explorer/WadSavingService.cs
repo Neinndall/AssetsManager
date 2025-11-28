@@ -172,17 +172,6 @@ namespace AssetsManager.Services.Explorer
             var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
             if (linkedBank == null) return;
 
-            // Prevent duplicate processing for linked audio bank files.
-            // Only the primary node (WPK or AudioBnkNode if no WPK) should trigger extraction.
-            if (linkedBank.WpkNode != null && node != linkedBank.WpkNode)
-            {
-                return;
-            }
-            if (linkedBank.AudioBnkNode != null && node != linkedBank.AudioBnkNode && linkedBank.WpkNode == null)
-            {
-                return;
-            }
-
             string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
             string audioBankPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(audioBankName));
             Directory.CreateDirectory(audioBankPath);
