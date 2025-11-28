@@ -2,15 +2,17 @@ using System;
 using System.Threading.Tasks;
 using System.Windows;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Formatting;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class JsonDiffWindow : Window
     {
-        public JsonDiffWindow(CustomMessageBoxService customMessageBoxService)
+        public JsonDiffWindow(CustomMessageBoxService customMessageBoxService, JsonFormattingService jsonFormattingService)
         {
             InitializeComponent();
             JsonDiffControl.CustomMessageBoxService = customMessageBoxService;
+            JsonDiffControl.JsonFormattingService = jsonFormattingService;
             JsonDiffControl.ComparisonFinished += JsonDiffControl_ComparisonFinished;
 
             // Start invisible to prevent visual jump

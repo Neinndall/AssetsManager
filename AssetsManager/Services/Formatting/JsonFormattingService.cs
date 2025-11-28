@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace AssetsManager.Views.Helpers
+namespace AssetsManager.Services.Formatting
 {
-    public static class JsonFormatter
+    public class JsonFormattingService
     {
-        public static (string Text, List<ChangeType> LineTypes) NormalizeTextForAlignment(DiffPaneModel paneModel)
+        public (string Text, List<ChangeType> LineTypes) NormalizeTextForAlignment(DiffPaneModel paneModel)
         {
             var lines = new List<string>();
             var lineTypes = new List<ChangeType>();
@@ -23,17 +23,17 @@ namespace AssetsManager.Views.Helpers
             return (string.Join("\r\n", lines), lineTypes);
         }
 
-        public static Task<string> FormatJsonAsync(object jsonInput)
+        public Task<string> FormatJsonAsync(object jsonInput)
         {
             return FormatJsonAsync(jsonInput, null);
         }
 
-        public static Task<string> FormatJsonAsync(object jsonInput, JsonSerializerOptions options)
+        public Task<string> FormatJsonAsync(object jsonInput, JsonSerializerOptions options)
         {
             if (jsonInput == null)
                 return Task.FromResult(string.Empty);
 
-            var localOptions = options == null ? new JsonSerializerOptions() : new JsonSerializerOptions(options);
+            var localOptions = options ?? new JsonSerializerOptions();
             localOptions.WriteIndented = true;
 
             return Task.Run(() =>

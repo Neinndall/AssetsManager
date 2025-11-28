@@ -49,7 +49,7 @@ namespace AssetsManager.Services.Audio
 
         public async Task<LinkedAudioBank> LinkAudioBankForDiffAsync(FileSystemNodeModel clickedNode, string basePath, bool preferOld = false, string backupRootDir = null)
         {
-            _logService.Log($"[LinkAudioBankForDiffAsync] Linking audio bank for diff view. Node: '{clickedNode.Name}', PreferOld: {preferOld}");
+            _logService.LogDebug($"[LinkAudioBankForDiffAsync] Linking audio bank for diff view. Node: '{clickedNode.Name}', PreferOld: {preferOld}");
 
             if (string.IsNullOrEmpty(basePath) && clickedNode.ChunkDiff == null)
             {
@@ -69,24 +69,24 @@ namespace AssetsManager.Services.Audio
             // If in backup mode (basePath is null), we get dependencies from the clickedNode's ChunkDiff.Dependencies
             if (basePath == null && clickedNode.ChunkDiff?.Dependencies != null)
             {
-                _logService.Log($"[LinkAudioBankForDiffAsync] Backup mode detected. Found {clickedNode.ChunkDiff.Dependencies.Count} dependencies in ChunkDiff.");
+                _logService.LogDebug($"[LinkAudioBankForDiffAsync] Backup mode detected. Found {clickedNode.ChunkDiff.Dependencies.Count} dependencies in ChunkDiff.");
 
                 if (string.IsNullOrEmpty(backupRootDir))
                 {
                     _logService.LogError("[LinkAudioBankForDiffAsync] Critical error: backupRootDir is null in backup mode.");
                     return null;
                 }
-                _logService.Log($"[LinkAudioBankForDiffAsync] Backup root path: '{backupRootDir}'");
+                _logService.LogDebug($"[LinkAudioBankForDiffAsync] Backup root path: '{backupRootDir}'");
 
                 // Find the BIN dependency
                 var binDep = clickedNode.ChunkDiff.Dependencies.FirstOrDefault(d => d.Path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase));
                 if (binDep != null)
                 {
-                    _logService.Log($"[LinkAudioBankForDiffAsync] Found .bin dependency: '{binDep.Path}' from WAD '{binDep.SourceWad}'");
+                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] Found .bin dependency: '{binDep.Path}' from WAD '{binDep.SourceWad}'");
                     ulong binHash = preferOld ? binDep.OldPathHash : binDep.NewPathHash;
                     string binChunkDir = preferOld ? "old" : "new";
                     string binBackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", binChunkDir, $"{binHash:X16}.chunk");
-                    _logService.Log($"[LinkAudioBankForDiffAsync] Constructed .bin chunk path: '{binBackupChunkPath}'");
+                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] Constructed .bin chunk path: '{binBackupChunkPath}'");
 
                     binNode = new FileSystemNodeModel(Path.GetFileName(binDep.Path), false, binDep.Path, binDep.SourceWad)
                     {
@@ -95,11 +95,11 @@ namespace AssetsManager.Services.Audio
                         Type = NodeType.SoundBank
                     };
                     binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
-                    _logService.Log($"[LinkAudioBankForDiffAsync] Loaded .bin data. Size: {binData?.Length ?? 0} bytes.");
+                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] Loaded .bin data. Size: {binData?.Length ?? 0} bytes.");
 
                     if (clickedNode.FullPath.Contains("/characters/")) binType = BinType.Champion;
                     else if (clickedNode.FullPath.Contains("/maps/")) binType = BinType.Map;
-                    _logService.Log($"[LinkAudioBankForDiffAsync] Determined BinType: {binType}");
+                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] Determined BinType: {binType}");
                 }
                 else
                 {
@@ -110,11 +110,11 @@ namespace AssetsManager.Services.Audio
                 var audioDep = clickedNode.ChunkDiff.Dependencies.FirstOrDefault(d => d.Path.Contains("_audio.bnk") || d.Path.Contains("_audio.wpk"));
                 if (audioDep != null)
                 {
-                    _logService.Log($"[LinkAudioBankForDiffAsync] Found sibling audio dependency: '{audioDep.Path}' from WAD '{audioDep.SourceWad}'");
+                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] Found sibling audio dependency: '{audioDep.Path}' from WAD '{audioDep.SourceWad}'");
                     ulong audioHash = preferOld ? audioDep.OldPathHash : audioDep.NewPathHash;
                     string audioChunkDir = preferOld ? "old" : "new";
                     string audioBackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", audioChunkDir, $"{audioHash:X16}.chunk");
-                    _logService.Log($"[LinkAudioBankForDiffAsync] Constructed sibling chunk path: '{audioBackupChunkPath}'");
+                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] Constructed sibling chunk path: '{audioBackupChunkPath}'");
 
                     var siblingNode = new FileSystemNodeModel(Path.GetFileName(audioDep.Path), false, audioDep.Path, audioDep.SourceWad)
                     {
@@ -124,13 +124,13 @@ namespace AssetsManager.Services.Audio
 
                     if (audioDep.Path.EndsWith(".wpk"))
                     {
-                        _logService.Log($"[LinkAudioBankForDiffAsync] Sibling is a .wpk file. Assigning to WpkNode.");
+                        _logService.LogDebug($"[LinkAudioBankForDiffAsync] Sibling is a .wpk file. Assigning to WpkNode.");
                         wpkNode = siblingNode;
                         wpkNode.Type = NodeType.SoundBank;
                     }
                     else if (audioDep.Path.EndsWith(".bnk"))
                     {
-                        _logService.Log($"[LinkAudioBankForDiffAsync] Sibling is a .bnk file. Assigning to AudioBnkNode.");
+                        _logService.LogDebug($"[LinkAudioBankForDiffAsync] Sibling is a .bnk file. Assigning to AudioBnkNode.");
                         audioBnkNode = siblingNode;
                         audioBnkNode.Type = NodeType.SoundBank;
                     }
@@ -142,12 +142,12 @@ namespace AssetsManager.Services.Audio
 
                 // The clickedNode itself is the _events.bnk
                 eventsBnkNode = clickedNode;
-                _logService.Log($"[LinkAudioBankForDiffAsync] Assigned clicked node '{clickedNode.Name}' as the EventsBnkNode.");
+                _logService.LogDebug($"[LinkAudioBankForDiffAsync] Assigned clicked node '{clickedNode.Name}' as the EventsBnkNode.");
             }
             // Live Mode or Backup Mode where dependencies are top-level diffs (old architecture)
             else
             {
-                _logService.Log($"[LinkAudioBankForDiffAsync] Live mode or legacy backup mode detected. BasePath: '{basePath}'");
+                _logService.LogDebug($"[LinkAudioBankForDiffAsync] Live mode or legacy backup mode detected. BasePath: '{basePath}'");
                 var (binNodeFromWads, baseNameFromWads, binTypeFromWads) = await FindAssociatedBinFileFromWadsAsync(clickedNode, basePath, preferOld);
                 binNode = binNodeFromWads;
                 baseName = baseNameFromWads;
@@ -156,7 +156,7 @@ namespace AssetsManager.Services.Audio
                 if (binNode != null)
                 {
                     binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
-                    _logService.Log($"[LinkAudioBankForDiffAsync] Live Mode: Loaded .bin data. Size: {binData?.Length ?? 0} bytes.");
+                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] Live Mode: Loaded .bin data. Size: {binData?.Length ?? 0} bytes.");
                 }
                 else
                 {
@@ -178,7 +178,7 @@ namespace AssetsManager.Services.Audio
                 BaseName = baseName,
                 BinType = binType
             };
-            _logService.Log($"[LinkAudioBankForDiffAsync] Finished linking. Wpk: {wpkNode != null}, AudioBnk: {audioBnkNode != null}, EventsBnk: {eventsBnkNode != null}, BinData: {binData != null}.");
+            _logService.LogDebug($"[LinkAudioBankForDiffAsync] Finished linking. Wpk: {wpkNode != null}, AudioBnk: {audioBnkNode != null}, EventsBnk: {eventsBnkNode != null}, BinData: {binData != null}.");
             return linkedBank;
         }
 
@@ -323,11 +323,11 @@ namespace AssetsManager.Services.Audio
 
         private BinFileStrategy GetBinFileSearchStrategy(FileSystemNodeModel clickedNode)
         {
-            _logService.Log($"[GetBinFileSearchStrategy] Searching for BIN strategy for node: '{clickedNode.FullPath}' in WAD: '{clickedNode.SourceWadPath}'");
+            _logService.LogDebug($"[GetBinFileSearchStrategy] Searching for BIN strategy for node: '{clickedNode.FullPath}' in WAD: '{clickedNode.SourceWadPath}'");
             string sourceWadName = Path.GetFileName(clickedNode.SourceWadPath);
 
             // Strategy 0: Infer from companion path structure
-            _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 0: Infer from companion path structure.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 0: Infer from companion path structure.");
             if (clickedNode.FullPath.Contains("/companions/pets/"))
             {
                 var pathParts = clickedNode.FullPath.Split('/');
@@ -343,15 +343,15 @@ namespace AssetsManager.Services.Audio
                         string binPath = $"data/characters/{petName}/themes/{themeName}/root.bin";
                         string targetWadName = "companions.wad.client";
                         var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Companion);
-                        _logService.Log($"[GetBinFileSearchStrategy] Strategy 0 successful. Found: {strategy}");
+                        _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 0 successful. Found: {strategy}");
                         return strategy;
                     }
                 }
             }
-            _logService.Log("[GetBinFileSearchStrategy] Strategy 0 failed or was not applicable.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 0 failed or was not applicable.");
 
             // Strategy 1: Infer from full path structure
-            _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 1: Infer from full path structure.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 1: Infer from full path structure.");
             if (clickedNode.FullPath.Contains("/characters/") && clickedNode.FullPath.Contains("/skins/"))
             {
                 var pathParts = clickedNode.FullPath.Split('/');
@@ -369,15 +369,15 @@ namespace AssetsManager.Services.Audio
                         string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
                         string targetWadName = $"{championName.ToLower()}.wad.client";
                         var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
-                        _logService.Log($"[GetBinFileSearchStrategy] Strategy 1 successful. Found: {strategy}");
+                        _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 1 successful. Found: {strategy}");
                         return strategy;
                     }
                 }
             }
-            _logService.Log("[GetBinFileSearchStrategy] Strategy 1 failed or was not applicable.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 1 failed or was not applicable.");
 
             // Strategy 2: Infer from WAD file name (for champions)
-            _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 2: Infer from WAD file name (for champions).");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 2: Infer from WAD file name (for champions).");
             var wadNameParts = sourceWadName.Split('.');
             if (wadNameParts.Length > 0)
             {
@@ -390,14 +390,14 @@ namespace AssetsManager.Services.Audio
                     string binPath = $"data/characters/{championName.ToLower()}/skins/{skinName}.bin";
                     string targetWadName = $"{championName.ToLower()}.wad.client";
                     var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
-                    _logService.Log($"[GetBinFileSearchStrategy] Strategy 2 successful. Found: {strategy}");
+                    _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 2 successful. Found: {strategy}");
                     return strategy;
                 }
             }
-            _logService.Log("[GetBinFileSearchStrategy] Strategy 2 failed or was not applicable.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 2 failed or was not applicable.");
 
             // Strategy 3 (New): Infer for locale VO files (e.g., misc_emotes_vo_audio.wpk in Common.es_ES.wad.client)
-            _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 3 (New): Infer for locale VO files.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 3 (New): Infer for locale VO files.");
             if (clickedNode.Name.Contains("_vo_", StringComparison.OrdinalIgnoreCase) &&
                 sourceWadName.StartsWith("Common.", StringComparison.OrdinalIgnoreCase) &&
                 sourceWadName.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) &&
@@ -406,13 +406,13 @@ namespace AssetsManager.Services.Audio
                 string binPath = "data/maps/shipping/common/common.bin";
                 string targetWadName = "Common.wad.client"; // Always in the general Common.wad.client
                 var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Map);
-                _logService.Log($"[GetBinFileSearchStrategy] Strategy 3 (New) successful. Found: {strategy}");
+                _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 3 (New) successful. Found: {strategy}");
                 return strategy;
             }
-            _logService.Log("[GetBinFileSearchStrategy] Strategy 3 (New) failed or was not applicable.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 3 (New) failed or was not applicable.");
 
             // Strategy 4 (Unified Map/Common): Infer from WAD file name for maps.
-            _logService.Log("[GetBinFileSearchStrategy] Attempting Strategy 4: Infer from WAD file name for Maps/Common.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 4: Infer from WAD file name for Maps/Common.");
             if (wadNameParts.Length > 0 && (sourceWadName.StartsWith("Map", StringComparison.OrdinalIgnoreCase) || sourceWadName.StartsWith("Common", StringComparison.OrdinalIgnoreCase)))
             {
                 // This will handle MapXX.wad.client, Common.wad.client, and also non-VO files in Common.es_ES.wad.client,
@@ -423,13 +423,13 @@ namespace AssetsManager.Services.Audio
                     string binPath = $"data/maps/shipping/{mapName.ToLower()}/{mapName.ToLower()}.bin";
                     string targetWadName = $"{mapName.ToLower()}.wad.client";
                     var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Map);
-                    _logService.Log($"[GetBinFileSearchStrategy] Strategy 4 (Unified) successful. Found: {strategy}");
+                    _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 4 (Unified) successful. Found: {strategy}");
                     return strategy;
                 }
             }
-            _logService.Log("[GetBinFileSearchStrategy] Strategy 4 failed or was not applicable.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 4 failed or was not applicable.");
 
-            _logService.Log("[GetBinFileSearchStrategy] No BIN file strategy found for '{clickedNode.FullPath}'.");
+            _logService.LogDebug("[GetBinFileSearchStrategy] No BIN file strategy found for '{clickedNode.FullPath}'.");
             return null;
         }
 
@@ -498,7 +498,7 @@ namespace AssetsManager.Services.Audio
                 }
 
                 string targetWadFullPath = Path.Combine(wadDirectory, strategy.TargetWadName);
-                _logService.Log($"[FindAssociatedBinFileFromWadsAsync] Live Mode: Target WAD for BIN search: '{targetWadFullPath}'");
+                _logService.LogDebug($"[FindAssociatedBinFileFromWadsAsync] Live Mode: Target WAD for BIN search: '{targetWadFullPath}'");
 
                 if (File.Exists(targetWadFullPath))
                 {
@@ -506,7 +506,7 @@ namespace AssetsManager.Services.Audio
                     var binNode = wadContent.FirstOrDefault(n => n.FullPath.Equals(strategy.BinPath, StringComparison.OrdinalIgnoreCase));
                     if (binNode != null)
                     {
-                        _logService.Log($"[FindAssociatedBinFileFromWadsAsync] Live Mode: BIN node '{strategy.BinPath}' found in WAD '{targetWadFullPath}'.");
+                        _logService.LogDebug($"[FindAssociatedBinFileFromWadsAsync] Live Mode: BIN node '{strategy.BinPath}' found in WAD '{targetWadFullPath}'.");
                         return (binNode, baseName, strategy.Type);
                     }
                     else
@@ -553,7 +553,7 @@ namespace AssetsManager.Services.Audio
             }
             else // Backup Mode - search across the whole tree
             {
-                _logService.Log("[FindSiblingFilesByName] Backup mode detected. Searching entire tree for siblings.");
+                _logService.LogDebug("[FindSiblingFilesByName] Backup mode detected. Searching entire tree for siblings.");
                 var namesToFind = new List<string> { expectedWpkName, expectedAudioBnkName, expectedEventsBnkName };
                 var allMatches = new List<FileSystemNodeModel>();
                 
@@ -563,7 +563,7 @@ namespace AssetsManager.Services.Audio
                 audioBnkNode = allMatches.FirstOrDefault(n => n.Name == expectedAudioBnkName);
                 eventsBnkNode = allMatches.FirstOrDefault(n => n.Name == expectedEventsBnkName);
 
-                _logService.Log($"[FindSiblingFilesByName] Sibling search results - WPK: {wpkNode != null}, AudioBNK: {audioBnkNode != null}, EventsBNK: {eventsBnkNode != null}");
+                _logService.LogDebug($"[FindSiblingFilesByName] Sibling search results - WPK: {wpkNode != null}, AudioBNK: {audioBnkNode != null}, EventsBNK: {eventsBnkNode != null}");
             }
 
             return (wpkNode, audioBnkNode, eventsBnkNode);
@@ -580,12 +580,12 @@ namespace AssetsManager.Services.Audio
                 return (null, baseName, BinType.Unknown);
             }
 
-            _logService.Log($"[FindAssociatedBinFileAsync] Using strategy for {clickedNode.FullPath}. BinPath: '{strategy.BinPath}', TargetWAD: '{strategy.TargetWadName}'");
+            _logService.LogDebug($"[FindAssociatedBinFileAsync] Using strategy for {clickedNode.FullPath}. BinPath: '{strategy.BinPath}', TargetWAD: '{strategy.TargetWadName}'");
 
             // Backup Mode
             if (currentRootPath == null)
             {
-                _logService.Log($"[FindAssociatedBinFileAsync] Backup Mode: Searching for BIN node with path: '{strategy.BinPath}'");
+                _logService.LogDebug($"[FindAssociatedBinFileAsync] Backup Mode: Searching for BIN node with path: '{strategy.BinPath}'");
                 
                 // First, try to find it without any prefix (for the non-sorted/flat view)
                 var binNode = FindNodeByPath(rootNodes, strategy.BinPath);
@@ -593,12 +593,12 @@ namespace AssetsManager.Services.Audio
                 // If not found, try with status prefixes (for the sorted/grouped by WAD view)
                 if (binNode == null)
                 {
-                    _logService.Log($"[FindAssociatedBinFileAsync] Node not found with direct path. Trying with status prefixes.");
+                    _logService.LogDebug($"[FindAssociatedBinFileAsync] Node not found with direct path. Trying with status prefixes.");
                     string[] prefixes = { "[~] Modified/", "[+] New/", "[»] Renamed/", "[=] Dependency/" };
                     foreach (var prefix in prefixes)
                     {
                         string prefixedPath = prefix + strategy.BinPath;
-                        _logService.Log($"[FindAssociatedBinFileAsync] Trying prefixed path: '{prefixedPath}'");
+                        _logService.LogDebug($"[FindAssociatedBinFileAsync] Trying prefixed path: '{prefixedPath}'");
                         binNode = FindNodeByPath(rootNodes, prefixedPath);
                         if (binNode != null)
                         {
@@ -609,11 +609,11 @@ namespace AssetsManager.Services.Audio
 
                 if (binNode != null)
                 {
-                    _logService.Log($"[FindAssociatedBinFileAsync] Backup Mode: Found BIN node: '{binNode.FullPath}'");
+                    _logService.LogDebug($"[FindAssociatedBinFileAsync] Backup Mode: Found BIN node: '{binNode.FullPath}'");
                 }
                 else
                 {
-                    _logService.Log($"[FindAssociatedBinFileAsync] Backup Mode: BIN node with path '{strategy.BinPath}' not found after all attempts.");
+                    _logService.LogDebug($"[FindAssociatedBinFileAsync] Backup Mode: BIN node with path '{strategy.BinPath}' not found after all attempts.");
                 }
                 return (binNode, baseName, strategy.Type);
             }
@@ -625,14 +625,14 @@ namespace AssetsManager.Services.Audio
                 var targetWadNode = FindNodeByName(rootNodes, strategy.TargetWadName);
                 if (targetWadNode != null)
                 {
-                    _logService.Log($"[FindAssociatedBinFileAsync] Searching for BIN '{strategy.BinPath}' inside '{targetWadNode.Name}'...");
+                    _logService.LogDebug($"[FindAssociatedBinFileAsync] Searching for BIN '{strategy.BinPath}' inside '{targetWadNode.Name}'...");
                     var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableCollection<FileSystemNodeModel> { targetWadNode }, loader);
                     if (binNode != null)
                     {
-                        _logService.Log($"[FindAssociatedBinFileAsync] Found BIN node in primary target WAD.");
+                        _logService.LogDebug($"[FindAssociatedBinFileAsync] Found BIN node in primary target WAD.");
                         return (binNode, baseName, strategy.Type);
                     }
-                    _logService.Log($"[FindAssociatedBinFileAsync] BIN not found in primary target WAD '{targetWadNode.Name}'.");
+                    _logService.LogDebug($"[FindAssociatedBinFileAsync] BIN not found in primary target WAD '{targetWadNode.Name}'.");
                 }
                 else
                 {
@@ -643,14 +643,14 @@ namespace AssetsManager.Services.Audio
                 var commonWadNode = FindNodeByName(rootNodes, "Common.wad.client");
                 if (commonWadNode != null && commonWadNode != targetWadNode)
                 {
-                    _logService.Log($"[FindAssociatedBinFileAsync] Fallback: Searching for BIN '{strategy.BinPath}' inside '{commonWadNode.Name}'...");
+                    _logService.LogDebug($"[FindAssociatedBinFileAsync] Fallback: Searching for BIN '{strategy.BinPath}' inside '{commonWadNode.Name}'...");
                     var binNodeInCommon = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableCollection<FileSystemNodeModel> { commonWadNode }, loader);
                     if (binNodeInCommon != null)
                     {
-                        _logService.Log($"[FindAssociatedBinFileAsync] Found BIN node in fallback WAD 'Common.wad.client'.");
+                        _logService.LogDebug($"[FindAssociatedBinFileAsync] Found BIN node in fallback WAD 'Common.wad.client'.");
                         return (binNodeInCommon, baseName, strategy.Type);
                     }
-                    _logService.Log($"[FindAssociatedBinFileAsync] BIN not found in fallback WAD 'Common.wad.client'.");
+                    _logService.LogDebug($"[FindAssociatedBinFileAsync] BIN not found in fallback WAD 'Common.wad.client'.");
                 }
             }
 
