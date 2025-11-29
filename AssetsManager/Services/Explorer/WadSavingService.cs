@@ -167,6 +167,11 @@ namespace AssetsManager.Services.Explorer
 
         private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
         {
+            if (!SupportedFileTypes.IsExpandableAudioBank(node.Name))
+            {
+                return;
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
 
             var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
