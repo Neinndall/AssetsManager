@@ -305,7 +305,7 @@ namespace AssetsManager.Services.Audio
             }
 
             _logService.LogDebug($"[AUDIO] Finished parsing events bank. Created {eventNodes.Count} event nodes.");
-            return eventNodes;
+            return eventNodes.OrderBy(n => n.Name).ToList();
         }
     }
 }
