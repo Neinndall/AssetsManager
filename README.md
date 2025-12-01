@@ -29,6 +29,8 @@ AssetsManager now includes a powerful suite of tools to automatically track chan
 *   **Asset Tracker:** Keep a persistent list of specific assets you want to track. The tool will periodically check their status (e.g., "OK", "Not Found", "Pending") in the background. It even includes fallback logic for assets with multiple possible extensions (like `.jpg` and `.png`).
 *   **History View:** All detected changes from the File Watcher are saved in a persistent history. You can browse past changes, view the diffs, and manage the history log.
 *   **Manage Versions:** A new tool that natively integrates with Riot's APIs to fetch and manage different client and game versions. It allows you to download version manifests, plugins, and even full game clients for specific PBE patches.
+*   **Backups:** Section where you can monitor and control your backups of your League of Legends PBE file system.
+*   **Api:** A powerful utility that will allow you to make a request to the League of Legends API to obtain sales, the Mythic Shop, and much more to come.
 
 ### 3D Model Viewer (`ModelWindow`)
 
