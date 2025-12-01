@@ -1,9 +1,7 @@
 using AssetsManager.Services;
-using AssetsManager.Services.Api;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Versions;
 using AssetsManager.Utils;
 using System;
 using System.Windows.Controls;
@@ -25,7 +23,8 @@ namespace AssetsManager.Views
             VersionService versionService,
             DirectoriesCreator directoriesCreator,
             RiotApiService riotApiService,
-            TaskCancellationManager taskCancellationManager) // Added RiotApiService
+            TaskCancellationManager taskCancellationManager,
+            BackupManager backupManager) // Added BackupManager
         {
             InitializeComponent();
 
@@ -56,6 +55,12 @@ namespace AssetsManager.Views
             ManageVersionsControl.AppSettings = appSettings;
             ManageVersionsControl.CustomMessageBoxService = customMessageBoxService;
             ManageVersionsControl.TaskCancellationManager = taskCancellationManager;
+
+            // Setup and inject dependencies for BackupsControl
+            BackupsControl.BackupManager = backupManager;
+            BackupsControl.LogService = logService;
+            BackupsControl.AppSettings = appSettings;
+            BackupsControl.CustomMessageBoxService = customMessageBoxService;
 
             // Setup and inject dependencies for ApiControl
             ApiControl.LogService = logService;

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Versions;
+using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Versions;
 
@@ -189,7 +189,24 @@ namespace AssetsManager.Views.Controls.Monitor
             var result = CustomMessageBoxService.ShowYesNo("Delete Versions", $"Are you sure you want to delete {selectedVersions.Count} selected version file(s)?", Window.GetWindow(this));
             if (result == true)
             {
-                _viewModel.DeleteVersions(selectedVersions);
+                DeleteVersions(selectedVersions);
+            }
+        }
+
+        private void DeleteVersions(IEnumerable<VersionFileInfo> versionsToDelete)
+        {
+            if (versionsToDelete == null || !versionsToDelete.Any()) return;
+
+            if (VersionService.DeleteVersionFiles(versionsToDelete))
+            {
+                foreach (var versionFile in versionsToDelete.ToList())
+                {
+                    _viewModel.AllLeagueClientVersions.Remove(versionFile);
+                    _viewModel.AllLoLGameClientVersions.Remove(versionFile);
+                }
+                // Recalculate total pages and update views after deletion
+                _viewModel.LeagueClientPaginator.SetFullList(_viewModel.AllLeagueClientVersions);
+                _viewModel.LoLGameClientPaginator.SetFullList(_viewModel.AllLoLGameClientVersions);
             }
         }
 

@@ -4,9 +4,6 @@ using System.IO;
 using System.Linq;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Audio;
-using LeagueToolkit.Core.Meta;
-using LeagueToolkit.Core.Meta.Properties;
-using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Parsers
 {
@@ -19,77 +16,172 @@ namespace AssetsManager.Services.Parsers
 
             try
             {
-                using var stream = new MemoryStream(binData);
-                var binTree = new BinTree(stream);
+                // Search for 'events' containers
+                var eventsMagicBytes = new byte[] { 0x84, 0xE3, 0xD8, 0x12, 0x80, 0x10 };
+                SearchAndExtract(binData, eventsMagicBytes, mapEventNames, logService);
 
-                uint skinCharacterDataPropertiesHash = Fnv1a.HashLower("SkinCharacterDataProperties");
-                uint mapAudioDataPropertiesHash = Fnv1a.HashLower("MapAudioDataProperties");
-                uint skinAudioPropertiesHash = Fnv1a.HashLower("skinAudioProperties");
-                uint bankUnitsHash = Fnv1a.HashLower("bankUnits");
-
-                foreach (var obj in binTree.Objects.Values)
-                {
-                    BinTreeContainer bankUnitsContainer = null;
-
-                    switch (binType)
-                    {
-                        case BinType.Champion:
-                            if (obj.ClassHash == skinCharacterDataPropertiesHash)
-                            {
-                                if (obj.Properties.TryGetValue(skinAudioPropertiesHash, out var skinAudioProp) && skinAudioProp is BinTreeStruct skinAudioStruct)
-                                {
-                                    if (skinAudioStruct.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer container)
-                                    {
-                                        bankUnitsContainer = container;
-                                    }
-                                }
-                            }
-                            break;
-
-                        case BinType.Map:
-                            if (obj.ClassHash == mapAudioDataPropertiesHash)
-                            {
-                                if (obj.Properties.TryGetValue(bankUnitsHash, out var bankUnitsProp) && bankUnitsProp is BinTreeContainer container)
-                                {
-                                    bankUnitsContainer = container;
-                                }
-                            }
-                            break;
-                    }
-
-                    if (bankUnitsContainer != null)
-                    {
-                        ExtractEventsFromBankUnits(bankUnitsContainer, bankName, mapEventNames);
-                    }
-                }
+                // Search for 'music' embedded objects
+                var musicMagicBytes = new byte[] { 0xD4, 0x4F, 0x9C, 0x9F, 0x83 };
+                SearchAndExtractMusic(binData, musicMagicBytes, mapEventNames, logService);
             }
-            catch (Exception ex) { logService.LogError(ex, "[AUDIO] Crash during BIN parsing."); }
-            logService.LogDebug($"[AUDIO] Finished BIN parsing. Found {mapEventNames.Count} total events for bank '{bankName}'.");
+            catch (Exception ex)
+            {
+                logService.LogError(ex, "[AUDIO] Crash during raw byte-based BIN processing in BinParser.");
+            }
+
+            if (mapEventNames.Any())
+            {
+                var eventsToShow = mapEventNames.Take(20).Select(kvp => string.Format("({0}: {1})", kvp.Key, kvp.Value));
+                string eventList = string.Join(", ", eventsToShow);
+            }
             return mapEventNames;
         }
-
-        private static void ExtractEventsFromBankUnits(BinTreeContainer bankUnitsContainer, string bankName, Dictionary<uint, string> mapEventNames)
+        
+        private static void SearchAndExtract(byte[] haystack, byte[] needle, Dictionary<uint, string> map, LogService logService)
         {
-            uint eventsHash = Fnv1a.HashLower("events");
-            uint nameHash = Fnv1a.HashLower("name");
-
-            foreach (BinTreeStruct bankUnit in bankUnitsContainer.Elements.OfType<BinTreeStruct>())
+            int currentPosition = 0;
+            while (currentPosition < haystack.Length)
             {
-                if (bankUnit.Properties.TryGetValue(nameHash, out var nameProp) && nameProp is BinTreeString nameString)
+                int foundIndex = FindBytes(haystack, needle, currentPosition);
+                if (foundIndex == -1) break;
+
+                currentPosition = foundIndex + needle.Length;
+                
+                // Read amount
+                if (currentPosition + 8 > haystack.Length)
                 {
-                    if (string.Equals(nameString.Value, bankName, StringComparison.OrdinalIgnoreCase))
+                    logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for amount after magic sequence (events).");
+                    break;
+                }
+                // Skipping 4 bytes of object size
+                uint amount = BitConverter.ToUInt32(haystack, currentPosition + 4);
+                currentPosition += 8;
+
+                for (int i = 0; i < amount; i++)
+                {
+                    if (currentPosition + 2 > haystack.Length)
                     {
-                        if (bankUnit.Properties.TryGetValue(eventsHash, out var eventsProp) && eventsProp is BinTreeContainer eventsContainer)
-                        {
-                            foreach (BinTreeString eventNameProp in eventsContainer.Elements.OfType<BinTreeString>())
-                            {
-                                uint eventHash = Fnv1Hash(eventNameProp.Value);
-                                mapEventNames[eventHash] = eventNameProp.Value;
-                            }
-                        }
+                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for string length (events).");
+                        break;
+                    }
+                    
+                    // Read length-prefixed string
+                    ushort stringLength = BitConverter.ToUInt16(haystack, currentPosition);
+                    currentPosition += 2;
+
+                    if (currentPosition + stringLength > haystack.Length)
+                    {
+                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for string data (events).");
+                        break;
+                    }
+                    
+                    string eventName = System.Text.Encoding.ASCII.GetString(haystack, currentPosition, stringLength);
+                    currentPosition += stringLength;
+
+                    uint eventHash = Fnv1Hash(eventName);
+                    if (!map.ContainsKey(eventHash))
+                    {
+                        map[eventHash] = eventName;
                     }
                 }
             }
+        }
+
+        private static void SearchAndExtractMusic(byte[] haystack, byte[] needle, Dictionary<uint, string> map, LogService logService)
+        {
+            int currentPosition = 0;
+            while (currentPosition < haystack.Length)
+            {
+                int foundIndex = FindBytes(haystack, needle, currentPosition);
+                if (foundIndex == -1) break;
+
+                currentPosition = foundIndex + needle.Length;
+
+                // Read type_hash
+                if (currentPosition + 4 > haystack.Length)
+                {
+                    logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for type_hash (music).");
+                    break;
+                }
+                uint typeHash = BitConverter.ToUInt32(haystack, currentPosition);
+                currentPosition += 4;
+                if (typeHash == 0) continue; // Skip if type_hash is 0
+
+                // Skip object size and read amount
+                if (currentPosition + 6 > haystack.Length)
+                {
+                    logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for object size/amount (music).");
+                    break;
+                }
+                currentPosition += 4; // skip object size (uint32)
+                ushort amount = BitConverter.ToUInt16(haystack, currentPosition); // amount is uint16
+                currentPosition += 2;
+
+                for (int i = 0; i < amount; i++)
+                {
+                    if (currentPosition + 5 > haystack.Length) // 4 bytes for name (hash) + 1 byte for bin_type
+                    {
+                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for name/bin_type (music).");
+                        break;
+                    }
+                    currentPosition += 4; // skip name (hash) (uint32)
+                    byte binTypeByte = haystack[currentPosition]; // read bin_type (uint8)
+                    currentPosition++;
+
+                    if (binTypeByte != 0x10 /* string */)
+                    {
+                        logService.LogWarning($"Malformed BIN file: Expected string type (0x10) for music event, but got 0x{binTypeByte:X2}. Skipping.");
+                        // C code used goto error, we break this loop. If we continue, we risk reading garbage.
+                        break; 
+                    }
+
+                    if (currentPosition + 2 > haystack.Length)
+                    {
+                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for string length (music).");
+                        break;
+                    }
+                    
+                    ushort stringLength = BitConverter.ToUInt16(haystack, currentPosition);
+                    currentPosition += 2;
+
+                    if (currentPosition + stringLength > haystack.Length)
+                    {
+                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for string data (music).");
+                        break;
+                    }
+                    
+                    string eventName = System.Text.Encoding.ASCII.GetString(haystack, currentPosition, stringLength);
+                    currentPosition += stringLength;
+
+                    uint eventHash = Fnv1Hash(eventName);
+                    if (!map.ContainsKey(eventHash))
+                    {
+                        map[eventHash] = eventName;
+                    }
+                }
+            }
+        }
+
+
+        private static int FindBytes(byte[] src, byte[] find, int startIndex)
+        {
+            for (int i = startIndex; i <= src.Length - find.Length; i++)
+            {
+                bool match = true;
+                for (int j = 0; j < find.Length; j++)
+                {
+                    if (src[i + j] != find[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match)
+                {
+                    return i; // Found a match, return the starting index
+                }
+            }
+            return -1; // No match found after checking all positions
         }
 
         private static uint Fnv1Hash(string input)
@@ -98,12 +190,18 @@ namespace AssetsManager.Services.Parsers
             const uint prime = 16777619;
 
             uint hash = offsetBasis;
-            foreach (byte b in System.Text.Encoding.ASCII.GetBytes(input.ToLowerInvariant()))
+            foreach (char c in input)
             {
+                // Custom tolower logic from the C code
+                byte b = (byte)c;
+                byte lower_b = (b > 64 && b < 91) ? (byte)(b + 32) : b;
+                
                 hash *= prime;
-                hash ^= b;
+                hash ^= lower_b;
             }
             return hash;
         }
     }
 }
+
+

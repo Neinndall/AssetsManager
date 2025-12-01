@@ -1,18 +1,17 @@
-using AssetsManager.Services.Audio;
-using AssetsManager.Services.Explorer;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using LeagueToolkit.Core.Meta;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
-using AssetsManager.Views.Helpers;
+using AssetsManager.Services.Audio;
+using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Audio;
-using LeagueToolkit.Core.Meta;
 
 namespace AssetsManager.Services.Formatting
 {
@@ -24,8 +23,9 @@ namespace AssetsManager.Services.Formatting
         private readonly HashResolverService _hashResolverService;
         private readonly AudioBankService _audioBankService;
         private readonly WadExtractionService _wadExtractionService;
+        private readonly JsonFormatterService _jsonFormatterService;
 
-        public ContentFormatterService(LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService, HashResolverService hashResolverService, AudioBankService audioBankService, WadExtractionService wadExtractionService)
+        public ContentFormatterService(LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService, HashResolverService hashResolverService, AudioBankService audioBankService, WadExtractionService wadExtractionService, JsonFormatterService jsonFormatterService)
         {
             _logService = logService;
             _jsBeautifierService = jsBeautifierService;
@@ -33,6 +33,7 @@ namespace AssetsManager.Services.Formatting
             _hashResolverService = hashResolverService;
             _audioBankService = audioBankService;
             _wadExtractionService = wadExtractionService;
+            _jsonFormatterService = jsonFormatterService;
         }
 
         public async Task<string> FormatAudioBankAsync(LinkedAudioBank linkedBank)
@@ -59,7 +60,7 @@ namespace AssetsManager.Services.Formatting
                 {
                     DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
                 };
-                return await JsonFormatter.FormatJsonAsync(result, options);
+                return await _jsonFormatterService.FormatJsonAsync(result, options);
             }
             catch (Exception ex)
             {
@@ -122,7 +123,7 @@ namespace AssetsManager.Services.Formatting
             {
                 using var bnkStream = new MemoryStream(data);
                 var bnkFile = BnkParser.Parse(bnkStream, _logService);
-                return await JsonFormatter.FormatJsonAsync(bnkFile);
+                return await _jsonFormatterService.FormatJsonAsync(bnkFile);
             }
             catch (Exception ex)
             {
@@ -200,7 +201,7 @@ namespace AssetsManager.Services.Formatting
         private async Task<string> GetFormattedJsonStringAsync(byte[] data)
         {
             var rawJson = Encoding.UTF8.GetString(data);
-            return await JsonFormatter.FormatJsonAsync(rawJson);
+            return await _jsonFormatterService.FormatJsonAsync(rawJson);
         }
     }
 }

@@ -5,7 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Versions;
+using AssetsManager.Services.Monitor;
 
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Versions;
@@ -57,23 +57,6 @@ namespace AssetsManager.Views.Models.Versions
                 var gameClientCategories = new[] { "lol-game-client" };
                 AllLoLGameClientVersions = allFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
 
-                LeagueClientPaginator.SetFullList(AllLeagueClientVersions);
-                LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions);
-            }
-        }
-
-        public void DeleteVersions(IEnumerable<VersionFileInfo> versionsToDelete)
-        {
-            if (versionsToDelete == null || !versionsToDelete.Any()) return;
-
-            if (_versionService.DeleteVersionFiles(versionsToDelete))
-            {
-                foreach (var versionFile in versionsToDelete.ToList())
-                {
-                    AllLeagueClientVersions.Remove(versionFile);
-                    AllLoLGameClientVersions.Remove(versionFile);
-                }
-                // Recalculate total pages and update views after deletion
                 LeagueClientPaginator.SetFullList(AllLeagueClientVersions);
                 LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions);
             }

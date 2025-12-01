@@ -26,7 +26,7 @@ namespace AssetsManager.Views.Models.Audio
         public uint Size { get; set; }
     }
 
-    public enum BinType { Champion, Map, Unknown }
+    public enum BinType { Champion, Map, Companion, Unknown }
 
     public class LinkedAudioBank
     {

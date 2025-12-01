@@ -20,7 +20,6 @@ namespace AssetsManager.Services.Parsers
                 long nextSectionStart = reader.BaseStream.Position + sectionSize;
 
                 logService.LogDebug($"[BNK DEBUG] Found section: {signature}, Size: {sectionSize}, Pos: {sectionStartPos}");
-
                 if (nextSectionStart > reader.BaseStream.Length)
                 {
                     logService.LogDebug($"[BNK ERROR] Invalid section size for {signature}. Aborting.");

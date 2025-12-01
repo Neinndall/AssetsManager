@@ -76,25 +76,36 @@ namespace AssetsManager.Services.Explorer
                         {
                             foreach (var dep in file.Dependencies)
                             {
-                                var depStatus = GetDiffStatus(ChunkDiffType.Modified); // Treat as modified for node creation
-                                var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
+                                _logService.Log($"[LoadFromBackupAsync] Processing dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
 
-                                string depStatusPrefix = GetStatusPrefix(ChunkDiffType.Modified);
-                                string depPrefixedPath = $"{depStatusPrefix}/{dep.Path}";
-
-                                var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, wadGroup.Key, dep.NewPathHash, depStatus);
-                                depNode.ChunkDiff = new SerializableChunkDiff
+                                // In this view, we add dependencies as top-level entries to respect the file path structure.
+                                // We only do this for dependencies that were originally top-level diffs to avoid clutter.
+                                if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                 {
-                                    Type = ChunkDiffType.Modified, // For consistency
-                                    OldPath = dep.Path,
-                                    NewPath = dep.Path,
-                                    OldPathHash = dep.OldPathHash,
-                                    NewPathHash = dep.NewPathHash,
-                                    OldCompressionType = dep.CompressionType,
-                                    NewCompressionType = dep.CompressionType,
-                                    BackupChunkPath = depChunkPath
-                                };
-                                depNode.BackupChunkPath = depChunkPath;
+                                    _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions (WasTopLevelDiff and Type.HasValue). Adding to tree.");
+                                    var depType = dep.Type.Value;
+                                    var depStatus = GetDiffStatus(depType);
+                                    string depStatusPrefix = GetStatusPrefix(depType);
+                                    string depPrefixedPath = $"{depStatusPrefix}/{dep.Path}";
+
+                                    // Add the dependency as a top-level node in its correct virtual path
+                                    var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, dep.SourceWad, dep.NewPathHash, depStatus);
+                                    
+                                    depNode.ChunkDiff = new SerializableChunkDiff
+                                    {
+                                        Type = depType,
+                                        OldPath = dep.Path,
+                                        NewPath = dep.Path,
+                                        OldPathHash = dep.OldPathHash,
+                                        NewPathHash = dep.NewPathHash,
+                                        OldCompressionType = dep.CompressionType,
+                                        NewCompressionType = dep.CompressionType,
+                                        BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = depType })
+                                    };
+                                    depNode.BackupChunkPath = depNode.ChunkDiff.BackupChunkPath;
+                                } else {
+                                    _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Skipping addition to tree in sorted view.");
+                                }
                             }
                         }
                     }
@@ -134,28 +145,63 @@ namespace AssetsManager.Services.Explorer
 
                                 if (file.Dependencies != null)
                                 {
+                                    _logService.Log($"[LoadFromBackupAsync] Processing audio bank '{file.Path}' dependencies (isSortingEnabled=false). Count: {file.Dependencies.Count}");
                                     foreach (var dep in file.Dependencies)
                                     {
-                                        var depChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified });
-
-                                        var depNode = new FileSystemNodeModel(Path.GetFileName(dep.Path), false, dep.Path, wadGroup.Key)
+                                        _logService.Log($"[LoadFromBackupAsync] Dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
+                                        if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                         {
-                                            SourceChunkPathHash = dep.NewPathHash,
-                                            Status = GetDiffStatus(ChunkDiffType.Modified),
-                                            ChunkDiff = new SerializableChunkDiff
+                                            _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions. Adding as child node.");
+                                            // New format: Create a visible child node with status
+                                            string depStatusPrefix = GetStatusPrefix(dep.Type.Value);
+                                            string depFileName = Path.GetFileName(dep.Path);
+                                            
+                                            // The FullPath must also contain the prefix for the search to work correctly
+                                            string prefixedFullPath = $"{depStatusPrefix}/{dep.Path}";
+
+                                            var depNode = new FileSystemNodeModel($"{depStatusPrefix} {depFileName}", false, prefixedFullPath, wadGroup.Key)
                                             {
-                                                Type = ChunkDiffType.Modified,
-                                                OldPath = dep.Path,
-                                                NewPath = dep.Path,
-                                                OldPathHash = dep.OldPathHash,
-                                                NewPathHash = dep.NewPathHash,
-                                                OldCompressionType = dep.CompressionType,
-                                                NewCompressionType = dep.CompressionType,
-                                                BackupChunkPath = depChunkPath
-                                            },
-                                            BackupChunkPath = depChunkPath
-                                        };
-                                        statusNode.Children.Add(depNode);
+                                                SourceChunkPathHash = dep.NewPathHash,
+                                                Status = GetDiffStatus(dep.Type.Value),
+                                                ChunkDiff = new SerializableChunkDiff
+                                                {
+                                                    Type = dep.Type.Value,
+                                                    OldPath = dep.Path,
+                                                    NewPath = dep.Path,
+                                                    OldPathHash = dep.OldPathHash,
+                                                    NewPathHash = dep.NewPathHash,
+                                                    OldCompressionType = dep.CompressionType,
+                                                    NewCompressionType = dep.CompressionType,
+                                                    BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
+                                                },
+                                                BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
+                                            };
+                                            node.Children.Add(depNode);
+                                        }
+                                        else
+                                        {
+                                            _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Adding as fallback.");
+                                            // Fallback for old backups or unchanged dependencies
+                                            string depFileName = Path.GetFileName(dep.Path);
+                                            var depNode = new FileSystemNodeModel(depFileName, false, dep.Path, wadGroup.Key)
+                                            {
+                                                SourceChunkPathHash = dep.NewPathHash,
+                                                Status = DiffStatus.Unchanged,
+                                                ChunkDiff = new SerializableChunkDiff
+                                                {
+                                                    Type = ChunkDiffType.Dependency,
+                                                    OldPath = dep.Path,
+                                                    NewPath = dep.Path,
+                                                    OldPathHash = dep.OldPathHash,
+                                                    NewPathHash = dep.NewPathHash,
+                                            OldCompressionType = dep.CompressionType,
+                                                    NewCompressionType = dep.CompressionType,
+                                                    BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified })
+                                                },
+                                                BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified })
+                                            };
+                                            node.Children.Add(depNode);
+                                        }
                                     }
                                 }
                             }
@@ -174,6 +220,7 @@ namespace AssetsManager.Services.Explorer
             ChunkDiffType.Modified => "[~] Modified",
             ChunkDiffType.Renamed => "[»] Renamed",
             ChunkDiffType.Removed => "[-] Deleted",
+            ChunkDiffType.Dependency => "[=] Dependency",
             _ => "[?] Unknown"
         };
 
@@ -201,6 +248,7 @@ namespace AssetsManager.Services.Explorer
                 ChunkDiffType.Removed => DiffStatus.Deleted,
                 ChunkDiffType.Modified => DiffStatus.Modified,
                 ChunkDiffType.Renamed => DiffStatus.Renamed,
+                ChunkDiffType.Dependency => DiffStatus.Unchanged,
                 _ => DiffStatus.Unchanged,
             };
         }

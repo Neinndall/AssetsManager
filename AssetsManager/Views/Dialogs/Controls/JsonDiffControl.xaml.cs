@@ -10,7 +10,6 @@ using ICSharpCode.AvalonEdit.Rendering;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using System.Xml;
-
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -19,6 +18,7 @@ using System.Windows.Media.Animation;
 using ICSharpCode.AvalonEdit.Document;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Formatting;
 using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs.Controls
@@ -29,6 +29,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         private bool _isWordLevelDiff = false;
         private bool _hideUnchangedLines = false;
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public JsonFormatterService JsonFormatterService { get; set; }
         public event EventHandler<bool> ComparisonFinished;
 
         public JsonDiffControl()
@@ -142,8 +143,8 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             var (normalizedOld, normalizedNew) = await Task.Run(() =>
             {
-                var nOld = JsonFormatter.NormalizeTextForAlignment(modelToShow.OldText);
-                var nNew = JsonFormatter.NormalizeTextForAlignment(modelToShow.NewText);
+                var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText);
+                var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText);
                 return (nOld, nNew);
             });
 

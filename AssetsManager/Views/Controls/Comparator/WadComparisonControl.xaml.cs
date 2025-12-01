@@ -60,47 +60,6 @@ namespace AssetsManager.Views.Controls.Comparator
             InitializeComponent();
         }
 
-        private async void createLolBackupButton_Click(object sender, RoutedEventArgs e)
-        {
-            string sourceLolPath = AppSettings.LolPbeDirectory;
-
-            if (string.IsNullOrEmpty(sourceLolPath))
-            {
-                CustomMessageBoxService.ShowWarning("Warning", "LoL directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
-                return;
-            }
-
-            if (!Directory.Exists(sourceLolPath))
-            {
-                CustomMessageBoxService.ShowError("Error", $"The configured LoL directory does not exist: {sourceLolPath}", Window.GetWindow(this));
-                return;
-            }
-
-            string destinationBackupPath = sourceLolPath + "_old";
-
-            createLolBackupButton.IsEnabled = false;
-            try
-            {
-                await BackupManager.CreateLolPbeDirectoryBackupAsync(sourceLolPath, destinationBackupPath);
-                CustomMessageBoxService.ShowInfo("Info", "LoL backup completed successfully.", Window.GetWindow(this));
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-                LogService.LogError(ex, "Error creating LoL backup");
-                CustomMessageBoxService.ShowError("Error", ex.Message, Window.GetWindow(this));
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "Error creating LoL backup");
-                CustomMessageBoxService.ShowError("Error", $"An unexpected error occurred while creating the backup: {ex.Message}", Window.GetWindow(this));
-            }
-            finally
-            {
-                createLolBackupButton.IsEnabled = true;
-                LogService.LogSuccess($"LoL backup completed successfully.");
-            }
-        }
-
         private void btnSelectOldLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
             using (var folderBrowserDialog = new CommonOpenFileDialog

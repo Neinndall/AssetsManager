@@ -30,6 +30,30 @@ namespace AssetsManager.Services.Comparator
             _logService.LogDebug($"[GetBinFileSearchStrategy] Searching for BIN strategy. FullPath: '{fullPath}', SourceWad: '{sourceWadPath}'");
             string sourceWadName = Path.GetFileName(sourceWadPath);
 
+            // Strategy 0: Infer from companion path structure
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 0: Infer from companion path structure.");
+            if (fullPath.Contains("/companions/pets/"))
+            {
+                var pathParts = fullPath.Split('/');
+                int petsIndex = Array.IndexOf(pathParts, "pets");
+
+                if (petsIndex != -1 && pathParts.Length > petsIndex + 2)
+                {
+                    string petName = pathParts[petsIndex + 1];
+                    string themeName = pathParts[petsIndex + 2];
+
+                    if (!string.IsNullOrEmpty(petName) && !string.IsNullOrEmpty(themeName))
+                    {
+                        string binPath = $"data/characters/{petName}/themes/{themeName}/root.bin";
+                        string targetWadName = "companions.wad.client";
+                        var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Companion);
+                        _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 0 successful. Found: {strategy}");
+                        return strategy;
+                    }
+                }
+            }
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 0 failed or was not applicable.");
+
             // Strategy 1: Infer from full path structure
             _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 1: Infer from full path structure.");
             if (fullPath.Contains("/characters/") && fullPath.Contains("/skins/"))
@@ -101,31 +125,33 @@ namespace AssetsManager.Services.Comparator
         {
             var finalDiffs = diffs.ToList();
             var audioBankDiffs = finalDiffs.Where(d => (d.NewPath ?? d.OldPath).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase)).ToList();
-            _logService.Log($"[CreateLeanWadPackageAsync] Found {audioBankDiffs.Count} audio bank diffs to process.");
+            _logService.LogDebug($"[CreateLeanWadPackageAsync] Found {audioBankDiffs.Count} audio bank diffs to process.");
 
             foreach (var audioBankDiff in audioBankDiffs)
             {
                 audioBankDiff.Dependencies = new List<AssociatedDependency>();
                 string pathForStrategy = audioBankDiff.NewPath ?? audioBankDiff.OldPath;
-                _logService.Log($"[CreateLeanWadPackageAsync] Processing audio bank: '{pathForStrategy}'");
+                _logService.LogDebug($"[CreateLeanWadPackageAsync] Processing audio bank: '{pathForStrategy}'");
 
                 // --- 1. Handle .bin dependency ---
-                _logService.Log($"[CreateLeanWadPackageAsync] Searching for .bin dependency for '{pathForStrategy}'...");
+                _logService.LogDebug($"[CreateLeanWadPackageAsync] Searching for .bin dependency for '{pathForStrategy}'...");
                 var binStrategy = GetBinFileSearchStrategy(pathForStrategy, audioBankDiff.SourceWadFile);
                 if (binStrategy != null)
                 {
-                    _logService.Log($"[CreateLeanWadPackageAsync] Found bin strategy: {binStrategy}. Creating dependency...");
-                    var binDependency = await CreateDependencyAsync(binStrategy.BinPath, XxHash64Ext.Hash(binStrategy.BinPath.ToLower()), binStrategy.TargetWadName, oldPbePath, newPbePath, binStrategy.TargetWadName);
+                    _logService.LogDebug($"[CreateLeanWadPackageAsync] Found bin strategy: {binStrategy}. Creating dependency...");
+                    var diffForBinDependency = finalDiffs.FirstOrDefault(d => d.NewPathHash == XxHash64Ext.Hash(binStrategy.BinPath.ToLower()) || d.OldPathHash == XxHash64Ext.Hash(binStrategy.BinPath.ToLower()));
+                    var binDependency = await CreateDependencyAsync(binStrategy.BinPath, XxHash64Ext.Hash(binStrategy.BinPath.ToLower()), binStrategy.TargetWadName, oldPbePath, newPbePath, binStrategy.TargetWadName, diffForBinDependency);
                     if (binDependency != null)
                     {
                         audioBankDiff.Dependencies.Add(binDependency);
-                        _logService.Log($"[CreateLeanWadPackageAsync] Successfully created and added .bin dependency for '{binStrategy.BinPath}'.");
+                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Successfully created and added .bin dependency for '{binStrategy.BinPath}'.");
 
-                        var diffToRemove = finalDiffs.FirstOrDefault(d => d.NewPathHash == binDependency.NewPathHash || d.OldPathHash == binDependency.NewPathHash);
-                        if (diffToRemove != null)
+                        // Always remove the top-level diff if it was explicitly a diff.
+                        // The dependency now carries its own Type and WasTopLevelDiff flag.
+                        if (diffForBinDependency != null)
                         {
-                            finalDiffs.Remove(diffToRemove);
-                            _logService.Log($"[CreateLeanWadPackageAsync] Removed duplicate top-level diff: '{binStrategy.BinPath}'.");
+                            finalDiffs.Remove(diffForBinDependency);
+                            _logService.LogDebug($"[CreateLeanWadPackageAsync] Removed top-level diff (now embedded as dependency): '{binStrategy.BinPath}'.");
                         }
                     }
                     else
@@ -139,7 +165,7 @@ namespace AssetsManager.Services.Comparator
                 }
 
                 // --- 2. Handle sibling audio dependency ---
-                _logService.Log($"[CreateLeanWadPackageAsync] Searching for sibling audio dependencies for '{pathForStrategy}'...");
+                _logService.LogDebug($"[CreateLeanWadPackageAsync] Searching for sibling audio dependencies for '{pathForStrategy}'...");
                 string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(pathForStrategy);
                 List<string> potentialSiblingsList = new List<string>();
 
@@ -160,23 +186,25 @@ namespace AssetsManager.Services.Comparator
                     potentialSiblingsList.Add(basePart + "_audio.bnk");
                     potentialSiblingsList.Add(basePart + "_audio.wpk");
                 }
-                _logService.Log($"[CreateLeanWadPackageAsync] Potential siblings identified: {string.Join(", ", potentialSiblingsList)}");
+                _logService.LogDebug($"[CreateLeanWadPackageAsync] Potential siblings identified: {string.Join(", ", potentialSiblingsList)}");
 
                 foreach (var siblingFileName in potentialSiblingsList)
                 {
                     string siblingFullPath = Path.Combine(Path.GetDirectoryName(pathForStrategy), siblingFileName).Replace('\\', '/');
-                    _logService.Log($"[CreateLeanWadPackageAsync] Attempting to create dependency for sibling: '{siblingFullPath}'");
-                    var siblingDependency = await CreateDependencyAsync(siblingFullPath, XxHash64Ext.Hash(siblingFullPath.ToLower()), audioBankDiff.SourceWadFile, oldPbePath, newPbePath, audioBankDiff.SourceWadFile);
+                    _logService.LogDebug($"[CreateLeanWadPackageAsync] Attempting to create dependency for sibling: '{siblingFullPath}'");
+                    var diffForSiblingDependency = finalDiffs.FirstOrDefault(d => (d.NewPath ?? d.OldPath).Equals(siblingFullPath, StringComparison.OrdinalIgnoreCase));
+                    var siblingDependency = await CreateDependencyAsync(siblingFullPath, XxHash64Ext.Hash(siblingFullPath.ToLower()), audioBankDiff.SourceWadFile, oldPbePath, newPbePath, audioBankDiff.SourceWadFile, diffForSiblingDependency);
                     if (siblingDependency != null)
                     {
                         audioBankDiff.Dependencies.Add(siblingDependency);
-                        _logService.Log($"[CreateLeanWadPackageAsync] Successfully created and added sibling dependency for '{siblingFullPath}'.");
+                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Successfully created and added sibling dependency for '{siblingFullPath}'.");
 
-                        var diffToRemove = finalDiffs.FirstOrDefault(d => d.NewPathHash == siblingDependency.NewPathHash || d.OldPathHash == siblingDependency.NewPathHash);
-                        if (diffToRemove != null)
+                        // Always remove the top-level diff if it was explicitly a diff.
+                        // The dependency now carries its own Type and WasTopLevelDiff flag.
+                        if (diffForSiblingDependency != null)
                         {
-                            finalDiffs.Remove(diffToRemove);
-                            _logService.Log($"[CreateLeanWadPackageAsync] Removed duplicate top-level diff: '{siblingFullPath}'.");
+                            finalDiffs.Remove(diffForSiblingDependency);
+                            _logService.LogDebug($"[CreateLeanWadPackageAsync] Removed top-level diff (now embedded as dependency): '{siblingFullPath}'.");
                         }
 
                         break;
@@ -194,7 +222,7 @@ namespace AssetsManager.Services.Comparator
             {
                 if (audioBankDiff.Dependencies != null)
                 {
-                    _logService.Log($"[CreateLeanWadPackageAsync] Packaging {audioBankDiff.Dependencies.Count} dependencies for '{audioBankDiff.NewPath ?? audioBankDiff.OldPath}'.");
+                    _logService.LogDebug($"[CreateLeanWadPackageAsync] Packaging {audioBankDiff.Dependencies.Count} dependencies for '{audioBankDiff.NewPath ?? audioBankDiff.OldPath}'.");
                     foreach (var dep in audioBankDiff.Dependencies)
                     {
                         allChunks.Add(new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, SourceWadFile = dep.SourceWad, Type = ChunkDiffType.Modified });
@@ -237,32 +265,34 @@ namespace AssetsManager.Services.Comparator
             return finalDiffs;
         }
 
-        private async Task<AssociatedDependency> CreateDependencyAsync(string filePath, ulong fileHash, string wadRelativePath, string oldPbePath, string newPbePath, string sourceWad)
+        private async Task<AssociatedDependency> CreateDependencyAsync(string filePath, ulong fileHash, string wadRelativePath, string oldPbePath, string newPbePath, string sourceWad, SerializableChunkDiff originalDiff)
         {
-            _logService.Log($"[CreateDependencyAsync] Attempting to create dependency for file '{filePath}' (Hash: {fileHash:X16}) in WAD '{wadRelativePath}'.");
+            _logService.LogDebug($"[CreateDependencyAsync] Attempting to create dependency for file '{filePath}' (Hash: {fileHash:X16}) in WAD '{wadRelativePath}'.");
             return await Task.Run(() =>
             {
                 string wadFullPath = Path.Combine(newPbePath, wadRelativePath);
                 if (!File.Exists(wadFullPath))
                 {
-                    _logService.Log($"[CreateDependencyAsync] WAD not found at new path, trying old path: '{wadFullPath}'");
+                    _logService.LogDebug($"[CreateDependencyAsync] WAD not found at new path, trying old path: '{wadFullPath}'");
                     wadFullPath = Path.Combine(oldPbePath, wadRelativePath);
                 }
 
                 if (File.Exists(wadFullPath))
                 {
-                    _logService.Log($"[CreateDependencyAsync] WAD found at '{wadFullPath}'. Reading...");
+                    _logService.LogDebug($"[CreateDependencyAsync] WAD found at '{wadFullPath}'. Reading...");
                     using var wad = new WadFile(wadFullPath);
                     if (wad.Chunks.TryGetValue(fileHash, out var chunk))
                     {
-                        _logService.Log($"[CreateDependencyAsync] Chunk found for hash {fileHash:X16}. Creating dependency object.");
+                        _logService.LogDebug($"[CreateDependencyAsync] Chunk found for hash {fileHash:X16}. Creating dependency object.");
                         return new AssociatedDependency
                         {
                             Path = filePath,
                             SourceWad = sourceWad,
                             OldPathHash = fileHash,
                             NewPathHash = fileHash,
-                            CompressionType = chunk.Compression
+                            CompressionType = chunk.Compression,
+                            Type = originalDiff?.Type ?? ChunkDiffType.Dependency, // Assign Dependency if not a top-level diff
+                            WasTopLevelDiff = true // Always true for dependencies so they are shown
                         };
                     }
                     else
@@ -299,10 +329,7 @@ namespace AssetsManager.Services.Comparator
                         Directory.CreateDirectory(targetChunkPath);
                         await File.WriteAllBytesAsync(destChunkPath, rawChunkData);
                     }
-                    else
-                    {
-                        _logService.LogWarning($"Could not find chunk with hash {hash:X16} in {sourceWadPath}");
-                    }
+
                 }
             }
             catch (System.Exception ex)

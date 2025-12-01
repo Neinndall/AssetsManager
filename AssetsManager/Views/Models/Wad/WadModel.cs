@@ -9,7 +9,8 @@ namespace AssetsManager.Views.Models.Wad
         New,
         Removed,
         Modified,
-        Renamed
+        Renamed,
+        Dependency // Represents a chunk that hasn't changed / an associated dependency
     }
 
     public class ChunkDiff
@@ -29,6 +30,8 @@ namespace AssetsManager.Views.Models.Wad
         public ulong OldPathHash { get; set; }
         public ulong NewPathHash { get; set; }
         public WadChunkCompression CompressionType { get; set; }
+        public ChunkDiffType? Type { get; set; }
+        public bool WasTopLevelDiff { get; set; }
     }
 
     public class SerializableChunkDiff

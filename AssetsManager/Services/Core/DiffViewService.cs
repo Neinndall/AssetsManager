@@ -5,18 +5,17 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
-using Microsoft.Extensions.DependencyInjection;
-using System.Text.Json;
 
 namespace AssetsManager.Services.Core
 {
@@ -30,8 +29,9 @@ namespace AssetsManager.Services.Core
         private readonly AudioBankLinkerService _audioBankLinkerService;
         private readonly AudioBankService _audioBankService;
         private readonly WadExtractionService _wadExtractionService;
+        private readonly JsonFormatterService _jsonFormatterService;
 
-        public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, ContentFormatterService contentFormatterService, AudioBankLinkerService audioBankLinkerService, AudioBankService audioBankService, WadExtractionService wadExtractionService)
+        public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, ContentFormatterService contentFormatterService, AudioBankLinkerService audioBankLinkerService, AudioBankService audioBankService, WadExtractionService wadExtractionService, JsonFormatterService jsonFormatterService)
         {
             _serviceProvider = serviceProvider;
             _wadDifferenceService = wadDifferenceService;
@@ -41,6 +41,7 @@ namespace AssetsManager.Services.Core
             _audioBankLinkerService = audioBankLinkerService;
             _audioBankService = audioBankService;
             _wadExtractionService = wadExtractionService;
+            _jsonFormatterService = jsonFormatterService;
         }
 
         public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath = null)
@@ -187,7 +188,7 @@ namespace AssetsManager.Services.Core
             }
 
             var settings = new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
-            return await JsonFormatter.FormatJsonAsync(result, settings);
+            return await _jsonFormatterService.FormatJsonAsync(result, settings);
         }
 
         private async Task HandleTextDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)
