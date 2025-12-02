@@ -129,8 +129,7 @@ namespace AssetsManager.Services.Explorer
                     break;
 
                 default:
-                    // For any other file, just extract it raw
-                    await _wadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken);
+                    await HandleRawFileExtractionAsync(node, destinationPath, cancellationToken);
                     break;
             }
         }
@@ -284,6 +283,30 @@ namespace AssetsManager.Services.Explorer
             string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
 
             await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
+        }
+
+        private async Task HandleRawFileExtractionAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
+            if (fileBytes == null) return;
+
+            string fileName = node.Name;
+            string existingExtension = Path.GetExtension(fileName);
+
+            if (string.IsNullOrEmpty(existingExtension))
+            {
+                // If no extension, try to guess it
+                string guessedExtension = FileTypeDetector.GuessExtension(fileBytes);
+                if (!string.IsNullOrEmpty(guessedExtension))
+                {
+                    fileName = $"{fileName}.{guessedExtension}";
+                }
+            }
+
+            string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
+            await File.WriteAllBytesAsync(filePath, fileBytes, cancellationToken);
         }
     }
 }
