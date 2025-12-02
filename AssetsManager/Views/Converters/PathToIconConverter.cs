@@ -35,6 +35,7 @@ namespace AssetsManager.Views.Converters
             { ".webm", MaterialIconKind.MoviePlayOutline },
             { ".ogg", MaterialIconKind.MusicNote },
             { ".bin", MaterialIconKind.FileCodeOutline },
+            { ".troybin", MaterialIconKind.StarFourPoints },
             { ".skl", MaterialIconKind.Person },
             { ".skn", MaterialIconKind.Person },
             { ".wpk", MaterialIconKind.FolderMusicOutline },
