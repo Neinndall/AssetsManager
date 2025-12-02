@@ -74,17 +74,22 @@ namespace AssetsManager.Services.Comparator
                     using var wadFile = new WadFile(wadPath);
                     if (wadFile.Chunks.TryGetValue(hash, out WadChunk chunk))
                     {
-                        using var decompressedChunk = wadFile.LoadChunkDecompressed(chunk);
-                        var extension = FileTypeDetector.GuessExtension(decompressedChunk.Span);
-                        if (!string.IsNullOrEmpty(extension))
+                        using (var stream = wadFile.OpenChunk(chunk))
                         {
-                            return $"{path}.{extension}";
+                            var buffer = new byte[256]; // Read only a small portion
+                            var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                            var data = new Span<byte>(buffer, 0, bytesRead);
+                            string extension = FileTypeDetector.GuessExtension(data);
+                            if (!string.IsNullOrEmpty(extension))
+                            {
+                                return $"{path}.{extension}";
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogWarning($"Could not process chunk {hash:x16} from {wadPath}: {ex.Message}");
+                    _logService.LogWarning($"Could not process chunk {hash:x16} from {wadPath} for extension guessing: {ex.Message}");
                 }
 
                 return path;
