@@ -279,7 +279,7 @@ namespace AssetsManager.Views
 
             if (_appSettings.ReportGeneration.Enabled) // Prioritize report generation
             {
-                await _reportGenerationService.GenerateReportAsync(serializableDiffs);
+                await _reportGenerationService.GenerateReportAsync(serializableDiffs, oldLolPath, newLolPath);
             }
             else if (_appSettings.EnableExtraction) // Only extract if report generation is NOT enabled
             {

@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
+using LeagueToolkit.Core.Wad;
 using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Services.Comparator
@@ -23,7 +24,7 @@ namespace AssetsManager.Services.Comparator
             _directoriesCreator = directoriesCreator;
         }
 
-        public async Task GenerateReportAsync(List<SerializableChunkDiff> diffs)
+        public async Task GenerateReportAsync(List<SerializableChunkDiff> diffs, string oldDirectory, string newDirectory)
         {
             if (diffs == null || !diffs.Any())
             {
@@ -55,22 +56,58 @@ namespace AssetsManager.Services.Comparator
             reportContent.AppendLine("========================================");
             reportContent.AppendLine();
 
+            string GetPathWithExtension(string path, ulong hash, string sourceWadFile, string baseDirectory)
+            {
+                if (Path.HasExtension(path) || string.IsNullOrEmpty(baseDirectory) || hash == 0)
+                {
+                    return path;
+                }
+
+                string wadPath = Path.Combine(baseDirectory, sourceWadFile);
+                if (!File.Exists(wadPath))
+                {
+                    return path;
+                }
+
+                try
+                {
+                    using var wadFile = new WadFile(wadPath);
+                    if (wadFile.Chunks.TryGetValue(hash, out WadChunk chunk))
+                    {
+                        using var decompressedChunk = wadFile.LoadChunkDecompressed(chunk);
+                        var extension = FileTypeDetector.GuessExtension(decompressedChunk.Span);
+                        if (!string.IsNullOrEmpty(extension))
+                        {
+                            return $"{path}.{extension}";
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogWarning($"Could not process chunk {hash:x16} from {wadPath}: {ex.Message}");
+                }
+
+                return path;
+            }
+
             foreach (var diff in filteredDiffs)
             {
                 string line = $"[{diff.Type}] ";
                 switch (diff.Type)
                 {
                     case ChunkDiffType.New:
-                        line += diff.NewPath;
+                        line += GetPathWithExtension(diff.NewPath, diff.NewPathHash, diff.SourceWadFile, newDirectory);
                         break;
                     case ChunkDiffType.Removed:
-                        line += diff.OldPath;
+                        line += GetPathWithExtension(diff.OldPath, diff.OldPathHash, diff.SourceWadFile, oldDirectory);
                         break;
                     case ChunkDiffType.Renamed:
-                        line += $"{diff.OldPath} -> {diff.NewPath}";
+                        var oldPathWithExt = GetPathWithExtension(diff.OldPath, diff.OldPathHash, diff.SourceWadFile, oldDirectory);
+                        var newPathWithExt = GetPathWithExtension(diff.NewPath, diff.NewPathHash, diff.SourceWadFile, newDirectory);
+                        line += $"{oldPathWithExt} -> {newPathWithExt}";
                         break;
                     case ChunkDiffType.Modified:
-                        line += diff.NewPath;
+                        line += GetPathWithExtension(diff.NewPath, diff.NewPathHash, diff.SourceWadFile, newDirectory);
                         break;
                 }
                 reportContent.AppendLine(line);
