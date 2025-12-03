@@ -59,7 +59,7 @@ namespace AssetsManager.Services.Explorer
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
+            string newDirPath = Path.Combine(destinationPath, PathUtils.SanitizeName(dirNode.Name));
             Directory.CreateDirectory(newDirPath);
 
             foreach (var childNode in dirNode.Children)
@@ -79,7 +79,7 @@ namespace AssetsManager.Services.Explorer
             var wemData = await GetWemFileBytesAsync(fileNode, cancellationToken);
             if (wemData != null)
             {
-                string destFilePath = Path.Combine(destinationPath, SanitizeName(fileNode.Name));
+                string destFilePath = PathUtils.GetUniqueFilePath(destinationPath, fileNode.Name);
                 await File.WriteAllBytesAsync(destFilePath, wemData, cancellationToken);
             }
         }
@@ -89,7 +89,7 @@ namespace AssetsManager.Services.Explorer
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
+            string newDirPath = Path.Combine(destinationPath, PathUtils.SanitizeName(dirNode.Name));
             Directory.CreateDirectory(newDirPath);
 
             // If children are not loaded (i.e., it's the dummy node), load them.
@@ -116,7 +116,7 @@ namespace AssetsManager.Services.Explorer
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            string newDirPath = Path.Combine(destinationPath, SanitizeName(dirNode.Name));
+            string newDirPath = Path.Combine(destinationPath, PathUtils.SanitizeName(dirNode.Name));
             Directory.CreateDirectory(newDirPath);
 
             // The tree is already fully loaded in memory, so we can just iterate through the children.
@@ -159,7 +159,7 @@ namespace AssetsManager.Services.Explorer
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    string destFilePath = Path.Combine(destinationPath, SanitizeName(fileNode.Name));
+                    string destFilePath = PathUtils.GetUniqueFilePath(destinationPath, fileNode.Name);
                     File.WriteAllBytes(destFilePath, decompressedData);
                 }
                 catch (OperationCanceledException)
@@ -315,22 +315,6 @@ namespace AssetsManager.Services.Explorer
                     return null;
                 }
             }, cancellationToken);
-        }
-
-        // Limpia y sanea nombres de fichero para que sean compatibles con el sistema de archivos.
-        public string SanitizeName(string name)
-        {
-            var invalidChars = Path.GetInvalidFileNameChars();
-            var sanitized = new string(name.Where(c => !invalidChars.Contains(c)).ToArray()).Trim();
-
-            const int MaxLength = 240; // A bit less than 255 to be safe.
-            if (sanitized.Length > MaxLength)
-            {
-                var extension = Path.GetExtension(sanitized);
-                var newLength = MaxLength - extension.Length;
-                sanitized = sanitized.Substring(0, newLength) + extension;
-            }
-            return sanitized;
         }
     }
 }

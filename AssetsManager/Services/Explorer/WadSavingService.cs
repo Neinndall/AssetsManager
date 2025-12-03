@@ -66,7 +66,7 @@ namespace AssetsManager.Services.Explorer
 
             if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
             {
-                string currentDestinationPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
+                string currentDestinationPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
                 Directory.CreateDirectory(currentDestinationPath);
 
                 foreach (var child in node.Children)
@@ -79,7 +79,7 @@ namespace AssetsManager.Services.Explorer
 
             if (node.Type == NodeType.AudioEvent)
             {
-                string eventPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
+                string eventPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
                 Directory.CreateDirectory(eventPath);
 
                 foreach (var soundNode in node.Children)
@@ -139,13 +139,16 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             var wemData = await _wadExtractionService.GetWemFileBytesAsync(node, cancellationToken);
-            if (wemData == null) return;
+            if (wemData == null)
+            {
+                return;
+            }
 
             byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData, cancellationToken);
             if (oggData != null)
             {
                 string fileName = Path.ChangeExtension(node.Name, ".ogg");
-                string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
+                string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
                 await File.WriteAllBytesAsync(filePath, oggData, cancellationToken);
             }
         }
@@ -159,7 +162,7 @@ namespace AssetsManager.Services.Explorer
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync("js", fileBytes);
 
-            string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(node.Name));
+            string filePath = PathUtils.GetUniqueFilePath(destinationPath, node.Name);
 
             await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
         }
@@ -174,10 +177,13 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
-            if (linkedBank == null) return;
+            if (linkedBank == null)
+            {
+                return;
+            }
 
             string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
-            string audioBankPath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(audioBankName));
+            string audioBankPath = Path.Combine(destinationPath, PathUtils.SanitizeName(audioBankName));
             Directory.CreateDirectory(audioBankPath);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -205,7 +211,7 @@ namespace AssetsManager.Services.Explorer
             foreach (var eventNode in audioTree)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string eventPath = Path.Combine(audioBankPath, _wadExtractionService.SanitizeName(eventNode.Name));
+                string eventPath = Path.Combine(audioBankPath, PathUtils.SanitizeName(eventNode.Name));
                 Directory.CreateDirectory(eventPath);
 
                 foreach (var soundNode in eventNode.Sounds)
@@ -236,7 +242,7 @@ namespace AssetsManager.Services.Explorer
                         if (oggData != null)
                         {
                             string fileName = Path.ChangeExtension(soundNode.Name, ".ogg");
-                            string filePath = Path.Combine(eventPath, _wadExtractionService.SanitizeName(fileName));
+                            string filePath = PathUtils.GetUniqueFilePath(eventPath, fileName);
                             await File.WriteAllBytesAsync(filePath, oggData, cancellationToken);
                         }
                     }
@@ -249,7 +255,10 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
-            if (fileBytes == null) return;
+            if (fileBytes == null)
+            {
+                return;
+            }
 
             using (var memoryStream = new MemoryStream(fileBytes))
             {
@@ -260,7 +269,7 @@ namespace AssetsManager.Services.Explorer
                     encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
 
                     string fileName = Path.ChangeExtension(node.Name, ".png");
-                    string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
+                    string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
 
                     using (var fileStream = new FileStream(filePath, FileMode.Create))
                     {
@@ -275,12 +284,15 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
-            if (fileBytes == null) return;
+            if (fileBytes == null)
+            {
+                return;
+            }
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync(type, fileBytes);
 
             string fileName = Path.ChangeExtension(node.Name, ".json");
-            string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
+            string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
 
             await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
         }
@@ -290,7 +302,10 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
-            if (fileBytes == null) return;
+            if (fileBytes == null)
+            {
+                return;
+            }
 
             string fileName = node.Name;
             string existingExtension = Path.GetExtension(fileName);
@@ -305,7 +320,7 @@ namespace AssetsManager.Services.Explorer
                 }
             }
 
-            string filePath = Path.Combine(destinationPath, _wadExtractionService.SanitizeName(fileName));
+            string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
             await File.WriteAllBytesAsync(filePath, fileBytes, cancellationToken);
         }
     }

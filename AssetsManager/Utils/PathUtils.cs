@@ -1,16 +1,57 @@
 using System;
 using System.IO;
-using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace AssetsManager.Utils
 {
     public static class PathUtils
     {
+        public static string SanitizeName(string name)
+        {
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var sanitized = new string(name.Where(c => !invalidChars.Contains(c)).ToArray()).Trim();
+
+            const int MaxLength = 240; // A bit less than 255 to be safe.
+            if (sanitized.Length > MaxLength)
+            {
+                var extension = Path.GetExtension(sanitized);
+                var newLength = MaxLength - extension.Length;
+                sanitized = sanitized.Substring(0, newLength) + extension;
+            }
+            return sanitized;
+        }
+
+        public static string GetUniqueFilePath(string destinationDirectory, string fileName)
+        {
+            string sanitizedFileName = SanitizeName(fileName); // This now calls the local static method
+            string filePath = Path.Combine(destinationDirectory, sanitizedFileName);
+
+            if (!File.Exists(filePath))
+            {
+                return filePath;
+            }
+
+            string fileNameWithoutExt = Path.GetFileNameWithoutExtension(sanitizedFileName);
+            string fileExt = Path.GetExtension(sanitizedFileName);
+            int counter = 1;
+
+            while (true)
+            {
+                string newFileName = $"{fileNameWithoutExt} ({counter}){fileExt}";
+                string newFilePath = Path.Combine(destinationDirectory, newFileName);
+                if (!File.Exists(newFilePath))
+                {
+                    return newFilePath;
+                }
+                counter++;
+            }
+        }
+        
         /// <summary>
         /// Generates a unique local file path from a given URL, preserving the URL's directory structure.
         /// </summary>
         /// <param name="url">The full URL of the JSON file.</param>
-        /// <returns>A relative path that can be appended to a base directory, e.g., "pbe/plugins/rcp-fe-lol-paw/global/default/trans.json".</returns>
+        /// <returns>A relative path that can be appended to a base directory, e.g., "pbe/plugins/rcp-fe-lol-clash/global/default/trans.json".</returns>
         public static string GetUniqueLocalPathFromJsonUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url))
