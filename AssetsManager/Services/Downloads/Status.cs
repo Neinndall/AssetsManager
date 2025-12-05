@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Downloads
@@ -14,7 +15,7 @@ namespace AssetsManager.Services.Downloads
     {
         // URL Server where obtain the info for the hashes
         private const string STATUS_URL = "https://raw.communitydragon.org/data/hashes/lol/";
-
+		
         // Game Hashes
         private const string GAME_HASHES_FILENAME = "hashes.game.txt";
         private const string LCU_HASHES_FILENAME = "hashes.lcu.txt";
@@ -60,35 +61,44 @@ namespace AssetsManager.Services.Downloads
             var outdatedFiles = await GetOutdatedHashFilesAsync(silent, onUpdateFound);
             if (outdatedFiles.Any())
             {
-                if (!silent) _logService.Log("Server updated or local files out of date. Starting hash synchronization...");
-
-                if (syncHashesWithCDTB)
+                await HashResolverService._hashFileAccessLock.WaitAsync();
+                try
                 {
-                    await _directoriesCreator.CreateHashesDirectories();
-                    await _requests.DownloadSpecificHashesAsync(outdatedFiles);
+                    if (!silent) _logService.Log("Server updated or local files out of date. Starting hash synchronization...");
 
-                    // Comprobamos si es una sincronización inicial.
-                    // Una forma de detectarlo es si la carpeta 'olds' está vacía.
-                    bool isInitialSync = !Directory.EnumerateFileSystemEntries(_directoriesCreator.HashesOldPath).Any();
-
-                    if (isInitialSync)
+                    if (syncHashesWithCDTB)
                     {
-                        var filesToCopyToOld = new[] { GAME_HASHES_FILENAME, LCU_HASHES_FILENAME };
-                        foreach (var fileName in filesToCopyToOld)
+                        await _directoriesCreator.CreateHashesDirectories();
+                        await _requests.DownloadSpecificHashesAsync(outdatedFiles);
+
+                        // Comprobamos si es una sincronización inicial.
+                        // Una forma de detectarlo es si la carpeta 'olds' está vacía.
+                        bool isInitialSync = !Directory.EnumerateFileSystemEntries(_directoriesCreator.HashesOldPath).Any();
+
+                        if (isInitialSync)
                         {
-                            var sourceFile = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
-                            var destFile = Path.Combine(_directoriesCreator.HashesOldPath, fileName);
-                            if (File.Exists(sourceFile))
+                            var filesToCopyToOld = new[] { GAME_HASHES_FILENAME, LCU_HASHES_FILENAME };
+                            foreach (var fileName in filesToCopyToOld)
                             {
-                                File.Copy(sourceFile, destFile, true);
+                                var sourceFile = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
+                                var destFile = Path.Combine(_directoriesCreator.HashesOldPath, fileName);
+                                if (File.Exists(sourceFile))
+                                {
+                                    File.Copy(sourceFile, destFile, true);
+                                }
                             }
                         }
                     }
+
+                    UpdateConfigWithLocalFileSizes();
+
+                    if (!silent) _logService.LogSuccess("Synchronization completed.");
+                }
+                finally
+                {
+                    HashResolverService._hashFileAccessLock.Release();
                 }
 
-                UpdateConfigWithLocalFileSizes();
-
-                if (!silent) _logService.LogSuccess("Synchronization completed.");
                 return true;
             }
 

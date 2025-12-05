@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using LeagueToolkit.Hashing;
 using AssetsManager.Utils;
@@ -10,6 +11,8 @@ namespace AssetsManager.Services.Hashes
 {
     public class HashResolverService
     {
+        internal static readonly SemaphoreSlim _hashFileAccessLock = new SemaphoreSlim(1, 1);
+
         private readonly Dictionary<ulong, string> _hashToPathMap = new Dictionary<ulong, string>();
         private readonly Dictionary<uint, string> _binHashesMap = new Dictionary<uint, string>();
         private readonly Dictionary<uint, string> _binEntriesMap = new Dictionary<uint, string>();
@@ -46,6 +49,7 @@ namespace AssetsManager.Services.Hashes
 
         private async Task LoadAllHashesInternalAsync()
         {
+            await _hashFileAccessLock.WaitAsync();
             try
             {
                 await Task.WhenAll(
@@ -58,6 +62,10 @@ namespace AssetsManager.Services.Hashes
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to load hashes on startup.");
+            }
+            finally
+            {
+                _hashFileAccessLock.Release();
             }
         }
 
