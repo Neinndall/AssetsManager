@@ -114,10 +114,15 @@
                                     </Style.Triggers>
                                 </Style>
                             </StackPanel.Style>
-                            <TextBlock Text="Update check frequency:" 
+                            <TextBlock Text="Update Interval (in minutes)" 
                                        Foreground="{StaticResource TextSecondary}" 
                                        FontSize="12" 
                                        Margin="0,0,0,4"/>
+                            <TextBlock Text="Specify the desired time between background updates"
+                                         Foreground="{StaticResource TextMuted}" 
+                                         FontSize="12" 
+                                         Margin="0,0,0,10"
+                                         TextWrapping="Wrap"/>
                             <ComboBox SelectedItem="{Binding Settings.UpdateCheckFrequency, Mode=TwoWay}" 
                                       Width="150" 
                                       HorizontalAlignment="Left"

@@ -4,8 +4,19 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:System="clr-namespace:System;assembly=mscorlib"
              mc:Ignorable="d" 
              d:DesignHeight="500" d:DesignWidth="850">
+
+    <UserControl.Resources>
+        <x:Array x:Key="UpdateFrequencies" Type="{x:Type System:Int32}">
+            <System:Int32>1</System:Int32>
+            <System:Int32>10</System:Int32>
+            <System:Int32>30</System:Int32>
+            <System:Int32>60</System:Int32>
+        </x:Array>
+    </UserControl.Resources>
+
     <StackPanel>
         <!-- Page Header -->
         <StackPanel Margin="0,0,0,32">
@@ -66,7 +77,7 @@
                                 </Style>
                             </StackPanel.Style>
 
-                            <TextBlock Text="Update Interval" 
+                            <TextBlock Text="Update Interval (in minutes)" 
                                          Foreground="{StaticResource TextSecondary}" 
                                          FontSize="12" 
                                          Margin="0,0,0,4"/>
@@ -75,15 +86,11 @@
                                          FontSize="12" 
                                          Margin="0,0,0,10"
                                          TextWrapping="Wrap"/>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBox x:Name="AssetTrackerIntervalValueTextBox"
-                                         Width="75"
-                                         Style="{StaticResource ModernTextBoxEditable}"/>
-                                <ComboBox x:Name="AssetTrackerIntervalUnitComboBox"
-                                          Width="100"
-                                          Margin="10,0,0,0"
-                                          Style="{StaticResource ModernComboBox}"/>
-                            </StackPanel>
+                            <ComboBox SelectedItem="{Binding Settings.AssetTrackerFrequency, Mode=TwoWay}" 
+                                      Width="150" 
+                                      HorizontalAlignment="Left"
+                                      Style="{StaticResource ModernComboBox}"
+                                      ItemsSource="{StaticResource UpdateFrequencies}"/>
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
@@ -131,7 +138,7 @@
                                 </Style>
                             </StackPanel.Style>
 
-                            <TextBlock Text="Update Interval"
+                            <TextBlock Text="Update Interval (in minutes)"
                                          Foreground="{StaticResource TextSecondary}"
                                          FontSize="12"
                                          Margin="0,0,0,4"/>
@@ -140,15 +147,11 @@
                                          FontSize="12"
                                          Margin="0,0,0,10"
                                          TextWrapping="Wrap"/>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBox x:Name="PbeIntervalValueTextBox"
-                                         Width="75"
-                                         Style="{StaticResource ModernTextBoxEditable}"/>
-                                <ComboBox x:Name="PbeIntervalUnitComboBox"
-                                          Width="100"
-                                          Margin="10,0,0,0"
-                                          Style="{StaticResource ModernComboBox}"/>
-                            </StackPanel>
+                            <ComboBox SelectedItem="{Binding Settings.PbeStatusFrequency, Mode=TwoWay}" 
+                                      Width="150" 
+                                      HorizontalAlignment="Left"
+                                      Style="{StaticResource ModernComboBox}"
+                                      ItemsSource="{StaticResource UpdateFrequencies}"/>
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
