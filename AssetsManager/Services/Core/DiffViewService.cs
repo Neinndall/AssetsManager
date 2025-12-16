@@ -291,6 +291,8 @@ namespace AssetsManager.Services.Core
                    SupportedFileTypes.Css.Contains(extension) ||
                    SupportedFileTypes.Bin.Contains(extension) ||
                    SupportedFileTypes.StringTable.Contains(extension) ||
+                   SupportedFileTypes.Troybin.Contains(extension) ||
+                   SupportedFileTypes.Preload.Contains(extension) ||
                    extension == ".bnk" ||
                    SupportedFileTypes.PlainText.Contains(extension);
         }
