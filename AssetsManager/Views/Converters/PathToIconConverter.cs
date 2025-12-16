@@ -36,6 +36,7 @@ namespace AssetsManager.Views.Converters
             { ".ogg", MaterialIconKind.MusicNote },
             { ".bin", MaterialIconKind.FileCodeOutline },
             { ".troybin", MaterialIconKind.StarFourPoints },
+            { ".preload", MaterialIconKind.FormatListBulleted },
             { ".skl", MaterialIconKind.Person },
             { ".skn", MaterialIconKind.Person },
             { ".wpk", MaterialIconKind.FolderMusicOutline },
