@@ -41,6 +41,8 @@ namespace AssetsManager.Views.Converters
             { ".skn", MaterialIconKind.Person },
             { ".wpk", MaterialIconKind.FolderMusicOutline },
             { ".bnk", MaterialIconKind.FolderMusicOutline },
+            { ".bundle", MaterialIconKind.PackageVariant },
+            { ".assetbundle", MaterialIconKind.PackageVariant },
         };
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

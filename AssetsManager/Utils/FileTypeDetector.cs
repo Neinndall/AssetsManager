@@ -31,6 +31,9 @@ namespace AssetsManager.Utils
         private static readonly byte[] BIN_PTCH_SIGNATURE = { 0x50, 0x54, 0x43, 0x48 }; // "PTCH"
         private static readonly byte[] ICO_SIGNATURE = { 0x00, 0x00, 0x01, 0x00 };
         private static readonly byte[] TEX_SIGNATURE = { 0x54, 0x45, 0x58, 0x00 }; // "TEX\0"
+        private static readonly byte[] UNITYFS_SIGNATURE = { 0x55, 0x6E, 0x69, 0x74, 0x79, 0x46, 0x53 }; // "UnityFS"
+        private static readonly byte[] UNITYWEB_SIGNATURE = { 0x55, 0x6E, 0x69, 0x74, 0x79, 0x57, 0x65, 0x62 }; // "UnityWeb"
+        private static readonly byte[] UNITYRAW_SIGNATURE = { 0x55, 0x6E, 0x69, 0x74, 0x79, 0x52, 0x61, 0x77 }; // "UnityRaw"
 
         public static string GuessExtension(Span<byte> data)
         {
@@ -39,6 +42,7 @@ namespace AssetsManager.Utils
 
             if (StartsWith(data, DDS_SIGNATURE)) return "dds";
             if (StartsWith(data, TEX_SIGNATURE)) return "tex";
+            if (StartsWith(data, UNITYFS_SIGNATURE) || StartsWith(data, UNITYWEB_SIGNATURE) || StartsWith(data, UNITYRAW_SIGNATURE)) return "assetbundle";
             if (StartsWith(data, PNG_SIGNATURE)) return "png";
             if (StartsWith(data, JPG_SIGNATURE)) return "jpg";
             if (StartsWith(data, OGG_SIGNATURE)) return "ogg";
