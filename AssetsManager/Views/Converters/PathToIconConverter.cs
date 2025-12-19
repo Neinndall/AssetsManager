@@ -41,6 +41,7 @@ namespace AssetsManager.Views.Converters
             { ".skn", MaterialIconKind.Person },
             { ".wpk", MaterialIconKind.FolderMusicOutline },
             { ".bnk", MaterialIconKind.FolderMusicOutline },
+            { ".wasm", MaterialIconKind.CodeBraces },
             { ".bundle", MaterialIconKind.PackageVariant },
             { ".assetbundle", MaterialIconKind.PackageVariant },
         };
