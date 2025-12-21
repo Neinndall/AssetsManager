@@ -1,0 +1,178 @@
+<UserControl x:Class="AssetsManager.Views.Controls.Monitor.MonitorDashboardControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800">
+
+    <UserControl.Resources>
+        <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+    </UserControl.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="*"/>    <!-- Body -->
+        </Grid.RowDefinitions>
+
+        <!-- Cabecera estándar (como los demás apartados de Monitor) -->
+        <Border Grid.Row="0" 
+                Style="{StaticResource SettingsCard}"
+                Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal">
+                <materialIcons:MaterialIcon Kind="ViewDashboard" 
+                                           FontSize="20" 
+                                           Foreground="{StaticResource AccentBrush}"
+                                           Margin="0,0,12,0"
+                                           VerticalAlignment="Center"/>
+                <StackPanel>
+                    <TextBlock Text="System Dashboard" 
+                              FontSize="18" 
+                              FontWeight="SemiBold"
+                              Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Real-time status overview of all monitored services" 
+                              FontSize="12" 
+                              Foreground="{StaticResource TextMuted}"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Body con tarjetas separadas -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/> <!-- Separación entre columnas -->
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="16"/> <!-- Separación entre filas -->
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Card 1: PBE Status -->
+                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource SettingsCard}" Margin="0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <Border Background="#252535" CornerRadius="8" Width="50" Height="50" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="ServerNetwork" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                            <TextBlock Text="PBE Server Status" Foreground="{StaticResource TextMuted}" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding PbeStatusText}" Foreground="{Binding PbeStatusColor}" FontSize="18" FontWeight="Bold" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                 <materialIcons:MaterialIcon Kind="ClockOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                 <TextBlock Text="{Binding PbeLastCheck, StringFormat='Last Check: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Card 2: File Watcher -->
+                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource SettingsCard}" Margin="0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Background="#252535" CornerRadius="8" Width="50" Height="50" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="FileFind" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                            <TextBlock Text="File Watcher" Foreground="{StaticResource TextMuted}" FontSize="13" FontWeight="SemiBold"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Text="{Binding MonitoredFilesCount}" Foreground="{StaticResource TextPrimary}" FontSize="24" FontWeight="Bold"/>
+                                <TextBlock Text="files monitored" Foreground="{StaticResource TextPrimary}" FontSize="14" VerticalAlignment="Bottom" Margin="6,0,0,4"/>
+                            </StackPanel>
+                            
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <Border Background="#303040" CornerRadius="4" Padding="6,2" Visibility="{Binding MonitoredFilesChangedCount, Converter={StaticResource CountToVisibilityConverter}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding MonitoredFilesChangedCount}" Foreground="#FF6B6B" FontWeight="Bold"/>
+                                        <TextBlock Text=" changes detected" Foreground="#FF6B6B" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                 <TextBlock Text="No recent changes" Foreground="#2ECC71" Margin="0,2,0,0"
+                                            Visibility="{Binding MonitoredFilesChangedCount, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Card 3: Asset Tracker -->
+                <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource SettingsCard}" Margin="0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Background="#252535" CornerRadius="8" Width="50" Height="50" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="Radar" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                            <TextBlock Text="Asset Tracker" Foreground="{StaticResource TextMuted}" FontSize="13" FontWeight="SemiBold"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Text="{Binding AssetTrackerTotalFound}" Foreground="{StaticResource TextPrimary}" FontSize="24" FontWeight="Bold"/>
+                                <TextBlock Text="assets found" Foreground="{StaticResource TextPrimary}" FontSize="14" VerticalAlignment="Bottom" Margin="6,0,0,4"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding AssetTrackerStatus}" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Card 4: System Health -->
+                <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource SettingsCard}" Margin="0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Background="#252535" CornerRadius="8" Width="50" Height="50" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="Chip" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                            <TextBlock Text="System Health" Foreground="{StaticResource TextMuted}" FontSize="13" FontWeight="SemiBold"/>
+                            
+                            <Grid Margin="0,8,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                                        <!-- Hashes -->
+                                                        <materialIcons:MaterialIcon Kind="DatabaseCheck" Width="14" Height="14" Foreground="#2ECC71" VerticalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                             <TextBlock Text="Hashes DB:" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,4,0"/>
+                                                             <TextBlock Text="{Binding HashesStatus}" Foreground="{StaticResource TextPrimary}" FontSize="12" FontWeight="SemiBold"/>
+                                                        </StackPanel>
+                                
+                                                        <!-- App Last Updated -->
+                                                        <materialIcons:MaterialIcon Grid.Row="1" Kind="History" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AppLastUpdated, StringFormat='App Updated: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="8,6,0,0" VerticalAlignment="Center"/>                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -6,6 +6,7 @@ using AssetsManager.Utils;
 using System;
 using System.Windows.Controls;
 using AssetsManager.Views.Controls.Monitor;
+using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Views
 {
@@ -24,9 +25,16 @@ namespace AssetsManager.Views
             DirectoriesCreator directoriesCreator,
             RiotApiService riotApiService,
             TaskCancellationManager taskCancellationManager,
-            BackupManager backupManager) // Added BackupManager
+            BackupManager backupManager,
+            PbeStatusService pbeStatusService) // Added BackupManager and PbeStatusService
         {
             InitializeComponent();
+
+            // Inject all necessary dependencies into the MonitorDashboardControl
+            MonitorDashboardControl.MonitorService = monitorService;
+            MonitorDashboardControl.PbeStatusService = pbeStatusService;
+            MonitorDashboardControl.AppSettings = appSettings;
+            MonitorDashboardControl.VersionService = versionService;
 
             // Inject all necessary dependencies into the FileWatcherControl
             FileWatcherControl.MonitorService = monitorService;

@@ -50,6 +50,9 @@
         <ScrollViewer Grid.Row="1" 
                       Padding="32,18,32,0">
             <TabControl Style="{StaticResource CustomTabControlStyle}">
+                <TabItem Header="Dashboard" Style="{StaticResource CustomTabItemStyle}">
+                    <monitorControls:MonitorDashboardControl x:Name="MonitorDashboardControl"/>
+                </TabItem>
                 <TabItem Header="File Watcher" Style="{StaticResource CustomTabItemStyle}">
                     <monitorControls:FileWatcherControl x:Name="FileWatcherControl"/>
                 </TabItem>

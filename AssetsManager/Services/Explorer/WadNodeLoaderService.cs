@@ -76,13 +76,12 @@ namespace AssetsManager.Services.Explorer
                         {
                             foreach (var dep in file.Dependencies)
                             {
-                                _logService.Log($"[LoadFromBackupAsync] Processing dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
-
+                                _logService.LogDebug($"[LoadFromBackupAsync] Processing dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
                                 // In this view, we add dependencies as top-level entries to respect the file path structure.
                                 // We only do this for dependencies that were originally top-level diffs to avoid clutter.
                                 if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                 {
-                                    _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions (WasTopLevelDiff and Type.HasValue). Adding to tree.");
+                                    _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions (WasTopLevelDiff and Type.HasValue). Adding to tree.");
                                     var depType = dep.Type.Value;
                                     var depStatus = GetDiffStatus(depType);
                                     string depStatusPrefix = GetStatusPrefix(depType);
@@ -104,7 +103,7 @@ namespace AssetsManager.Services.Explorer
                                     };
                                     depNode.BackupChunkPath = depNode.ChunkDiff.BackupChunkPath;
                                 } else {
-                                    _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Skipping addition to tree in sorted view.");
+                                    _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Skipping addition to tree in sorted view.");
                                 }
                             }
                         }
@@ -115,7 +114,6 @@ namespace AssetsManager.Services.Explorer
                 else
                 {
                     var statusGroups = wadGroup.GroupBy(d => d.Type).ToDictionary(g => g.Key, g => g.ToList());
-
                     var statusOrder = new[] { ChunkDiffType.New, ChunkDiffType.Modified, ChunkDiffType.Renamed, ChunkDiffType.Removed };
 
                     foreach (var statusType in statusOrder)
@@ -145,13 +143,13 @@ namespace AssetsManager.Services.Explorer
 
                                 if (file.Dependencies != null)
                                 {
-                                    _logService.Log($"[LoadFromBackupAsync] Processing audio bank '{file.Path}' dependencies (isSortingEnabled=false). Count: {file.Dependencies.Count}");
+                                    _logService.LogDebug($"[LoadFromBackupAsync] Processing audio bank '{file.Path}' dependencies (isSortingEnabled=false). Count: {file.Dependencies.Count}");
                                     foreach (var dep in file.Dependencies)
                                     {
-                                        _logService.Log($"[LoadFromBackupAsync] Dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
+                                        _logService.LogDebug($"[LoadFromBackupAsync] Dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
                                         if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                         {
-                                            _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions. Adding as child node.");
+                                            _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions. Adding as child node.");
                                             // New format: Create a visible child node with status
                                             string depStatusPrefix = GetStatusPrefix(dep.Type.Value);
                                             string depFileName = Path.GetFileName(dep.Path);
@@ -180,7 +178,7 @@ namespace AssetsManager.Services.Explorer
                                         }
                                         else
                                         {
-                                            _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Adding as fallback.");
+                                            _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Adding as fallback.");
                                             // Fallback for old backups or unchanged dependencies
                                             string depFileName = Path.GetFileName(dep.Path);
                                             var depNode = new FileSystemNodeModel(depFileName, false, dep.Path, wadGroup.Key)
