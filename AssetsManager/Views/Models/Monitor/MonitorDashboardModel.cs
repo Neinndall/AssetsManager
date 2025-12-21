@@ -147,6 +147,11 @@ namespace AssetsManager.Views.Models.Monitor
                 RefreshAssetTrackerData();
             };
             _monitorService.CategoryCheckStarted += (category) => AssetTrackerStatus = $"Checking {category.Name}...";
+
+            _pbeStatusService.StatusChecked += () => 
+            {
+                System.Windows.Application.Current.Dispatcher.Invoke(RefreshPbeData);
+            };
         }
 
         private void MonitoredItems_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)

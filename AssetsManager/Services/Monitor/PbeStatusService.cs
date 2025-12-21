@@ -18,6 +18,8 @@ namespace AssetsManager.Services.Monitor
         private readonly AppSettings _appSettings;
         private const string PbeStatusUrl = "https://lol.secure.dyn.riotcdn.net/channels/public/x/status/pbe.json";
 
+        public event Action StatusChecked;
+
         // Dictionary to map common timezone abbreviations to their UTC offsets.
         private static readonly Dictionary<string, TimeSpan> TimeZoneAbbreviations = new Dictionary<string, TimeSpan>(StringComparer.OrdinalIgnoreCase)
         {
@@ -57,6 +59,10 @@ namespace AssetsManager.Services.Monitor
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to check PBE status.");
+            }
+            finally
+            {
+                StatusChecked?.Invoke();
             }
             return null; // No change or error
         }
