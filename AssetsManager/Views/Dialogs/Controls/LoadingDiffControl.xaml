@@ -29,18 +29,14 @@
                             HorizontalAlignment="Center" 
                             Margin="0,0,0,12">
 
-                    <!-- Icono -->
-                    <icons:MaterialIcon x:Name="ProgressIcon" 
-                                        Kind="Sync" 
+                    <!-- Icono con animación automática desde Animations.xaml -->
+                    <icons:MaterialIcon Kind="Sync" 
+                                        Style="{StaticResource SpinningIconStyle}"
                                         Foreground="{StaticResource AccentBrush}" 
                                         Width="24" 
-                                        Height="24" RenderTransformOrigin="0.5,0.5"
+                                        Height="24"
                                         VerticalAlignment="Center"
-                                        Margin="0,0,10,0">
-                        <icons:MaterialIcon.RenderTransform>
-                            <RotateTransform/>
-                        </icons:MaterialIcon.RenderTransform>
-                    </icons:MaterialIcon>
+                                        Margin="0,0,10,0"/>
 
                     <!-- Texto principal -->
                     <TextBlock Text="Processing files..." 
