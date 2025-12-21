@@ -27,7 +27,8 @@ namespace AssetsManager.Views
             TaskCancellationManager taskCancellationManager,
             BackupManager backupManager,
             PbeStatusService pbeStatusService,
-            Status statusService) 
+            Status statusService,
+            UpdateCheckService updateCheckService) 
         {
             InitializeComponent();
 
@@ -37,6 +38,7 @@ namespace AssetsManager.Views
             MonitorDashboardControl.AppSettings = appSettings;
             MonitorDashboardControl.VersionService = versionService;
             MonitorDashboardControl.StatusService = statusService;
+            MonitorDashboardControl.UpdateCheckService = updateCheckService;
 
             // Inject all necessary dependencies into the FileWatcherControl
             FileWatcherControl.MonitorService = monitorService;

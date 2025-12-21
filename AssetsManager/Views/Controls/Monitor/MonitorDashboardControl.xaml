@@ -148,7 +148,7 @@
 
                         <StackPanel Grid.Column="1" Margin="16,0,0,0">
                             <TextBlock Text="System Health" Foreground="{StaticResource TextMuted}" FontSize="13" FontWeight="SemiBold"/>
-                            
+
                             <Grid Margin="0,8,0,0">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -159,16 +159,20 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
-                                                        <!-- Hashes -->
-                                                        <materialIcons:MaterialIcon Kind="DatabaseCheck" Width="14" Height="14" Foreground="#2ECC71" VerticalAlignment="Center"/>
-                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                             <TextBlock Text="Hashes DB:" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,4,0"/>
-                                                             <TextBlock Text="{Binding HashesStatus}" Foreground="{StaticResource TextPrimary}" FontSize="12" FontWeight="SemiBold"/>
-                                                        </StackPanel>
-                                
-                                                        <!-- App Last Updated -->
-                                                        <materialIcons:MaterialIcon Grid.Row="1" Kind="History" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AppLastUpdated, StringFormat='App Updated: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="8,6,0,0" VerticalAlignment="Center"/>                            </Grid>
+                                <!-- Hashes -->
+                                <materialIcons:MaterialIcon Kind="DatabaseCheck" Width="14" Height="14" Foreground="#2ECC71" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Hashes DB:" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,4,0"/>
+                                    <TextBlock Text="{Binding HashesStatus}" Foreground="{StaticResource TextPrimary}" FontSize="12" FontWeight="SemiBold"/>
+                                </StackPanel>
+
+                                <!-- App Version -->
+                                <materialIcons:MaterialIcon Grid.Row="1" Kind="{Binding AppVersionIconKind}" Width="14" Height="14" Foreground="{Binding AppVersionColor}" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="8,6,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="App Version:" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,0,4,0"/>
+                                    <TextBlock Text="{Binding AppVersionText}" Foreground="{Binding AppVersionColor}" FontSize="12" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </Grid>
                 </Border>

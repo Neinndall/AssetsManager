@@ -3,12 +3,13 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using System.Collections.Specialized;
 using AssetsManager.Info;
 using AssetsManager.Services;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
+using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using System.Collections.Specialized;
 
 namespace AssetsManager.Views.Models.Monitor
 {
@@ -19,6 +20,7 @@ namespace AssetsManager.Views.Models.Monitor
         private readonly AppSettings _appSettings;
         private readonly VersionService _versionService;
         private readonly Status _statusService;
+        private readonly UpdateCheckService _updateCheckService;
 
         // --- PBE Status ---
         private string _pbeStatusText = "Unknown";
@@ -94,32 +96,63 @@ namespace AssetsManager.Views.Models.Monitor
             set { _hashesStatus = value; OnPropertyChanged(); }
         }
 
-        private string _appLastUpdated;
-        public string AppLastUpdated
+        private string _appVersionText;
+        public string AppVersionText
         {
-            get => _appLastUpdated;
-            set { _appLastUpdated = value; OnPropertyChanged(); }
+            get => _appVersionText;
+            set { _appVersionText = value; OnPropertyChanged(); }
         }
 
-        public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService)
+        private Brush _appVersionColor;
+        public Brush AppVersionColor
+        {
+            get => _appVersionColor;
+            set { _appVersionColor = value; OnPropertyChanged(); }
+        }
+
+        private Material.Icons.MaterialIconKind _appVersionIconKind;
+        public Material.Icons.MaterialIconKind AppVersionIconKind
+        {
+            get => _appVersionIconKind;
+            set { _appVersionIconKind = value; OnPropertyChanged(); }
+        }
+
+        public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
         {
             _monitorService = monitorService;
             _pbeStatusService = pbeStatusService;
             _appSettings = appSettings;
             _versionService = versionService;
             _statusService = statusService;
+            _updateCheckService = updateCheckService;
 
-            // Get the last write time of the assembly to represent the "Last Updated" date
-            try
+            // Set Initial App Version State (Normal)
+            AppVersionText = ApplicationInfos.Version;
+            AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
+            AppVersionIconKind = Material.Icons.MaterialIconKind.TagOutline;
+
+            // Check if an update was already found before this model was created
+            if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
             {
-                var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                var lastWriteTime = System.IO.File.GetLastWriteTime(assemblyLocation);
-                AppLastUpdated = lastWriteTime.ToString("yyyy-MMM-dd");
+                AppVersionText = $"{_updateCheckService.AvailableVersion} available!";
+                AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
+                AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
             }
-            catch
+
+            // Subscribe to UpdateCheckService for future updates
+            _updateCheckService.UpdatesFound += (message, latestVersion) =>
             {
-                AppLastUpdated = "Unknown";
-            }
+                // Verify if it's an app update notification
+                if (!string.IsNullOrEmpty(latestVersion))
+                {
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        AppVersionText = $"v{latestVersion} available!";
+                        AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
+                        AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
+                    });
+                }
+            };
 
             // Initialize PBE status with last known message and check time
             if (_appSettings.LastPbeStatusMessage == "ONLINE")
