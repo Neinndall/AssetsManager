@@ -42,6 +42,10 @@ namespace AssetsManager.Services.Downloads
         private readonly HttpClient _httpClient;
         private readonly DirectoriesCreator _directoriesCreator;
 
+        public event Action HashSyncStarted;
+        public event Action HashSyncCompleted;
+        public bool IsSyncing { get; private set; } = false;
+
         public Status(
             LogService logService,
             Requests requests,
@@ -97,6 +101,8 @@ namespace AssetsManager.Services.Downloads
                 finally
                 {
                     HashResolverService._hashFileAccessLock.Release();
+                    IsSyncing = false;
+                    HashSyncCompleted?.Invoke();
                 }
 
                 return true;
@@ -182,8 +188,8 @@ namespace AssetsManager.Services.Downloads
             if (localOutOfSync.Any())
             {
                 onUpdateFound?.Invoke();
-                // If files are out of sync locally, we might need to sync everything
-                // depending on the strategy, but for now, let's just return the list.
+                IsSyncing = true;
+                HashSyncStarted?.Invoke(); // Disparar evento para desincronización local
                 return localOutOfSync;
             }
 
@@ -210,6 +216,8 @@ namespace AssetsManager.Services.Downloads
                         if (!notificationSent)
                         {
                             onUpdateFound?.Invoke();
+                            IsSyncing = true;
+                            HashSyncStarted?.Invoke(); // Disparar evento para desincronización remota
                             notificationSent = true;
                         }
                     }

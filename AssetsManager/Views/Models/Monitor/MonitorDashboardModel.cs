@@ -3,10 +3,12 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
-using AssetsManager.Services.Monitor;
-using AssetsManager.Services;
 using AssetsManager.Info;
+using AssetsManager.Services;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
+using System.Collections.Specialized;
 
 namespace AssetsManager.Views.Models.Monitor
 {
@@ -15,7 +17,8 @@ namespace AssetsManager.Views.Models.Monitor
         private readonly MonitorService _monitorService;
         private readonly PbeStatusService _pbeStatusService;
         private readonly AppSettings _appSettings;
-        private readonly VersionService _versionService; // To check Hash/App status if needed
+        private readonly VersionService _versionService;
+        private readonly Status _statusService;
 
         // --- PBE Status ---
         private string _pbeStatusText = "Unknown";
@@ -98,12 +101,13 @@ namespace AssetsManager.Views.Models.Monitor
             set { _appLastUpdated = value; OnPropertyChanged(); }
         }
 
-        public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService)
+        public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService)
         {
             _monitorService = monitorService;
             _pbeStatusService = pbeStatusService;
             _appSettings = appSettings;
             _versionService = versionService;
+            _statusService = statusService;
 
             // Get the last write time of the assembly to represent the "Last Updated" date
             try
@@ -117,21 +121,44 @@ namespace AssetsManager.Views.Models.Monitor
                 AppLastUpdated = "Unknown";
             }
 
+            // Initialize PBE status with last known message and check time
+            if (_appSettings.LastPbeStatusMessage == "ONLINE")
+            {
+                PbeStatusText = "No issues detected";
+                PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
+            }
+            else if (!string.IsNullOrEmpty(_appSettings.LastPbeStatusMessage))
+            {
+                PbeStatusText = _appSettings.LastPbeStatusMessage;
+                PbeStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
+            }
+            else // Default if status is null or empty in settings
+            {
+                PbeStatusText = "No issues detected";
+                PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
+            }
+            PbeLastCheck = !string.IsNullOrEmpty(_appSettings.LastPbeCheckTime) ? _appSettings.LastPbeCheckTime : "N/A";
+
             // Initial Loads
-            RefreshPbeData();
             RefreshFileWatcherData();
             RefreshAssetTrackerData();
 
+            // Set initial Hashes status based on whether a sync is already in progress
+            if (_statusService.IsSyncing)
+            {
+                HashesStatus = "Updating...";
+            }
+
             // Subscriptions
             _monitorService.MonitoredItems.CollectionChanged += MonitoredItems_CollectionChanged;
-            
+
             // Subscribe to PropertyChanged for existing items
             foreach (var item in _monitorService.MonitoredItems)
             {
                 item.PropertyChanged += MonitoredItem_PropertyChanged;
             }
 
-            _monitorService.CategoryCheckCompleted += (category) => 
+            _monitorService.CategoryCheckCompleted += (category) =>
             {
                 // Race condition fix: When this event fires, 'category.Status' might still be 'Checking'.
                 // We check if ANY OTHER category is checking. If not, we are effectively Idle.
@@ -148,13 +175,32 @@ namespace AssetsManager.Views.Models.Monitor
             };
             _monitorService.CategoryCheckStarted += (category) => AssetTrackerStatus = $"Checking {category.Name}...";
 
-            _pbeStatusService.StatusChecked += () => 
+            _pbeStatusService.StatusChecked += () =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(RefreshPbeData);
+                System.Windows.Application.Current.Dispatcher.Invoke(() => {
+                    RefreshPbeData();
+                    PbeLastCheck = DateTime.Now.ToString("HH:mm");
+                });
+            };
+
+            _statusService.HashSyncStarted += () =>
+            {
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    HashesStatus = "Updating...";
+                });
+            };
+
+            _statusService.HashSyncCompleted += () =>
+            {
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    HashesStatus = "Synced";
+                });
             };
         }
 
-        private void MonitoredItems_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        private void MonitoredItems_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.NewItems != null)
             {
@@ -186,17 +232,21 @@ namespace AssetsManager.Views.Models.Monitor
         {
             // Since PbeStatusService stores the msg in AppSettings, we read it.
             string status = _appSettings.LastPbeStatusMessage;
-            if (string.IsNullOrEmpty(status))
+            if (status == "ONLINE") // Use the specific "code" from PbeStatusService
             {
                 PbeStatusText = "No issues detected";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
             }
-            else
+            else if (!string.IsNullOrEmpty(status))
             {
-                PbeStatusText = status.Replace("PBE Status: ", "");
+                PbeStatusText = status; // Display the concise maintenance message directly
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
             }
-            PbeLastCheck = DateTime.Now.ToString("HH:mm"); 
+            else // Default if status is null or empty
+            {
+                PbeStatusText = "No issues detected";
+                PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
+            }
         }
 
         public void RefreshFileWatcherData()
@@ -205,10 +255,10 @@ namespace AssetsManager.Views.Models.Monitor
 
             MonitoredFilesCount = _monitorService.MonitoredItems.Count;
             MonitoredFilesChangedCount = _monitorService.MonitoredItems.Count(x => x.HasChanges);
-            
+
             var lastItem = _monitorService.MonitoredItems.OrderByDescending(x => x.LastChecked).FirstOrDefault();
-            WatcherLastUpdate = lastItem != null && lastItem.LastChecked != "N/A" 
-                ? lastItem.LastChecked.Replace("Last Update: ", "") 
+            WatcherLastUpdate = lastItem != null && lastItem.LastChecked != "N/A"
+                ? lastItem.LastChecked.Replace("Last Update: ", "")
                 : "Never";
         }
 
@@ -218,7 +268,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             AssetTrackerCategoriesCount = _monitorService.AssetCategories.Count;
             AssetTrackerTotalFound = _monitorService.AssetCategories.Sum(c => c.FoundUrls.Count);
-            
+
             // If all idle
             if (_monitorService.AssetCategories.All(c => c.Status == CategoryStatus.Idle || c.Status == CategoryStatus.CompletedSuccess))
             {

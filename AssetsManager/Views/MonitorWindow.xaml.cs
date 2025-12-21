@@ -26,7 +26,8 @@ namespace AssetsManager.Views
             RiotApiService riotApiService,
             TaskCancellationManager taskCancellationManager,
             BackupManager backupManager,
-            PbeStatusService pbeStatusService) // Added BackupManager and PbeStatusService
+            PbeStatusService pbeStatusService,
+            Status statusService) 
         {
             InitializeComponent();
 
@@ -35,6 +36,7 @@ namespace AssetsManager.Views
             MonitorDashboardControl.PbeStatusService = pbeStatusService;
             MonitorDashboardControl.AppSettings = appSettings;
             MonitorDashboardControl.VersionService = versionService;
+            MonitorDashboardControl.StatusService = statusService;
 
             // Inject all necessary dependencies into the FileWatcherControl
             FileWatcherControl.MonitorService = monitorService;

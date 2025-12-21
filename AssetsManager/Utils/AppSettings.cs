@@ -32,6 +32,7 @@ namespace AssetsManager.Utils
         public string LolLiveDirectory { get; set; }
         public string DefaultExtractedSelectDirectory { get; set; }
         public string LastPbeStatusMessage { get; set; }
+        public string LastPbeCheckTime { get; set; }
         public string CustomFloorTexturePath { get; set; } = string.Empty;
         public Dictionary<string, long> HashesSizes { get; set; }
 
@@ -167,6 +168,7 @@ namespace AssetsManager.Utils
                 DefaultExtractedSelectDirectory = null,
                 CustomFloorTexturePath = null,
                 LastPbeStatusMessage = null,
+                LastPbeCheckTime = null,
                 HashesSizes = new Dictionary<string, long>(),
                 JsonDataModificationDates = new Dictionary<string, DateTime>(),
                 MonitoredJsonFiles = new List<string>(),
