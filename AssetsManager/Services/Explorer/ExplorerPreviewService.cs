@@ -79,6 +79,8 @@ namespace AssetsManager.Services.Explorer
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
+            await SetPreviewerAsync(Previewer.None); // Blank the preview area immediately
+
             if (node != null && _currentlyDisplayedNode != null && _currentlyDisplayedNode.FullPath == node.FullPath)
             {
                 return;
