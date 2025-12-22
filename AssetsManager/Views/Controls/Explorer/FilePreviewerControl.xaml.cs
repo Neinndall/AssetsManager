@@ -33,6 +33,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private bool _isLoaded = false;
 
         private FileSystemNodeModel _currentNode;
+        private FileSystemNodeModel _currentFolderNode;
         private ObservableCollection<FileSystemNodeModel> _rootNodes;
         private bool _isShowingTemporaryPreview = false;
 
@@ -175,6 +176,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 Breadcrumbs.NodeClicked += Breadcrumbs_NodeClicked;
                 FileGridView.NodeClicked += FileGridView_NodeClicked;
+                GridViewButton.Checked += ViewSwitcher_Checked;
+                PreviewButton.Checked += ViewSwitcher_Checked;
                 UpdateScrollButtonsVisibility();
 
                 _isLoaded = true;
@@ -194,6 +197,8 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
                 Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
                 FileGridView.NodeClicked -= FileGridView_NodeClicked;
+                GridViewButton.Checked -= ViewSwitcher_Checked;
+                PreviewButton.Checked -= ViewSwitcher_Checked;
             }
             catch (Exception ex)
             {
@@ -216,14 +221,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 _isShowingTemporaryPreview = true;
                 ViewModel.SelectedFile = null;
 
-                bool wasDetailsVisible = DetailsPreview.Visibility == Visibility.Visible;
-
                 DetailsPreview.Visibility = Visibility.Collapsed;
-
-                if (wasDetailsVisible)
-                {
-                    PreviewPlaceholder.Visibility = Visibility.Visible;
-                }
 
                 await ExplorerPreviewService.ShowPreviewAsync(node);
                 _isShowingTemporaryPreview = false;
@@ -256,9 +254,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile))
             {
+                _currentFolderNode = node; // Track the last folder
                 FileGridView.ItemsSource = node.Children;
-                FileGridView.Visibility = Visibility.Visible;
-                PreviewContainer.Visibility = Visibility.Collapsed;
+                
+                SwitchToFolderView();
+                GridViewButton.IsChecked = true;
 
                 // Asynchronously load image previews for the children
                 foreach (var child in node.Children)
@@ -272,10 +272,25 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else
             {
-                FileGridView.Visibility = Visibility.Collapsed;
-                PreviewContainer.Visibility = Visibility.Visible;
+                SwitchToFilePreview();
+                PreviewButton.IsChecked = true;
             }
         }
+
+        private void SwitchToFolderView()
+        {
+            PreviewContainer.Visibility = Visibility.Collapsed;
+            FileGridView.Visibility = Visibility.Visible;
+        }
+
+        private void SwitchToFilePreview()
+        {
+            FileGridView.Visibility = Visibility.Collapsed;
+            PreviewPlaceholder.Visibility = Visibility.Collapsed; // Hide placeholder to prevent flicker
+            PreviewContainer.Visibility = Visibility.Visible;
+            PreviewButton.IsChecked = true;
+        }
+
 
         private async Task LoadImagePreviewAsync(FileSystemNodeModel node)
         {
@@ -293,16 +308,36 @@ namespace AssetsManager.Views.Controls.Explorer
             var node = e.Node;
             if (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
             {
-                // Raise the event to tell the parent window to select this node in the tree
                 BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(node));
             }
             else
             {
-                // It's a file, so show the preview for it
-                FileGridView.Visibility = Visibility.Collapsed;
-                PreviewPlaceholder.Visibility = Visibility.Collapsed;
-                PreviewContainer.Visibility = Visibility.Visible;
+                SwitchToFilePreview();
                 await ShowPreviewAsync(node);
+            }
+        }
+        
+        private void ViewSwitcher_Checked(object sender, RoutedEventArgs e)
+        {
+            if (GridViewButton.IsChecked == true)
+            {
+                if (_currentFolderNode != null)
+                {
+                    // This will also set the ItemsSource if it's a new folder
+                    UpdateSelectedNode(_currentFolderNode, _rootNodes); 
+                }
+            }
+            else // PreviewButton is checked
+            {
+                SwitchToFilePreview();
+                if (_currentNode != null && _currentNode != _currentFolderNode)
+                {
+                    _ = ShowPreviewAsync(_currentNode);
+                }
+                else
+                {
+                    _ = ExplorerPreviewService.ResetPreviewAsync();
+                }
             }
         }
 
