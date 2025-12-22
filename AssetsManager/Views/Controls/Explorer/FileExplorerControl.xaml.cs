@@ -183,7 +183,8 @@ namespace AssetsManager.Views.Controls.Explorer
         private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
         {
             _isWadMode = !_isWadMode;
-            Toolbar.ResetViewMode(); // Ensure toolbar UI matches the reset state
+            // Mode switched, we keep the current view mode (Grid/Preview) preference.
+            
             if (FilePreviewer != null)
             {
                 await FilePreviewer.ResetToDefaultState();

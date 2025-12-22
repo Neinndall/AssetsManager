@@ -38,23 +38,13 @@
                     Click="SwitchModeButton_Click">
                 <materialIcons:MaterialIcon Kind="Sync" Width="18" Height="18"/>
             </Button>
-            <RadioButton x:Name="GridViewButton" 
-                         GroupName="ViewSwitcher" 
-                         Style="{StaticResource TransparentIconToggleButton}"
-                         ToolTip="Grid View"
-                         Margin="5,0"
-                         Click="ViewSwitcher_Click">
+            <ToggleButton x:Name="GridViewToggleButton" 
+                          Style="{StaticResource TransparentIconToggleButton}"
+                          ToolTip="Toggle Grid View"
+                          Margin="5,0"
+                          Click="GridViewToggle_Click">
                 <materialIcons:MaterialIcon Kind="ViewGridOutline" Width="18" Height="18"/>
-            </RadioButton>
-            <RadioButton x:Name="PreviewButton" 
-                         GroupName="ViewSwitcher" 
-                         IsChecked="True" 
-                         Style="{StaticResource TransparentIconToggleButton}"
-                         ToolTip="Preview View"
-                         Margin="5,0"
-                         Click="ViewSwitcher_Click">
-                <materialIcons:MaterialIcon Kind="EyeOutline" Width="18" Height="18"/>
-            </RadioButton>
+            </ToggleButton>
             <ToggleButton x:Name="BreadcrumbToggleButton"
                           Style="{StaticResource TransparentIconToggleButton}"
                           Click="BreadcrumbToggleButton_Click"

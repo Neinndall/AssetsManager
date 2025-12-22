@@ -26,33 +26,14 @@ namespace AssetsManager.Views.Controls.Explorer
             InitializeComponent();
         }
 
-        public void ResetViewMode()
-        {
-            PreviewButton.IsChecked = true;
-        }
-
         public void SetViewMode(bool isGridMode)
         {
-            if (isGridMode)
-            {
-                GridViewButton.IsChecked = true;
-            }
-            else
-            {
-                PreviewButton.IsChecked = true;
-            }
+            GridViewToggleButton.IsChecked = isGridMode;
         }
 
-        private void ViewSwitcher_Click(object sender, RoutedEventArgs e)
+        private void GridViewToggle_Click(object sender, RoutedEventArgs e)
         {
-            if (GridViewButton.IsChecked == true)
-            {
-                ViewModeChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(false, true));
-            }
-            else
-            {
-                ViewModeChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(true, false));
-            }
+            ViewModeChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(GridViewToggleButton.IsChecked ?? false), GridViewToggleButton.IsChecked ?? false));
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
