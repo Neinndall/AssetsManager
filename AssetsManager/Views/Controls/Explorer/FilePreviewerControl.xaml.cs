@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
@@ -9,6 +11,7 @@ using System.Windows.Input;
 using Microsoft.Web.WebView2.Core;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Explorer;
 
@@ -20,11 +23,15 @@ namespace AssetsManager.Views.Controls.Explorer
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public DirectoriesCreator DirectoriesCreator { get; set; }
         public ExplorerPreviewService ExplorerPreviewService { get; set; }
+        public TreeUIManager TreeUIManager { get; set; }
+
+        public event EventHandler<NodeClickedEventArgs> BreadcrumbNodeClicked;
 
         public PinnedFilesManager ViewModel { get; set; }
         private bool _isLoaded = false;
 
         private FileSystemNodeModel _currentNode;
+        private ObservableCollection<FileSystemNodeModel> _rootNodes;
         private bool _isShowingTemporaryPreview = false;
 
         public FilePreviewerControl()
@@ -160,6 +167,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     DetailsPreview
                 );
 
+                Breadcrumbs.NodeClicked += Breadcrumbs_NodeClicked;
                 UpdateScrollButtonsVisibility();
 
                 _isLoaded = true;
@@ -175,8 +183,9 @@ namespace AssetsManager.Views.Controls.Explorer
             try
             {
                 await ExplorerPreviewService.ResetPreviewAsync();
-                ViewModel.PropertyChanged -= ViewModel_PropertyChanged; // Unsubscribe to prevent memory leaks
+                ViewModel.PropertyChanged -= ViewModel_PropertyChanged; 
                 ViewModel.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
             }
             catch (Exception ex)
             {
@@ -229,6 +238,95 @@ namespace AssetsManager.Views.Controls.Explorer
                 };
                 ViewModel.PinnedFiles.Add(newDetailsPin);
             }
+        }
+
+        public void UpdateSelectedNode(FileSystemNodeModel node, ObservableCollection<FileSystemNodeModel> rootNodes)
+        {
+            _currentNode = node;
+            _rootNodes = rootNodes;
+            UpdateBreadcrumbs(node);
+
+            if (node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile))
+            {
+                FileGridView.ItemsSource = node.Children;
+                FileGridView.Visibility = Visibility.Visible;
+                PreviewContainer.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                FileGridView.Visibility = Visibility.Collapsed;
+                PreviewContainer.Visibility = Visibility.Visible;
+            }
+        }
+
+        private async void FileGridView_Item_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is FileSystemNodeModel node)
+            {
+                if (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
+                {
+                    // Raise the event to tell the parent window to select this node in the tree
+                    BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(node));
+                }
+                else
+                {
+                    // It's a file, so show the preview for it
+                    await ShowPreviewAsync(node);
+                }
+            }
+        }
+
+        public void SetBreadcrumbVisibility(Visibility visibility)
+        {
+            Breadcrumbs.Visibility = visibility;
+            BreadcrumbSeparator.Visibility = visibility;
+        }
+
+        private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)
+        {
+            Breadcrumbs.Nodes.Clear();
+            if (selectedNode == null) return;
+
+            var path = TreeUIManager.FindNodePath(_rootNodes, selectedNode);
+            if (path == null) return;
+
+            if (selectedNode.Type == NodeType.RealFile ||
+                selectedNode.Type == NodeType.VirtualFile ||
+                selectedNode.Type == NodeType.WemFile ||
+                selectedNode.Type == NodeType.AudioEvent)
+            {
+                if (path.Count > 0)
+                {
+                    path.RemoveAt(path.Count - 1);
+                }
+            }
+
+            const int maxItems = 5;
+
+            if (path.Count > maxItems)
+            {
+                var truncatedPath = new List<FileSystemNodeModel>();
+                truncatedPath.Add(path[0]);
+                truncatedPath.Add(path[1]);
+
+                truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
+
+                for (int i = path.Count - 2; i < path.Count; i++)
+                {
+                    truncatedPath.Add(path[i]);
+                }
+                path = truncatedPath;
+            }
+
+            foreach (var node in path)
+            {
+                Breadcrumbs.Nodes.Add(node);
+            }
+        }
+
+        private void Breadcrumbs_NodeClicked(object sender, NodeClickedEventArgs e)
+        {
+            BreadcrumbNodeClicked?.Invoke(this, e);
         }
     }
 }

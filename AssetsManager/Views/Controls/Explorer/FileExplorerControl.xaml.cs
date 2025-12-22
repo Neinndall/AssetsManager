@@ -26,6 +26,7 @@ namespace AssetsManager.Views.Controls.Explorer
     public partial class FileExplorerControl : UserControl
     {
         public event RoutedPropertyChangedEventHandler<object> FileSelected;
+        public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
 
         public FilePreviewerControl FilePreviewer { get; set; }
 
@@ -93,12 +94,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
                 Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
                 Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
-            }
-
-            // Desuscribir eventos del Breadcrumbs
-            if (Breadcrumbs != null)
-            {
-                Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
             }
 
             // 3. Desuscribir eventos propios
@@ -178,7 +173,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
-            Breadcrumbs.Visibility = e.NewValue ? Visibility.Visible : Visibility.Collapsed;
+            BreadcrumbVisibilityChanged?.Invoke(this, e);
         }
 
         private async void Toolbar_SortStateChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
@@ -621,8 +616,6 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
-                UpdateBreadcrumbs(selectedNode);
-
                 if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
                     await HandleAudioBankExpansion(selectedNode);
@@ -632,54 +625,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     FileSelected?.Invoke(this, e);
                 }
             }
-        }
-
-        private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)
-        {
-            Breadcrumbs.Nodes.Clear();
-            if (selectedNode == null) return;
-
-            var path = TreeUIManager.FindNodePath(RootNodes, selectedNode);
-            if (path == null) return;
-
-            if (selectedNode.Type == NodeType.RealFile ||
-                selectedNode.Type == NodeType.VirtualFile ||
-                selectedNode.Type == NodeType.WemFile ||
-                selectedNode.Type == NodeType.AudioEvent)
-            {
-                if (path.Count > 0)
-                {
-                    path.RemoveAt(path.Count - 1);
-                }
-            }
-
-            const int maxItems = 5;
-
-            if (path.Count > maxItems)
-            {
-                var truncatedPath = new List<FileSystemNodeModel>();
-                truncatedPath.Add(path[0]);
-                truncatedPath.Add(path[1]);
-
-                truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
-
-                for (int i = path.Count - 2; i < path.Count; i++)
-                {
-                    truncatedPath.Add(path[i]);
-                }
-                path = truncatedPath;
-            }
-
-            foreach (var node in path)
-            {
-                Breadcrumbs.Nodes.Add(node);
-            }
-        }
-
-        private void Breadcrumbs_NodeClicked(object sender, NodeClickedEventArgs e)
-        {
-            if (e.Node == null) return;
-            TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, e.Node, false);
         }
 
         private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
@@ -846,6 +791,12 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
         {
             await TreeBuilderService.LoadAllChildren(node, _currentRootPath);
+        }
+
+        public void SelectNode(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+            TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, node, false);
         }
     }
 }

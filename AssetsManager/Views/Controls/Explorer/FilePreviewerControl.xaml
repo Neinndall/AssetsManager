@@ -14,6 +14,19 @@
         <UserControl.Resources>
             <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
             <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+            <converters:PathToIconConverter x:Key="PathToIconConverter"/>
+
+            <DataTemplate x:Key="FileGridItemTemplate">
+                <Border Style="{StaticResource SettingsCard}" Margin="5" Width="140" Height="100"
+                        MouseLeftButtonUp="FileGridView_Item_MouseLeftButtonUp" Cursor="Hand">
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="32" Height="32" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding Name}" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,8,0,0" Foreground="{StaticResource TextPrimary}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </DataTemplate>
         </UserControl.Resources>
         
         <DockPanel>
@@ -77,73 +90,90 @@
             </Grid>
         <Border x:Name="PinnedTabsSeparator" DockPanel.Dock="Top" Height="1" Background="{StaticResource BorderColor}" Margin="0,5,5,5" Visibility="{Binding PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
 
-        <Grid x:Name="PreviewContainer" Margin="5">
-            <local:DetailsTabView x:Name="DetailsPreview" Visibility="Collapsed"/>
-            <StackPanel x:Name="PreviewPlaceholder"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Visibility="Visible">
-                <StackPanel x:Name="SelectFileMessagePanel"
-                            Orientation="Vertical"
-                            HorizontalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="FileUploadOutline"
-                                                Width="48" Height="48"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource TextMuted}"
-                                                Opacity="0.5"/>
-                    <TextBlock x:Name="SelectFileMessage"
-                               Text="SELECT A FILE"
-                               FontSize="18" 
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextMuted}"
-                               HorizontalAlignment="Center"
-                               Margin="0,16,0,0"/>
-                    <TextBlock x:Name="SelectFileSubMessage"
-                               Text="Select a file from the tree to preview its content"
-                               FontSize="14"
-                               Foreground="{StaticResource TextMuted}"
-                               HorizontalAlignment="Center"
-                               Margin="0,8,0,0"
-                               Opacity="0.7"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"/>
-                </StackPanel>
+        <local:BreadcrumbControl x:Name="Breadcrumbs" DockPanel.Dock="Top" Margin="10,5,5,0" Visibility="Collapsed"/>
+        <Border x:Name="BreadcrumbSeparator" DockPanel.Dock="Top" Height="1" Background="{StaticResource BorderColor}" Margin="5,5,5,5" Visibility="Collapsed"/>
 
-                <StackPanel x:Name="UnsupportedFileMessagePanel"
-                            Orientation="Vertical"
+        <Grid Margin="5">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="FileGridView"
+                              ItemTemplate="{StaticResource FileGridItemTemplate}"
+                              Visibility="Collapsed">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </ScrollViewer>
+            
+            <Grid x:Name="PreviewContainer" Visibility="Visible">
+                <local:DetailsTabView x:Name="DetailsPreview" Visibility="Collapsed"/>
+                <StackPanel x:Name="PreviewPlaceholder"
                             HorizontalAlignment="Center"
-                            Visibility="Collapsed">
-                    <materialIcons:MaterialIcon Kind="FileCancelOutline"
-                                                Width="48" Height="48"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource TextMuted}"
-                                                Opacity="0.5"/>
-                    <TextBlock x:Name="UnsupportedFileMessage"
-                               Text="Preview not available for this file type"
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextMuted}"
-                               HorizontalAlignment="Center"
-                               Margin="0,8,0,0"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"/>
-                </StackPanel>
-            </StackPanel>
-            <Image x:Name="ImagePreview" Visibility="Collapsed" Stretch="Uniform"/>
-            <avalonedit:TextEditor x:Name="TextEditorPreview"
-                                   Style="{StaticResource BaseTextEditorStyle}"
-                                   Visibility="Collapsed"
-                                   Margin="-4,0,0,0"/>
-            <Grid x:Name="WebViewContainer"/>
+                            VerticalAlignment="Center"
+                            Visibility="Visible">
+                    <StackPanel x:Name="SelectFileMessagePanel"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="FileUploadOutline"
+                                                    Width="48" Height="48"
+                                                    HorizontalAlignment="Center"
+                                                    Foreground="{StaticResource TextMuted}"
+                                                    Opacity="0.5"/>
+                        <TextBlock x:Name="SelectFileMessage"
+                                   Text="SELECT A FILE"
+                                   FontSize="18" 
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextMuted}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,16,0,0"/>
+                        <TextBlock x:Name="SelectFileSubMessage"
+                                   Text="Select a file from the tree to preview its content"
+                                   FontSize="14"
+                                   Foreground="{StaticResource TextMuted}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,8,0,0"
+                                   Opacity="0.7"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"/>
+                    </StackPanel>
 
-            <shared:FindInDocumentControl x:Name="FindInDocumentControl"
-                                          Grid.Row="0"
-                                          HorizontalAlignment="Right"
-                                          VerticalAlignment="Top"
-                                          Margin="0,0,15,0"
-                                          Visibility="Collapsed"
-                                          TargetTextEditor="{Binding ElementName=TextEditorPreview}"
-                                          Close="FindInDocumentControl_Close"/>
+                    <StackPanel x:Name="UnsupportedFileMessagePanel"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                Visibility="Collapsed">
+                        <materialIcons:MaterialIcon Kind="FileCancelOutline"
+                                                    Width="48" Height="48"
+                                                    HorizontalAlignment="Center"
+                                                    Foreground="{StaticResource TextMuted}"
+                                                    Opacity="0.5"/>
+                        <TextBlock x:Name="UnsupportedFileMessage"
+                                   Text="Preview not available for this file type"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextMuted}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,8,0,0"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+                <Image x:Name="ImagePreview" Visibility="Collapsed" Stretch="Uniform"/>
+                <avalonedit:TextEditor x:Name="TextEditorPreview"
+                                       Style="{StaticResource BaseTextEditorStyle}"
+                                       Visibility="Collapsed"
+                                       Margin="-4,0,0,0"/>
+                <Grid x:Name="WebViewContainer"/>
+
+                <shared:FindInDocumentControl x:Name="FindInDocumentControl"
+                                              Grid.Row="0"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Top"
+                                              Margin="0,0,15,0"
+                                              Visibility="Collapsed"
+                                              TargetTextEditor="{Binding ElementName=TextEditorPreview}"
+                                              Close="FindInDocumentControl_Close"/>
+            </Grid>
         </Grid>
     </DockPanel>
 </UserControl>

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -5,33 +6,15 @@ using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
-    public class NodeClickedEventArgs : RoutedEventArgs
-    {
-        public FileSystemNodeModel Node { get; }
-
-        public NodeClickedEventArgs(RoutedEvent routedEvent, FileSystemNodeModel node) : base(routedEvent)
-        {
-            Node = node;
-        }
-    }
-
     public partial class BreadcrumbControl : UserControl
     {
-        public delegate void NodeClickedEventHandler(object sender, NodeClickedEventArgs e);
-
-        public static readonly RoutedEvent NodeClickedEvent = EventManager.RegisterRoutedEvent(
-            "NodeClicked", RoutingStrategy.Bubble, typeof(NodeClickedEventHandler), typeof(BreadcrumbControl));
-
-        public event NodeClickedEventHandler NodeClicked
-        {
-            add { AddHandler(NodeClickedEvent, value); }
-            remove { RemoveHandler(NodeClickedEvent, value); }
-        }
+        public event EventHandler<NodeClickedEventArgs> NodeClicked;
 
         public BreadcrumbControl()
         {
             InitializeComponent();
             DataContext = this;
+            Nodes = new ObservableCollection<FileSystemNodeModel>();
         }
 
         public ObservableCollection<FileSystemNodeModel> Nodes
@@ -47,8 +30,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (sender is Button button && button.DataContext is FileSystemNodeModel node)
             {
-                var args = new NodeClickedEventArgs(NodeClickedEvent, node);
-                RaiseEvent(args);
+                NodeClicked?.Invoke(this, new NodeClickedEventArgs(node));
             }
         }
     }
