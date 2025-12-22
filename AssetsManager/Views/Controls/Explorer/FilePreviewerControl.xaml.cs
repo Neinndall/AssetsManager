@@ -14,6 +14,8 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Controls.Explorer;
+using NodeClickedEventArgs = AssetsManager.Views.Controls.Explorer.NodeClickedEventArgs;
 
 namespace AssetsManager.Views.Controls.Explorer
 {

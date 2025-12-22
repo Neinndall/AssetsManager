@@ -6,6 +6,16 @@ using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
+    public class NodeClickedEventArgs : EventArgs
+    {
+        public FileSystemNodeModel Node { get; }
+
+        public NodeClickedEventArgs(FileSystemNodeModel node)
+        {
+            Node = node;
+        }
+    }
+
     public partial class BreadcrumbControl : UserControl
     {
         public event EventHandler<NodeClickedEventArgs> NodeClicked;

@@ -9,6 +9,8 @@ using AssetsManager.Utils;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer.Tree;
+using AssetsManager.Views.Controls.Explorer;
+using NodeClickedEventArgs = AssetsManager.Views.Controls.Explorer.NodeClickedEventArgs;
 
 namespace AssetsManager.Views
 {

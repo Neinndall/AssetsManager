@@ -21,7 +21,7 @@
                         MouseLeftButtonUp="FileGridView_Item_MouseLeftButtonUp" Cursor="Hand">
                     <Grid>
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="32" Height="32" HorizontalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="32" Height="32" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                             <TextBlock Text="{Binding Name}" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,8,0,0" Foreground="{StaticResource TextPrimary}"/>
                         </StackPanel>
                     </Grid>
@@ -90,8 +90,14 @@
             </Grid>
         <Border x:Name="PinnedTabsSeparator" DockPanel.Dock="Top" Height="1" Background="{StaticResource BorderColor}" Margin="0,5,5,5" Visibility="{Binding PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
 
-        <local:BreadcrumbControl x:Name="Breadcrumbs" DockPanel.Dock="Top" Margin="10,5,5,0" Visibility="Collapsed"/>
-        <Border x:Name="BreadcrumbSeparator" DockPanel.Dock="Top" Height="1" Background="{StaticResource BorderColor}" Margin="5,5,5,5" Visibility="Collapsed"/>
+        <Grid DockPanel.Dock="Top">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <local:BreadcrumbControl x:Name="Breadcrumbs" Grid.Row="0" Margin="5,2,5,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+            <Border x:Name="BreadcrumbSeparator" Grid.Row="1" Height="1" Background="{StaticResource BorderColor}" Margin="0,5,5,5" Visibility="Collapsed"/>
+        </Grid>
 
         <Grid Margin="5">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
