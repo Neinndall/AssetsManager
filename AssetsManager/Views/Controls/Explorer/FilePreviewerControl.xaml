@@ -15,18 +15,6 @@
             <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
             <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
             <converters:PathToIconConverter x:Key="PathToIconConverter"/>
-
-            <DataTemplate x:Key="FileGridItemTemplate">
-                <Border Style="{StaticResource SettingsCard}" Margin="5" Width="140" Height="100"
-                        MouseLeftButtonUp="FileGridView_Item_MouseLeftButtonUp" Cursor="Hand">
-                    <Grid>
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="32" Height="32" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="{Binding Name}" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,8,0,0" Foreground="{StaticResource TextPrimary}"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </DataTemplate>
         </UserControl.Resources>
         
         <DockPanel>
@@ -100,17 +88,7 @@
         </Grid>
 
         <Grid Margin="5">
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <ItemsControl x:Name="FileGridView"
-                              ItemTemplate="{StaticResource FileGridItemTemplate}"
-                              Visibility="Collapsed">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
-            </ScrollViewer>
+            <local:FileGridView x:Name="FileGridView" Visibility="Collapsed"/>
             
             <Grid x:Name="PreviewContainer" Visibility="Visible">
                 <local:DetailsTabView x:Name="DetailsPreview" Visibility="Collapsed"/>

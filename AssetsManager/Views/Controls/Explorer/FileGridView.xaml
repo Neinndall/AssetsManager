@@ -1,0 +1,34 @@
+<UserControl x:Class="AssetsManager.Views.Controls.Explorer.FileGridView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
+             mc:Ignorable="d">
+    <UserControl.Resources>
+        <converters:PathToIconConverter x:Key="PathToIconConverter"/>
+        <DataTemplate x:Key="FileGridItemTemplate">
+            <Border Style="{StaticResource SettingsCard}" Margin="5" Width="140" Height="120" Padding="5"
+                    MouseLeftButtonUp="FileGridView_Item_MouseLeftButtonUp" Cursor="Hand">
+                <Grid>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="38" Height="38" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="{Binding Name}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{StaticResource TextPrimary}" FontSize="10"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="FileGridViewItemsControl"
+                      ItemTemplate="{StaticResource FileGridItemTemplate}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+        </ItemsControl>
+    </ScrollViewer>
+</UserControl>

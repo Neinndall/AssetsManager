@@ -170,6 +170,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 );
 
                 Breadcrumbs.NodeClicked += Breadcrumbs_NodeClicked;
+                FileGridView.NodeClicked += FileGridView_NodeClicked;
                 UpdateScrollButtonsVisibility();
 
                 _isLoaded = true;
@@ -185,9 +186,10 @@ namespace AssetsManager.Views.Controls.Explorer
             try
             {
                 await ExplorerPreviewService.ResetPreviewAsync();
-                ViewModel.PropertyChanged -= ViewModel_PropertyChanged; 
+                ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
                 ViewModel.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
                 Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
+                FileGridView.NodeClicked -= FileGridView_NodeClicked;
             }
             catch (Exception ex)
             {
@@ -261,20 +263,18 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async void FileGridView_Item_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private async void FileGridView_NodeClicked(object sender, NodeClickedEventArgs e)
         {
-            if (sender is FrameworkElement element && element.DataContext is FileSystemNodeModel node)
+            var node = e.Node;
+            if (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
             {
-                if (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
-                {
-                    // Raise the event to tell the parent window to select this node in the tree
-                    BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(node));
-                }
-                else
-                {
-                    // It's a file, so show the preview for it
-                    await ShowPreviewAsync(node);
-                }
+                // Raise the event to tell the parent window to select this node in the tree
+                BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(node));
+            }
+            else
+            {
+                // It's a file, so show the preview for it
+                await ShowPreviewAsync(node);
             }
         }
 
