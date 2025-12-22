@@ -256,9 +256,19 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 _currentFolderNode = node; // Track the last folder
                 FileGridView.ItemsSource = node.Children;
-                
-                SwitchToFolderView();
-                GridViewButton.IsChecked = true;
+
+                // If the user is on Preview mode, do not switch to GridView automatically.
+                if (PreviewButton.IsChecked == true)
+                {
+                    // A folder is selected, so reset the preview to show the default placeholder.
+                    _ = ExplorerPreviewService.ResetPreviewAsync();
+                }
+                else
+                {
+                    // Otherwise, the user is in GridView, so show the folder's content.
+                    SwitchToFolderView();
+                    GridViewButton.IsChecked = true;
+                }
 
                 // Asynchronously load image previews for the children
                 foreach (var child in node.Children)

@@ -88,12 +88,7 @@
         </Grid>
 
         <Grid Margin="5">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0">
+            <Grid>
                 <local:FileGridView x:Name="FileGridView" Visibility="Collapsed"/>
                 
                 <Grid x:Name="PreviewContainer" Visibility="Visible">
@@ -164,16 +159,20 @@
                                                   TargetTextEditor="{Binding ElementName=TextEditorPreview}"
                                                   Close="FindInDocumentControl_Close"/>
                 </Grid>
+
+                <StackPanel Orientation="Vertical" 
+                            HorizontalAlignment="Right" 
+                            VerticalAlignment="Bottom" 
+                            Margin="0,0,10,10"
+                            Opacity="0.5">
+                    <RadioButton x:Name="GridViewButton" GroupName="ViewSwitcher" IsChecked="True" Style="{StaticResource TransparentIconToggleButton}">
+                        <materialIcons:MaterialIcon Kind="ViewGridOutline" Width="18" Height="18"/>
+                    </RadioButton>
+                    <RadioButton x:Name="PreviewButton" GroupName="ViewSwitcher" Style="{StaticResource TransparentIconToggleButton}">
+                        <materialIcons:MaterialIcon Kind="EyeOutline" Width="18" Height="18"/>
+                    </RadioButton>
+                </StackPanel>
             </Grid>
-            
-            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,5,0">
-                <RadioButton x:Name="GridViewButton" GroupName="ViewSwitcher" IsChecked="True" Style="{StaticResource TransparentIconToggleButton}">
-                    <materialIcons:MaterialIcon Kind="ViewGridOutline"/>
-                </RadioButton>
-                <RadioButton x:Name="PreviewButton" GroupName="ViewSwitcher" Style="{StaticResource TransparentIconToggleButton}">
-                    <materialIcons:MaterialIcon Kind="EyeOutline"/>
-                </RadioButton>
-            </StackPanel>
         </Grid>
     </DockPanel>
 </UserControl>
