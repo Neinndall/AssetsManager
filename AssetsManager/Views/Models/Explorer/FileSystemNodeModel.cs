@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Windows.Media;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
 
@@ -26,6 +27,20 @@ namespace AssetsManager.Views.Models.Explorer
         public AudioSourceType AudioSource { get; set; } // Only for WemFile
 
         public ObservableCollection<FileSystemNodeModel> Children { get; set; }
+
+        private ImageSource _imagePreview;
+        public ImageSource ImagePreview
+        {
+            get { return _imagePreview; }
+            set
+            {
+                if (_imagePreview != value)
+                {
+                    _imagePreview = value;
+                    OnPropertyChanged(nameof(ImagePreview));
+                }
+            }
+        }
 
         // --- Data for WADs and Chunks ---
         public string SourceWadPath { get; set; } // Only for VirtualFile/VirtualDirectory

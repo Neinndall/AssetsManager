@@ -14,8 +14,33 @@
                     MouseLeftButtonUp="FileGridView_Item_MouseLeftButtonUp" Cursor="Hand">
                 <Grid>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="38" Height="38" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="{Binding Name}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{StaticResource TextPrimary}" FontSize="10"/>
+                        <Grid Width="38" Height="38">
+                            <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="38" Height="38" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}">
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ImagePreview}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialIcons:MaterialIcon.Style>
+                            </materialIcons:MaterialIcon>
+                            <Image Source="{Binding ImagePreview}" Stretch="Uniform">
+                                <Image.Style>
+                                    <Style TargetType="Image">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ImagePreview}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Image.Style>
+                            </Image>
+                        </Grid>
+                        <TextBlock Text="{Binding Name}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="{StaticResource TextPrimary}" FontSize="10"/>
                     </StackPanel>
                 </Grid>
             </Border>

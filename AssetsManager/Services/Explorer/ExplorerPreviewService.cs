@@ -544,5 +544,51 @@ namespace AssetsManager.Services.Explorer
         {
             await SetPreviewerAsync(Previewer.Placeholder, extension);
         }
+
+        public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node)
+        {
+            if (node == null || (!SupportedFileTypes.Images.Contains(node.Extension) && !SupportedFileTypes.Textures.Contains(node.Extension)))
+            {
+                return null;
+            }
+
+            try
+            {
+                byte[] data = node.Type switch
+                {
+                    NodeType.VirtualFile => await _wadExtractionService.GetVirtualFileBytesAsync(node),
+                    NodeType.RealFile => await File.ReadAllBytesAsync(node.FullPath),
+                    _ => null
+                };
+
+                if (data == null) return null;
+
+                if (SupportedFileTypes.Images.Contains(node.Extension))
+                {
+                    return await Task.Run(() =>
+                    {
+                        using var stream = new MemoryStream(data);
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.StreamSource = stream;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        return bmp;
+                    });
+                }
+                else if (SupportedFileTypes.Textures.Contains(node.Extension))
+                {
+                    return await Task.Run(() => TextureUtils.LoadTexture(new MemoryStream(data), node.Extension));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to get image preview for '{node.FullPath}'.");
+                return null;
+            }
+
+            return null;
+        }
     }
 }

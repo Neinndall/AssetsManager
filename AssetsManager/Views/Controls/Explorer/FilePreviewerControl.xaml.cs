@@ -255,11 +255,32 @@ namespace AssetsManager.Views.Controls.Explorer
                 FileGridView.ItemsSource = node.Children;
                 FileGridView.Visibility = Visibility.Visible;
                 PreviewContainer.Visibility = Visibility.Collapsed;
+
+                // Asynchronously load image previews for the children
+                foreach (var child in node.Children)
+                {
+                    if (SupportedFileTypes.Images.Contains(child.Extension) || SupportedFileTypes.Textures.Contains(child.Extension))
+                    {
+                        // Fire and forget
+                        _ = LoadImagePreviewAsync(child);
+                    }
+                }
             }
             else
             {
                 FileGridView.Visibility = Visibility.Collapsed;
                 PreviewContainer.Visibility = Visibility.Visible;
+            }
+        }
+
+        private async Task LoadImagePreviewAsync(FileSystemNodeModel node)
+        {
+            if (node.ImagePreview != null) return; // Already loaded
+
+            var image = await ExplorerPreviewService.GetImagePreviewAsync(node);
+            if (image != null)
+            {
+                node.ImagePreview = image;
             }
         }
 
