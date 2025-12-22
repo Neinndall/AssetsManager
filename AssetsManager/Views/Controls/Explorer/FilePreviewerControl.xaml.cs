@@ -300,6 +300,7 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 // It's a file, so show the preview for it
                 FileGridView.Visibility = Visibility.Collapsed;
+                PreviewPlaceholder.Visibility = Visibility.Collapsed;
                 PreviewContainer.Visibility = Visibility.Visible;
                 await ShowPreviewAsync(node);
             }
