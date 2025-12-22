@@ -14,8 +14,8 @@
                     MouseLeftButtonUp="FileGridView_Item_MouseLeftButtonUp" Cursor="Hand">
                 <Grid>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <Grid Width="42" Height="42">
-                            <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="42" Height="42" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}">
+                        <Grid Width="64" Height="64">
+                            <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="64" Height="64" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}">
                                 <materialIcons:MaterialIcon.Style>
                                     <Style TargetType="materialIcons:MaterialIcon">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -40,7 +40,7 @@
                                 </Image.Style>
                             </Image>
                         </Grid>
-                        <TextBlock Text="{Binding DisplayName}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,16,0,0" Foreground="{StaticResource TextPrimary}" FontSize="9"/>
+                        <TextBlock Text="{Binding DisplayName}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{StaticResource TextPrimary}" FontSize="11"/>
                     </StackPanel>
                 </Grid>
             </Border>
