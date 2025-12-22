@@ -81,10 +81,6 @@ namespace AssetsManager.Services.Explorer
         {
             await SetPreviewerAsync(Previewer.None); // Blank the preview area immediately
 
-            if (node != null && _currentlyDisplayedNode != null && _currentlyDisplayedNode.FullPath == node.FullPath)
-            {
-                return;
-            }
             _currentlyDisplayedNode = node;
 
             if (node == null || node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || SupportedFileTypes.AudioBank.Contains(node.Extension))

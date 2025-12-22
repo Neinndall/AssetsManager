@@ -118,9 +118,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     return;
                 }
                 
-                // When a pin is selected, always show the preview container and hide the grid
-                FileGridView.Visibility = Visibility.Collapsed;
-                PreviewContainer.Visibility = Visibility.Visible;
+                // When a pin is selected, use the helper to ensure the view and buttons are synced
+                SwitchToFilePreview();
 
                 if (selectedPin.IsDetailsTab)
                 {
@@ -214,7 +213,17 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (existingPin != null)
             {
-                ViewModel.SelectedFile = existingPin;
+                // If the pin is already selected, the PropertyChanged event won't fire.
+                // So, we need to explicitly show the preview content again.
+                if (ViewModel.SelectedFile == existingPin)
+                {
+                    await ExplorerPreviewService.ShowPreviewAsync(node);
+                }
+                else
+                {
+                    // If a different pin was selected, setting the property will trigger the update.
+                    ViewModel.SelectedFile = existingPin;
+                }
             }
             else
             {
