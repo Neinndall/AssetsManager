@@ -64,7 +64,13 @@ namespace AssetsManager.Views
         private void ExplorerWindow_Loaded(object sender, RoutedEventArgs e)
         {
             FilePreviewer.BreadcrumbNodeClicked += FilePreviewer_BreadcrumbNodeClicked;
+            FilePreviewer.ViewModeChanged += FilePreviewer_ViewModeChanged;
             FileExplorer.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
+        }
+
+        private void FilePreviewer_ViewModeChanged(object sender, bool isGridMode)
+        {
+            FileExplorer.SetToolbarViewMode(isGridMode);
         }
 
         private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
@@ -107,6 +113,7 @@ namespace AssetsManager.Views
             if (FilePreviewer != null)
             {
                 FilePreviewer.BreadcrumbNodeClicked -= FilePreviewer_BreadcrumbNodeClicked;
+                FilePreviewer.ViewModeChanged -= FilePreviewer_ViewModeChanged;
             }
 
             // Limpiar controles hijo

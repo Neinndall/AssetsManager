@@ -27,7 +27,7 @@ namespace AssetsManager.Views.Controls.Explorer
     {
         public event RoutedPropertyChangedEventHandler<object> FileSelected;
         public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
-
+        
         public FilePreviewerControl FilePreviewer { get; set; }
 
         public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "PinMenuItem");
@@ -94,6 +94,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
                 Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
                 Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
+                Toolbar.ViewModeChanged -= Toolbar_ViewModeChanged;
             }
 
             // 3. Desuscribir eventos propios
@@ -118,7 +119,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
 
             // 6. Romper referencias cruzadas
-            FilePreviewer = null;
+            FilePreviewer = null; // Setting to null will trigger the setter logic to unsubscribe
 
             // 8. Limpiar paths
             _currentRootPath = null;
@@ -153,6 +154,7 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
+            Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
 
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
@@ -165,9 +167,23 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private void Toolbar_ViewModeChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        {
+            if (FilePreviewer != null)
+            {
+                FilePreviewer.SetViewMode(e.NewValue);
+            }
+        }
+
+        public void SetToolbarViewMode(bool isGridMode)
+        {
+            Toolbar.SetViewMode(isGridMode);
+        }
+
         private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
         {
             _isWadMode = !_isWadMode;
+            Toolbar.ResetViewMode(); // Ensure toolbar UI matches the reset state
             if (FilePreviewer != null)
             {
                 await FilePreviewer.ResetToDefaultState();

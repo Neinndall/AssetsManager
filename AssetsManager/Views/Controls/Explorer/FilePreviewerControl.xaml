@@ -159,19 +159,6 @@
                                                   TargetTextEditor="{Binding ElementName=TextEditorPreview}"
                                                   Close="FindInDocumentControl_Close"/>
                 </Grid>
-
-                <StackPanel Orientation="Vertical" 
-                            HorizontalAlignment="Right" 
-                            VerticalAlignment="Bottom" 
-                            Margin="0,0,7,10"
-                            Opacity="0.5">
-                    <RadioButton x:Name="GridViewButton" GroupName="ViewSwitcher" Style="{StaticResource TransparentIconToggleButton}">
-                        <materialIcons:MaterialIcon Kind="ViewGridOutline" Width="18" Height="18"/>
-                    </RadioButton>
-                    <RadioButton x:Name="PreviewButton" GroupName="ViewSwitcher" IsChecked="True" Style="{StaticResource TransparentIconToggleButton}">
-                        <materialIcons:MaterialIcon Kind="EyeOutline" Width="18" Height="18"/>
-                    </RadioButton>
-                </StackPanel>
             </Grid>
         </Grid>
     </DockPanel>

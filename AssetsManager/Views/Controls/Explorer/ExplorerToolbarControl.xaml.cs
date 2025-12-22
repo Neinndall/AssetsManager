@@ -11,6 +11,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public event RoutedEventHandler SwitchModeClicked;
         public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
         public event RoutedPropertyChangedEventHandler<bool> SortStateChanged;
+        public event RoutedPropertyChangedEventHandler<bool> ViewModeChanged; // True for Grid, False for Preview
 
         public string SearchText => SearchTextBox.Text;
 
@@ -23,6 +24,35 @@ namespace AssetsManager.Views.Controls.Explorer
         public ExplorerToolbarControl()
         {
             InitializeComponent();
+        }
+
+        public void ResetViewMode()
+        {
+            PreviewButton.IsChecked = true;
+        }
+
+        public void SetViewMode(bool isGridMode)
+        {
+            if (isGridMode)
+            {
+                GridViewButton.IsChecked = true;
+            }
+            else
+            {
+                PreviewButton.IsChecked = true;
+            }
+        }
+
+        private void ViewSwitcher_Click(object sender, RoutedEventArgs e)
+        {
+            if (GridViewButton.IsChecked == true)
+            {
+                ViewModeChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(false, true));
+            }
+            else
+            {
+                ViewModeChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(true, false));
+            }
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
