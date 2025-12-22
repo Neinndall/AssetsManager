@@ -28,7 +28,6 @@ namespace AssetsManager.Views.Controls.Explorer
         public TreeUIManager TreeUIManager { get; set; }
 
         public event EventHandler<NodeClickedEventArgs> BreadcrumbNodeClicked;
-        public event EventHandler<bool> ViewModeChanged; // True for Grid, False for Preview
 
         public PinnedFilesManager ViewModel { get; set; }
         private bool _isLoaded = false;
@@ -154,6 +153,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 
                 // When a pin is selected, use the helper to ensure the view and buttons are synced
                 SwitchToFilePreview();
+                UpdateBreadcrumbs(selectedPin.Node);
 
                 if (selectedPin.IsDetailsTab)
                 {
@@ -361,20 +361,11 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async void FileGridView_NodeClicked(object sender, NodeClickedEventArgs e)
+        private void FileGridView_NodeClicked(object sender, NodeClickedEventArgs e)
         {
-            var node = e.Node;
-            if (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
-            {
-                BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(node));
-            }
-            else
-            {
-                SwitchToFilePreview();
-                // Removed _isGridMode = false and ViewModeChanged invoke
-                // to keep the Grid View toggle state active.
-                await ShowPreviewAsync(node);
-            }
+            // We always notify the parent (ExplorerWindow) to select the node in the tree.
+            // This keeps the TreeView and the Previewer in sync, which fixes navigation bugs.
+            BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(e.Node));
         }
         
         public void SetBreadcrumbVisibility(Visibility visibility)
@@ -390,17 +381,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
             var path = TreeUIManager.FindNodePath(_rootNodes, selectedNode);
             if (path == null) return;
-
-            if (selectedNode.Type == NodeType.RealFile ||
-                selectedNode.Type == NodeType.VirtualFile ||
-                selectedNode.Type == NodeType.WemFile ||
-                selectedNode.Type == NodeType.AudioEvent)
-            {
-                if (path.Count > 0)
-                {
-                    path.RemoveAt(path.Count - 1);
-                }
-            }
 
             const int maxItems = 5;
 

@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d">
              
-    <ItemsControl ItemsSource="{Binding Nodes}">
+    <ItemsControl ItemsSource="{Binding Nodes}" AlternationCount="1000">
         <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
                 <StackPanel Orientation="Horizontal"/>
@@ -14,6 +14,7 @@
         <ItemsControl.ItemTemplate>
             <DataTemplate>
                 <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="Separator" Text=">" VerticalAlignment="Center" Margin="4,0" Foreground="{StaticResource TextMuted}" Opacity="0.6"/>
                     <Button Content="{Binding BreadcrumbDisplayName}" Click="Button_Click">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
@@ -25,8 +26,12 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <TextBlock Text=">" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                 </StackPanel>
+                <DataTemplate.Triggers>
+                    <Trigger Property="ItemsControl.AlternationIndex" Value="0">
+                        <Setter TargetName="Separator" Property="Visibility" Value="Collapsed"/>
+                    </Trigger>
+                </DataTemplate.Triggers>
             </DataTemplate>
         </ItemsControl.ItemTemplate>
     </ItemsControl>
