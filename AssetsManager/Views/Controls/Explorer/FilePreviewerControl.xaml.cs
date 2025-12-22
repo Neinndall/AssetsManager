@@ -116,6 +116,10 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
                     return;
                 }
+                
+                // When a pin is selected, always show the preview container and hide the grid
+                FileGridView.Visibility = Visibility.Collapsed;
+                PreviewContainer.Visibility = Visibility.Visible;
 
                 if (selectedPin.IsDetailsTab)
                 {
