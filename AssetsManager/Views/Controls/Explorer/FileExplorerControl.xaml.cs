@@ -168,6 +168,10 @@ namespace AssetsManager.Views.Controls.Explorer
         private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
         {
             _isWadMode = !_isWadMode;
+            if (FilePreviewer != null)
+            {
+                await FilePreviewer.ResetToDefaultState();
+            }
             await ReloadTreeAsync();
         }
 

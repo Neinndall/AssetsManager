@@ -255,6 +255,15 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        public async Task ResetToDefaultState()
+        {
+            FileGridView.Visibility = Visibility.Collapsed;
+            PreviewContainer.Visibility = Visibility.Visible;
+            PreviewButton.IsChecked = true;
+            UpdateSelectedNode(null, null);
+            await ExplorerPreviewService.ResetPreviewAsync();
+        }
+
         public void UpdateSelectedNode(FileSystemNodeModel node, ObservableCollection<FileSystemNodeModel> rootNodes)
         {
             _currentNode = node;
