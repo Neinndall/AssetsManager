@@ -299,6 +299,8 @@ namespace AssetsManager.Views.Controls.Explorer
             else
             {
                 // It's a file, so show the preview for it
+                FileGridView.Visibility = Visibility.Collapsed;
+                PreviewContainer.Visibility = Visibility.Visible;
                 await ShowPreviewAsync(node);
             }
         }
