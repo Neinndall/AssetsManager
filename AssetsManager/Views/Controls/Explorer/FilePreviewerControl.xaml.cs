@@ -371,11 +371,8 @@ namespace AssetsManager.Views.Controls.Explorer
             else
             {
                 SwitchToFilePreview();
-                if (_isGridMode)
-                {
-                    _isGridMode = false;
-                    ViewModeChanged?.Invoke(this, _isGridMode);
-                }
+                // Removed _isGridMode = false and ViewModeChanged invoke
+                // to keep the Grid View toggle state active.
                 await ShowPreviewAsync(node);
             }
         }
