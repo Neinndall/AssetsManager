@@ -25,7 +25,7 @@
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <!-- Icon/Preview -->
                         <Grid Width="64" Height="64">
-                            <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="64" Height="64" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}">
+                            <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" Width="64" Height="64" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}">
                                 <materialIcons:MaterialIcon.Style>
                                     <Style TargetType="materialIcons:MaterialIcon">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -52,7 +52,7 @@
                         </Grid>
 
                         <!-- Name -->
-                        <TextBlock Text="{Binding DisplayName}" 
+                        <TextBlock Text="{Binding Node.DisplayName}" 
                                    TextAlignment="Center" 
                                    TextWrapping="Wrap" 
                                    Margin="0,3,0,0" 

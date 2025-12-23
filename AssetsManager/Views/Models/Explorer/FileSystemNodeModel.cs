@@ -29,20 +29,6 @@ namespace AssetsManager.Views.Models.Explorer
 
         public ObservableCollection<FileSystemNodeModel> Children { get; set; }
 
-        private ImageSource _imagePreview;
-        public ImageSource ImagePreview
-        {
-            get { return _imagePreview; }
-            set
-            {
-                if (_imagePreview != value)
-                {
-                    _imagePreview = value;
-                    OnPropertyChanged(nameof(ImagePreview));
-                }
-            }
-        }
-
         // --- Data for WADs and Chunks ---
         public string SourceWadPath { get; set; } // Only for VirtualFile/VirtualDirectory
         public string BackupChunkPath { get; set; } // Only for nodes from a backup
@@ -94,11 +80,6 @@ namespace AssetsManager.Views.Models.Explorer
                 return name;
             }
         }
-
-        public bool IsFolder => Type == NodeType.VirtualDirectory || Type == NodeType.RealDirectory || Type == NodeType.WadFile || Type == NodeType.SoundBank || Type == NodeType.AudioEvent;
-
-        public int SubfolderCount => Children?.Count(c => c.IsFolder && !c.Name.Equals("Loading...")) ?? 0;
-        public int AssetCount => Children?.Count(c => !c.IsFolder && !c.Name.Equals("Loading...")) ?? 0;
 
         private bool _isExpanded;
         public bool IsExpanded

@@ -10,11 +10,11 @@ namespace AssetsManager.Views.Controls.Explorer
     public partial class FileGridView : UserControl
     {
         public static readonly DependencyProperty ItemsSourceProperty =
-            DependencyProperty.Register("ItemsSource", typeof(ObservableCollection<FileSystemNodeModel>), typeof(FileGridView), new PropertyMetadata(null, OnItemsSourceChanged));
+            DependencyProperty.Register("ItemsSource", typeof(ObservableCollection<FileGridViewModel>), typeof(FileGridView), new PropertyMetadata(null, OnItemsSourceChanged));
 
-        public ObservableCollection<FileSystemNodeModel> ItemsSource
+        public ObservableCollection<FileGridViewModel> ItemsSource
         {
-            get { return (ObservableCollection<FileSystemNodeModel>)GetValue(ItemsSourceProperty); }
+            get { return (ObservableCollection<FileGridViewModel>)GetValue(ItemsSourceProperty); }
             set { SetValue(ItemsSourceProperty, value); }
         }
 
@@ -29,15 +29,15 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (d is FileGridView control)
             {
-                control.FileGridViewItemsControl.ItemsSource = (ObservableCollection<FileSystemNodeModel>)e.NewValue;
+                control.FileGridViewItemsControl.ItemsSource = (ObservableCollection<FileGridViewModel>)e.NewValue;
             }
         }
 
         private void FileGridView_Item_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (sender is FrameworkElement element && element.DataContext is FileSystemNodeModel node)
+            if (sender is FrameworkElement element && element.DataContext is FileGridViewModel item)
             {
-                NodeClicked?.Invoke(this, new NodeClickedEventArgs(node));
+                NodeClicked?.Invoke(this, new NodeClickedEventArgs(item.Node));
             }
         }
     }

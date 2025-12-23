@@ -316,14 +316,20 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 _currentFolderNode = node; // Track the last folder
 
+                ObservableCollection<FileGridViewModel> gridItems;
+
                 if (!string.IsNullOrEmpty(_currentSearchFilter))
                 {
-                    FileGridView.ItemsSource = new ObservableCollection<FileSystemNodeModel>(node.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0));
+                     gridItems = new ObservableCollection<FileGridViewModel>(node.Children
+                        .Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+                        .Select(n => new FileGridViewModel(n)));
                 }
                 else
                 {
-                    FileGridView.ItemsSource = node.Children;
+                    gridItems = new ObservableCollection<FileGridViewModel>(node.Children.Select(n => new FileGridViewModel(n)));
                 }
+
+                FileGridView.ItemsSource = gridItems;
 
                 // If the user is on Preview mode, do not switch to GridView automatically.
                 if (!_isGridMode)
@@ -338,12 +344,12 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
 
                 // Asynchronously load image previews for the children
-                foreach (var child in node.Children)
+                foreach (var vm in gridItems)
                 {
-                    if (SupportedFileTypes.Images.Contains(child.Extension) || SupportedFileTypes.Textures.Contains(child.Extension))
+                    if (SupportedFileTypes.Images.Contains(vm.Node.Extension) || SupportedFileTypes.Textures.Contains(vm.Node.Extension))
                     {
                         // Fire and forget
-                        _ = LoadImagePreviewAsync(child);
+                        _ = LoadImagePreviewAsync(vm);
                     }
                 }
             }
@@ -370,14 +376,14 @@ namespace AssetsManager.Views.Controls.Explorer
         }
 
 
-        private async Task LoadImagePreviewAsync(FileSystemNodeModel node)
+        private async Task LoadImagePreviewAsync(FileGridViewModel vm)
         {
-            if (node.ImagePreview != null) return; // Already loaded
+            if (vm.ImagePreview != null) return; // Already loaded
 
-            var image = await ExplorerPreviewService.GetImagePreviewAsync(node);
+            var image = await ExplorerPreviewService.GetImagePreviewAsync(vm.Node);
             if (image != null)
             {
-                node.ImagePreview = image;
+                vm.ImagePreview = image;
             }
         }
 
