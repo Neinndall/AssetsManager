@@ -10,8 +10,17 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool IsFolder => Node.Type == NodeType.VirtualDirectory || Node.Type == NodeType.RealDirectory || Node.Type == NodeType.WadFile || Node.Type == NodeType.SoundBank || Node.Type == NodeType.AudioEvent;
 
-        public int SubfolderCount => Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0;
-        public int AssetCount => Node.Children?.Count(c => !IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0;
+        public string SubfolderCount => IsUnloadedSoundBank 
+            ? "N/A" 
+            : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
+
+        public string AssetCount => IsUnloadedSoundBank 
+            ? "N/A" 
+            : (Node.Children?.Count(c => !IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
+
+        private bool IsUnloadedSoundBank => Node.Type == NodeType.SoundBank && 
+                                            Node.Children?.Count == 1 && 
+                                            Node.Children[0].Name == "Loading...";
 
         private static bool IsNodeFolder(FileSystemNodeModel node)
         {
