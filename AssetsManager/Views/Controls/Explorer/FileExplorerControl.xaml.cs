@@ -641,10 +641,8 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     await HandleAudioBankExpansion(selectedNode);
                 }
-                else
-                {
-                    FileSelected?.Invoke(this, e);
-                }
+                
+                FileSelected?.Invoke(this, e);
             }
         }
 

@@ -312,7 +312,7 @@ namespace AssetsManager.Views.Controls.Explorer
             UpdateBreadcrumbs(node);
             UpdateBreadcrumbAndSeparatorVisibility();
 
-            if (node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile))
+            if (node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent))
             {
                 _currentFolderNode = node; // Track the last folder
 
