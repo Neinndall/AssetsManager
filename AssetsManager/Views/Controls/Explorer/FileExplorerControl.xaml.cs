@@ -155,6 +155,9 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
             Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
+            
+            var initialBreadcrumbState = Toolbar.IsBreadcrumbChecked;
+            Toolbar_BreadcrumbVisibilityChanged(this, new RoutedPropertyChangedEventArgs<bool>(!initialBreadcrumbState, initialBreadcrumbState));
 
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)

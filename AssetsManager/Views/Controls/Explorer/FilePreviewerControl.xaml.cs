@@ -38,6 +38,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private bool _isShowingTemporaryPreview = false;
         private bool _isGridMode = false;
         private string _currentSearchFilter = string.Empty;
+        private bool _isBreadcrumbToggleOn = false; // New field
 
         public FilePreviewerControl()
         {
@@ -309,6 +310,7 @@ namespace AssetsManager.Views.Controls.Explorer
             _currentNode = node;
             _rootNodes = rootNodes;
             UpdateBreadcrumbs(node);
+            UpdateBreadcrumbAndSeparatorVisibility();
 
             if (node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile))
             {
@@ -386,15 +388,18 @@ namespace AssetsManager.Views.Controls.Explorer
             BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(e.Node));
         }
         
-        public void SetBreadcrumbVisibility(Visibility visibility)
+        public void SetBreadcrumbToggleState(bool isToggleOn)
         {
-            if (visibility == Visibility.Visible && _currentNode == null)
-            {
-                return;
-            }
+            _isBreadcrumbToggleOn = isToggleOn;
+            UpdateBreadcrumbAndSeparatorVisibility();
+        }
 
-            Breadcrumbs.Visibility = visibility;
-            BreadcrumbSeparator.Visibility = visibility;
+        private void UpdateBreadcrumbAndSeparatorVisibility()
+        {
+            bool shouldBeVisible = _isBreadcrumbToggleOn && _currentNode != null;
+            Visibility newVisibility = shouldBeVisible ? Visibility.Visible : Visibility.Collapsed;
+            Breadcrumbs.Visibility = newVisibility;
+            BreadcrumbSeparator.Visibility = newVisibility;
         }
 
         private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)

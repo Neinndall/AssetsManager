@@ -69,7 +69,7 @@ namespace AssetsManager.Views
 
         private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
-            FilePreviewer.SetBreadcrumbVisibility(e.NewValue ? Visibility.Visible : Visibility.Collapsed);
+            FilePreviewer.SetBreadcrumbToggleState(e.NewValue);
         }
 
 

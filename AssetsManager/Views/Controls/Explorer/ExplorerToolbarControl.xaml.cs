@@ -21,6 +21,8 @@ namespace AssetsManager.Views.Controls.Explorer
             set => SortToggleButton.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        public bool IsBreadcrumbChecked => BreadcrumbToggleButton.IsChecked ?? false;
+
         public ExplorerToolbarControl()
         {
             InitializeComponent();
