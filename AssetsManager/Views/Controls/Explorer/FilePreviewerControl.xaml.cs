@@ -316,18 +316,11 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 _currentFolderNode = node; // Track the last folder
 
-                ObservableCollection<FileGridViewModel> gridItems;
-
-                if (!string.IsNullOrEmpty(_currentSearchFilter))
-                {
-                     gridItems = new ObservableCollection<FileGridViewModel>(node.Children
-                        .Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
-                        .Select(n => new FileGridViewModel(n)));
-                }
-                else
-                {
-                    gridItems = new ObservableCollection<FileGridViewModel>(node.Children.Select(n => new FileGridViewModel(n)));
-                }
+                var gridItems = new ObservableCollection<FileGridViewModel>(
+                    (!string.IsNullOrEmpty(_currentSearchFilter)
+                        ? node.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+                        : node.Children)
+                    .Select(n => new FileGridViewModel(n)));
 
                 FileGridView.ItemsSource = gridItems;
 
