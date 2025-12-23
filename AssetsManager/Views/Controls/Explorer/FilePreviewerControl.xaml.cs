@@ -388,6 +388,11 @@ namespace AssetsManager.Views.Controls.Explorer
         
         public void SetBreadcrumbVisibility(Visibility visibility)
         {
+            if (visibility == Visibility.Visible && _currentNode == null)
+            {
+                return;
+            }
+
             Breadcrumbs.Visibility = visibility;
             BreadcrumbSeparator.Visibility = visibility;
         }
