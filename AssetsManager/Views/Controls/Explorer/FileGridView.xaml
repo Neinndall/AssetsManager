@@ -10,7 +10,7 @@
     <UserControl.Resources>
         <converters:PathToIconConverter x:Key="PathToIconConverter"/>
         <DataTemplate x:Key="FileGridItemTemplate">
-            <Border Margin="5" Width="140" Height="120" Padding="5"
+            <Border Margin="5" Width="140" Height="130" Padding="5"
                     MouseLeftButtonUp="FileGridView_Item_MouseLeftButtonUp" Cursor="Hand">
                 <Border.Style>
                     <Style TargetType="Border" BasedOn="{StaticResource SettingsCard}">
@@ -23,6 +23,7 @@
                 </Border.Style>
                 <Grid>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <!-- Icon/Preview -->
                         <Grid Width="64" Height="64">
                             <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" Width="64" Height="64" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}">
                                 <materialIcons:MaterialIcon.Style>
@@ -49,7 +50,39 @@
                                 </Image.Style>
                             </Image>
                         </Grid>
-                        <TextBlock Text="{Binding DisplayName}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{StaticResource TextPrimary}" FontSize="11"/>
+
+                        <!-- Name -->
+                        <TextBlock Text="{Binding DisplayName}" 
+                                   TextAlignment="Center" 
+                                   TextWrapping="Wrap" 
+                                   Margin="0,3,0,0" 
+                                   Foreground="{StaticResource TextPrimary}" 
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   MaxHeight="32"/>
+
+                        <!-- Metadata (Only for Folders) -->
+                        <StackPanel Margin="0,3,0,0" Opacity="0.7">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Text="Subfolders: " FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="{Binding SubfolderCount}" FontSize="9" Foreground="{StaticResource TextSecondary}" FontWeight="Medium"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Text="Assets: " FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="{Binding AssetCount}" FontSize="9" Foreground="{StaticResource TextSecondary}" FontWeight="Medium"/>
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </Border>

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Windows.Media;
@@ -93,6 +94,11 @@ namespace AssetsManager.Views.Models.Explorer
                 return name;
             }
         }
+
+        public bool IsFolder => Type == NodeType.VirtualDirectory || Type == NodeType.RealDirectory || Type == NodeType.WadFile || Type == NodeType.SoundBank || Type == NodeType.AudioEvent;
+
+        public int SubfolderCount => Children?.Count(c => c.IsFolder && !c.Name.Equals("Loading...")) ?? 0;
+        public int AssetCount => Children?.Count(c => !c.IsFolder && !c.Name.Equals("Loading...")) ?? 0;
 
         private bool _isExpanded;
         public bool IsExpanded
