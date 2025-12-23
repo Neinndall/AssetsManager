@@ -37,6 +37,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private ObservableCollection<FileSystemNodeModel> _rootNodes;
         private bool _isShowingTemporaryPreview = false;
         private bool _isGridMode = false;
+        private string _currentSearchFilter = string.Empty;
 
         public FilePreviewerControl()
         {
@@ -47,6 +48,15 @@ namespace AssetsManager.Views.Controls.Explorer
             this.Loaded += FilePreviewerControl_Loaded;
             this.Unloaded += FilePreviewerControl_Unloaded;
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+        }
+
+        public void SetSearchFilter(string searchText)
+        {
+            _currentSearchFilter = searchText;
+            if (_isGridMode && _currentFolderNode != null)
+            {
+                UpdateSelectedNode(_currentFolderNode, _rootNodes);
+            }
         }
 
         public void SetViewMode(bool isGridMode)
@@ -303,7 +313,15 @@ namespace AssetsManager.Views.Controls.Explorer
             if (node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile))
             {
                 _currentFolderNode = node; // Track the last folder
-                FileGridView.ItemsSource = node.Children;
+
+                if (!string.IsNullOrEmpty(_currentSearchFilter))
+                {
+                    FileGridView.ItemsSource = new ObservableCollection<FileSystemNodeModel>(node.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0));
+                }
+                else
+                {
+                    FileGridView.ItemsSource = node.Children;
+                }
 
                 // If the user is on Preview mode, do not switch to GridView automatically.
                 if (!_isGridMode)

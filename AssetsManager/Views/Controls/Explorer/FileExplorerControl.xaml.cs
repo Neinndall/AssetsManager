@@ -787,6 +787,11 @@ namespace AssetsManager.Views.Controls.Explorer
             _searchTimer.Stop();
             string searchText = Toolbar.SearchText;
 
+            if (FilePreviewer != null)
+            {
+                FilePreviewer.SetSearchFilter(searchText);
+            }
+
             var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, RootNodes, LoadAllChildrenForSearch);
 
             if (nodeToSelect != null)
