@@ -395,7 +395,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)
         {
             Breadcrumbs.Nodes.Clear();
-            if (selectedNode == null) return;
+            if (selectedNode == null || _rootNodes == null) return;
 
             var path = TreeUIManager.FindNodePath(_rootNodes, selectedNode);
             if (path == null) return;
