@@ -119,7 +119,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
 
             // 6. Romper referencias cruzadas
-            FilePreviewer = null; // Setting to null will trigger the setter logic to unsubscribe
+            FilePreviewer = null; // Remove reference
 
             // 8. Limpiar paths
             _currentRootPath = null;
@@ -156,9 +156,6 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
             Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
             
-            var initialBreadcrumbState = Toolbar.IsBreadcrumbChecked;
-            Toolbar_BreadcrumbVisibilityChanged(this, new RoutedPropertyChangedEventArgs<bool>(!initialBreadcrumbState, initialBreadcrumbState));
-
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
             {

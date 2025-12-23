@@ -38,7 +38,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private bool _isShowingTemporaryPreview = false;
         private bool _isGridMode = false;
         private string _currentSearchFilter = string.Empty;
-        private bool _isBreadcrumbToggleOn = false; // New field
+        private bool _isBreadcrumbToggleOn = true; // Default to true to match Toolbar XAML state
 
         public FilePreviewerControl()
         {
