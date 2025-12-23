@@ -50,7 +50,7 @@
                           Click="BreadcrumbToggleButton_Click"
                           ToolTip="Show Breadcrumb"
                           Margin="5,0"
-                          IsChecked="False">
+                          IsChecked="True">
                 <materialIcons:MaterialIcon Kind="CodeTags" Width="18" Height="18"/>
             </ToggleButton>
             <ToggleButton x:Name="SearchToggleButton" 
