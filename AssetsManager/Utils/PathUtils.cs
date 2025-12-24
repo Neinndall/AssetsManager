@@ -102,7 +102,7 @@ namespace AssetsManager.Utils
             }
         }
 
-        public static string TruncateForDisplay(string text, int maxLength = 45)
+        public static string TruncateForDisplay(string text, int maxLength = 50)
         {
             if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
             {
