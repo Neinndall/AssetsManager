@@ -19,8 +19,6 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-
-
                 <!-- Icono y texto "Logger" eliminados. Se pueden volver a añadir aquí si es necesario. -->
                 <Button Grid.Column="1"
                         Style="{StaticResource TransparentIconButton}"

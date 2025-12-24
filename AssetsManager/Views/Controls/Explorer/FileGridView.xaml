@@ -10,7 +10,7 @@
     <UserControl.Resources>
         <converters:PathToIconConverter x:Key="PathToIconConverter"/>
         <DataTemplate x:Key="FileGridItemTemplate">
-            <Border Margin="5" Width="140" Height="130" Padding="5"
+            <Border Margin="5" Width="140" Height="130" Padding="6,0,6,0"
                     MouseLeftButtonUp="FileGridView_Item_MouseLeftButtonUp" Cursor="Hand">
                 <Border.Style>
                     <Style TargetType="Border" BasedOn="{StaticResource SettingsCard}">
@@ -59,7 +59,7 @@
                                    Foreground="{StaticResource TextPrimary}" 
                                    FontSize="10"
                                    FontWeight="SemiBold"
-                                   MaxHeight="32"/>
+                                   MaxHeight="34"/>
 
                         <!-- Metadata (Only for Folders) -->
                         <StackPanel Margin="0,3,0,0" Opacity="0.7">
