@@ -576,7 +576,7 @@ namespace AssetsManager.Services.Audio
 
             if (strategy == null)
             {
-                _logService.LogWarning($"[FindAssociatedBinFileAsync] No BIN strategy found for node: {clickedNode.FullPath}");
+                _logService.LogDebug($"[FindAssociatedBinFileAsync] No BIN strategy found for node: {clickedNode.FullPath}");
                 return (null, baseName, BinType.Unknown);
             }
 
