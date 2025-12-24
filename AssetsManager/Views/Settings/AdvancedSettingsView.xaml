@@ -58,7 +58,7 @@
                                   IsChecked="{Binding Settings.AssetTrackerTimer, Mode=TwoWay}"
                                   Content="Automatic CDN asset tracking"
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Automatically check for and discover new game assets on Riot's CDN in the background"
+                        <TextBlock Text="Automatically check for and discover new assets on Riot's CDN"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
                                      Margin="27,0,0,6" 
@@ -117,9 +117,9 @@
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox x:Name="EnablePbeStatusCheckBox"
                                   IsChecked="{Binding Settings.CheckPbeStatus, Mode=TwoWay}"
-                                  Content="PBE status notifications"
+                                  Content="Automatic PBE status alerts"
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Stay updated on PBE server maintenance and status changes with background notifications"
+                        <TextBlock Text="Stay updated on PBE maintenance and server status changes"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
                                      Margin="27,0,0,6"
@@ -178,7 +178,7 @@
                         <CheckBox IsChecked="{Binding Settings.ApiSettings.UsePbeForApi, Mode=TwoWay}"
                                   Content="Authenticate via PBE Client"
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Use PBE client credentials for LCU API authentication instead of Live"
+                        <TextBlock Text="Use PBE client credentials for LCU API authentication"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
                                      Margin="27,0,0,6"
@@ -208,7 +208,7 @@
                         <CheckBox IsChecked="{Binding Settings.MinimizeToTrayOnClose, Mode=TwoWay}" 
                                   Content="Minimize to system tray on close" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Keep the application running in the background when the main window is closed"
+                        <TextBlock Text="Keep the app running in the background when the window is closed"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
                                      Margin="27,0,0,6"
