@@ -101,5 +101,14 @@ namespace AssetsManager.Utils
                 return url; // Or throw an exception, or log an error
             }
         }
+
+        public static string TruncateForDisplay(string text, int maxLength = 45)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+            {
+                return text;
+            }
+            return text.Substring(0, maxLength) + "...";
+        }
     }
 }
