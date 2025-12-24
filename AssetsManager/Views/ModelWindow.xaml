@@ -6,6 +6,35 @@
              xmlns:models="clr-namespace:AssetsManager.Views.Controls.Models"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
+    <UserControl.Resources>
+        <Style x:Key="SelectionCardButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="20">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -61,43 +90,92 @@
                         Visibility="Visible">
                 <!-- Default Empty State Content -->
                 <StackPanel x:Name="DefaultEmptyStateContent" Visibility="Visible">
-                    <materialIcons:MaterialIcon Kind="CubeOutline"
-                                                Width="64" Height="64"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource TextMuted}"
-                                                Opacity="0.5"
-                                                Margin="0,0,0,16"/>
-                    <TextBlock Text="SELECT A MODEL OR MAPGEOMETRY"
-                            FontSize="24" 
-                            FontWeight="SemiBold"
-                            Foreground="{StaticResource TextMuted}"
-                            HorizontalAlignment="Center"
-                            Margin="0,0,0,8"/>
-                    <TextBlock Text="Load a model, chroma or mapgeometry to view it in 3D"
-                            FontSize="16"
-                            Foreground="{StaticResource TextMuted}"
-                            HorizontalAlignment="Center"
-                            Margin="0,0,0,24"
-                            Opacity="0.7"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Style="{StaticResource SecondaryButton}"
+                    <TextBlock Text="Get Started"
+                               FontSize="32"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimary}"
+                               HorizontalAlignment="Center"
+                               Margin="0,20,0,4"/>
+                    
+                    <TextBlock Text="Select an option to load your models"
+                               FontSize="15"
+                               Foreground="{StaticResource TextMuted}"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,20"/>
+
+                    <UniformGrid Columns="3" HorizontalAlignment="Center">
+                        <!-- Load Model Card -->
+                        <Button Style="{StaticResource SelectionCardButtonStyle}"
                                 Click="OpenFile_Click"
-                                ToolTip="Load Model">
-                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="20" Height="20"/>
+                                ToolTip="Load a standard .skn model"
+                                Width="160" Height="140">
+                            <StackPanel>
+                                <materialIcons:MaterialIcon Kind="CubeOutline" 
+                                                          Width="40" Height="40" 
+                                                          Foreground="{StaticResource AccentBrush}" 
+                                                          HorizontalAlignment="Center"
+                                                          Margin="0,0,0,12"/>
+                                <TextBlock Text="Load Model" 
+                                           FontWeight="SemiBold" 
+                                           FontSize="15" 
+                                           Foreground="{StaticResource TextPrimary}" 
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Import .skn files" 
+                                           FontSize="12" 
+                                           Foreground="{StaticResource TextMuted}" 
+                                           HorizontalAlignment="Center" 
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource SecondaryButton}"
+
+                        <!-- Load Chroma Card -->
+                        <Button Style="{StaticResource SelectionCardButtonStyle}"
                                 Click="OpenChromaFile_Click"
-                                ToolTip="Load Chroma Model"
-                                Margin="10,0,0,0">
-                            <materialIcons:MaterialIcon Kind="Palette" Width="20" Height="20"/>
+                                ToolTip="Load a model with custom textures"
+                                Width="160" Height="140">
+                            <StackPanel>
+                                <materialIcons:MaterialIcon Kind="Palette" 
+                                                          Width="40" Height="40" 
+                                                          Foreground="{StaticResource AccentPurple}" 
+                                                          HorizontalAlignment="Center"
+                                                          Margin="0,0,0,12"/>
+                                <TextBlock Text="Load Chroma" 
+                                           FontWeight="SemiBold" 
+                                           FontSize="15" 
+                                           Foreground="{StaticResource TextPrimary}" 
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Model + Textures" 
+                                           FontSize="12" 
+                                           Foreground="{StaticResource TextMuted}" 
+                                           HorizontalAlignment="Center" 
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource SecondaryButton}"
+
+                        <!-- Load Map Card -->
+                        <Button Style="{StaticResource SelectionCardButtonStyle}"
                                 Click="OpenGeometryFile_Click"
-                                ToolTip="Load MapGeometry"
-                                Margin="10,0,0,0">
-                            <materialIcons:MaterialIcon Kind="Map" Width="20" Height="20"/>
+                                ToolTip="Load map geometry"
+                                Width="160" Height="140">
+                            <StackPanel>
+                                <materialIcons:MaterialIcon Kind="Map" 
+                                                          Width="40" Height="40" 
+                                                          Foreground="{StaticResource AccentOrange}" 
+                                                          HorizontalAlignment="Center"
+                                                          Margin="0,0,0,12"/>
+                                <TextBlock Text="Load Map" 
+                                           FontWeight="SemiBold" 
+                                           FontSize="15" 
+                                           Foreground="{StaticResource TextPrimary}" 
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Import .mapgeo" 
+                                           FontSize="12" 
+                                           Foreground="{StaticResource TextMuted}" 
+                                           HorizontalAlignment="Center" 
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
                         </Button>
-                    </StackPanel>
+                    </UniformGrid>
                 </StackPanel>
 
                 <!-- Loading State Content (Initially Collapsed) -->
