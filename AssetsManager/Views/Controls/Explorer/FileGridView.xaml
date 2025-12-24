@@ -52,14 +52,13 @@
                         </Grid>
 
                         <!-- Name -->
-                        <TextBlock Text="{Binding Node.DisplayName}" 
-                                   TextAlignment="Center" 
-                                   TextWrapping="Wrap" 
+                        <TextBlock Text="{Binding DisplayNameShort}" 
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
                                    Margin="0,3,0,0" 
                                    Foreground="{StaticResource TextPrimary}" 
                                    FontSize="10"
-                                   FontWeight="SemiBold"
-                                   MaxHeight="34"/>
+                                   FontWeight="SemiBold"/>
 
                         <!-- Metadata (Only for Folders) -->
                         <StackPanel Margin="0,3,0,0" Opacity="0.7">
