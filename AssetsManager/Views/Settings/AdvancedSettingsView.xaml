@@ -56,9 +56,9 @@
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox x:Name="EnableAssetTrackerCheckBox"
                                   IsChecked="{Binding Settings.AssetTrackerTimer, Mode=TwoWay}"
-                                  Content="Enable automatic background check"
+                                  Content="Automatic CDN asset tracking"
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="When enabled, the application will periodically check for new assets"
+                        <TextBlock Text="Automatically check for and discover new game assets on Riot's CDN in the background"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="12" 
                                      Margin="27,0,0,6" 
@@ -119,7 +119,7 @@
                                   IsChecked="{Binding Settings.CheckPbeStatus, Mode=TwoWay}"
                                   Content="PBE status notifications"
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="When enabled, the application will periodically check for PBE updates"
+                        <TextBlock Text="Stay updated on PBE server maintenance and status changes with background notifications"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
                                      Margin="27,0,0,6"
@@ -176,9 +176,9 @@
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox IsChecked="{Binding Settings.ApiSettings.UsePbeForApi, Mode=TwoWay}"
-                                  Content="Use PBE client for API authentication"
+                                  Content="Authenticate via PBE Client"
                                   Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="When enabled, the application will use the PBE client's lockfile"
+                        <TextBlock Text="Use PBE client credentials for LCU API authentication instead of Live"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
                                      Margin="27,0,0,6"
@@ -206,9 +206,9 @@
                     </StackPanel>
                     <StackPanel Margin="10,0,0,0">
                         <CheckBox IsChecked="{Binding Settings.MinimizeToTrayOnClose, Mode=TwoWay}" 
-                                  Content="Minimize to tray" 
+                                  Content="Minimize to system tray on close" 
                                   Style="{StaticResource ModernCheckBox}"/>
-                                                <TextBlock Text="When closing the app, the application will be minimized to the system tray"
+                        <TextBlock Text="Keep the application running in the background when the main window is closed"
                                      Foreground="{StaticResource TextMuted}"
                                      FontSize="12"
                                      Margin="27,0,0,6"
