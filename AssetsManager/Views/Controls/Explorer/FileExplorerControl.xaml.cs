@@ -310,7 +310,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
-                ToolbarSeparator.Visibility = Visibility.Visible;
+
             }
         }
 
@@ -358,7 +358,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
-                ToolbarSeparator.Visibility = Visibility.Visible;
+
             }
         }
 
@@ -402,7 +402,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
-                ToolbarSeparator.Visibility = Visibility.Visible;
+
             }
         }
 

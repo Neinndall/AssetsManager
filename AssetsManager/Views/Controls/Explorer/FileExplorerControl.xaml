@@ -39,95 +39,100 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Toolbar -->
-        <local:ExplorerToolbarControl x:Name="Toolbar" Grid.Row="0" Margin="5,0,5,0" Visibility="Collapsed"/>
-        <Border x:Name="ToolbarSeparator" Grid.Row="1" Height="1" Background="{StaticResource BorderColor}" Margin="5,5,5,5" Visibility="Collapsed"/>
-
-        <Grid Grid.Row="2">
+        <!-- Toolbar area -->
+        <local:ExplorerToolbarControl x:Name="Toolbar" 
+                                      Grid.Row="0" 
+                                      Margin="10,10,10,5" 
+                                      Visibility="Collapsed"/>
+        <Grid Grid.Row="1">
             <TreeView x:Name="FileTreeView" 
-                      Margin="5,0,5,5" 
+                      Margin="6,0,0,0" 
                       ItemsSource="{Binding RootNodes}"
                       SelectedItemChanged="FileTreeView_SelectedItemChanged"
                       Style="{StaticResource ModernTreeView}">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type models:FileSystemNodeModel}" ItemsSource="{Binding Children}">
-                        <Grid Margin="3,2,0,2">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon Grid.Column="0" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,5,0" Kind="{Binding Converter={StaticResource PathToIconConverter}}">
-                                    <materialIcons:MaterialIcon.Style>
+                                
+                            <!-- Icon -->
+                            <materialIcons:MaterialIcon Grid.Column="0" 
+                                                        Width="16" Height="16" 
+                                                        VerticalAlignment="Center" 
+                                                        Margin="0,0,6,0" 
+                                                        Kind="{Binding Converter={StaticResource PathToIconConverter}}">
+                                <materialIcons:MaterialIcon.Style>
                                         <Style TargetType="materialIcons:MaterialIcon">
-                                            <Style.Triggers>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding Status}" Value="New" />
-                                                        <Condition Binding="{Binding IsGroupingFolder}" Value="True" />
-                                                    </MultiDataTrigger.Conditions>
-                                                    <Setter Property="Foreground" Value="#4CAF50"/>
-                                                </MultiDataTrigger>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding Status}" Value="Modified" />
-                                                        <Condition Binding="{Binding IsGroupingFolder}" Value="True" />
-                                                    </MultiDataTrigger.Conditions>
-                                                    <Setter Property="Foreground" Value="#2196F3"/>
-                                                </MultiDataTrigger>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding Status}" Value="Deleted" />
-                                                        <Condition Binding="{Binding IsGroupingFolder}" Value="True" />
-                                                    </MultiDataTrigger.Conditions>
-                                                    <Setter Property="Foreground" Value="#F44336"/>
-                                                </MultiDataTrigger>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding Status}" Value="Renamed" />
-                                                        <Condition Binding="{Binding IsGroupingFolder}" Value="True" />
-                                                    </MultiDataTrigger.Conditions>
-                                                    <Setter Property="Foreground" Value="#FF9800"/>
-                                                </MultiDataTrigger>
-                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
-                                                    <Setter Property="Foreground" Value="White"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </materialIcons:MaterialIcon.Style>
-                                </materialIcons:MaterialIcon>
+                                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                        <Setter Property="RenderTransformOrigin" Value="0.5, 0.5"/>
+                                        <Setter Property="RenderTransform">
+                                            <Setter.Value>
+                                                <RotateTransform Angle="0"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <!-- Loading State Spinner -->
+                                            <DataTrigger Binding="{Binding Name}" Value="Loading...">
+                                                <Setter Property="Kind" Value="Loading"/>
+                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" 
+                                                                             From="0" To="360" Duration="0:0:1" 
+                                                                             RepeatBehavior="Forever"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                            </DataTrigger>
+                                            
+                                            <!-- Status Colors -->
+                                            <DataTrigger Binding="{Binding Status}" Value="New">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Modified">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Deleted">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Renamed">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentPurple}"/>
+                                            </DataTrigger>
+                                            
+                                            <!-- Selection Override -->
+                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                                <Setter Property="Foreground" Value="White"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialIcons:MaterialIcon.Style>
+                            </materialIcons:MaterialIcon>
                             
-                            <TextBlock Grid.Column="1" VerticalAlignment="Center">
+                            <!-- Standard Text -->
+                            <TextBlock Grid.Column="1" 
+                                       VerticalAlignment="Center" 
+                                       FontSize="13">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Visible"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding HasMatch}" Value="True">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                             </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="New">
-                                                <Setter Property="Foreground" Value="#4CAF50"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Modified">
-                                                <Setter Property="Foreground" Value="#2196F3"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Deleted">
-                                                <Setter Property="Foreground" Value="#F44336"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Renamed">
-                                                <Setter Property="Foreground" Value="#FF9800"/>
-                                            </DataTrigger>
-
-                                            <!-- 
-                                                Este Trigger es necesario para forzar el texto a blanco en la selección.
-                                                Anula los colores de estado (New, Modified, etc.) definidos arriba,
-                                                ya que el estilo general de TreeViewItem es anulado por este estilo local.
-                                            -->
                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
                                                 <Setter Property="Foreground" Value="White"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Name}" Value="Loading...">
+                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                <Setter Property="FontStyle" Value="Italic"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -137,7 +142,10 @@
                                 </TextBlock.Text>
                             </TextBlock>
 
-                            <TextBlock Grid.Column="1" VerticalAlignment="Center">
+                            <!-- Search Match Text -->
+                            <TextBlock Grid.Column="1" 
+                                       VerticalAlignment="Center" 
+                                       FontSize="13">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -148,7 +156,7 @@
                                         </Style.Triggers>
                                     </Style>
                                 </TextBlock.Style>
-                                <Run Text="{Binding PreMatch, Mode=OneWay}" /><Run Text="{Binding Match, Mode=OneWay}" Foreground="White" FontWeight="Medium" /><Run Text="{Binding PostMatch, Mode=OneWay}" />
+                                <Run Text="{Binding PreMatch, Mode=OneWay}" Foreground="{StaticResource TextMuted}" /><Run Text="{Binding Match, Mode=OneWay}" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" /><Run Text="{Binding PostMatch, Mode=OneWay}" Foreground="{StaticResource TextMuted}" />
                             </TextBlock>
                         </Grid>
                     </HierarchicalDataTemplate>
@@ -164,6 +172,8 @@
                     </Style>
                 </TreeView.ItemContainerStyle>
             </TreeView>
+
+            <!-- Empty State -->
             <StackPanel x:Name="NoDirectoryMessage"
                         Orientation="Vertical"
                         HorizontalAlignment="Center"
@@ -171,59 +181,55 @@
                         Margin="10"
                         Visibility="Collapsed">
                 <materialIcons:MaterialIcon Kind="FolderSearchOutline"
-                                            Width="48" Height="48"
+                                            Width="64" Height="64"
                                             HorizontalAlignment="Center"
                                             Foreground="{StaticResource TextMuted}"
-                                            Opacity="0.8"/>
+                                            Opacity="0.5"/>
                 <TextBlock x:Name="PlaceholderTitle"
-                           Text="Select a LoL Directory"
-                           FontSize="18"
+                           Text="No Directory Selected"
+                           FontSize="20"
                            FontWeight="SemiBold"
-                           Foreground="{StaticResource TextMuted}"
+                           Foreground="{StaticResource TextPrimary}"
                            HorizontalAlignment="Center"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
                            Margin="0,16,0,0"/>
                 <TextBlock x:Name="PlaceholderDescription"
-                           Text="Choose the root folder where you installed League of Legends to browse its WAD files."
+                           Text="Please select your League of Legends installation folder to start exploring."
                            TextWrapping="Wrap"
                            FontSize="14"
-                           Foreground="{StaticResource TextMuted}"
+                           Foreground="{StaticResource TextSecondary}"
                            HorizontalAlignment="Center"
                            TextAlignment="Center"
-                           Margin="0,8,0,0"
-                           Opacity="0.7"/>
+                           Margin="20,8,20,0"/>
                 <Button x:Name="SelectLolDirButton"
-                        Content="Select Directory"
+                        Content="Open Folder"
                         Style="{StaticResource SecondaryButton}"
                         Click="SelectLolDirButton_Click"
-                        Padding="16,0"
-                        Height="36"
+                        Padding="24,8"
                         HorizontalAlignment="Center"
-                        Margin="0,20,0,0"
-                        ToolTip="Choose your League of Legends installation to browse its WAD files."/>
+                        Margin="0,24,0,0"/>
             </StackPanel>
             
-            <!-- Loading Indicator para la carga del Arbol -->
-            <StackPanel x:Name="LoadingIndicator" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
-                <Border CornerRadius="5"
-                        Width="100"
-                        Height="5"
-                        Margin="-8,0,0,8"
-                        Background="{StaticResource DarkBackground}" 
-                        BorderBrush="{StaticResource BorderColor}"
-                        BorderThickness="1"
-                        SnapsToDevicePixels="True"
-                        ClipToBounds="True">
+            <!-- Loading Indicator -->
+            <Grid x:Name="LoadingIndicator" 
+                  Visibility="Collapsed" 
+                  Background="{StaticResource SidebarBackground}">
+                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <ProgressBar IsIndeterminate="True" 
                                  Style="{StaticResource ModernProgressBar}" 
+                                 Width="150" Height="4"
                                  BorderThickness="0"
-                                 Background="{StaticResource TextPrimary}"/>
-                </Border>
-                <TextBlock Text="Loading Files..."
-                           FontSize="12"
-                           FontWeight="Medium"
-                           Foreground="{StaticResource TextMuted}"
-                           HorizontalAlignment="Center" />
-            </StackPanel>
+                                 Background="Transparent"
+                                 Foreground="{StaticResource AccentBrush}"/>
+                    <TextBlock Text="Loading assets..."
+                               FontSize="14"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource TextSecondary}"
+                               HorizontalAlignment="Center" 
+                               Margin="0,12,0,0"/>
+                 </StackPanel>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>
