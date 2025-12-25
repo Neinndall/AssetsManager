@@ -78,11 +78,11 @@
                                                    Margin="0,0,12,0"
                                                    VerticalAlignment="Center"/>
                         <StackPanel>
-                            <TextBlock Text="Comparison Tools" 
+                            <TextBlock Text="WAD Comparator" 
                                        FontSize="18" 
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Select a tool to compare different types of assets" 
+                            <TextBlock Text="Analyze and compare game versions to identify differences" 
                                        FontSize="12" 
                                        Foreground="{StaticResource TextMuted}"/>
                         </StackPanel>

@@ -54,7 +54,7 @@
                                FontSize="24" 
                                FontWeight="Bold"
                                Foreground="{StaticResource AccentBrush}"/>
-                    <TextBlock Text="Monitor remote files and asset updates"
+                    <TextBlock Text="Track PBE status, remote data changes and live asset updates"
                                FontSize="12" 
                                Foreground="{StaticResource TextSecondary}"
                                Margin="0,4,0,0"/>
