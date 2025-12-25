@@ -15,7 +15,7 @@
     <SolidColorBrush x:Key="AccentPurple" Color="#FFC77DFF"/>
     <SolidColorBrush x:Key="AccentOrange" Color="#FFFFD166"/>
     <SolidColorBrush x:Key="AccentRed" Color="#FFFF5C5C"/>
-    <SolidColorBrush x:Key="TextPrimary" Color="#FFE1E1E1"/>  <!-- Más blanco para mejor contraste -->
+    <SolidColorBrush x:Key="TextPrimary" Color="#FFD1D1D1"/>  <!-- Más suave que el blanco intenso -->
     <SolidColorBrush x:Key="TextSecondary" Color="#FFAAAAAA"/>
     <SolidColorBrush x:Key="TextMuted" Color="#FF757575"/>
     <SolidColorBrush x:Key="BorderColor" Color="#FF3F3F46"/>
