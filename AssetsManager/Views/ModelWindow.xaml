@@ -46,38 +46,47 @@
                 Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1"
-                Padding="32,24">
+                Padding="32,20">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Icono + textos -->
-                <Grid Grid.Column="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+                <!-- Icono con Brillo -->
+                <materialIcons:MaterialIcon Kind="Cube"
+                                             Height="48"
+                                             Width="48"
+                                             VerticalAlignment="Center"
+                                             Foreground="{StaticResource AccentBrush}"
+                                             Grid.Column="0">
+                    <materialIcons:MaterialIcon.Effect>
+                        <DropShadowEffect Color="{Binding Color, Source={StaticResource AccentBrush}}" 
+                                          BlurRadius="15" 
+                                          ShadowDepth="0" 
+                                          Opacity="0.4"/>
+                    </materialIcons:MaterialIcon.Effect>
+                </materialIcons:MaterialIcon>
 
-                    <materialIcons:MaterialIcon Kind="Cube"
-                                                 Height="54"
-                                                 Width="54"
-                                                 Margin="0,0,10,0"
-                                                 VerticalAlignment="Center"
-                                                 Foreground="{StaticResource AccentBrush}"
-                                                 Grid.Column="0"/>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="3D Model Viewer" 
-                                   FontSize="26" 
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource AccentBrush}"
-                                   Margin="0,2,0,0"/>
-                        <TextBlock Text="Visualize 3D Models with their animations and MapGeometry"
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextMuted}"
-                                   Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Grid>
+                <!-- Separador Vertical -->
+                <Rectangle Grid.Column="1" 
+                           Width="1" 
+                           Fill="{StaticResource BorderColor}" 
+                           Margin="12,8" 
+                           VerticalAlignment="Stretch"/>
+
+                <!-- Textos -->
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="3D MODELS" 
+                               FontSize="24" 
+                               FontWeight="Bold"
+                               Foreground="{StaticResource AccentBrush}"/>
+                    <TextBlock Text="Visualize 3D Models with their animations and MapGeometry"
+                               FontSize="12" 
+                               Foreground="{StaticResource TextSecondary}"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
             </Grid>
         </Border>
 

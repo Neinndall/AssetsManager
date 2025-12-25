@@ -18,30 +18,46 @@
                 Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1"
-                Padding="32,24">
+                Padding="32,20">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
+                <!-- Icono con Brillo -->
                 <materialIcons:MaterialIcon Kind="FileCompare"
-                                             Height="54"
-                                             Width="54"
-                                             Margin="0,0,10,0"
+                                             Height="48"
+                                             Width="48"
                                              VerticalAlignment="Center"
                                              Foreground="{StaticResource AccentBrush}"
-                                             Grid.Column="0"/>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                             Grid.Column="0">
+                    <materialIcons:MaterialIcon.Effect>
+                        <DropShadowEffect Color="{Binding Color, Source={StaticResource AccentBrush}}" 
+                                          BlurRadius="15" 
+                                          ShadowDepth="0" 
+                                          Opacity="0.4"/>
+                    </materialIcons:MaterialIcon.Effect>
+                </materialIcons:MaterialIcon>
+
+                <!-- Separador Vertical -->
+                <Rectangle Grid.Column="1" 
+                           Width="1" 
+                           Fill="{StaticResource BorderColor}" 
+                           Margin="12,8" 
+                           VerticalAlignment="Stretch"/>
+
+                <!-- Textos -->
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
                     <TextBlock Text="COMPARATOR" 
-                               FontSize="26" 
+                               FontSize="24" 
                                FontWeight="Bold"
-                               Foreground="{StaticResource AccentBrush}"
-                               Margin="0,2,0,0"/>
+                               Foreground="{StaticResource AccentBrush}"/>
                     <TextBlock Text="Compare WAD files and view differences"
                                FontSize="12" 
-                               Foreground="{StaticResource TextMuted}"
-                               Margin="0,2,0,0"/>
+                               Foreground="{StaticResource TextSecondary}"
+                               Margin="0,4,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
