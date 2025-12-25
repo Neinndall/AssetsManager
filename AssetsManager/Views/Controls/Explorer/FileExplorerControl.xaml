@@ -91,20 +91,36 @@
                                                     </BeginStoryboard>
                                                 </DataTrigger.EnterActions>
                                             </DataTrigger>
-                                            
-                                            <!-- Status Colors -->
-                                            <DataTrigger Binding="{Binding Status}" Value="New">
+
+                                            <!-- Status Colors ONLY for Grouping Folders (e.g. [+] New) -->
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Status}" Value="New"/>
+                                                    <Condition Binding="{Binding IsGroupingFolder}" Value="True"/>
+                                                </MultiDataTrigger.Conditions>
                                                 <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Modified">
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Status}" Value="Modified"/>
+                                                    <Condition Binding="{Binding IsGroupingFolder}" Value="True"/>
+                                                </MultiDataTrigger.Conditions>
                                                 <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Deleted">
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Status}" Value="Deleted"/>
+                                                    <Condition Binding="{Binding IsGroupingFolder}" Value="True"/>
+                                                </MultiDataTrigger.Conditions>
                                                 <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Renamed">
-                                                <Setter Property="Foreground" Value="{StaticResource AccentPurple}"/>
-                                            </DataTrigger>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Status}" Value="Renamed"/>
+                                                    <Condition Binding="{Binding IsGroupingFolder}" Value="True"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                            </MultiDataTrigger>
                                             
                                             <!-- Selection Override -->
                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
@@ -127,6 +143,22 @@
                                             <DataTrigger Binding="{Binding HasMatch}" Value="True">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                             </DataTrigger>
+                                            
+                                            <!-- Status Colors for Text -->
+                                            <DataTrigger Binding="{Binding Status}" Value="New">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Modified">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Deleted">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Renamed">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                            </DataTrigger>
+
+                                            <!-- Selection and Loading overrides -->
                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
                                                 <Setter Property="Foreground" Value="White"/>
                                             </DataTrigger>
