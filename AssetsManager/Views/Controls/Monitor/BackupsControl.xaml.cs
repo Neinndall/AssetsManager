@@ -159,5 +159,14 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        private void ListViewItem_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is ListViewItem item && item.IsSelected)
+            {
+                item.IsSelected = false;
+                e.Handled = true;
+            }
+        }
     }
 }
