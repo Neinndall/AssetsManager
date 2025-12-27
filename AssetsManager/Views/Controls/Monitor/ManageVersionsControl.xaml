@@ -6,370 +6,162 @@
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
-    <StackPanel Margin="15">
-        <!-- Header -->
-        <Border Style="{StaticResource SettingsCard}">
+             d:DesignHeight="1000" d:DesignWidth="800">
+
+    <Grid Margin="0,10,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="Auto"/> <!-- Toolbar -->
+            <RowDefinition Height="Auto"/> <!-- Tab Selector -->
+            <RowDefinition Height="*"/>    <!-- Content Area -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. HEADER -->
+        <Border Grid.Row="0" Margin="0,0,0,20" Background="{DynamicResource CardBackground}" CornerRadius="12" Padding="24,20" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="{DynamicResource HoverColor}" CornerRadius="10" Width="50" Height="50" Margin="0,0,20,0"><materialIcons:MaterialIcon Kind="CloudDownloadOutline" Width="26" Height="26" Foreground="{DynamicResource AccentBrush}"/></Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="Manage Versions" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
+                    <TextBlock Text="Download and organize League of Legends manifests and clients" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 2. TOOLBAR -->
+        <Border Grid.Row="1" Margin="0,0,0,16" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+            <StackPanel>
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Fetch All" Click="FetchVersions_Click" Style="{DynamicResource ModernButton}" Height="32" Padding="16,0" Margin="0,0,8,0"/>
+                        <Button Content="Get League Client" Click="GetLeagueClient_Click" Style="{DynamicResource SecondaryButton}" Height="32" Padding="16,0" Margin="0,0,8,0"/>
+                        <Button Content="Get Game Client" Click="GetLoLGameClient_Click" Style="{DynamicResource SecondaryButton}" Height="32" Padding="16,0"/>
+                    </StackPanel>
+                    <Button Grid.Column="2" Click="DeleteSelectedVersions_Click" Style="{DynamicResource TransparentIconButton}" Width="32" Height="32" ToolTip="Delete Selected"><materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{DynamicResource AccentRed}"/></Button>
+                </Grid>
+                <Border Background="{DynamicResource CardBackground}" CornerRadius="6" Padding="12,8" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <materialIcons:MaterialIcon Kind="Translate" Foreground="{DynamicResource AccentOrange}" Width="14" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Download Locales:" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                        <ItemsControl ItemsSource="{Binding AvailableLocales}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate><DataTemplate><CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}" Style="{DynamicResource ModernCheckBox}" Margin="0,0,16,0" FontSize="11"/></DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- 3. TAB SELECTOR -->
+        <Border Grid.Row="2" Margin="0,0,0,12" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
             <StackPanel Orientation="Horizontal">
-                <materialIcons:MaterialIcon Kind="CloudDownloadOutline" 
-                                           FontSize="20" 
-                                           Foreground="{StaticResource AccentBrush}"
-                                           Margin="0,0,12,0"
-                                           VerticalAlignment="Center"/>
-                <StackPanel>
-                    <TextBlock Text="Manage Versions" 
-                               FontSize="18" 
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Fetch and save version information from Riot's servers."
-                               FontSize="12" 
-                               Foreground="{StaticResource TextMuted}"/>
-                </StackPanel>
+                <RadioButton x:Name="TabClient" Content="League Client" IsChecked="True" GroupName="VersionTabs" Style="{DynamicResource SegmentedRadioButtonStyle}" Width="140"/>
+                <RadioButton x:Name="TabGame" Content="Game Client" GroupName="VersionTabs" Style="{DynamicResource SegmentedRadioButtonStyle}" Width="140"/>
             </StackPanel>
         </Border>
 
-        <!-- Action Card -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                    <materialIcons:MaterialIcon Kind="PackageDown"
-                                                   Foreground="{StaticResource AccentOrange}"
-                                                   FontSize="20"
-                                                   Margin="0,0,12,0"
-                                                   VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Fetch Versions"
-                                     FontSize="15"
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Fetch manifests and download specific client versions."
-                                     TextWrapping="Wrap"
-                                     FontSize="12"
-                                     Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
+        <!-- 4. CONTENT AREA -->
+        <Grid Grid.Row="3">
+            <!-- LEAGUE CLIENT LIST -->
+            <Grid x:Name="ClientPanel">
+                <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabClient}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,8">
+                    <StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding LeagueClientPaginator.TotalPages}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                    <Button Style="{DynamicResource TransparentIconButton}" Click="PrevLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToPreviousPage}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{DynamicResource TextSecondary}"/></Button>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0"><TextBlock Text="Page" Foreground="{DynamicResource TextMuted}" FontSize="12"/><TextBlock Text="{Binding LeagueClientPaginator.CurrentPage}" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="6,0"/><TextBlock Text="/" Foreground="{DynamicResource TextMuted}" FontSize="12"/><TextBlock Text="{Binding LeagueClientPaginator.TotalPages}" Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="6,0"/></StackPanel>
+                    <Button Style="{DynamicResource TransparentIconButton}" Click="NextLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{DynamicResource TextSecondary}"/></Button>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="34,0,0,0">
-                    <Button Content="Get Versions"
-                            Click="FetchVersions_Click"
-                            Style="{StaticResource ModernButton}"
-                            HorizontalAlignment="Left"/>
-                    <Button Content="Get League-Client"
-                            Click="GetLeagueClient_Click"
-                            Style="{StaticResource ModernButton}"
-                            HorizontalAlignment="Left"
-                            Margin="10,0,0,0"/>
-                    <Button Content="Get LoL-Game-Client"
-                            Click="GetLoLGameClient_Click" 
-                            Style="{StaticResource ModernButton}"
-                            HorizontalAlignment="Left"
-                            Margin="10,0,0,0"/>
-                    <Button Content="Delete Selected"
-                            Click="DeleteSelectedVersions_Click"
-                            Style="{StaticResource DestructiveButton}"
-                            HorizontalAlignment="Left"
-                            Margin="10,0,0,0"
-                            ToolTip="Delete Selected"/>
-                </StackPanel>
-            </StackPanel>
-        </Border>
 
-        <!-- Locales Card -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                    <materialIcons:MaterialIcon Kind="Translate"
-                                                   Foreground="{StaticResource AccentOrange}"
-                                                   FontSize="20"
-                                                   Margin="0,0,12,0"
-                                                   VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Locales"
-                                     FontSize="15"
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Select the locales for both 'Get League-Client' and 'Get LoL-Game-Client' actions."
-                                     TextWrapping="Wrap"
-                                     FontSize="12"
-                                     Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
-                </StackPanel>
-                <ItemsControl ItemsSource="{Binding AvailableLocales}" Margin="34,0,0,0">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}" Style="{StaticResource ModernCheckBox}" Margin="0,0,15,0"/>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </Border>
-
-        <!-- League Client Versions List -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <materialIcons:MaterialIcon Kind="DesktopClassic" 
-                                                       Foreground="{StaticResource AccentBrush}"
-                                                       FontSize="20" 
-                                                       Margin="0,0,12,0" 
-                                                       VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="League Client Versions" 
-                                         FontSize="15" 
-                                         FontWeight="SemiBold"
-                                         Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Versions of the League of Legends client" 
-                                         FontSize="12" 
-                                         Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Grid Grid.Column="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="24*"/>
-                                    <ColumnDefinition Width="22*"/>
-                                    <ColumnDefinition Width="54*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Filename" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Grid.Column="1" Style="{StaticResource HalfModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Date" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Grid.Column="2" Style="{StaticResource LastModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Manifest URL" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                            <ListView Grid.Row="1" x:Name="LeagueClientVersionsListView"
-                                      ItemsSource="{Binding LeagueClientPaginator.PagedItems}"
-                                      Style="{StaticResource ModernListView}" >
-                                <ListView.ItemContainerStyle>
-                                    <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
-                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=OneWay}"/>
-                                        <EventSetter Event="PreviewMouseDown" Handler="ListViewItem_PreviewMouseDown"/>
-                                    </Style>
-                                </ListView.ItemContainerStyle>
-                                <ListView.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="24*"/>
-                                                <ColumnDefinition Width="22*"/>
-                                                <ColumnDefinition Width="54*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Grid.Column="0" Margin="0,0,10,0">
-                                                <TextBlock Text="{Binding FileName}"
-                                                           Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Normal"
-                                                           TextAlignment="Center" />
-                                            </Border>
-                                            <Border Grid.Column="1" Margin="0,0,10,0">
-                                                <TextBlock Text="{Binding Date}" 
-                                                           Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Normal"
-                                                           TextAlignment="Center" />
-                                            </Border>
-                                            <Grid Grid.Column="2" Margin="10,0,0,0">
-                                                <TextBlock Text="{Binding Content}" 
-                                                           Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Normal"
-                                                           TextAlignment="Center" />
+                <ListView Grid.Row="1" x:Name="LeagueClientVersionsListView" ItemsSource="{Binding LeagueClientPaginator.PagedItems}" Style="{DynamicResource ModernListView}" Background="Transparent" BorderThickness="0">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Background" Value="Transparent"/><Setter Property="Margin" Value="0,0,0,8"/>
+                            <!-- BINDING CRÍTICO: Conecta la UI con el modelo IsSelected -->
+                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                            <EventSetter Event="PreviewMouseDown" Handler="ListViewItem_PreviewMouseDown"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <Border x:Name="SelectionBorder" Background="{DynamicResource CardBackground}" CornerRadius="10" Padding="16,12" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8" Background="{DynamicResource HoverColor}" Margin="0,0,16,0"><materialIcons:MaterialIcon Kind="DesktopClassic" Width="20" Foreground="{DynamicResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextPrimary}"/>
+                                                    <TextBlock Text="{Binding Date, StringFormat='Published on {0}'}" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                                <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{DynamicResource AccentBrush}" Width="20" Visibility="Collapsed"/>
                                             </Grid>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListView.ItemTemplate>
-                            </ListView>
-                        </Grid>
-                    </Grid>
-                </StackPanel>
-
-                <!-- Pagination Controls for League Client Versions -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,-15">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding LeagueClientPaginator.TotalPages}" Value="0">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="2"/>
+                                                <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HoverColor}"/>
+                                                <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HoverColor}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
-                    </StackPanel.Style>
-                    <Button Style="{StaticResource TransparentIconButton}"
-                            Click="PrevLeagueClientPage_Click"
-                            IsEnabled="{Binding LeagueClientPaginator.CanGoToPreviousPage}">
-                        <materialIcons:MaterialIcon Kind="ChevronLeft" />
-                    </Button>
+                    </ListView.ItemContainerStyle>
+                </ListView>
+            </Grid>
 
-                    <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
-                        <Run Text="{Binding LeagueClientPaginator.CurrentPage, Mode=OneWay}" />
-                        <Run Text="/" />
-                        <Run Text="{Binding LeagueClientPaginator.TotalPages, Mode=OneWay}" />
-                    </TextBlock>
-
-                    <Button Style="{StaticResource TransparentIconButton}"
-                            Click="NextLeagueClientPage_Click"
-                            IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}">
-                        <materialIcons:MaterialIcon Kind="ChevronRight" />
-                    </Button>
+            <!-- GAME CLIENT LIST -->
+            <Grid x:Name="GamePanel">
+                <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabGame}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,8">
+                    <StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding LoLGameClientPaginator.TotalPages}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                    <Button Style="{DynamicResource TransparentIconButton}" Click="PrevLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToPreviousPage}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{DynamicResource TextSecondary}"/></Button>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0"><TextBlock Text="Page" Foreground="{DynamicResource TextMuted}" FontSize="12"/><TextBlock Text="{Binding LoLGameClientPaginator.CurrentPage}" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="6,0"/><TextBlock Text="/" Foreground="{DynamicResource TextMuted}" FontSize="12"/><TextBlock Text="{Binding LoLGameClientPaginator.TotalPages}" Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="6,0"/></StackPanel>
+                    <Button Style="{DynamicResource TransparentIconButton}" Click="NextLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToNextPage}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{DynamicResource TextSecondary}"/></Button>
                 </StackPanel>
-            </StackPanel>
-        </Border>
 
-        <!-- LoL Game Client Versions List -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <materialIcons:MaterialIcon Kind="FolderMultipleOutline" 
-                                                       Foreground="{StaticResource AccentBrush}"
-                                                       FontSize="20" 
-                                                       Margin="0,0,12,0" 
-                                                       VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="Game Client Versions" 
-                                         FontSize="15" 
-                                         FontWeight="SemiBold"
-                                         Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Versions of the Game Client" 
-                                         FontSize="12" 
-                                         Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Grid Grid.Column="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="24*"/>
-                                    <ColumnDefinition Width="22*"/>
-                                    <ColumnDefinition Width="54*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Style="{StaticResource FirstModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="FileDocument" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="File Name" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Grid.Column="1" Style="{StaticResource HalfModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="DateRange" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Date" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Grid.Column="2" Style="{StaticResource LastModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="LinkVariant" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Manifest URL" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                            <ListView Grid.Row="1" x:Name="LoLGameClientVersionsListView" 
-                                      ItemsSource="{Binding LoLGameClientPaginator.PagedItems}"
-                                      Style="{StaticResource ModernListView}" >
-                                <ListView.ItemContainerStyle>
-                                    <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
-                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=OneWay}"/>
-                                        <EventSetter Event="PreviewMouseDown" Handler="ListViewItem_PreviewMouseDown"/>
-                                    </Style>
-                                </ListView.ItemContainerStyle>
-                                <ListView.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="24*"/>
-                                                <ColumnDefinition Width="22*"/>
-                                                <ColumnDefinition Width="54*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Grid.Column="0" Margin="0,0,10,0">
-                                                <TextBlock Text="{Binding FileName}"
-                                                           Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Normal"
-                                                           TextAlignment="Center" />
-                                            </Border>
-                                            <Border Grid.Column="1" Margin="0,0,10,0">
-                                                <TextBlock Text="{Binding Date}"
-                                                           Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Normal"
-                                                           TextAlignment="Center" />
-                                            </Border>
-                                            <Grid Grid.Column="2" Margin="10,0,0,0">
-                                                <TextBlock Text="{Binding Content}" 
-                                                           Style="{StaticResource CellTextStyle}"
-                                                           FontWeight="Normal"
-                                                           TextAlignment="Center" />
+                <ListView Grid.Row="1" x:Name="LoLGameClientVersionsListView" ItemsSource="{Binding LoLGameClientPaginator.PagedItems}" Style="{DynamicResource ModernListView}" Background="Transparent" BorderThickness="0">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Background" Value="Transparent"/><Setter Property="Margin" Value="0,0,0,8"/>
+                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                            <EventSetter Event="PreviewMouseDown" Handler="ListViewItem_PreviewMouseDown"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <Border x:Name="SelectionBorder" Background="{DynamicResource CardBackground}" CornerRadius="10" Padding="16,12" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8" Background="{DynamicResource HoverColor}" Margin="0,0,16,0"><materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="20" Foreground="{DynamicResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextPrimary}"/>
+                                                    <TextBlock Text="{Binding Date, StringFormat='Published on {0}'}" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                                <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{DynamicResource AccentBrush}" Width="20" Visibility="Collapsed"/>
                                             </Grid>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListView.ItemTemplate>
-                            </ListView>
-                        </Grid>
-                    </Grid>
-                </StackPanel>
-
-                <!-- Pagination Controls for LoL Game Client Versions -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,-15">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding LoLGameClientPaginator.TotalPages}" Value="0">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="2"/>
+                                                <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HoverColor}"/>
+                                                <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HoverColor}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
-                    </StackPanel.Style>
-                    <Button Style="{StaticResource TransparentIconButton}"
-                            Click="PrevLoLGameClientPage_Click"
-                            IsEnabled="{Binding LoLGameClientPaginator.CanGoToPreviousPage}">
-                        <materialIcons:MaterialIcon Kind="ChevronLeft" />
-                    </Button>
-
-                    <TextBlock VerticalAlignment="Center" Margin="0" Foreground="{StaticResource TextPrimary}">
-                        <Run Text="{Binding LoLGameClientPaginator.CurrentPage, Mode=OneWay}" />
-                        <Run Text="/" />
-                        <Run Text="{Binding LoLGameClientPaginator.TotalPages, Mode=OneWay}" />
-                    </TextBlock>
-
-                    <Button Style="{StaticResource TransparentIconButton}"
-                            Click="NextLoLGameClientPage_Click"
-                            IsEnabled="{Binding LoLGameClientPaginator.CanGoToNextPage}">
-                        <materialIcons:MaterialIcon Kind="ChevronRight" />
-                    </Button>
-                </StackPanel>
-            </StackPanel>
-        </Border>
-    </StackPanel>
+                    </ListView.ItemContainerStyle>
+                </ListView>
+            </Grid>
+        </Grid>
+    </Grid>
 </UserControl>
