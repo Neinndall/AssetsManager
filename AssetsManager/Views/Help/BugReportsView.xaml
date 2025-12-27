@@ -5,81 +5,157 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="600" d:DesignWidth="800">
     <StackPanel>
         <!-- Page Header -->
-        <StackPanel Margin="0,0,0,32">
+        <StackPanel Margin="0,0,0,24">
             <TextBlock Text="Bug Reports" 
-                       FontSize="28" 
-                       FontWeight="Medium" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
                        Foreground="{StaticResource TextPrimary}"
-                       Margin="0,4,0,0"/>
+                       Margin="0,0,0,4"/>
             <TextBlock Text="Report issues and help improve the application" 
                        FontSize="14" 
-                       Foreground="{StaticResource TextMuted}"
-                       Margin="0,2,0,0"/>
+                       Foreground="{StaticResource TextSecondary}"/>
         </StackPanel>
 
-        <!-- Bug Report Card -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialIcons:MaterialIcon Kind="Bug"
+        <!-- MAIN ACTION CARD -->
+        <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="60" Height="60">
+                    <materialIcons:MaterialIcon Kind="Bug" 
                                                Foreground="{StaticResource AccentOrange}"
-                                               FontSize="20"
-                                               Margin="0,0,12,0"
-                                               VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Report Issues" 
-                                   FontSize="18" 
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource AccentOrange}"/>
-                        <TextBlock Text="Help us improve by reporting bugs and issues" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
+                                               Width="32" Height="32"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,20,0">
+                    <TextBlock Text="Found an issue?" 
+                               FontSize="18" 
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Your feedback is essential to making AssetsManager better for everyone." 
+                               FontSize="13" 
+                               Foreground="{StaticResource TextSecondary}"
+                               TextWrapping="Wrap"
+                               Margin="0,2,0,0"/>
                 </StackPanel>
-                
-                <TextBlock Text="Found a bug or experiencing unexpected behavior? Your feedback helps us improve the application for everyone."
-                           Foreground="{StaticResource TextSecondary}"
-                           FontWeight="Normal"
-                           FontSize="13" 
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,20"/>
-                
-                <Button x:Name="buttonReportBug" 
-                        Content="Report Bug"
-                        HorizontalAlignment="Left"
+
+                <Button Grid.Column="2"
+                        x:Name="buttonReportBug" 
+                        Content="Report on GitHub"
+                        Padding="24,0"
+                        Height="44"
                         Click="buttonReportBug_Click"
                         Style="{StaticResource ModernButton}"/>
+            </Grid>
+        </Border>
+
+        <!-- REPORTING GUIDE SECTION -->
+        <Border Style="{StaticResource SettingsCard}">
+            <StackPanel>
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialIcons:MaterialIcon Kind="TextBoxCheckOutline" 
+                                               Foreground="{StaticResource AccentBrush}"
+                                               Width="24" Height="24"
+                                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" 
+                               Text="How to write an effective report" 
+                               FontSize="18" 
+                               FontWeight="SemiBold" 
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"/>
+                </Grid>
+
+                <UniformGrid Columns="2">
+                    <!-- Step 1 -->
+                    <Grid Margin="0,0,16,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
+                            <TextBlock Text="1" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Be Descriptive" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Include what happened and what you expected to see instead." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Step 2 -->
+                    <Grid Margin="0,0,0,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
+                            <TextBlock Text="2" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Steps to Reproduce" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Explain exactly how to trigger the bug so we can find it." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Step 3 -->
+                    <Grid Margin="0,0,16,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
+                            <TextBlock Text="3" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="System Info" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Mention your OS and application version for context." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Step 4 -->
+                    <Grid Margin="0,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
+                            <TextBlock Text="4" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Attach Logs" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Add relevant files from the 'logs' folder to your report." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+                </UniformGrid>
             </StackPanel>
         </Border>
 
-        <!-- Tips Card -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialIcons:MaterialIcon Kind="LightbulbOn"
-                                               Foreground="Gold"
-                                               FontSize="20"
-                                               Margin="0,0,12,0"
-                                               VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Reporting Tips" 
-                                   FontSize="18" 
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="How to write effective bug reports" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
-                </StackPanel>
-
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• Provide as much information as possible."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• Description and steps to reproduce."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• Expected actual results."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• Application version and OS."/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• Relevant log files from the logs folder."/>
+        <!-- HELP BOX -->
+        <Border Background="{StaticResource HoverColor}" 
+                CornerRadius="12" 
+                Padding="16" 
+                Margin="0,20,0,0"
+                BorderBrush="{StaticResource BorderColor}"
+                BorderThickness="1">
+            <StackPanel Orientation="Horizontal">
+                <materialIcons:MaterialIcon Kind="InformationOutline" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" VerticalAlignment="Center"/>
+                <TextBlock Text="You can find the logs folder in the application root directory." 
+                           Foreground="{StaticResource TextSecondary}" 
+                           FontSize="12" 
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0"/>
             </StackPanel>
         </Border>
     </StackPanel>

@@ -5,166 +5,181 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="800" d:DesignWidth="800">
     <StackPanel>
-        <!-- Page Header -->
-        <StackPanel Margin="0,0,0,32">
+        <!-- Page Header (Standard) -->
+        <StackPanel Margin="0,0,0,24">
             <TextBlock Text="About"
-                       FontSize="28"
-                       FontWeight="Medium"
+                       FontSize="24"
+                       FontWeight="Bold"
                        Foreground="{StaticResource TextPrimary}"
-                       Margin="0,4,0,0"/>
+                       Margin="0,0,0,4"/>
             <TextBlock Text="Information about the application"
                        FontSize="14"
-                       Foreground="{StaticResource TextMuted}"
-                       Margin="0,2,0,0"/>
+                       Foreground="{StaticResource TextSecondary}"/>
         </StackPanel>
 
-        <!-- Description Card -->
+        <!-- HERO SECTION: Branding -->
+        <StackPanel HorizontalAlignment="Center" Margin="0,0,0,32">
+            <TextBlock Text="AssetsManager" 
+                       FontSize="32" 
+                       FontWeight="Bold" 
+                       Foreground="{StaticResource TextPrimary}"
+                       HorizontalAlignment="Center"/>
+            
+            <Border Background="{StaticResource CardBackground}" 
+                    BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="1" 
+                    CornerRadius="12" 
+                    Padding="12,4" 
+                    Margin="0,8,0,0"
+                    HorizontalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Version " Foreground="{StaticResource TextMuted}" FontSize="12"/>
+                    <TextBlock Text="{Binding ApplicationVersion, FallbackValue='3.0.0.0'}" 
+                               Foreground="{StaticResource AccentBrush}" 
+                               FontWeight="SemiBold" 
+                               FontSize="12"/>
+                </StackPanel>
+            </Border>
+            
+            <TextBlock Text="The ultimate tool for League of Legends PBE analysis and asset management."
+                       Foreground="{StaticResource TextSecondary}"
+                       FontSize="14"
+                       HorizontalAlignment="Center"
+                       Margin="0,16,0,0"
+                       TextAlignment="Center"
+                       MaxWidth="500"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- FEATURES GRID -->
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialIcons:MaterialIcon Kind="Information" 
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialIcons:MaterialIcon Kind="RocketLaunch" 
                                                Foreground="{StaticResource AccentBrush}"
-                                               FontSize="20" 
-                                               Margin="0,0,12,0" 
+                                               Width="24" Height="24"
                                                VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Description"
-                                   FontSize="18"
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="General information about the application" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
-                </StackPanel>
-                <TextBlock Text="AssetsManager is a tool for League of Legends enthusiasts who need to analyze, manage, and track changes to game assets from PBE server updates. It goes beyond simple downloading, offering a powerful suite of features for deep asset analysis, a 3D model viewer, exploration, and monitoring for changes."
-                           Foreground="{StaticResource TextSecondary}"
-                           FontWeight="Normal"
-                           FontSize="13"
-                           TextWrapping="Wrap"/>
-            </StackPanel>
-        </Border>
+                    <TextBlock Grid.Column="1" 
+                               Text="Core Capabilities" 
+                               FontSize="18" 
+                               FontWeight="SemiBold" 
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"/>
+                </Grid>
 
-        <!-- Key Features Card -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialIcons:MaterialIcon Kind="Star"
-                                               Foreground="Gold"
-                                               FontSize="20" 
-                                               Margin="0,0,12,0" 
-                                               VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Key Features"
-                                   FontSize="18"
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Discover the main functionalities of the application" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
-                </StackPanel>
+                <UniformGrid Columns="2" Rows="4">
+                    <!-- Feature 1: Download -->
+                    <Grid Margin="0,0,16,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="CloudDownload" Foreground="{StaticResource AccentBlue}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Auto Downloads" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Detects and downloads new PBE assets automatically." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
 
-                <StackPanel Margin="0,4">
-                    <TextBlock Foreground="{StaticResource TextPrimary}"
-                               FontSize="13"
-                               FontWeight="Medium"
-                               Margin="6,0,0,0">
-                        <Run Text="• Download automatically new assets"/>
-                    </TextBlock>
-                    <TextBlock Text="Automatically detects and downloads new assets from PBE updates."
-                               FontWeight="Normal"
-                               Foreground="{StaticResource TextSecondary}"
-                               FontSize="13"
-                               TextWrapping="Wrap"
-                               Margin="20,2,0,8"/>
-                </StackPanel>
-                <StackPanel Margin="0,4">
-                    <TextBlock Foreground="{StaticResource TextPrimary}"
-                               FontSize="13"
-                               FontWeight="Medium"
-                               Margin="6,0,0,0">
-                        <Run Text="• Advanced WAD Comparator"/>
-                    </TextBlock>
-                    <TextBlock Text="Compares WAD files between different versions to identify new, modified, or deleted assets."
-                               FontWeight="Normal"
-                               Foreground="{StaticResource TextSecondary}"
-                               FontSize="13"
-                               TextWrapping="Wrap"
-                               Margin="20,2,0,8"/>
-                </StackPanel>
-                <StackPanel Margin="0,4">
-                    <TextBlock Foreground="{StaticResource TextPrimary}"
-                               FontSize="13"
-                               FontWeight="Medium"
-                               Margin="6,0,0,0">
-                        <Run Text="• Powerful File Explorer"/>
-                    </TextBlock>
-                    <TextBlock Text="Explore WAD with powerful tools with archives with a file tree interface and previews dozens of formats."
-                               FontWeight="Normal"
-                               Foreground="{StaticResource TextSecondary}"
-                               FontSize="13"
-                               TextWrapping="Wrap"
-                               Margin="20,2,0,8"/>
-                </StackPanel>
-                <StackPanel Margin="0,4">
-                    <TextBlock Foreground="{StaticResource TextPrimary}"
-                               FontSize="13"
-                               FontWeight="Medium"
-                               Margin="6,0,0,0">
-                        <Run Text="• 3D Model Viewer"/>
-                    </TextBlock>
-                    <TextBlock Text="Inspects 3D champion models with their animations and MapGeometry Environments with a built-in viewer."
-                               FontWeight="Normal"
-                               Foreground="{StaticResource TextSecondary}"
-                               FontSize="13"
-                               TextWrapping="Wrap"
-                               Margin="20,2,0,8"/>
-                </StackPanel>
-                <StackPanel Margin="0,4">
-                    <TextBlock Foreground="{StaticResource TextPrimary}"
-                               FontSize="13"
-                               FontWeight="Medium"
-                               Margin="6,0,0,0">
-                        <Run Text="• Asset Monitoring"/>
-                    </TextBlock>
-                    <TextBlock Text="Tracks remote assets, JSON files, and the PBE server status for real-time updates."
-                               FontWeight="Normal"
-                               Foreground="{StaticResource TextSecondary}"
-                               FontSize="13"
-                               TextWrapping="Wrap"
-                               Margin="20,2,0,8"/>
-                </StackPanel>
-                <StackPanel Margin="0,4">
-                    <TextBlock Foreground="{StaticResource TextPrimary}"
-                               FontSize="13"
-                               FontWeight="Medium"
-                               Margin="6,0,0,0">
-                        <Run Text="• Version Management"/>
-                    </TextBlock>
-                    <TextBlock Text="Manages and downloads diferentes versiones de LoL Game Client or Plugins."
-                               FontWeight="Normal"
-                               Foreground="{StaticResource TextSecondary}"
-                               FontSize="13"
-                               TextWrapping="Wrap"
-                               Margin="20,2,0,8"/>
-                </StackPanel>
-                <StackPanel Margin="0,4">
-                    <TextBlock Foreground="{StaticResource TextPrimary}"
-                               FontSize="13"
-                               FontWeight="Medium"
-                               Margin="6,0,0,0">
-                        <Run Text="• Audio Bank"/>
-                    </TextBlock>
-                    <TextBlock Text="Explores audio banks (.wpk, .bnk) and displays audio events with their names and plays them."
-                               FontWeight="Normal"
-                               Foreground="{StaticResource TextSecondary}"
-                               FontSize="13"
-                               TextWrapping="Wrap"
-                               Margin="20,2,0,8"/>
-                </StackPanel>
+                    <!-- Feature 2: Comparator -->
+                    <Grid Margin="0,0,0,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="FileCompare" Foreground="{StaticResource AccentOrange}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="WAD Comparator" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Analyze differences between versions to find changes." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Feature 3: Explorer -->
+                    <Grid Margin="0,0,16,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="FolderSearch" Foreground="{StaticResource AccentGreen}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="File Explorer" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Explore archives with a tree view and previews." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Feature 4: 3D Viewer -->
+                    <Grid Margin="0,0,0,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="3D Viewer" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Inspect models (.skn) and animations in real-time." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Feature 5: Monitor -->
+                    <Grid Margin="0,0,16,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="Radar" Foreground="{StaticResource AccentRed}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Live Monitoring" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Track JSON files and PBE server status." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Feature 6: Version Management -->
+                    <Grid Margin="0,0,0,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="Layers" Foreground="{StaticResource AccentPurple}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Version Management" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Download different LoL Game Client versions or Plugins." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Feature 7: Audio -->
+                    <Grid Margin="0,0,16,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="MusicNote" Foreground="{StaticResource AccentBrush}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Audio Banks" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Listen to and inspect .bnk and .wpk audio events." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+                </UniformGrid>
             </StackPanel>
         </Border>
     </StackPanel>

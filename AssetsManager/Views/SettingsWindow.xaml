@@ -95,42 +95,57 @@
                 
             </ScrollViewer>
 
-            <!-- Bottom Action Bar -->
-            <Border Grid.Row="1"
-                    Background="{StaticResource CardBackground}"
-                    BorderBrush="{StaticResource BorderColor}"
-                    BorderThickness="0,1,0,0"
-                    Padding="32,16">
+            <!-- Bottom Action Bar (Improved Style) -->
+            <Border Grid.Row="1" 
+                  Background="{StaticResource CardBackground}"
+                  BorderBrush="{StaticResource BorderColor}"
+                  BorderThickness="0,1,0,0"
+                  Padding="24,16">
                 <Grid>
-                    <!-- Left: Informational Text -->
-                    <StackPanel Orientation="Horizontal" 
-                                HorizontalAlignment="Left" 
-                                VerticalAlignment="Center">
-                        <materialIcons:MaterialIcon Kind="InformationOutline" 
-                                                    Foreground="{StaticResource TextMuted}"
-                                                    VerticalAlignment="Center"
-                                                    Margin="0,0,8,0"/>
-                        <TextBlock Text="Changes aren't applied until you click Save"
-                                   Foreground="{StaticResource TextMuted}" 
-                                   FontSize="12"
-                                   VerticalAlignment="Center"/>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Status/Info with Icon -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="{StaticResource HoverColor}" CornerRadius="16" Width="32" Height="32" Margin="0,0,12,0">
+                            <materialIcons:MaterialIcon Kind="Tune" 
+                                                       Width="16" Height="16" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                        </Border>
+                        
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Configuration Manager"
+                                     FontWeight="SemiBold"
+                                     Foreground="{StaticResource TextPrimary}" 
+                                     FontSize="13"/>
+                            <TextBlock Text="Manage your application preferences and defaults"
+                                     Foreground="{StaticResource TextMuted}" 
+                                     FontSize="11"/>
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- Right: Action Buttons -->
-                    <StackPanel Orientation="Horizontal" 
+                    <StackPanel Grid.Column="1" 
+                                Orientation="Horizontal" 
                                 HorizontalAlignment="Right">
                         <Button x:Name="BtnResetDefaults" 
                                 Content="Reset Defaults"
                                 Click="BtnResetDefaults_Click"
-                                Style="{StaticResource SecondaryButton}"/>
-
-
+                                Style="{StaticResource SecondaryButton}"
+                                Height="32"
+                                Padding="12,0"/>
 
                         <Button x:Name="btnSave" 
                                 Content="Save Changes"
-                                Margin="8,0,0,0"
+                                Margin="12,0,0,0"
                                 Click="btnSave_Click"
-                                Style="{StaticResource ModernButton}"/>
+                                Style="{StaticResource ModernButton}"
+                                Height="32"
+                                Padding="12,0"/>
                     </StackPanel>
                 </Grid>
             </Border>

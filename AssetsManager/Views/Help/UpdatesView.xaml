@@ -5,80 +5,140 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="600" d:DesignWidth="800">
     <StackPanel>
         <!-- Page Header -->
-        <StackPanel Margin="0,0,0,32">
+        <StackPanel Margin="0,0,0,24">
             <TextBlock Text="Application Updates" 
-                       FontSize="28" 
-                       FontWeight="Medium" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
                        Foreground="{StaticResource TextPrimary}"
-                       Margin="0,4,0,0"/>
+                       Margin="0,0,0,4"/>
             <TextBlock Text="Keep your application up to date with the latest features" 
                        FontSize="14" 
-                       Foreground="{StaticResource TextMuted}"
-                       Margin="0,2,0,0"/>
+                       Foreground="{StaticResource TextSecondary}"/>
         </StackPanel>
 
-        <!-- Update Check Card -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialIcons:MaterialIcon Kind="Update"
+        <!-- UPDATE STATUS CARD -->
+        <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="60" Height="60">
+                    <materialIcons:MaterialIcon Kind="Update" 
                                                Foreground="{StaticResource AccentGreen}"
-                                               FontSize="20"
-                                               Margin="0,0,12,0"
-                                               VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Update Check" 
-                                   FontSize="18" 
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource AccentGreen}"/>
-                        <TextBlock Text="Check for the latest version and download updates" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
+                                               Width="32" Height="32"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,20,0">
+                    <TextBlock Text="Update Center" 
+                               FontSize="18" 
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Stay up to date with the latest features, improvements, and bug fixes." 
+                               FontSize="13" 
+                               Foreground="{StaticResource TextSecondary}"
+                               TextWrapping="Wrap"
+                               Margin="0,2,0,0"/>
                 </StackPanel>
-                
-                <TextBlock Text="Stay up to date with the latest features, improvements, and bug fixes by checking for updates regularly."
-                           Foreground="{StaticResource TextSecondary}" 
-                           FontWeight="Normal"
-                           FontSize="13" 
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,20"/>
-                
-                <Button x:Name="buttonCheckUpdates" 
-                        Content="Check Updates"
-                        HorizontalAlignment="Left"
+
+                <Button Grid.Column="2"
+                        x:Name="buttonCheckUpdates" 
+                        Content="Check for Updates"
+                        Padding="24,0"
+                        Height="44"
                         Click="buttonCheckUpdates_Click"
                         Style="{StaticResource ModernButton}"/>
-            </StackPanel>
+            </Grid>
         </Border>
 
-        <!-- Update Information Card -->
+        <!-- UPDATE INFORMATION GRID -->
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialIcons:MaterialIcon Kind="PackageVariant"
-                                               Foreground="SaddleBrown"
-                                               FontSize="20"
-                                               Margin="0,0,12,0"
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialIcons:MaterialIcon Kind="InformationOutline" 
+                                               Foreground="{StaticResource AccentBrush}"
+                                               Width="24" Height="24"
                                                VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Update Information" 
-                                   FontSize="18" 
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="About automatic updates and release cycle" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
-                </StackPanel>
+                    <TextBlock Grid.Column="1" 
+                               Text="Update Policy &amp; Information" 
+                               FontSize="18" 
+                               FontWeight="SemiBold" 
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"/>
+                </Grid>
 
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• Updates are released regularly with new features and fixes"/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• The application will notify you when updates are available"/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• You can always check manually using the button above"/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• Backup your settings before major updates"/>
+                <UniformGrid Columns="2">
+                    <!-- Point 1 -->
+                    <Grid Margin="0,0,16,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentBlue}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Regular Releases" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Updates are released frequently with new features and critical fixes." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Point 2 -->
+                    <Grid Margin="0,0,0,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="BellOutline" Foreground="{StaticResource AccentOrange}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Notifications" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="The application will notify you as soon as a new version is detected." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Point 3 -->
+                    <Grid Margin="0,0,16,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="HandBackLeftOutline" Foreground="{StaticResource AccentGreen}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Manual Control" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="You can always check for updates manually using the button above." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Point 4 -->
+                    <Grid Margin="0,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
+                            <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Foreground="{StaticResource AccentPurple}" Width="20" Height="20"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Safe Updates" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock Text="We recommend backing up your settings before major updates." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+                </UniformGrid>
             </StackPanel>
         </Border>
     </StackPanel>
