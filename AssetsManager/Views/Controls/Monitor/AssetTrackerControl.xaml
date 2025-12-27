@@ -125,10 +125,11 @@
                                         </StackPanel>
                                         
                                         <!-- The Asset Image with small margin for framing -->
-                                        <Image Source="{Binding Thumbnail}" 
-                                               Stretch="Uniform" 
-                                               Margin="6"
-                                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                                        <Border CornerRadius="8" Margin="6">
+                                            <Border.Background>
+                                                <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="Uniform"/>
+                                            </Border.Background>
+                                        </Border>
                                     </Grid>
                                 </Border>
                             </Border>

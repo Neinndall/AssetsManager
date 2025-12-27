@@ -45,7 +45,7 @@
 
                 <Button Grid.Column="0" Content="+ Add Monitor" Click="AddUrl_Click" Style="{DynamicResource ModernButton}" Height="32" Padding="16,0"/>
                 
-                <TextBox Grid.Column="2" x:Name="txtSearch" Style="{DynamicResource StandardSearchBoxStyle}" Width="220" Height="32" TextChanged="TxtSearch_TextChanged" Tag="Filter monitors..."/>
+                <TextBox Grid.Column="2" x:Name="txtSearch" Style="{DynamicResource StandardSearchBoxStyle}" Width="220" Height="36" TextChanged="TxtSearch_TextChanged" Tag="Filter monitors..."/>
             </Grid>
         </Border>
 

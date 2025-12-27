@@ -52,12 +52,7 @@
                     <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{DynamicResource TextSecondary}"/>
                 </Button>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
-                    <TextBlock Text="Page" Foreground="{DynamicResource TextMuted}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <TextBlock Text="{Binding Paginator.CurrentPage}" Foreground="{DynamicResource TextSecondary}" FontSize="12" VerticalAlignment="Center"/>
-                    <TextBlock Text="/" Foreground="{DynamicResource TextMuted}" Margin="6,0" FontSize="12" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding Paginator.TotalPages}" Foreground="{DynamicResource TextSecondary}" FontSize="12" VerticalAlignment="Center"/>
-                </StackPanel>
+                <TextBlock Text="{Binding Paginator.PageInfo}" Foreground="{DynamicResource TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="12,0"/>
 
                 <Button Style="{DynamicResource TransparentIconButton}" Click="NextPage_Click" IsEnabled="{Binding Paginator.CanGoToNextPage}" Width="24" Height="24">
                     <materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{DynamicResource TextSecondary}"/>

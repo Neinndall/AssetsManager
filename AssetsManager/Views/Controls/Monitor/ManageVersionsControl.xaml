@@ -69,7 +69,7 @@
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,8">
                     <StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding LeagueClientPaginator.TotalPages}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
                     <Button Style="{DynamicResource TransparentIconButton}" Click="PrevLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToPreviousPage}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{DynamicResource TextSecondary}"/></Button>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0"><TextBlock Text="Page" Foreground="{DynamicResource TextMuted}" FontSize="12"/><TextBlock Text="{Binding LeagueClientPaginator.CurrentPage}" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="6,0"/><TextBlock Text="/" Foreground="{DynamicResource TextMuted}" FontSize="12"/><TextBlock Text="{Binding LeagueClientPaginator.TotalPages}" Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="6,0"/></StackPanel>
+                    <TextBlock Text="{Binding LeagueClientPaginator.PageInfo}" Foreground="{DynamicResource TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="12,0"/>
                     <Button Style="{DynamicResource TransparentIconButton}" Click="NextLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{DynamicResource TextSecondary}"/></Button>
                 </StackPanel>
 
@@ -120,7 +120,7 @@
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,8">
                     <StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding LoLGameClientPaginator.TotalPages}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
                     <Button Style="{DynamicResource TransparentIconButton}" Click="PrevLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToPreviousPage}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{DynamicResource TextSecondary}"/></Button>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0"><TextBlock Text="Page" Foreground="{DynamicResource TextMuted}" FontSize="12"/><TextBlock Text="{Binding LoLGameClientPaginator.CurrentPage}" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="6,0"/><TextBlock Text="/" Foreground="{DynamicResource TextMuted}" FontSize="12"/><TextBlock Text="{Binding LoLGameClientPaginator.TotalPages}" Foreground="{DynamicResource TextMuted}" FontSize="12" Margin="6,0"/></StackPanel>
+                    <TextBlock Text="{Binding LoLGameClientPaginator.PageInfo}" Foreground="{DynamicResource TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="12,0"/>
                     <Button Style="{DynamicResource TransparentIconButton}" Click="NextLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToNextPage}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{DynamicResource TextSecondary}"/></Button>
                 </StackPanel>
 
