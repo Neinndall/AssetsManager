@@ -117,10 +117,10 @@
 
                             <!-- Actions -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Content="Compare" Click="ViewChanges_Click" 
-                                        Height="30" Padding="12,0" Margin="0,0,8,0">
+                                <Button Click="ViewChanges_Click" ToolTip="Compare Changes" 
+                                        Width="32" Height="32" Margin="0,0,8,0">
                                     <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
                                             <Setter Property="Visibility" Value="Collapsed"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding HasChanges}" Value="True">
@@ -129,9 +129,10 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{DynamicResource AccentBrush}"/>
                                 </Button>
                                 
-                                <Button Click="Remove_Click" Style="{DynamicResource TransparentIconButton}" Width="30" Height="30" ToolTip="Remove Monitor">
+                                <Button Click="Remove_Click" Style="{DynamicResource TransparentIconButton}" Width="32" Height="32" ToolTip="Remove Monitor">
                                     <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{DynamicResource AccentRed}"/>
                                 </Button>
                             </StackPanel>
