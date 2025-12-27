@@ -464,40 +464,40 @@
     <Style x:Key="SegmentedRadioButtonStyle" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="Padding" Value="12,10"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Grid>
+                        <!-- Main background -->
                         <Border x:Name="Border" 
                                 Background="{TemplateBinding Background}" 
-                                CornerRadius="4" 
+                                CornerRadius="6" 
+                                BorderThickness="0,0,0,2"
+                                BorderBrush="Transparent"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <!-- Selection Indicator Line -->
-                        <Border x:Name="SelectionLine" 
-                                Height="2" 
-                                Width="60"
-                                Background="{StaticResource AccentBrush}" 
-                                VerticalAlignment="Bottom" 
-                                HorizontalAlignment="Center"
-                                Margin="0,0,0,-4"
-                                CornerRadius="1"
-                                Visibility="Collapsed"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource CardBackground}"/>
-                            <Setter TargetName="SelectionLine" Property="Visibility" Value="Visible"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter Property="Foreground" Value="White"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                         </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsChecked" Value="False"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
+                        </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
