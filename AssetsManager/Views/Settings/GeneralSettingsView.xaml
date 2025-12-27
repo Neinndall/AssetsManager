@@ -15,16 +15,6 @@
             <System:Int32>30</System:Int32>
             <System:Int32>60</System:Int32>
         </x:Array>
-
-        <!-- Local style for the Settings Card -->
-        <Style x:Key="SectionCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="20"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
-        </Style>
     </UserControl.Resources>
 
     <StackPanel>
@@ -41,7 +31,7 @@
         </StackPanel>
 
         <!-- SECTION 1: Data & History -->
-        <Border Style="{StaticResource SectionCardStyle}">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Header -->
                 <Grid Margin="0,0,0,16">
@@ -70,7 +60,7 @@
                 </Grid>
                 
                 <!-- Content -->
-                <StackPanel Margin="56,0,0,0">
+                <StackPanel Margin="20,0,0,0">
                     <CheckBox IsChecked="{Binding Settings.SyncHashesWithCDTB, Mode=TwoWay}" 
                               Content="Synchronization with CDTB" 
                               Style="{StaticResource ModernCheckBox}"/>
@@ -93,7 +83,7 @@
         </Border>
 
         <!-- SECTION 2: Automatic Checks -->
-        <Border Style="{StaticResource SectionCardStyle}">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Header -->
                 <Grid Margin="0,0,0,16">
@@ -122,7 +112,7 @@
                 </Grid>
 
                 <!-- Content -->
-                <StackPanel Margin="56,0,0,0">
+                <StackPanel Margin="20,0,0,0">
                     <CheckBox x:Name="checkBoxBackgroundUpdates" 
                               IsChecked="{Binding Settings.BackgroundUpdates, Mode=TwoWay}"
                               Content="Background updates" 
@@ -180,7 +170,7 @@
         </Border>
 
         <!-- SECTION 3: File Management -->
-        <Border Style="{StaticResource SectionCardStyle}">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Header -->
                 <Grid Margin="0,0,0,16">
@@ -209,7 +199,7 @@
                 </Grid>
 
                 <!-- Content -->
-                <StackPanel Margin="56,0,0,0">
+                <StackPanel Margin="20,0,0,0">
                     <CheckBox IsChecked="{Binding Settings.EnableExtraction, Mode=TwoWay}"
                               x:Name="EnableExtractionCheckBox"
                               Content="Auto-extract new files">
@@ -252,7 +242,7 @@
         </Border>
 
         <!-- SECTION 4: Report Generation -->
-        <Border Style="{StaticResource SectionCardStyle}">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Header -->
                 <Grid Margin="0,0,0,16">
@@ -281,7 +271,7 @@
                 </Grid>
 
                 <!-- Content -->
-                <StackPanel Margin="56,0,0,0">
+                <StackPanel Margin="20,0,0,0">
                     <CheckBox x:Name="ReportGenerationCheckBox"
                               IsChecked="{Binding Settings.ReportGeneration.Enabled, Mode=TwoWay}" 
                               Content="Generate asset report">

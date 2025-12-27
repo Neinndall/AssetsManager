@@ -109,5 +109,7 @@ namespace AssetsManager.Views
 
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = false });
         }
+
+
     }
 }

@@ -15,16 +15,6 @@
             <System:Int32>30</System:Int32>
             <System:Int32>60</System:Int32>
         </x:Array>
-
-        <!-- Local style for the Settings Card -->
-        <Style x:Key="SectionCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="20"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
-        </Style>
     </UserControl.Resources>
 
     <StackPanel>
@@ -41,7 +31,7 @@
         </StackPanel>
 
         <!-- SECTION 1: Asset Tracker -->
-        <Border Style="{StaticResource SectionCardStyle}">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Header -->
                 <Grid Margin="0,0,0,16">
@@ -70,7 +60,7 @@
                 </Grid>
 
                 <!-- Content -->
-                <StackPanel Margin="56,0,0,0">
+                <StackPanel Margin="20,0,0,0">
                     <CheckBox x:Name="EnableAssetTrackerCheckBox"
                               IsChecked="{Binding Settings.AssetTrackerTimer, Mode=TwoWay}"
                               Content="Automatic CDN asset tracking"
@@ -119,7 +109,7 @@
         </Border>
 
         <!-- SECTION 2: PBE Status -->
-        <Border Style="{StaticResource SectionCardStyle}">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Header -->
                 <Grid Margin="0,0,0,16">
@@ -148,7 +138,7 @@
                 </Grid>
 
                 <!-- Content -->
-                <StackPanel Margin="56,0,0,0">
+                <StackPanel Margin="20,0,0,0">
                     <CheckBox x:Name="EnablePbeStatusCheckBox"
                               IsChecked="{Binding Settings.CheckPbeStatus, Mode=TwoWay}"
                               Content="Automatic PBE status alerts"
@@ -197,7 +187,7 @@
         </Border>
 
         <!-- SECTION 3: API Settings -->
-        <Border Style="{StaticResource SectionCardStyle}">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Header -->
                 <Grid Margin="0,0,0,16">
@@ -226,7 +216,7 @@
                 </Grid>
 
                 <!-- Content -->
-                <StackPanel Margin="56,0,0,0">
+                <StackPanel Margin="20,0,0,0">
                     <CheckBox IsChecked="{Binding Settings.ApiSettings.UsePbeForApi, Mode=TwoWay}"
                               Content="Authenticate via PBE Client"
                               Style="{StaticResource ModernCheckBox}"/>
@@ -240,7 +230,7 @@
         </Border>
 
         <!-- SECTION 4: Application Behavior -->
-        <Border Style="{StaticResource SectionCardStyle}">
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Header -->
                 <Grid Margin="0,0,0,16">
@@ -269,7 +259,7 @@
                 </Grid>
 
                 <!-- Content -->
-                <StackPanel Margin="56,0,0,0">
+                <StackPanel Margin="20,0,0,0">
                     <CheckBox IsChecked="{Binding Settings.MinimizeToTrayOnClose, Mode=TwoWay}" 
                               Content="Minimize to system tray on close" 
                               Style="{StaticResource ModernCheckBox}"/>

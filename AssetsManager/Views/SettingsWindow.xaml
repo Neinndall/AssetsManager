@@ -96,37 +96,41 @@
             </ScrollViewer>
 
             <!-- Bottom Action Bar -->
-            <Border Grid.Row="1" 
-                  Background="{StaticResource CardBackground}"
-                  BorderBrush="{StaticResource BorderColor}"
-                  BorderThickness="0,1,0,0"
-                  Padding="32,16">
+            <Border Grid.Row="1"
+                    Background="{StaticResource CardBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="0,1,0,0"
+                    Padding="32,16">
                 <Grid>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                    
-                        <materialIcons:MaterialIcon Kind="LightbulbOn" 
-                                                     FontSize="12" 
-                                                     Margin="0,0,8,0" 
-                                                     VerticalAlignment="Center"
-                                                     Foreground="Gold"/>
-                        <TextBlock Text="Changes aren´t applied immediately"
-                                 Foreground="{StaticResource TextMuted}" 
-                                 FontSize="12" 
-                                 VerticalAlignment="Center"/>
+                    <!-- Left: Informational Text -->
+                    <StackPanel Orientation="Horizontal" 
+                                HorizontalAlignment="Left" 
+                                VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="InformationOutline" 
+                                                    Foreground="{StaticResource TextMuted}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                        <TextBlock Text="Changes aren't applied until you click Save"
+                                   Foreground="{StaticResource TextMuted}" 
+                                   FontSize="12"
+                                   VerticalAlignment="Center"/>
                     </StackPanel>
-                    
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    
+
+                    <!-- Right: Action Buttons -->
+                    <StackPanel Orientation="Horizontal" 
+                                HorizontalAlignment="Right">
                         <Button x:Name="BtnResetDefaults" 
-                              Content="Reset to Defaults"
-                              Margin="0,0,12,0"
-                              Click="BtnResetDefaults_Click"
-                              Style="{StaticResource SecondaryButton}"/>
-                        
+                                Content="Reset Defaults"
+                                Click="BtnResetDefaults_Click"
+                                Style="{StaticResource SecondaryButton}"/>
+
+
+
                         <Button x:Name="btnSave" 
-                              Content="Save Changes"
-                              Click="btnSave_Click"
-                              Style="{StaticResource ModernButton}"/>
+                                Content="Save Changes"
+                                Margin="8,0,0,0"
+                                Click="btnSave_Click"
+                                Style="{StaticResource ModernButton}"/>
                     </StackPanel>
                 </Grid>
             </Border>

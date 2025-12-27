@@ -6,37 +6,50 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="800" d:DesignWidth="800">
+
     <StackPanel>
         <!-- Page Header -->
         <StackPanel Margin="0,0,0,24">
             <TextBlock Text="Default Paths" 
-                         FontSize="28" 
-                         FontWeight="Medium" 
-                         Foreground="{StaticResource TextPrimary}"
-                         Margin="0,4,0,0"/>
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Foreground="{StaticResource TextPrimary}"
+                       Margin="0,0,0,4"/>
             <TextBlock Text="Configure default directories for the application" 
-                         FontSize="14" 
-                         Foreground="{StaticResource TextMuted}"
-                         Margin="0,2,0,0"/>
+                       FontSize="14" 
+                       Foreground="{StaticResource TextSecondary}"/>
         </StackPanel>
 
-        <!-- Paths Configuration Section -->
-        <Border Style="{StaticResource SettingsCard}" Padding="30">
+        <!-- SECTION 1: Hash Directories -->
+        <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
-                <!-- New Hash Directory -->
-                <StackPanel Margin="0,0,0,30">
+                <!-- Header -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="40" Height="40">
+                        <materialIcons:MaterialIcon Kind="FolderZipOutline" Foreground="{StaticResource AccentPurple}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="Hash Directories" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Locations for managing hash files" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+                
+                <!-- Content - New Hash Directory -->
+                <StackPanel Margin="20,0,0,16">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderPlus" Foreground="{StaticResource AccentGreen}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="New Hash Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Location where new hash files will be stored" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderPlus" Foreground="{StaticResource AccentGreen}" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="New Hash Directory" FontSize="14" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </Grid>
+                    <TextBlock Text="Location where new hash files will be stored" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -52,19 +65,16 @@
                     </Grid>
                 </StackPanel>
 
-                <!-- Old Hash Directory -->
-                <StackPanel Margin="0,0,0,30">
+                <StackPanel Margin="20,0,0,0">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderMinus" Foreground="{StaticResource AccentOrange}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Old Hash Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Location where existing hash files are located" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderMinus" Foreground="{StaticResource AccentOrange}" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Old Hash Directory" FontSize="14" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </Grid>
+                    <TextBlock Text="Location where existing hash files are located" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -79,20 +89,38 @@
                         </Button>
                     </Grid>
                 </StackPanel>
+            </StackPanel>
+        </Border>
 
-                <!-- LoL Pbe Directory -->
-                <StackPanel Margin="0,0,0,30">
+        <!-- SECTION 2: LoL Directories -->
+        <Border Style="{StaticResource SettingsCard}">
+            <StackPanel>
+                <!-- Header -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="40" Height="40">
+                        <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="League of Legends Client Directories" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Configure paths for League of Legends game clients" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Content - LoL Pbe Directory -->
+                <StackPanel Margin="20,0,0,16">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderSearch" Foreground="{StaticResource AccentBrush}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="LoL PBE Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Directory where League of Legends PBE is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderSearch" Foreground="{StaticResource AccentBrush}" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="LoL PBE Directory" FontSize="14" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </Grid>
+                    <TextBlock Text="Directory where League of Legends PBE is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -108,19 +136,17 @@
                     </Grid>
                 </StackPanel>
 
-                <!-- LoL Live Directory -->
-                <StackPanel Margin="0,0,0,30">
+                <!-- Content - LoL Live Directory -->
+                <StackPanel Margin="20,0,0,0">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderHeart" Foreground="{StaticResource AccentBrush}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="LoL Live Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Directory where League of Legends LIVE is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderHeart" Foreground="{StaticResource AccentBrush}" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="LoL Live Directory" FontSize="14" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </Grid>
+                    <TextBlock Text="Directory where League of Legends LIVE is installed" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -135,20 +161,38 @@
                         </Button>
                     </Grid>
                 </StackPanel>
+            </StackPanel>
+        </Border>
 
-                <!-- Custom Floor Texture Path -->
-                <StackPanel Margin="0,0,0,30">
+        <!-- SECTION 3: Visual Settings -->
+        <Border Style="{StaticResource SettingsCard}">
+            <StackPanel>
+                <!-- Header -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="40" Height="40">
+                        <materialIcons:MaterialIcon Kind="PaletteOutline" Foreground="{StaticResource AccentBlue}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="Visual Settings" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Customize visual preferences for the application" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Content - Custom Floor Texture Path -->
+                <StackPanel Margin="20,0,0,16">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Image" Foreground="{StaticResource AccentBlue}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Custom Floor Texture" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Path to a custom image file for the 3D viewer's floor" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Image" Foreground="{StaticResource AccentBlue}" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Custom Floor Texture" FontSize="14" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </Grid>
+                    <TextBlock Text="Path to a custom image file for the 3D viewer's floor" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -164,19 +208,17 @@
                     </Grid>
                 </StackPanel>
 
-                <!-- Default Extracted Select Directory -->
-                <StackPanel>
+                <!-- Content - Default Extracted Select Directory -->
+                <StackPanel Margin="20,0,0,0">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Foreground="{StaticResource AccentPurple}" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Default Extracted Directory" FontSize="16" FontWeight="Normal" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Default directory for extracted files" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Foreground="{StaticResource AccentPurple}" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Default Extracted Directory" FontSize="14" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </Grid>
+                    <TextBlock Text="Default directory for extracted files" FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
