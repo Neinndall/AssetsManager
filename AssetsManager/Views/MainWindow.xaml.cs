@@ -110,7 +110,7 @@ namespace AssetsManager.Views
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
 
-            _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, this);
+            _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, StatusTextBlock, ProgressPercentageTextBlock, this);
 
             _logService.SetLogOutput(LogView.richTextBoxLogs);
 
@@ -332,12 +332,14 @@ namespace AssetsManager.Views
                     _notificationMessages.Clear();
                 }
 
-                UpdateNotificationIcon.Visibility = _notificationMessages.Any() ? Visibility.Visible : Visibility.Collapsed;
-                NotificationTextBlock.Text = string.Join(Environment.NewLine, _notificationMessages);
+                NotificationButton.Visibility = _notificationMessages.Any() ? Visibility.Visible : Visibility.Collapsed;
+                string fullMessage = string.Join(" | ", _notificationMessages);
+                NotificationMessageText.Text = fullMessage;
+                NotificationToolTipText.Text = fullMessage;
             });
         }
 
-        private async void UpdateNotificationIcon_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private async void NotificationButton_Click(object sender, RoutedEventArgs e)
         {
             ShowNotification(false);
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))

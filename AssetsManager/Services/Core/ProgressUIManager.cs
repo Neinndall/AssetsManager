@@ -26,6 +26,8 @@ namespace AssetsManager.Services.Core
 
         private Button _progressSummaryButton;
         private MaterialIcon _progressIcon;
+        private TextBlock _statusTextBlock;
+        private TextBlock _progressPercentageTextBlock;
         private Window _owner;
 
         private Storyboard _spinningIconAnimationStoryboard;
@@ -54,10 +56,12 @@ namespace AssetsManager.Services.Core
             _taskCancellationManager = taskCancellationManager; // Assign new dependency
         }
 
-        public void Initialize(Button progressSummaryButton, MaterialIcon progressIcon, Window owner)
+        public void Initialize(Button progressSummaryButton, MaterialIcon progressIcon, TextBlock statusTextBlock, TextBlock progressPercentageTextBlock, Window owner)
         {
             _progressSummaryButton = progressSummaryButton;
             _progressIcon = progressIcon;
+            _statusTextBlock = statusTextBlock;
+            _progressPercentageTextBlock = progressPercentageTextBlock;
             _owner = owner;
             _progressSummaryButton.Click += ProgressSummaryButton_Click;
         }
@@ -74,11 +78,36 @@ namespace AssetsManager.Services.Core
             _progressDetailsWindow = null;
             _progressSummaryButton = null;
             _progressIcon = null;
+            _statusTextBlock = null;
+            _progressPercentageTextBlock = null;
             _owner = null;
+        }
+
+        private void UpdateStatusBar(string message, int completed = -1, int total = -1)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                if (_statusTextBlock != null) _statusTextBlock.Text = message;
+                
+                if (_progressPercentageTextBlock != null)
+                {
+                    if (completed >= 0 && total > 0)
+                    {
+                        double percentage = (double)completed / total * 100;
+                        _progressPercentageTextBlock.Text = $"{(int)percentage}%";
+                        _progressPercentageTextBlock.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        _progressPercentageTextBlock.Visibility = Visibility.Collapsed;
+                    }
+                }
+            });
         }
 
         public void OnDownloadProgressChanged(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage)
         {
+            UpdateStatusBar($"Downloading: {currentFileName}", completedFiles, totalFiles);
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(completedFiles, totalFiles, currentFileName, isSuccess, errorMessage);
@@ -87,6 +116,7 @@ namespace AssetsManager.Services.Core
 
         public void OnDownloadCompleted()
         {
+            UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
@@ -104,6 +134,8 @@ namespace AssetsManager.Services.Core
                 _progressSummaryButton.Visibility = Visibility.Visible;
                 _progressSummaryButton.ToolTip = "Click to see comparison details";
 
+                UpdateStatusBar("Comparing WADs...", 0, totalFiles);
+
                 if (_spinningIconAnimationStoryboard == null)
                 {
                     var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
@@ -118,13 +150,13 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "Compare";
                 _progressDetailsWindow.HeaderText = "Comparing WADs";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
             });
         }
 
         public void OnComparisonProgressChanged(int completedFiles, string currentFile, bool isSuccess, string errorMessage)
         {
+            UpdateStatusBar($"Comparing: {currentFile}", completedFiles, _totalFiles);
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(completedFiles, _totalFiles, currentFile, isSuccess, errorMessage);
@@ -133,6 +165,7 @@ namespace AssetsManager.Services.Core
 
         public void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath)
         {
+            UpdateStatusBar("");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
@@ -149,6 +182,8 @@ namespace AssetsManager.Services.Core
                 _progressSummaryButton.Visibility = Visibility.Visible;
                 _progressSummaryButton.ToolTip = "Click to see extraction details";
 
+                UpdateStatusBar("Extracting assets...", 0, data.totalFiles);
+
                 if (_spinningIconAnimationStoryboard == null)
                 {
                     var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
@@ -163,13 +198,13 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "PackageDown";
                 _progressDetailsWindow.HeaderText = "Extracting New Assets";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, data.totalFiles, data.message, true, null);
             });
         }
 
         public void OnExtractionProgressChanged(int completedFiles, int totalFiles, string currentFile)
         {
+            UpdateStatusBar($"Extracting: {currentFile}", completedFiles, totalFiles);
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(completedFiles, totalFiles, currentFile, true, null);
@@ -178,6 +213,7 @@ namespace AssetsManager.Services.Core
 
         public void OnExtractionCompleted()
         {
+            UpdateStatusBar("");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
@@ -194,6 +230,8 @@ namespace AssetsManager.Services.Core
                 _progressSummaryButton.Visibility = Visibility.Visible;
                 _progressSummaryButton.ToolTip = "Click to see download details";
 
+                UpdateStatusBar($"Updating {taskName}...");
+
                 if (_spinningIconAnimationStoryboard == null)
                 {
                     var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
@@ -208,13 +246,13 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "Download";
                 _progressDetailsWindow.HeaderText = "Versions Update";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, 0, "Initializing...", true, null);
             });
         }
 
         public void OnVersionDownloadProgressChanged(object sender, (string TaskName, int Progress, string Details) data)
         {
+            UpdateStatusBar($"Downloading {data.TaskName}: {data.Details}");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(0, 1, data.Details, true, null); // Indeterminate progress, update current file
@@ -223,6 +261,7 @@ namespace AssetsManager.Services.Core
 
         public void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
         {
+            UpdateStatusBar("");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
