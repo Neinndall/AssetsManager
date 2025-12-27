@@ -187,44 +187,58 @@ namespace AssetsManager.Services.Core
         {
             if (_outputRichTextBox == null) return;
 
-            var paragraph = new Paragraph { Margin = new Thickness(0) };
+            var paragraph = new Paragraph { Margin = new Thickness(0, 0, 0, 2) }; // Slight spacing between lines
 
-            SolidColorBrush levelColor;
+            Brush levelColor;
             string levelTag;
+
+            // Helper to safe get resource
+            Brush GetBrush(string key) => Application.Current.TryFindResource(key) as Brush ?? Brushes.White;
 
             switch (logEntry.Level)
             {
                 case LogLevel.Info:
-                    levelColor = Brushes.Green;
-                    levelTag = "INFO";
+                    levelColor = GetBrush("AccentBrush"); // Blue-ish
+                    levelTag = "Info";
                     break;
                 case LogLevel.Warning:
-                    levelColor = Brushes.Yellow;
-                    levelTag = "WARNING";
+                    levelColor = GetBrush("AccentOrange");
+                    levelTag = "Warn";
                     break;
                 case LogLevel.Error:
-                    levelColor = Brushes.Red;
-                    levelTag = "ERROR";
+                    levelColor = GetBrush("AccentRed");
+                    levelTag = "Error";
                     break;
                 case LogLevel.Success:
-                    levelColor = Brushes.LightGreen;
-                    levelTag = "SUCCESS";
+                    levelColor = GetBrush("AccentGreen");
+                    levelTag = "Success";
                     break;
                 case LogLevel.Debug:
-                    levelColor = Brushes.LightBlue;
-                    levelTag = "DEBUG";
+                    levelColor = Brushes.Gray;
+                    levelTag = "Debug";
                     break;
                 default:
-                    levelColor = Brushes.White;
-                    levelTag = "UNKNOWN";
+                    levelColor = GetBrush("TextPrimary");
+                    levelTag = "Unknown";
                     break;
             }
 
-            var timestampRun = new Run($"[{logEntry.Timestamp:HH:mm:ss}] ") { Foreground = Brushes.LightGray };
-            var levelRun = new Run($"[{levelTag}] ") { Foreground = levelColor, FontWeight = FontWeights.Medium };
+            // Time: 10:30:15
+            var timestampRun = new Run($"{logEntry.Timestamp:HH:mm:ss}") { Foreground = GetBrush("TextSecondary") };
+            
+            // Separator:  │ 
+            var separatorRun1 = new Run(" │ ") { Foreground = GetBrush("BorderColor") };
+            
+            // Level: Info
+            var levelRun = new Run($"{levelTag}") { Foreground = levelColor, FontWeight = FontWeights.Medium };
+            
+            // Separador:  │ 
+            var separatorRun2 = new Run(" │ ") { Foreground = GetBrush("BorderColor") };
 
             paragraph.Inlines.Add(timestampRun);
+            paragraph.Inlines.Add(separatorRun1);
             paragraph.Inlines.Add(levelRun);
+            paragraph.Inlines.Add(separatorRun2);
 
             if (!string.IsNullOrEmpty(logEntry.ClickablePath) && (File.Exists(logEntry.ClickablePath) || Directory.Exists(logEntry.ClickablePath)))
             {
@@ -243,11 +257,11 @@ namespace AssetsManager.Services.Core
                 if (pathIndex != -1)
                 {
                     // Text before the path
-                    paragraph.Inlines.Add(new Run(fullMessage.Substring(0, pathIndex)));
+                    paragraph.Inlines.Add(new Run(fullMessage.Substring(0, pathIndex)) { Foreground = GetBrush("TextPrimary") });
 
                     // The hyperlink
                     var link = new Hyperlink(new Run(linkText));
-                    link.Foreground = Application.Current.FindResource("AccentBrush") as SolidColorBrush;
+                    link.Foreground = GetBrush("AccentBrush");
                     link.NavigateUri = new Uri(Path.GetFullPath(logEntry.ClickablePath));
                     link.RequestNavigate += (sender, e) =>
                     {
@@ -264,14 +278,14 @@ namespace AssetsManager.Services.Core
                     paragraph.Inlines.Add(link);
 
                     // Text after the path
-                    paragraph.Inlines.Add(new Run(fullMessage.Substring(pathIndex + linkText.Length)));
+                    paragraph.Inlines.Add(new Run(fullMessage.Substring(pathIndex + linkText.Length)) { Foreground = GetBrush("TextPrimary") });
                 }
                 else
                 {
                     // If the linkText/ClickablePath is not found in the message, just append the message and the link
-                    paragraph.Inlines.Add(new Run(fullMessage + " "));
+                    paragraph.Inlines.Add(new Run(fullMessage + " ") { Foreground = GetBrush("TextPrimary") });
                     var link = new Hyperlink(new Run(linkText));
-                    link.Foreground = Application.Current.FindResource("AccentBrush") as SolidColorBrush;
+                    link.Foreground = GetBrush("AccentBrush");
                     link.NavigateUri = new Uri(Path.GetFullPath(logEntry.ClickablePath));
                     link.RequestNavigate += (sender, e) =>
                     {
@@ -290,14 +304,14 @@ namespace AssetsManager.Services.Core
             }
             else
             {
-                paragraph.Inlines.Add(new Run(logEntry.Message));
+                paragraph.Inlines.Add(new Run(logEntry.Message) { Foreground = GetBrush("TextPrimary") });
             }
 
             if (logEntry.Exception != null)
             {
                 var exceptionDetailRun = new Run(" See application_errors.log for more details.")
                 {
-                    Foreground = Brushes.OrangeRed,
+                    Foreground = GetBrush("AccentOrange"),
                     FontStyle = FontStyles.Italic
                 };
                 paragraph.Inlines.Add(exceptionDetailRun);
