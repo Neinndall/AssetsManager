@@ -6,7 +6,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:System="clr-namespace:System;assembly=mscorlib"
              mc:Ignorable="d" 
-             d:DesignHeight="500" d:DesignWidth="850">
+             d:DesignHeight="800" d:DesignWidth="850">
 
     <UserControl.Resources>
         <x:Array x:Key="UpdateFrequencies" Type="{x:Type System:Int32}">
@@ -15,205 +15,269 @@
             <System:Int32>30</System:Int32>
             <System:Int32>60</System:Int32>
         </x:Array>
+
+        <!-- Local style for the Settings Card -->
+        <Style x:Key="SectionCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
     </UserControl.Resources>
 
     <StackPanel>
         <!-- Page Header -->
-        <StackPanel Margin="0,0,0,32">
+        <StackPanel Margin="0,0,0,24">
             <TextBlock Text="Advanced Settings" 
-                         FontSize="28" 
-                         FontWeight="Medium" 
-                         Foreground="{StaticResource TextPrimary}"
-                         Margin="0,4,0,0"/>
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Foreground="{StaticResource TextPrimary}"
+                       Margin="0,0,0,4"/>
             <TextBlock Text="Performance and advanced configuration options" 
-                         FontSize="14" 
-                         Foreground="{StaticResource TextMuted}"
-                         Margin="0,2,0,0"/>
+                       FontSize="14" 
+                       Foreground="{StaticResource TextSecondary}"/>
         </StackPanel>
 
-        <!-- Unified Settings Card -->
-        <Border Style="{StaticResource SettingsCard}">
+        <!-- SECTION 1: Asset Tracker -->
+        <Border Style="{StaticResource SectionCardStyle}">
             <StackPanel>
-                <!-- Asset Tracker Section -->
-                <StackPanel Margin="0,0,0,16">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <!-- Header -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="40" Height="40">
                         <materialIcons:MaterialIcon Kind="TimerCogOutline" 
                                                    Foreground="{StaticResource AccentOrange}"
-                                                   FontSize="20" 
-                                                   Margin="0,0,12,0" 
-                                                   VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="Asset Tracker" 
-                                     FontSize="18" 
-                                     FontWeight="Normal"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Configure background search frequency" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
+                                                   Width="20" Height="20"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="Asset Tracker" 
+                                   FontSize="16" 
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Configure background search frequency" 
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextMuted}"
+                                   Margin="0,2,0,0"/>
                     </StackPanel>
+                </Grid>
 
-                    <StackPanel Margin="10,0,0,0">
-                        <CheckBox x:Name="EnableAssetTrackerCheckBox"
-                                  IsChecked="{Binding Settings.AssetTrackerTimer, Mode=TwoWay}"
-                                  Content="Automatic CDN asset tracking"
-                                  Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Automatically check for and discover new assets on Riot's CDN"
-                                     Foreground="{StaticResource TextMuted}" 
-                                     FontSize="12" 
-                                     Margin="27,0,0,6" 
-                                     TextWrapping="Wrap"/>
+                <!-- Content -->
+                <StackPanel Margin="56,0,0,0">
+                    <CheckBox x:Name="EnableAssetTrackerCheckBox"
+                              IsChecked="{Binding Settings.AssetTrackerTimer, Mode=TwoWay}"
+                              Content="Automatic CDN asset tracking"
+                              Style="{StaticResource ModernCheckBox}"/>
+                    <TextBlock Text="Automatically check for and discover new assets on Riot's CDN"
+                               Foreground="{StaticResource TextMuted}" 
+                               FontSize="12" 
+                               Margin="28,4,0,12" 
+                               TextWrapping="Wrap"/>
 
-                        <!-- Interval Settings Container -->
-                        <StackPanel Margin="27,5,0,8">
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked, ElementName=EnableAssetTrackerCheckBox}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </StackPanel.Style>
+                    <!-- Interval Settings Container -->
+                    <StackPanel Margin="28,0,0,0">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=EnableAssetTrackerCheckBox}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
 
-                            <TextBlock Text="Update Interval (in minutes)" 
-                                         Foreground="{StaticResource TextSecondary}" 
-                                         FontSize="12" 
-                                         Margin="0,0,0,4"/>
-                            <TextBlock Text="Specify the desired time between background searches"
-                                         Foreground="{StaticResource TextMuted}" 
-                                         FontSize="12" 
-                                         Margin="0,0,0,10"
-                                         TextWrapping="Wrap"/>
-                            <ComboBox SelectedItem="{Binding Settings.AssetTrackerFrequency, Mode=TwoWay}" 
-                                      Width="150" 
-                                      HorizontalAlignment="Left"
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Search Interval" 
+                                           Foreground="{StaticResource TextSecondary}" 
+                                           FontSize="13"/>
+                                <TextBlock Text="Time in minutes between checks"
+                                           Foreground="{StaticResource TextMuted}" 
+                                           FontSize="11"/>
+                            </StackPanel>
+                            <ComboBox Grid.Column="1"
+                                      SelectedItem="{Binding Settings.AssetTrackerFrequency, Mode=TwoWay}" 
+                                      Width="100" 
                                       Style="{StaticResource ModernComboBox}"
                                       ItemsSource="{StaticResource UpdateFrequencies}"/>
-                        </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </StackPanel>
+            </StackPanel>
+        </Border>
 
-                <!-- PBE Status Checker Section -->
-                <StackPanel Margin="0,0,0,16">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+        <!-- SECTION 2: PBE Status -->
+        <Border Style="{StaticResource SectionCardStyle}">
+            <StackPanel>
+                <!-- Header -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="40" Height="40">
                         <materialIcons:MaterialIcon Kind="LanPending"
                                                    Foreground="{StaticResource AccentPurple}"
-                                                   FontSize="20"
-                                                   Margin="0,0,12,0"
-                                                   VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="PBE Status"
-                                     FontSize="18"
-                                     FontWeight="Normal"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Get notifications about PBE status"
-                                     FontSize="12"
-                                     Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
+                                                   Width="20" Height="20"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="PBE Status"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Get notifications about PBE status"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextMuted}"
+                                   Margin="0,2,0,0"/>
                     </StackPanel>
+                </Grid>
 
-                    <StackPanel Margin="10,0,0,0">
-                        <CheckBox x:Name="EnablePbeStatusCheckBox"
-                                  IsChecked="{Binding Settings.CheckPbeStatus, Mode=TwoWay}"
-                                  Content="Automatic PBE status alerts"
-                                  Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Stay updated on PBE maintenance and server status changes"
-                                     Foreground="{StaticResource TextMuted}"
-                                     FontSize="12"
-                                     Margin="27,0,0,6"
-                                     TextWrapping="Wrap"/>
+                <!-- Content -->
+                <StackPanel Margin="56,0,0,0">
+                    <CheckBox x:Name="EnablePbeStatusCheckBox"
+                              IsChecked="{Binding Settings.CheckPbeStatus, Mode=TwoWay}"
+                              Content="Automatic PBE status alerts"
+                              Style="{StaticResource ModernCheckBox}"/>
+                    <TextBlock Text="Stay updated on PBE maintenance and server status changes"
+                               Foreground="{StaticResource TextMuted}"
+                               FontSize="12"
+                               Margin="28,4,0,12"
+                               TextWrapping="Wrap"/>
 
-                        <!-- Interval Settings Container -->
-                        <StackPanel Margin="27,5,0,8">
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked, ElementName=EnablePbeStatusCheckBox}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </StackPanel.Style>
+                    <!-- Interval Settings Container -->
+                    <StackPanel Margin="28,0,0,0">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=EnablePbeStatusCheckBox}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
 
-                            <TextBlock Text="Update Interval (in minutes)"
-                                         Foreground="{StaticResource TextSecondary}"
-                                         FontSize="12"
-                                         Margin="0,0,0,4"/>
-                            <TextBlock Text="Specify the desired time between background searches"
-                                         Foreground="{StaticResource TextMuted}"
-                                         FontSize="12"
-                                         Margin="0,0,0,10"
-                                         TextWrapping="Wrap"/>
-                            <ComboBox SelectedItem="{Binding Settings.PbeStatusFrequency, Mode=TwoWay}" 
-                                      Width="150" 
-                                      HorizontalAlignment="Left"
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Check Interval"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="13"/>
+                                <TextBlock Text="Time in minutes between checks"
+                                           Foreground="{StaticResource TextMuted}"
+                                           FontSize="11"/>
+                            </StackPanel>
+                            <ComboBox Grid.Column="1"
+                                      SelectedItem="{Binding Settings.PbeStatusFrequency, Mode=TwoWay}" 
+                                      Width="100" 
                                       Style="{StaticResource ModernComboBox}"
                                       ItemsSource="{StaticResource UpdateFrequencies}"/>
-                        </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </StackPanel>
+            </StackPanel>
+        </Border>
 
-                <!-- API Settings Section -->
-                <StackPanel Margin="0,0,0,16">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+        <!-- SECTION 3: API Settings -->
+        <Border Style="{StaticResource SectionCardStyle}">
+            <StackPanel>
+                <!-- Header -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="40" Height="40">
                         <materialIcons:MaterialIcon Kind="Api"
                                                    Foreground="{StaticResource AccentGreen}"
-                                                   FontSize="20"
-                                                   Margin="0,0,12,0"
-                                                   VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="API Settings"
-                                     FontSize="18"
-                                     FontWeight="Normal"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Configure which client to use for API authentication"
-                                     FontSize="12"
-                                     Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </StackPanel>
-                    <StackPanel Margin="10,0,0,0">
-                        <CheckBox IsChecked="{Binding Settings.ApiSettings.UsePbeForApi, Mode=TwoWay}"
-                                  Content="Authenticate via PBE Client"
-                                  Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Use PBE client credentials for LCU API authentication"
-                                     Foreground="{StaticResource TextMuted}"
-                                     FontSize="12"
-                                     Margin="27,0,0,6"
-                                     TextWrapping="Wrap"/>
-                    </StackPanel>
-                </StackPanel>
+                                                   Width="20" Height="20"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
 
-                <!-- Application Behavior Section -->
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="API Settings"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Configure client for API authentication"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextMuted}"
+                                   Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Content -->
+                <StackPanel Margin="56,0,0,0">
+                    <CheckBox IsChecked="{Binding Settings.ApiSettings.UsePbeForApi, Mode=TwoWay}"
+                              Content="Authenticate via PBE Client"
+                              Style="{StaticResource ModernCheckBox}"/>
+                    <TextBlock Text="Use PBE client credentials for LCU API authentication"
+                               Foreground="{StaticResource TextMuted}"
+                               FontSize="12"
+                               Margin="28,4,0,0"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- SECTION 4: Application Behavior -->
+        <Border Style="{StaticResource SectionCardStyle}">
+            <StackPanel>
+                <!-- Header -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="40" Height="40">
                         <materialIcons:MaterialIcon Kind="ApplicationCog" 
                                                    Foreground="{StaticResource AccentBlue}"
-                                                   FontSize="20" 
-                                                   Margin="0,0,12,0" 
-                                                   VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="Application Behavior" 
-                                     FontSize="18" 
-                                     FontWeight="Normal"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Customize how the application opens and closes" 
-                                     FontSize="12" 
-                                     Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
+                                                   Width="20" Height="20"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="Application Behavior" 
+                                   FontSize="16" 
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Customize how the application opens and closes" 
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextMuted}"
+                                   Margin="0,2,0,0"/>
                     </StackPanel>
-                    <StackPanel Margin="10,0,0,0">
-                        <CheckBox IsChecked="{Binding Settings.MinimizeToTrayOnClose, Mode=TwoWay}" 
-                                  Content="Minimize to system tray on close" 
-                                  Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Keep the app running in the background when the window is closed"
-                                     Foreground="{StaticResource TextMuted}"
-                                     FontSize="12"
-                                     Margin="27,0,0,6"
-                                     TextWrapping="Wrap"/>
-                    </StackPanel>
+                </Grid>
+
+                <!-- Content -->
+                <StackPanel Margin="56,0,0,0">
+                    <CheckBox IsChecked="{Binding Settings.MinimizeToTrayOnClose, Mode=TwoWay}" 
+                              Content="Minimize to system tray on close" 
+                              Style="{StaticResource ModernCheckBox}"/>
+                    <TextBlock Text="Keep the app running in the background when the window is closed"
+                               Foreground="{StaticResource TextMuted}"
+                               FontSize="12"
+                               Margin="28,4,0,0"
+                               TextWrapping="Wrap"/>
                 </StackPanel>
             </StackPanel>
         </Border>
