@@ -63,9 +63,11 @@
             </Grid>
         </Border>
 
-        <!-- CUERPO (No ScrollViewer needed here anymore) -->
-        <Grid Grid.Row="1" Margin="32,24,32,0">
-            <comparator:WadComparisonControl x:Name="WadComparisonControl"/>
-        </Grid>
+        <!-- CUERPO -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="32,24,32,24">
+                <comparator:WadComparisonControl x:Name="WadComparisonControl"/>
+            </Grid>
+        </ScrollViewer>
     </Grid>
 </UserControl>

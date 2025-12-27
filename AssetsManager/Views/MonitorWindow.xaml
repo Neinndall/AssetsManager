@@ -51,90 +51,92 @@
         </Border>
 
         <!-- Main Layout with side margins -->
-        <Grid Grid.Row="1" Margin="32,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> <!-- Navigation Selector -->
-                <RowDefinition Height="*"/>    <!-- Content Area -->
-            </Grid.RowDefinitions>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="32,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- Navigation Selector -->
+                    <RowDefinition Height="*"/>    <!-- Content Area -->
+                </Grid.RowDefinitions>
 
-            <!-- 1. NAVIGATION SELECTOR (Segmented) -->
-            <Border Grid.Row="0" Margin="0,18,0,8" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
-                <UniformGrid Columns="7">
-                    <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                    <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                    <RadioButton x:Name="TabHistory" Content="History" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                    <RadioButton x:Name="TabAssetTracker" Content="Tracker" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                    <RadioButton x:Name="TabVersions" Content="Versions" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                    <RadioButton x:Name="TabBackups" Content="Backups" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                    <RadioButton x:Name="TabApi" Content="API Center" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                </UniformGrid>
-            </Border>
+                <!-- 1. NAVIGATION SELECTOR (Segmented) -->
+                <Border Grid.Row="0" Margin="0,18,0,8" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                    <UniformGrid Columns="7">
+                        <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabHistory" Content="History" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabAssetTracker" Content="Tracker" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabVersions" Content="Versions" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabBackups" Content="Backups" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabApi" Content="API Center" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
+                    </UniformGrid>
+                </Border>
 
-            <!-- 2. CONTENT AREA (Direct Grid, no ScrollViewer) -->
-            <Grid Grid.Row="1" Margin="0,10,0,0">
-                <monitorControls:MonitorDashboardControl x:Name="MonitorDashboardControl">
-                    <monitorControls:MonitorDashboardControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabDashboard}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                        </Style>
-                    </monitorControls:MonitorDashboardControl.Style>
-                </monitorControls:MonitorDashboardControl>
+                <!-- 2. CONTENT AREA (Direct Grid, no ScrollViewer) -->
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <monitorControls:MonitorDashboardControl x:Name="MonitorDashboardControl">
+                        <monitorControls:MonitorDashboardControl.Style>
+                            <Style TargetType="UserControl">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabDashboard}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </monitorControls:MonitorDashboardControl.Style>
+                    </monitorControls:MonitorDashboardControl>
 
-                <monitorControls:FileWatcherControl x:Name="FileWatcherControl">
-                    <monitorControls:FileWatcherControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                        </Style>
-                    </monitorControls:FileWatcherControl.Style>
-                </monitorControls:FileWatcherControl>
+                    <monitorControls:FileWatcherControl x:Name="FileWatcherControl">
+                        <monitorControls:FileWatcherControl.Style>
+                            <Style TargetType="UserControl">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </monitorControls:FileWatcherControl.Style>
+                    </monitorControls:FileWatcherControl>
 
-                <monitorControls:HistoryViewControl x:Name="HistoryViewControl">
-                    <monitorControls:HistoryViewControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                        </Style>
-                    </monitorControls:HistoryViewControl.Style>
-                </monitorControls:HistoryViewControl>
+                    <monitorControls:HistoryViewControl x:Name="HistoryViewControl">
+                        <monitorControls:HistoryViewControl.Style>
+                            <Style TargetType="UserControl">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </monitorControls:HistoryViewControl.Style>
+                    </monitorControls:HistoryViewControl>
 
-                <monitorControls:AssetTrackerControl x:Name="AssetTrackerControl">
-                    <monitorControls:AssetTrackerControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                        </Style>
-                    </monitorControls:AssetTrackerControl.Style>
-                </monitorControls:AssetTrackerControl>
+                    <monitorControls:AssetTrackerControl x:Name="AssetTrackerControl">
+                        <monitorControls:AssetTrackerControl.Style>
+                            <Style TargetType="UserControl">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </monitorControls:AssetTrackerControl.Style>
+                    </monitorControls:AssetTrackerControl>
 
-                <monitorControls:ManageVersionsControl x:Name="ManageVersionsControl">
-                    <monitorControls:ManageVersionsControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                        </Style>
-                    </monitorControls:ManageVersionsControl.Style>
-                </monitorControls:ManageVersionsControl>
+                    <monitorControls:ManageVersionsControl x:Name="ManageVersionsControl">
+                        <monitorControls:ManageVersionsControl.Style>
+                            <Style TargetType="UserControl">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </monitorControls:ManageVersionsControl.Style>
+                    </monitorControls:ManageVersionsControl>
 
-                <monitorControls:BackupsControl x:Name="BackupsControl">
-                    <monitorControls:BackupsControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                        </Style>
-                    </monitorControls:BackupsControl.Style>
-                </monitorControls:BackupsControl>
+                    <monitorControls:BackupsControl x:Name="BackupsControl">
+                        <monitorControls:BackupsControl.Style>
+                            <Style TargetType="UserControl">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </monitorControls:BackupsControl.Style>
+                    </monitorControls:BackupsControl>
 
-                <monitorControls:ApiControl x:Name="ApiControl">
-                    <monitorControls:ApiControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                        </Style>
-                    </monitorControls:ApiControl.Style>
-                </monitorControls:ApiControl>
+                    <monitorControls:ApiControl x:Name="ApiControl">
+                        <monitorControls:ApiControl.Style>
+                            <Style TargetType="UserControl">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </monitorControls:ApiControl.Style>
+                    </monitorControls:ApiControl>
+                </Grid>
             </Grid>
-        </Grid>
+        </ScrollViewer>
     </Grid>
 </UserControl>
