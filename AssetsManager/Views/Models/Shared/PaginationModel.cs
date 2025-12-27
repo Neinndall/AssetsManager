@@ -56,7 +56,7 @@ namespace AssetsManager.Views.Models.Shared
 
         public bool CanGoToPreviousPage => CurrentPage > 1;
         public bool CanGoToNextPage => CurrentPage < TotalPages;
-        public string PageInfo => $"{CurrentPage} / {TotalPages}";
+        public string PageInfo => $"Page {CurrentPage} / {TotalPages}";
 
         public void SetFullList(IEnumerable<T> fullList)
         {
