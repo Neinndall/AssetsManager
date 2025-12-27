@@ -470,15 +470,28 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Border" 
-                            Background="{TemplateBinding Background}" 
-                            CornerRadius="4" 
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+                    <Grid>
+                        <Border x:Name="Border" 
+                                Background="{TemplateBinding Background}" 
+                                CornerRadius="4" 
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <!-- Selection Indicator Line -->
+                        <Border x:Name="SelectionLine" 
+                                Height="2" 
+                                Width="60"
+                                Background="{StaticResource AccentBrush}" 
+                                VerticalAlignment="Bottom" 
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,-4"
+                                CornerRadius="1"
+                                Visibility="Collapsed"/>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource CardBackground}"/>
+                            <Setter TargetName="SelectionLine" Property="Visibility" Value="Visible"/>
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
