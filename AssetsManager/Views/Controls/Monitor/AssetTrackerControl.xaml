@@ -62,7 +62,7 @@
                                             </Style>
                                         </Border.Style>
                                     </Border>
-                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="240"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
