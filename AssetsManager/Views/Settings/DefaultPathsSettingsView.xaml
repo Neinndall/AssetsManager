@@ -40,7 +40,7 @@
                 </Grid>
                 
                 <!-- Content - New Hash Directory -->
-                <StackPanel Margin="20,0,0,16">
+                <StackPanel Margin="12,0,0,16">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -62,7 +62,7 @@
                     </Grid>
                 </StackPanel>
 
-                <StackPanel Margin="20,0,0,0">
+                <StackPanel Margin="12,0,0,0">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -105,7 +105,7 @@
                 </Grid>
 
                 <!-- Content - LoL Pbe Directory -->
-                <StackPanel Margin="20,0,0,16">
+                <StackPanel Margin="12,0,0,16">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -128,7 +128,7 @@
                 </StackPanel>
 
                 <!-- Content - LoL Live Directory -->
-                <StackPanel Margin="20,0,0,0">
+                <StackPanel Margin="12,0,0,0">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -171,7 +171,7 @@
                 </Grid>
 
                 <!-- Content - Custom Floor Texture Path -->
-                <StackPanel Margin="20,0,0,16">
+                <StackPanel Margin="12,0,0,16">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -194,7 +194,7 @@
                 </StackPanel>
 
                 <!-- Content - Default Extracted Select Directory -->
-                <StackPanel Margin="20,0,0,0">
+                <StackPanel Margin="12,0,0,0">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>

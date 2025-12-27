@@ -69,8 +69,8 @@
 
                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FolderStarOutline" Foreground="{StaticResource AccentGreen}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="New Directory" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                    <materialIcons:MaterialIcon Kind="FolderStarOutline" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="New Directory" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBox x:Name="newLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
                             </StackPanel>
@@ -88,8 +88,8 @@
                             
                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FolderClockOutline" Foreground="{StaticResource AccentOrange}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Old Directory" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                    <materialIcons:MaterialIcon Kind="FolderClockOutline" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Old Directory" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBox x:Name="oldLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
                             </StackPanel>
@@ -110,8 +110,8 @@
 
                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FileStarOutline" Foreground="{StaticResource AccentGreen}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="New WAD File" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                    <materialIcons:MaterialIcon Kind="FileStarOutline" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="New WAD File" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBox x:Name="newWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
                             </StackPanel>
@@ -129,8 +129,8 @@
 
                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FileClockOutline" Foreground="{StaticResource AccentOrange}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Old WAD File" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                    <materialIcons:MaterialIcon Kind="FileClockOutline" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Old WAD File" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBox x:Name="oldWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
                             </StackPanel>

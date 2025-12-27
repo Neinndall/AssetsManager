@@ -63,7 +63,7 @@
                         <ItemsControl x:Name="MeshesItemsControl">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <GroupBox Style="{DynamicResource SettingsGroupBoxStyle}" Padding="12" Margin="0,0,0,10">
+                                    <GroupBox Style="{DynamicResource SettingsGroupBoxStyle}" Padding="8" Margin="0,0,0,6">
                                         <GroupBox.Header>
                                             <StackPanel Orientation="Horizontal">
                                                 <CheckBox Style="{DynamicResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,8,0"/>
