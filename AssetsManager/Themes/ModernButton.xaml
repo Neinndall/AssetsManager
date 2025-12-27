@@ -52,6 +52,70 @@
         </Setter>
     </Style>
 
+    <!-- Nuevo Estilo Moderno con Indicador Lateral -->
+    <Style x:Key="ModernSidebarNavigationStyle" TargetType="RadioButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Height" Value="46"/>
+        <Setter Property="Margin" Value="0,2"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid>
+                        <!-- Fondo Principal: Diseño de Píldora Simétrica -->
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Margin="8,4,8,4"/>
+
+                        <!-- Indicador Lateral: Píldora Flotante en el margen derecho -->
+                        <Border x:Name="Indicator"
+                                Background="{StaticResource AccentBrush}"
+                                Width="4"
+                                Height="20"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                CornerRadius="2"
+                                Margin="0,0,2,0"
+                                Visibility="Collapsed"/>
+
+                        <!-- Contenido (Icono y Texto) -->
+                        <ContentPresenter VerticalAlignment="Center"
+                                          HorizontalAlignment="Left"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- Estado: Hover (No seleccionado) -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsChecked" Value="False"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                        </MultiTrigger>
+
+                        <!-- Estado: Seleccionado -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="Indicator" Property="Visibility" Value="Visible"/>
+                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                            <!-- Efecto de brillo sutil en el fondo si se desea, opcional -->
+                            <Setter TargetName="Border" Property="Opacity" Value="1.0"/>
+                        </Trigger>
+                        
+                         <!-- Estado: Presionado -->
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource ModernButtonPressedBrush}"/>
+                            <Setter TargetName="Border" Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Navigation Button Style (Windows Options) -->
     <Style x:Key="NavButtonStyle" TargetType="RadioButton">
         <Setter Property="Template">
