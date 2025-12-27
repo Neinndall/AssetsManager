@@ -22,37 +22,46 @@
                 Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1"
-                Padding="32,24">
+                Padding="24,20">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+                
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="Compare" Width="32" Height="32" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}"/>
-                    <StackPanel>
-                        <TextBlock Text="WAD COMPARISON RESULTS" 
-                                   FontSize="24" 
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource AccentBrush}"/>
+                    <Border Background="{DynamicResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="Compare" Width="24" Height="24" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Comparison Results" 
+                                   FontSize="20" 
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock x:Name="summaryTextBlock"
-                                   Text="Loading results..." 
-                                   FontSize="14" 
-                                   Foreground="{StaticResource TextMuted}"/>
+                                   Text="Analyzing differences..." 
+                                   FontSize="13" 
+                                   Foreground="{StaticResource TextSecondary}"
+                                   Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="reloadHashesButton"
                             Content="Reload Hashes" 
-                            Style="{StaticResource ModernButton}"
+                            Style="{StaticResource SecondaryButton}"
+                            Height="36"
+                            Padding="16,0"
                             Click="ReloadHashesButton_Click"
-                            ToolTip="Reloads hashes from the default application path to resolve unknown paths and refresh the tree."/>
+                            ToolTip="Reloads hashes from the default application path"/>
                     <Button x:Name="saveButton"
-                            Content="Save Results"
+                            Content="Save Report"
                             Margin="12,0,0,0"
                             Style="{StaticResource ModernButton}"
+                            Height="36"
+                            Padding="16,0"
                             Click="SaveButton_Click"
-                            ToolTip="Save the full list of differences to a json file"/>
+                            ToolTip="Save the full list of differences to a JSON file"/>
                 </StackPanel>
             </Grid>
         </Border>
