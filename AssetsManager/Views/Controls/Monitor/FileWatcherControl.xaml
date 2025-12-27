@@ -4,64 +4,62 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
-             xmlns:models="clr-namespace:AssetsManager.Views.Models"
-             xmlns:services="clr-namespace:AssetsManager.Services"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="600" d:DesignWidth="800"
-             d:DataContext="{d:DesignInstance Type=services:MonitorService, IsDesignTimeCreatable=True}">
-    <Grid Margin="15">
+             d:DesignHeight="800" d:DesignWidth="800">
+
+    <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="Auto"/> <!-- Toolbar -->
+            <RowDefinition Height="*"/>    <!-- List -->
         </Grid.RowDefinitions>
 
-        <!-- Header con título -->
-        <Border Grid.Row="0" 
-                Style="{StaticResource SettingsCard}"
-                Margin="0,0,0,16">
-            <StackPanel Orientation="Horizontal">
-                <materialIcons:MaterialIcon Kind="FileFind" 
-                                           FontSize="20" 
-                                           Foreground="{StaticResource AccentBrush}"
-                                           Margin="0,0,12,0"
-                                           VerticalAlignment="Center"/>
-                <StackPanel>
-                    <TextBlock Text="File Watcher" 
-                              FontSize="18" 
-                              FontWeight="SemiBold"
-                              Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Monitor files from CDTB for updates" 
-                              FontSize="12" 
-                              Foreground="{StaticResource TextMuted}"/>
+        <!-- 1. HEADER -->
+        <Border Grid.Row="0" Margin="0,0,0,20" Background="{DynamicResource CardBackground}" CornerRadius="12" Padding="24,20" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <Border Grid.Column="0" Background="{DynamicResource HoverColor}" CornerRadius="10" Width="50" Height="50" Margin="0,0,20,0">
+                    <materialIcons:MaterialIcon Kind="EyeSettingsOutline" Width="26" Height="26" Foreground="{DynamicResource AccentBlue}"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="File Watcher" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
+                    <TextBlock Text="Monitor remote CDTB files for real-time updates and differences" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
-            </StackPanel>
+            </Grid>
         </Border>
 
-        <!-- Toolbar -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
-            <Button Content="+ Add URLs" 
-                    Click="AddUrl_Click"
-                    Style="{StaticResource ModernButton}"/>
-            <TextBox x:Name="txtSearch"
-                     Style="{StaticResource StandardSearchBoxStyle}"
-                     Width="180"
-                     Margin="10,0,0,0"
-                     TextChanged="TxtSearch_TextChanged"
-                     />
-        </StackPanel>
+        <!-- 2. TOOLBAR -->
+        <Border Grid.Row="1" Margin="0,0,0,16" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="12" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-        <!-- Cards List -->
+                <Button Grid.Column="0" Content="+ Add Monitor" Click="AddUrl_Click" Style="{DynamicResource ModernButton}" Height="32" Padding="16,0"/>
+                
+                <TextBox Grid.Column="2" x:Name="txtSearch" Style="{DynamicResource StandardSearchBoxStyle}" Width="220" Height="32" TextChanged="TxtSearch_TextChanged" Tag="Filter monitors..."/>
+            </Grid>
+        </Border>
+
+        <!-- 3. MONITORS LIST -->
         <ListView x:Name="MonitoredItemsListView" 
                   Grid.Row="2" 
                   ItemsSource="{Binding MonitoredItems}" 
-                  Style="{StaticResource ModernListView}"
-                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                  ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                  Style="{DynamicResource ModernListView}"
+                  Background="Transparent" BorderThickness="0">
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Margin" Value="0,0,0,8"/>
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="ListViewItem">
@@ -73,56 +71,70 @@
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate>
-                    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="10,8">
+                    <Border Background="{DynamicResource CardBackground}" CornerRadius="10" Padding="16,12" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
                         <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/> <!-- Status Icon -->
+                                <ColumnDefinition Width="*"/>    <!-- Info -->
+                                <ColumnDefinition Width="Auto"/> <!-- Actions -->
                             </Grid.ColumnDefinitions>
 
-                            <!-- Row 1: Status, Alias, Actions -->
-                            <materialIcons:MaterialIcon Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="{Binding StatusText}">
-                                <materialIcons:MaterialIcon.Style>
-                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource {x:Type materialIcons:MaterialIcon}}">
-                                        <Setter Property="FontSize" Value="16" />
-                                        <Setter Property="Kind" Value="HelpCircleOutline" />
-                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date">
-                                                <Setter Property="Kind" Value="CheckCircle" />
-                                                <Setter Property="Foreground" Value="{StaticResource AccentGreen}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusText}" Value="Updated">
-                                                <Setter Property="Kind" Value="ArrowUpCircle" />
-                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusText}" Value="Checking...">
-                                                <Setter Property="Kind" Value="Sync" />
-                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusText}" Value="Error">
-                                                <Setter Property="Kind" Value="AlertCircle" />
-                                                <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </materialIcons:MaterialIcon.Style>
-                            </materialIcons:MaterialIcon>
+                            <!-- Status Indicator -->
+                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="20" Background="{DynamicResource HoverColor}" Margin="0,0,16,0">
+                                <materialIcons:MaterialIcon Width="20" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon.Style>
+                                        <Style TargetType="materialIcons:MaterialIcon">
+                                            <Setter Property="Kind" Value="HelpCircleOutline" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date">
+                                                    <Setter Property="Kind" Value="CheckCircleOutline" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource AccentGreen}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Updated">
+                                                    <Setter Property="Kind" Value="ArrowUpCircleOutline" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Checking...">
+                                                    <Setter Property="Kind" Value="Sync" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Error">
+                                                    <Setter Property="Kind" Value="AlertCircleOutline" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource AccentRed}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </materialIcons:MaterialIcon.Style>
+                                </materialIcons:MaterialIcon>
+                            </Border>
 
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Alias, StringFormat='File: {0}'}" Foreground="{StaticResource TextPrimary}" FontWeight="Normal" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}" />
-
-                            <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="View Changes" Click="ViewChanges_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,5,0" IsEnabled="{Binding HasChanges}" Padding="10,6"/>
-                                <Button Content="Remove" Style="{StaticResource DestructiveButton}" Click="Remove_Click" Padding="10,6"/>
+                            <!-- Info -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Alias}" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="{Binding CombinedStatusAndDate}" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
 
-                            <!-- Row 2: Combined Status and Last Checked -->
-                            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Text="{Binding CombinedStatusAndDate}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0" />
+                            <!-- Actions -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Content="Compare" Click="ViewChanges_Click" 
+                                        Height="30" Padding="12,0" Margin="0,0,8,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasChanges}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                
+                                <Button Click="Remove_Click" Style="{DynamicResource TransparentIconButton}" Width="30" Height="30" ToolTip="Remove Monitor">
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{DynamicResource AccentRed}"/>
+                                </Button>
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </DataTemplate>
