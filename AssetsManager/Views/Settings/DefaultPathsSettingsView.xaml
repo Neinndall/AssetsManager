@@ -56,11 +56,8 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="textBoxNewHashPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.NewHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button x:Name="btnBrowseNew" Grid.Column="1" Click="btnBrowseNew_Click" Style="{StaticResource SecondaryButton}" Padding="12,0">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                            </StackPanel>
+                        <Button x:Name="btnBrowseNew" Grid.Column="1" Click="btnBrowseNew_Click" Style="{StaticResource SecondaryButton}" Width="36" Height="36" Padding="0">
+                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                         </Button>
                     </Grid>
                 </StackPanel>
@@ -81,11 +78,8 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="textBoxOldHashPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.OldHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button x:Name="btnBrowseOld" Grid.Column="1" Click="btnBrowseOld_Click" Style="{StaticResource SecondaryButton}" Padding="12,0">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                            </StackPanel>
+                        <Button x:Name="btnBrowseOld" Grid.Column="1" Click="btnBrowseOld_Click" Style="{StaticResource SecondaryButton}" Width="36" Height="36" Padding="0">
+                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                         </Button>
                     </Grid>
                 </StackPanel>
@@ -127,11 +121,8 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="textBoxLolPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.LolPbeDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button x:Name="btnBrowseLol" Grid.Column="1" Click="btnBrowseLol_Click" Style="{StaticResource SecondaryButton}" Padding="12,0">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                            </StackPanel>
+                        <Button x:Name="btnBrowseLol" Grid.Column="1" Click="btnBrowseLol_Click" Style="{StaticResource SecondaryButton}" Width="36" Height="36" Padding="0">
+                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                         </Button>
                     </Grid>
                 </StackPanel>
@@ -153,11 +144,8 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="textBoxLolLivePath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.LolLiveDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button x:Name="btnBrowseLolLive" Grid.Column="1" Click="btnBrowseLolLive_Click" Style="{StaticResource SecondaryButton}" Padding="12,0">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                            </StackPanel>
+                        <Button x:Name="btnBrowseLolLive" Grid.Column="1" Click="btnBrowseLolLive_Click" Style="{StaticResource SecondaryButton}" Width="36" Height="36" Padding="0">
+                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                         </Button>
                     </Grid>
                 </StackPanel>
@@ -199,11 +187,8 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="textBoxCustomFloorTexturePath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.CustomFloorTexturePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button x:Name="btnBrowseCustomFloorTexture" Grid.Column="1" Click="btnBrowseCustomFloorTexture_Click" Style="{StaticResource SecondaryButton}" Padding="12,0">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                            </StackPanel>
+                        <Button x:Name="btnBrowseCustomFloorTexture" Grid.Column="1" Click="btnBrowseCustomFloorTexture_Click" Style="{StaticResource SecondaryButton}" Width="36" Height="36" Padding="0">
+                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                         </Button>
                     </Grid>
                 </StackPanel>
@@ -225,11 +210,8 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="textBoxDefaultExtractedPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Margin="0,0,12,0" Text="{Binding Settings.DefaultExtractedSelectDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button x:Name="btnBrowseDefaultExtracted" Grid.Column="1" Click="btnBrowseDefaultExtracted_Click" Style="{StaticResource SecondaryButton}" Padding="12,0">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                            </StackPanel>
+                        <Button x:Name="btnBrowseDefaultExtracted" Grid.Column="1" Click="btnBrowseDefaultExtracted_Click" Style="{StaticResource SecondaryButton}" Width="36" Height="36" Padding="0">
+                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                         </Button>
                     </Grid>
                 </StackPanel>
