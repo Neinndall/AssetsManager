@@ -20,44 +20,60 @@
                 Background="{StaticResource SidebarBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,1,0">
-            <StackPanel>
-                <!-- Header -->
-                <Border Background="{StaticResource CardBackground}" 
-                        BorderBrush="{StaticResource BorderColor}"
+            <StackPanel Margin="0,0,0,0">
+                <!-- Header Elaborado -->
+                <Border Padding="16,32,12,24" 
+                        BorderBrush="{StaticResource BorderColor}" 
                         BorderThickness="0,0,0,1"
-                        Padding="20,24">
-                    <StackPanel>
-                        <TextBlock Text="⚙️ SETTINGS" 
-                                  FontSize="16" 
-                                  FontWeight="Bold"
-                                  Foreground="{StaticResource AccentBrush}"/>
-                        <TextBlock Text="Configuration Panel" 
-                                  FontSize="11" 
-                                  Foreground="{StaticResource TextMuted}"
-                                  Margin="0,4,0,0"/>
+                        Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal">
+                        <!-- Icon Box -->
+                        <Border Background="{StaticResource CardBackground}" 
+                                CornerRadius="8" 
+                                Width="44" Height="44"
+                                BorderBrush="{StaticResource BorderColor}"
+                                BorderThickness="1">
+                            <materialIcons:MaterialIcon Kind="CogOutline" 
+                                                       Width="22" Height="22" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- Titles -->
+                        <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                            <TextBlock Text="SETTINGS" 
+                                       FontWeight="Bold" 
+                                       FontSize="14" 
+                                       Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Configuration Panel" 
+                                       FontSize="11" 
+                                       Foreground="{StaticResource TextSecondary}" 
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <!-- Navigation Items -->
-                <StackPanel Margin="0,16,0,0">
+                <StackPanel>
                     <RadioButton x:Name="NavGeneral" 
                                Content="General" 
-                               Tag="🔧"
+                               Tag="Wrench"
                                GroupName="Navigation" 
                                IsChecked="True" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                     
                     <RadioButton x:Name="NavAdvanced" 
                                Content="Advanced" 
-                               Tag="⚡"
+                               Tag="Flash"
                                GroupName="Navigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                     
                     <RadioButton x:Name="NavDefaultPaths" 
                                Content="Default Paths" 
-                               Tag="📁"
+                               Tag="Folder"
                                GroupName="Navigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                 </StackPanel>
             </StackPanel>
         </Border>

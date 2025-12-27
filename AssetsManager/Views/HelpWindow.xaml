@@ -20,50 +20,66 @@
                 Background="{StaticResource SidebarBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,1,0">
-            <StackPanel>
-                <!-- Header -->
-                <Border Background="{StaticResource CardBackground}" 
-                        BorderBrush="{StaticResource BorderColor}"
+            <StackPanel Margin="0,0,0,0">
+                <!-- Header Elaborado -->
+                <Border Padding="16,32,12,24" 
+                        BorderBrush="{StaticResource BorderColor}" 
                         BorderThickness="0,0,0,1"
-                        Padding="20,24">
-                    <StackPanel>
-                        <TextBlock Text="🔧 HELP" 
-                                  FontSize="16" 
-                                  FontWeight="Bold"
-                                  Foreground="{StaticResource AccentBrush}"/>
-                        <TextBlock Text="Support and Information" 
-                                  FontSize="11" 
-                                  Foreground="{StaticResource TextMuted}"
-                                  Margin="0,4,0,0"/>
+                        Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal">
+                        <!-- Icon Box -->
+                        <Border Background="{StaticResource CardBackground}" 
+                                CornerRadius="8" 
+                                Width="44" Height="44"
+                                BorderBrush="{StaticResource BorderColor}"
+                                BorderThickness="1">
+                            <materialIcons:MaterialIcon Kind="HelpCircleOutline" 
+                                                       Width="22" Height="22" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- Titles -->
+                        <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                            <TextBlock Text="HELP CENTER" 
+                                       FontWeight="Bold" 
+                                       FontSize="14" 
+                                       Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Support &amp; Information" 
+                                       FontSize="11" 
+                                       Foreground="{StaticResource TextSecondary}" 
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <!-- Navigation Items -->
-                <StackPanel Margin="0,16,0,0">
+                <StackPanel>
                     <RadioButton x:Name="NavAbout" 
                                Content="About" 
-                               Tag="ℹ️"
+                               Tag="InformationOutline"
                                GroupName="HelpNavigation" 
                                IsChecked="True" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                     
                     <RadioButton x:Name="NavChangelogs" 
                                Content="Changelogs" 
-                               Tag="📜"
+                               Tag="History"
                                GroupName="HelpNavigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                     
                     <RadioButton x:Name="NavBugsReport" 
                                Content="Bug Reports" 
-                               Tag="🐛"
+                               Tag="BugOutline"
                                GroupName="HelpNavigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                     
                     <RadioButton x:Name="NavUpdates" 
                                Content="Updates" 
-                               Tag="🔄"
+                               Tag="Update"
                                GroupName="HelpNavigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                 </StackPanel>
             </StackPanel>
         </Border>

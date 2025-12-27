@@ -69,41 +69,79 @@
         </Setter>
     </Style>
 
-    <!-- Navigation Button Style (Windows Options) -->
-    <Style x:Key="NavButtonStyle" TargetType="RadioButton">
+    <!-- Estilo para Pestañas de Configuración (Settings) -->
+    <Style x:Key="SettingsTabStyle" TargetType="RadioButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Height" Value="42"/>
+        <Setter Property="Margin" Value="0,1"/>
+        <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Border" 
-                            Background="Transparent" 
-                            BorderThickness="0,0,3,0"
-                            Padding="20,12">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock x:Name="Icon" 
-                                      Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
-                                      FontSize="16" 
-                                      Margin="0,0,12,0"
-                                      VerticalAlignment="Center"/>
-                            <TextBlock x:Name="Text" 
-                                      Text="{TemplateBinding Content}"
-                                      FontSize="13"
+                    <Grid>
+                        <!-- Fondo Píldora Simétrica -->
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Margin="12,2,12,2"/>
+
+                        <!-- Indicador Flotante (Derecha) -->
+                        <Border x:Name="Indicator"
+                                Background="{StaticResource AccentBrush}"
+                                Width="3"
+                                Height="18"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                CornerRadius="1.5"
+                                Margin="0,0,4,0"
+                                Visibility="Collapsed"/>
+
+                        <Grid VerticalAlignment="Center" Margin="24,0,20,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- Icono (desde Tag) -->
+                            <materialIcons:MaterialIcon Grid.Column="0" 
+                                                        Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" 
+                                                        Width="18" Height="18" 
+                                                        Margin="0,0,12,0"
+                                                        VerticalAlignment="Center"
+                                                        Opacity="0.8"/>
+                            
+                            <!-- Texto -->
+                            <TextBlock Grid.Column="1" 
+                                      Text="{TemplateBinding Content}" 
+                                      FontSize="13" 
                                       FontWeight="Normal"
                                       VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
+                        </Grid>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
+                        <!-- Hover -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsChecked" Value="False"/>
+                            </MultiTrigger.Conditions>
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
-                        </Trigger>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                        </MultiTrigger>
+
+                        <!-- Selected -->
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
-                            <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="Text" Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="Icon" Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Indicator" Property="Visibility" Value="Visible"/>
+                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                         </Trigger>
-                        <Trigger Property="IsChecked" Value="False">
-                            <Setter TargetName="Text" Property="Foreground" Value="{StaticResource TextSecondary}"/>
-                            <Setter TargetName="Icon" Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                        
+                         <!-- Pressed -->
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource ModernButtonPressedBrush}"/>
+                            <Setter TargetName="Border" Property="Opacity" Value="0.4"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
