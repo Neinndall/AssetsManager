@@ -27,14 +27,15 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Icono con Brillo -->
-                <materialIcons:MaterialIcon Kind="FileCompare"
+                <materialIcons:MaterialIcon x:Name="CompIcon"
+                                             Kind="FileCompare"
                                              Height="48"
                                              Width="48"
                                              VerticalAlignment="Center"
                                              Foreground="{StaticResource AccentBrush}"
                                              Grid.Column="0">
                     <materialIcons:MaterialIcon.Effect>
-                        <DropShadowEffect Color="{Binding Color, Source={StaticResource AccentBrush}}" 
+                        <DropShadowEffect Color="{Binding Foreground.Color, ElementName=CompIcon}" 
                                           BlurRadius="15" 
                                           ShadowDepth="0" 
                                           Opacity="0.4"/>
@@ -62,15 +63,9 @@
             </Grid>
         </Border>
 
-        <!-- CUERPO -->
-        <ScrollViewer Grid.Row="1" 
-                      Background="Transparent"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled"
-                      Padding="32,24,32,0">
-            <StackPanel>
-                <comparator:WadComparisonControl x:Name="WadComparisonControl"/>
-            </StackPanel>
-        </ScrollViewer>
+        <!-- CUERPO (No ScrollViewer needed here anymore) -->
+        <Grid Grid.Row="1" Margin="32,24,32,0">
+            <comparator:WadComparisonControl x:Name="WadComparisonControl"/>
+        </Grid>
     </Grid>
 </UserControl>

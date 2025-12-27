@@ -39,8 +39,10 @@
                         BorderBrush="{StaticResource BorderColor}"
                         BorderThickness="0,0,0,1"
                         Padding="0">
-                    <ContentControl x:Name="MainContentArea"
-                                    Background="Transparent"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ContentControl x:Name="MainContentArea"
+                                        Background="Transparent"/>
+                    </ScrollViewer>
                 </Border>
 
                 <GridSplitter Grid.Row="1"

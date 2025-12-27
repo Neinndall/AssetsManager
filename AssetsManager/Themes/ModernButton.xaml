@@ -481,11 +481,6 @@
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource CardBackground}"/>
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
-                            <Setter TargetName="Border" Property="Effect">
-                                <Setter.Value>
-                                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.1" Color="Black"/>
-                                </Setter.Value>
-                            </Setter>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>

@@ -40,7 +40,7 @@
                         </StackPanel>
 
                         <!-- Segmented Control -->
-                        <Border Grid.Column="2" Background="{StaticResource HoverColor}" CornerRadius="6" Padding="3" VerticalAlignment="Center">
+                        <Border Grid.Column="2" Background="{DynamicResource SidebarBackground}" CornerRadius="6" Padding="3" VerticalAlignment="Center" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton x:Name="ModeDirectory" 
                                              Content="Directory" 
