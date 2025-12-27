@@ -23,7 +23,7 @@
             </Grid.RowDefinitions>
 
             <!-- Header Limpio y Moderno -->
-            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" MouseDown="TitleBar_MouseDown">
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="8,8,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" MouseDown="TitleBar_MouseDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -31,9 +31,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,0">
-                             <materialIcons:MaterialIcon x:Name="iconType" Kind="QuestionMarkCircle" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource AccentBrush}" Width="16" Height="16"/>
-                        </Border>
+                        <materialIcons:MaterialIcon x:Name="iconType" Kind="QuestionMarkCircle" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Margin="0,0,10,0"/>
                         <TextBlock Grid.Column="1" Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
@@ -49,16 +47,18 @@
             </Border>
 
             <!-- Content Area -->
-            <Grid Grid.Row="1" Margin="24,24,24,12">
-                <TextBlock x:Name="textBlockMessage" 
-                           TextWrapping="Wrap" 
-                           Foreground="{StaticResource TextPrimary}" 
-                           FontSize="13"
-                           LineHeight="20"/>
-            </Grid>
+            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}">
+                 <Grid Margin="24,24,24,12">
+                    <TextBlock x:Name="textBlockMessage" 
+                               TextWrapping="Wrap" 
+                               Foreground="{StaticResource TextPrimary}" 
+                               FontSize="13"
+                               LineHeight="20"/>
+                </Grid>
+            </Border>
 
             <!-- Footer / Actions -->
-            <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,8,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="16">
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,8,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="16">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <StackPanel x:Name="YesNoButtons" Orientation="Horizontal">
                         <Button x:Name="btnNo" Content="No" Style="{StaticResource SecondaryButton}" Width="80" Click="btnNo_Click"/>

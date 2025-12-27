@@ -54,7 +54,7 @@
                     <TextBlock Text="COMPARATOR" 
                                FontSize="24" 
                                FontWeight="Bold"
-                               Foreground="{StaticResource AccentBrush}"/>
+                               Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Compare WAD files and view differences"
                                FontSize="12" 
                                Foreground="{StaticResource TextSecondary}"

@@ -23,7 +23,7 @@
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" MouseDown="TitleBar_MouseDown">
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="8,8,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" MouseDown="TitleBar_MouseDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -31,9 +31,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,0">
-                            <materialIcons:MaterialIcon Kind="TextBoxEdit" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource AccentBrush}" Width="16" Height="16"/>
-                        </Border>
+                        <materialIcons:MaterialIcon Kind="TextBoxEdit" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Margin="0,0,10,0"/>
                         <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
@@ -49,19 +47,21 @@
             </Border>
 
             <!-- Input Area -->
-            <StackPanel Grid.Row="1" Margin="24">
-                <TextBlock Name="textBlockQuestion" TextWrapping="Wrap" Margin="0,0,0,12" Foreground="{StaticResource TextSecondary}" FontSize="13"/>
-                <TextBox Name="textBoxInput" 
-                         Style="{StaticResource ModernTextBoxEditable}" 
-                         AcceptsReturn="True" 
-                         TextWrapping="NoWrap" 
-                         VerticalScrollBarVisibility="Auto" 
-                         MinHeight="36" MaxHeight="200"
-                         Padding="8"/>
-            </StackPanel>
+            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}">
+                <StackPanel Margin="24">
+                    <TextBlock Name="textBlockQuestion" TextWrapping="Wrap" Margin="0,0,0,12" Foreground="{StaticResource TextSecondary}" FontSize="13"/>
+                    <TextBox Name="textBoxInput" 
+                             Style="{StaticResource ModernTextBoxEditable}" 
+                             AcceptsReturn="True" 
+                             TextWrapping="NoWrap" 
+                             VerticalScrollBarVisibility="Auto" 
+                             MinHeight="36" MaxHeight="200"
+                             Padding="8"/>
+                </StackPanel>
+            </Border>
 
             <!-- Footer -->
-            <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,8,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="16">
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,8,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="16">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Name="btnCancel" Content="Cancel" Width="80" Click="btnCancel_Click" Style="{StaticResource SecondaryButton}"/>
                     <Button Name="btnOk" Content="OK" Width="80" Margin="12,0,0,0" Click="btnOk_Click" Style="{StaticResource ModernButton}"/>

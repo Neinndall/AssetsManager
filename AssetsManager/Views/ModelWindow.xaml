@@ -81,7 +81,7 @@
                     <TextBlock Text="3D MODELS" 
                                FontSize="24" 
                                FontWeight="Bold"
-                               Foreground="{StaticResource AccentBrush}"/>
+                               Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Visualize 3D models with animations and map geometry"
                                FontSize="12" 
                                Foreground="{StaticResource TextSecondary}"

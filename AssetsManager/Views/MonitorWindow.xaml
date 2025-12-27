@@ -44,7 +44,7 @@
                 <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="12,8" VerticalAlignment="Stretch"/>
 
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="MONITOR CENTER" FontSize="24" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                    <TextBlock Text="MONITOR CENTER" FontSize="24" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Track PBE status, remote data changes and live asset updates" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
                 </StackPanel>
             </Grid>

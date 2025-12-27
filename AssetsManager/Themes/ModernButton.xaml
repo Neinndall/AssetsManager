@@ -191,6 +191,9 @@
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Height" Value="Auto"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="Padding" Value="10"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">

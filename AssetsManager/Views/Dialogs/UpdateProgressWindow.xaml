@@ -22,7 +22,7 @@
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" MouseDown="TitleBar_MouseDown">
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="8,8,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" MouseDown="TitleBar_MouseDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -30,9 +30,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,0">
-                            <materialIcons:MaterialIcon Kind="CloudDownload" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource AccentBrush}" Width="16" Height="16"/>
-                        </Border>
+                        <materialIcons:MaterialIcon Kind="CloudDownload" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Margin="0,0,10,0"/>
                         <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
@@ -48,26 +46,28 @@
             </Border>
 
             <!-- Content -->
-            <Grid Grid.Row="1" Margin="24,32,24,32">
-                <StackPanel>
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <TextBlock x:Name="MessageTextBlock" 
-                                   Text="Initializing download..." 
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   FontSize="13"
-                                   VerticalAlignment="Bottom"/>
-                                   
-                        <!-- Simple Pulse/Loading Indicator could go here if needed, but Text is dynamic -->
-                    </Grid>
+            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}">
+                <Grid Margin="24,32,24,32">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBlock x:Name="MessageTextBlock" 
+                                       Text="Initializing download..." 
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       FontSize="13"
+                                       VerticalAlignment="Bottom"/>
+                                       
+                            <!-- Simple Pulse/Loading Indicator could go here if needed, but Text is dynamic -->
+                        </Grid>
 
-                    <ProgressBar x:Name="DownloadProgressBar" Height="6" Minimum="0" Maximum="100" HorizontalAlignment="Stretch" Style="{DynamicResource ModernProgressBar}" BorderThickness="0"/>
-                </StackPanel>
-            </Grid>
+                        <ProgressBar x:Name="DownloadProgressBar" Height="6" Minimum="0" Maximum="100" HorizontalAlignment="Stretch" Style="{DynamicResource ModernProgressBar}" BorderThickness="0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
         </Grid>
     </Border>
 </Window>
