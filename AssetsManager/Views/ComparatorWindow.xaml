@@ -69,26 +69,6 @@
                       HorizontalScrollBarVisibility="Disabled"
                       Padding="32,24,32,0">
             <StackPanel>
-                <!-- Header Card -->
-                <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,15">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="ToolboxOutline" 
-                                                   FontSize="20" 
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   Margin="0,0,12,0"
-                                                   VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="WAD Comparator" 
-                                       FontSize="18" 
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Analyze and compare game versions to identify differences" 
-                                       FontSize="12" 
-                                       Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
                 <comparator:WadComparisonControl x:Name="WadComparisonControl"/>
             </StackPanel>
         </ScrollViewer>
