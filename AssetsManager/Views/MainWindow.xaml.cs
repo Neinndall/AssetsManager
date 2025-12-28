@@ -110,7 +110,7 @@ namespace AssetsManager.Views
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
 
-            _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, StatusTextBlock, ProgressPercentageTextBlock, this);
+            _progressUIManager.Initialize(ProgressSummaryButton, StatusTextBlock, ProgressPercentageTextBlock, this);
 
             _logService.SetLogOutput(LogView.richTextBoxLogs);
 

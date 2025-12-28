@@ -126,14 +126,20 @@
                                 </StackPanel>
                             </Button>
 
-                            <!-- Progress Tick & Status Message -->
-                            <materialIcons:MaterialIcon x:Name="ReadyIcon" Kind="CheckCircleOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon x:Name="ReadyIcon" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center">
                                 <materialIcons:MaterialIcon.Style>
                                     <Style TargetType="materialIcons:MaterialIcon">
+                                        <!-- Default values moved here -->
+                                        <Setter Property="Kind" Value="CheckCircleOutline"/>
+                                        <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
                                         <Setter Property="Visibility" Value="Visible"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="Cancelling Task...">
+                                                <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                <Setter Property="Foreground" Value="Orange"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -155,6 +161,20 @@
                                                                 Width="16" Height="16"
                                                                 Foreground="{StaticResource AccentBrush}"
                                                                 VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon.Style>
+                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Visibility, ElementName=ProgressSummaryButton}" Value="Visible">
+                                                        <DataTrigger.EnterActions>
+                                                            <BeginStoryboard x:Name="SpinAnimation" Storyboard="{StaticResource SpinningIconAnimation}"/>
+                                                        </DataTrigger.EnterActions>
+                                                        <DataTrigger.ExitActions>
+                                                            <StopStoryboard BeginStoryboardName="SpinAnimation"/>
+                                                        </DataTrigger.ExitActions>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialIcons:MaterialIcon.Style>
                                         <materialIcons:MaterialIcon.RenderTransform>
                                             <RotateTransform CenterX="8" CenterY="8"/>
                                         </materialIcons:MaterialIcon.RenderTransform>
