@@ -21,6 +21,9 @@
     <SolidColorBrush x:Key="BorderColor" Color="#FF3F3F46"/>
     <SolidColorBrush x:Key="HoverColor" Color="#FF3E3E42"/>
     
+    <!-- Dialog Colors -->
+    <SolidColorBrush x:Key="OptionCardBrush" Color="#FF29292C"/> 
+    
     <!-- Colores que usará CustomScrollbarStyles.xaml -->
     <SolidColorBrush x:Key="ScrollBarBackground" Color="#252526" />
     <SolidColorBrush x:Key="ScrollBarThumbBackground" Color="#505050" />
