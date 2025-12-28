@@ -20,14 +20,23 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Icono y texto "Logger" eliminados. Se pueden volver a añadir aquí si es necesario. -->
-                <Button Grid.Column="1"
-                        Style="{StaticResource TransparentIconButton}"
-                        Click="ClearLogs_Click"
-                        ToolTip="Clear Logger">
-                    <materialIcons:MaterialIcon Kind="TrashCan" 
-                                                Width="15" 
-                                                Height="15"/>
-                </Button>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="ClearStatusBar_Click"
+                            ToolTip="Clear Status Bar"
+                            Margin="0,0,4,0">
+                        <materialIcons:MaterialIcon Kind="NotificationClearAll" 
+                                                    Width="15" 
+                                                    Height="15"/>
+                    </Button>
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="ClearLogs_Click"
+                            ToolTip="Clear Logger">
+                        <materialIcons:MaterialIcon Kind="TrashCan" 
+                                                    Width="15" 
+                                                    Height="15"/>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

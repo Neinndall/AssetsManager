@@ -20,5 +20,13 @@ namespace AssetsManager.Views.Controls
         {
             richTextBoxLogs.Document.Blocks.Clear();
         }
+
+        private void ClearStatusBar_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+            {
+                mainWindow.ClearStatusBar();
+            }
+        }
     }
 }

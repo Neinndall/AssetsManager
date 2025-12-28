@@ -165,7 +165,7 @@ namespace AssetsManager.Services.Core
 
         public void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath)
         {
-            UpdateStatusBar("");
+            UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
@@ -213,7 +213,7 @@ namespace AssetsManager.Services.Core
 
         public void OnExtractionCompleted()
         {
-            UpdateStatusBar("");
+            UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
@@ -261,7 +261,7 @@ namespace AssetsManager.Services.Core
 
         public void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
         {
-            UpdateStatusBar("");
+            UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
@@ -278,6 +278,11 @@ namespace AssetsManager.Services.Core
                     _customMessageBoxService.ShowError("Error", data.Message, _owner);
                 }
             });
+        }
+
+        public void ClearStatusText()
+        {
+            UpdateStatusBar("");
         }
 
         private void ProgressSummaryButton_Click(object sender, RoutedEventArgs e)

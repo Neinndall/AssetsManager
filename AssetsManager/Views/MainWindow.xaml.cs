@@ -339,6 +339,11 @@ namespace AssetsManager.Views
             });
         }
 
+        public void ClearStatusBar()
+        {
+            _progressUIManager.ClearStatusText();
+        }
+
         private async void NotificationButton_Click(object sender, RoutedEventArgs e)
         {
             ShowNotification(false);
