@@ -28,7 +28,7 @@
 
                 <!-- Icono con Brillo -->
                 <materialIcons:MaterialIcon x:Name="CompIcon"
-                                             Kind="FileCompare"
+                                             Kind="Compare"
                                              Height="48"
                                              Width="48"
                                              VerticalAlignment="Center"

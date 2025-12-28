@@ -151,9 +151,16 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Ready to Compare?" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="The process might take a while depending on file size." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="CheckCircleOutline" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       Width="24" Height="24"
+                                                       Margin="0,0,12,0"
+                                                       VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Ready to Compare?" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="The process might take a while depending on file size." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                            </StackPanel>
                         </StackPanel>
 
                         <Button x:Name="compareWadButton" 
