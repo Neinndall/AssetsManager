@@ -309,33 +309,41 @@ namespace AssetsManager.Services.Explorer
                 cancellationToken.ThrowIfCancellationRequested();
                 string pathToWad = wadNode.Type == NodeType.WadFile ? wadNode.FullPath : wadNode.SourceWadPath;
                 var rootVirtualNode = new FileSystemNodeModel(wadNode.Name, true, wadNode.FullPath, pathToWad);
-                using (var wadFile = new WadFile(pathToWad))
+                
+                try
                 {
-                    foreach (var chunk in wadFile.Chunks.Values)
+                    using (var wadFile = new WadFile(pathToWad))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
-
-                        bool isUnresolved = virtualPath == chunk.PathHash.ToString("x16");
-                        bool noExtension = !Path.HasExtension(virtualPath);
-
-                        if (isUnresolved || noExtension)
+                        foreach (var chunk in wadFile.Chunks.Values)
                         {
-                            using (var stream = wadFile.OpenChunk(chunk))
+                            cancellationToken.ThrowIfCancellationRequested();
+                            string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
+
+                            bool isUnresolved = virtualPath == chunk.PathHash.ToString("x16");
+                            bool noExtension = !Path.HasExtension(virtualPath);
+
+                            if (isUnresolved || noExtension)
                             {
-                                var buffer = new byte[256];
-                                var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                                var data = new Span<byte>(buffer, 0, bytesRead);
-                                string extension = FileTypeDetector.GuessExtension(data);
-                                if (!string.IsNullOrEmpty(extension))
+                                using (var stream = wadFile.OpenChunk(chunk))
                                 {
-                                    virtualPath = virtualPath + "." + extension;
+                                    var buffer = new byte[256];
+                                    var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                                    var data = new Span<byte>(buffer, 0, bytesRead);
+                                    string extension = FileTypeDetector.GuessExtension(data);
+                                    if (!string.IsNullOrEmpty(extension))
+                                    {
+                                        virtualPath = virtualPath + "." + extension;
+                                    }
                                 }
                             }
-                        }
 
-                        AddNodeToVirtualTree(rootVirtualNode, virtualPath, pathToWad, chunk.PathHash);
+                            AddNodeToVirtualTree(rootVirtualNode, virtualPath, pathToWad, chunk.PathHash);
+                        }
                     }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError($"Failed to load WAD file at '{pathToWad}': {ex.Message}");
                 }
 
                 SortChildrenRecursively(rootVirtualNode);
@@ -355,22 +363,29 @@ namespace AssetsManager.Services.Explorer
                     return fileNodes; // Return empty list if WAD file doesn't exist
                 }
 
-                using (var wadFile = new WadFile(wadPath))
+                try
                 {
-                    foreach (var chunk in wadFile.Chunks.Values)
+                    using (var wadFile = new WadFile(wadPath))
                     {
-                        string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
-                        if (string.IsNullOrEmpty(virtualPath) || virtualPath == chunk.PathHash.ToString("x16"))
+                        foreach (var chunk in wadFile.Chunks.Values)
                         {
-                            virtualPath = chunk.PathHash.ToString("x16"); // Use hash as name if not resolved
-                        }
+                            string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
+                            if (string.IsNullOrEmpty(virtualPath) || virtualPath == chunk.PathHash.ToString("x16"))
+                            {
+                                virtualPath = chunk.PathHash.ToString("x16"); // Use hash as name if not resolved
+                            }
 
-                        var fileNode = new FileSystemNodeModel(Path.GetFileName(virtualPath), false, virtualPath, wadPath)
-                        {
-                            SourceChunkPathHash = chunk.PathHash
-                        };
-                        fileNodes.Add(fileNode);
+                            var fileNode = new FileSystemNodeModel(Path.GetFileName(virtualPath), false, virtualPath, wadPath)
+                            {
+                                SourceChunkPathHash = chunk.PathHash
+                            };
+                            fileNodes.Add(fileNode);
+                        }
                     }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError($"Failed to load WAD content at '{wadPath}': {ex.Message}");
                 }
                 return fileNodes;
             });
