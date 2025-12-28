@@ -143,9 +143,9 @@
     <Style TargetType="{x:Type ScrollViewer}">
         <Setter Property="Background" Value="Transparent"/>
         <Style.Resources>
-            <!-- Esto cambia el color por defecto de la esquina -->
+            <!-- Sobreescribimos el pincel que usa WPF para la esquina (Corner) de forma segura -->
             <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" 
-                             Color="Transparent"/>
+                             Color="{Binding Color, Source={StaticResource ScrollBarBackground}}"/>
         </Style.Resources>
     </Style>
 </ResourceDictionary>
