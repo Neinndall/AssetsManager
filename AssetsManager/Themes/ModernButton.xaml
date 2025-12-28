@@ -17,24 +17,15 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Grid>
-                        <!-- Fondo Principal: Diseño de Píldora Simétrica -->
+                        <!-- Fondo Principal: Diseño de Píldora Simétrica con Borde Derecho -->
                         <Border x:Name="Border"
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="8"
-                                Margin="8,4,8,4"/>
+                                Margin="8,4,8,4"
+                                BorderThickness="0,0,2,0"
+                                BorderBrush="Transparent"/>
 
-                        <!-- Indicador Lateral: Píldora Flotante en el margen derecho -->
-                        <Border x:Name="Indicator"
-                                Background="{StaticResource AccentBrush}"
-                                Width="4"
-                                Height="20"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                CornerRadius="2"
-                                Margin="0,0,2,0"
-                                Visibility="Collapsed"/>
-
-                        <!-- Contenido (Icono y Texto) -->
+                        <!-- Contenido (Icono y Texto) - FUERA del Border para no moverse -->
                         <ContentPresenter VerticalAlignment="Center"
                                           HorizontalAlignment="Left"/>
                     </Grid>
@@ -52,7 +43,7 @@
                         <!-- Estado: Seleccionado -->
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
-                            <Setter TargetName="Indicator" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                             <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                             <!-- Efecto de brillo sutil en el fondo si se desea, opcional -->
                             <Setter TargetName="Border" Property="Opacity" Value="1.0"/>
