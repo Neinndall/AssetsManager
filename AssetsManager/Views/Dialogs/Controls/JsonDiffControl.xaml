@@ -70,7 +70,15 @@
                         <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,4" CornerRadius="1"/>
 
                         <!-- Settings Group -->
+                        <ToggleButton x:Name="WordWrapButton"
+                                      Click="WordWrapButton_Click"
+                                      Style="{StaticResource TransparentIconToggleButton}"
+                                      Width="34" Height="34"
+                                      ToolTip="Toggle Word Wrap">
+                             <icons:MaterialIcon Kind="Wrap" Width="18" Height="18"/>
+                        </ToggleButton>
                         <ToggleButton x:Name="WordLevelDiffButton"
+                                      Margin="4,0,0,0"
                                       Click="WordLevelDiffButton_Click"
                                       Style="{StaticResource TransparentIconToggleButton}"
                                       Width="34" Height="34"
