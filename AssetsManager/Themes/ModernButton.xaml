@@ -149,11 +149,12 @@
         <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="16,0"/>
-        <Setter Property="Height" Value="32"/>
+        <Setter Property="Padding" Value="16,8"/>
         <Setter Property="MinWidth" Value="80"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -186,9 +187,8 @@
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Height" Value="Auto"/>
         <Setter Property="MinWidth" Value="0"/>
-        <Setter Property="Padding" Value="10"/>
+        <Setter Property="Padding" Value="16,8"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -219,6 +219,7 @@
     <Style x:Key="DestructiveButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
         <Setter Property="Background" Value="{StaticResource AccentRed}"/>
         <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Padding" Value="16,8"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">

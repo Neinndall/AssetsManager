@@ -67,7 +67,7 @@
                             <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{DynamicResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                                <TextBlock x:Name="OldFileNameLabel" FontSize="10" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="OldFileNameLabel" FontSize="12" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -101,7 +101,7 @@
                             <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{DynamicResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                                <TextBlock x:Name="NewFileNameLabel" FontSize="10" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="NewFileNameLabel" FontSize="12" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>

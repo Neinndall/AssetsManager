@@ -34,7 +34,7 @@
                                                 Width="16" Height="16" Margin="0,0,10,0"
                                                 VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" 
-                               FontWeight="SemiBold" FontSize="13" 
+                               FontWeight="SemiBold" FontSize="14" 
                                Foreground="{StaticResource TextPrimary}" 
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -63,7 +63,7 @@
                     <!-- Options Content -->
                     <Grid Grid.Row="0" Margin="24">
                         <StackPanel>
-                            <TextBlock Text="Choose Update Method" Foreground="{StaticResource TextPrimary}" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,20"/>
+                            <TextBlock Text="Choose Update Method" Foreground="{StaticResource TextPrimary}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,20"/>
                             
                             <!-- Option 1: Save Settings (Lighter Card on Dark Body) -->
                             <Button x:Name="CleanUpdateWithSaveButton" 

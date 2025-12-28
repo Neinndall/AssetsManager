@@ -40,7 +40,7 @@
                                    Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock x:Name="summaryTextBlock"
                                    Text="Analyzing differences..." 
-                                   FontSize="13" 
+                                   FontSize="12" 
                                    Foreground="{StaticResource TextSecondary}"
                                    Margin="0,2,0,0"/>
                     </StackPanel>

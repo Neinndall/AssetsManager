@@ -41,7 +41,7 @@
                                                 VerticalAlignment="Center" 
                                                 Margin="0,0,10,0"/>
                     <TextBlock Text="{Binding HeaderText}" 
-                               FontWeight="SemiBold" FontSize="13" 
+                               FontWeight="SemiBold" FontSize="14" 
                                Foreground="{StaticResource TextPrimary}" 
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -70,10 +70,9 @@
                     <!-- Content -->
                     <Grid Grid.Row="0" Margin="24">
                         <StackPanel>
-                            <TextBlock x:Name="ProgressSummaryTextBlock" 
-                                       Text="{Binding OperationVerb}" 
-                                       FontWeight="SemiBold" FontSize="15" 
-                                       Foreground="{StaticResource TextPrimary}" 
+                                                        <TextBlock x:Name="ProgressSummaryTextBlock"
+                                                                   Text="{Binding OperationVerb}"
+                                                                   FontWeight="SemiBold" FontSize="16"                                       Foreground="{StaticResource TextPrimary}" 
                                        Margin="0,0,0,16"/>
                             
                             <!-- Status Card (Uses CardBackground for contrast on Dark Body) -->

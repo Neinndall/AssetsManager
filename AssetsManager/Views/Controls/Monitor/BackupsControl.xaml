@@ -37,7 +37,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <Button Content="Create New Backup" Click="createLolBackupButton_Click" Height="32" Padding="16,0" Margin="0,0,8,0">
+                    <Button Content="Create Backup" Click="createLolBackupButton_Click" Margin="0,0,8,0">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
                                 <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>

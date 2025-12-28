@@ -34,9 +34,9 @@
                 <Grid Margin="0,0,0,12">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="Fetch All" Click="FetchVersions_Click" Style="{DynamicResource ModernButton}" Height="32" Padding="16,0" Margin="0,0,8,0"/>
-                        <Button Content="Get League Client" Click="GetLeagueClient_Click" Style="{DynamicResource SecondaryButton}" Height="32" Padding="16,0" Margin="0,0,8,0"/>
-                        <Button Content="Get Game Client" Click="GetLoLGameClient_Click" Style="{DynamicResource SecondaryButton}" Height="32" Padding="16,0"/>
+                        <Button Content="Fetch All" Click="FetchVersions_Click" Style="{DynamicResource ModernButton}" Margin="0,0,8,0"/>
+                        <Button Content="Get League Client" Click="GetLeagueClient_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,0"/>
+                        <Button Content="Get Game Client" Click="GetLoLGameClient_Click" Style="{DynamicResource SecondaryButton}"/>
                     </StackPanel>
                     <Button Grid.Column="2" Click="DeleteSelectedVersions_Click" Style="{DynamicResource TransparentIconButton}" Width="32" Height="32" ToolTip="Delete Selected"><materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{DynamicResource AccentRed}"/></Button>
                 </Grid>
@@ -53,7 +53,7 @@
         </Border>
 
         <!-- 3. TAB SELECTOR -->
-        <Border Grid.Row="2" Margin="0,0,0,12" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
+        <Border Grid.Row="2" Margin="0,0,0,2" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
             <StackPanel Orientation="Horizontal">
                 <RadioButton x:Name="TabClient" Content="League Client" IsChecked="True" GroupName="VersionTabs" Style="{DynamicResource SegmentedRadioButtonStyle}" Width="140"/>
                 <RadioButton x:Name="TabGame" Content="Game Client" GroupName="VersionTabs" Style="{DynamicResource SegmentedRadioButtonStyle}" Width="140"/>

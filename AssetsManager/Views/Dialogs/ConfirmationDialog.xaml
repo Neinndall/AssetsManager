@@ -36,7 +36,7 @@
                                                 Width="16" Height="16" Margin="0,0,10,0"
                                                 VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" 
-                               FontWeight="SemiBold" FontSize="13" 
+                               FontWeight="SemiBold" FontSize="14" 
                                Foreground="{StaticResource TextPrimary}" 
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -80,8 +80,8 @@
                         <TextBlock Grid.Column="1" x:Name="textBlockMessage" 
                                    TextWrapping="Wrap" 
                                    Foreground="{StaticResource TextPrimary}" 
-                                   FontSize="14"
-                                   LineHeight="22"
+                                   FontSize="13"
+                                   LineHeight="20"
                                    VerticalAlignment="Center"/>
                     </Grid>
 

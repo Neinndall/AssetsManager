@@ -75,7 +75,7 @@
                                 <TextBox x:Name="newLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
                             </StackPanel>
 
-                            <Button Grid.Column="1" Click="btnSelectNewLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" Height="36" Width="36" Padding="0" VerticalAlignment="Bottom" ToolTip="Browse New Directory">
+                            <Button Grid.Column="1" Click="btnSelectNewLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New Directory">
                                 <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
@@ -94,7 +94,7 @@
                                 <TextBox x:Name="oldLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
                             </StackPanel>
                             
-                            <Button Grid.Column="1" Click="btnSelectOldLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" Height="36" Width="36" Padding="0" VerticalAlignment="Bottom" ToolTip="Browse Old Directory">
+                            <Button Grid.Column="1" Click="btnSelectOldLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old Directory">
                                 <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
@@ -116,7 +116,7 @@
                                 <TextBox x:Name="newWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
                             </StackPanel>
 
-                            <Button Grid.Column="1" Click="btnSelectNewWadFile_Click" Style="{StaticResource SecondaryButton}" Height="36" Width="36" Padding="0" VerticalAlignment="Bottom" ToolTip="Browse New File">
+                            <Button Grid.Column="1" Click="btnSelectNewWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New File">
                                 <materialIcons:MaterialIcon Kind="FileFindOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
@@ -135,7 +135,7 @@
                                 <TextBox x:Name="oldWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
                             </StackPanel>
 
-                            <Button Grid.Column="1" Click="btnSelectOldWadFile_Click" Style="{StaticResource SecondaryButton}" Height="36" Width="36" Padding="0" VerticalAlignment="Bottom" ToolTip="Browse Old File">
+                            <Button Grid.Column="1" Click="btnSelectOldWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old File">
                                 <materialIcons:MaterialIcon Kind="FileFindOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
