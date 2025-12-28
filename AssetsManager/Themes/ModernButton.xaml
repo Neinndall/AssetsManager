@@ -17,15 +17,22 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Grid>
-                        <!-- Fondo Principal: Diseño de Píldora Simétrica con Borde Derecho -->
-                        <Border x:Name="Border"
+                        <!-- Capa 1: Fondo (Color Hover/Selected) - Simétrico y sin bordes -->
+                        <Border x:Name="BackgroundBorder"
                                 Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Margin="8,4,8,4"
+                                BorderThickness="0"/>
+
+                        <!-- Capa 2: Borde de Selección (Solo Borde Derecho) - Superpuesto para seguir la curva -->
+                        <Border x:Name="SelectionBorder"
+                                Background="Transparent"
                                 CornerRadius="8"
                                 Margin="8,4,8,4"
                                 BorderThickness="0,0,2,0"
                                 BorderBrush="Transparent"/>
 
-                        <!-- Contenido (Icono y Texto) - FUERA del Border para no moverse -->
+                        <!-- Contenido -->
                         <ContentPresenter VerticalAlignment="Center"
                                           HorizontalAlignment="Left"/>
                     </Grid>
@@ -36,23 +43,22 @@
                                 <Condition Property="IsMouseOver" Value="True"/>
                                 <Condition Property="IsChecked" Value="False"/>
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                         </MultiTrigger>
 
                         <!-- Estado: Seleccionado -->
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
-                            <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                             <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                            <!-- Efecto de brillo sutil en el fondo si se desea, opcional -->
-                            <Setter TargetName="Border" Property="Opacity" Value="1.0"/>
+                            <Setter TargetName="BackgroundBorder" Property="Opacity" Value="1.0"/>
                         </Trigger>
                         
                          <!-- Estado: Presionado -->
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Border" Property="Background" Value="{StaticResource ModernButtonPressedBrush}"/>
-                            <Setter TargetName="Border" Property="Opacity" Value="0.4"/>
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource ModernButtonPressedBrush}"/>
+                            <Setter TargetName="BackgroundBorder" Property="Opacity" Value="0.4"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
