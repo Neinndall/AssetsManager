@@ -7,6 +7,10 @@ namespace AssetsManager.Utils
     {
         private CancellationTokenSource _cancellationTokenSource;
 
+        public bool IsCancelling { get; private set; }
+
+        public event EventHandler OperationStateChanged;
+
         public CancellationToken Token => _cancellationTokenSource?.Token ?? CancellationToken.None;
 
         public CancellationToken PrepareNewOperation()
@@ -14,6 +18,8 @@ namespace AssetsManager.Utils
             // Dispose the old one if it exists, to prevent leaks
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = new CancellationTokenSource();
+            IsCancelling = false;
+            OperationStateChanged?.Invoke(this, EventArgs.Empty);
             return _cancellationTokenSource.Token;
         }
 
@@ -21,6 +27,8 @@ namespace AssetsManager.Utils
         {
             if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
             {
+                IsCancelling = true;
+                OperationStateChanged?.Invoke(this, EventArgs.Empty);
                 _cancellationTokenSource.Cancel();
             }
         }
