@@ -38,7 +38,18 @@
 
             <!-- Main Navigation Tools -->
             <StackPanel Grid.Row="1">
-                <RadioButton x:Name="JsonDiffToolButton" Style="{StaticResource ModernSidebarNavigationStyle}" Click="MenuButton_Click" Tag="Comparator" IsChecked="True" GroupName="SidebarNavigation">
+                <RadioButton x:Name="HomeButton" Style="{StaticResource ModernSidebarNavigationStyle}" Click="MenuButton_Click" Tag="Home" IsChecked="True" GroupName="SidebarNavigation">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="64"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Home" Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Home" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                    </Grid>
+                </RadioButton>
+
+                <RadioButton x:Name="JsonDiffToolButton" Style="{StaticResource ModernSidebarNavigationStyle}" Click="MenuButton_Click" Tag="Comparator" GroupName="SidebarNavigation">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="64"/>

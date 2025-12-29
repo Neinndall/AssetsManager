@@ -130,7 +130,7 @@ namespace AssetsManager.Views
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
             Sidebar.NavigationRequested += OnSidebarNavigationRequested;
-            LoadComparatorWindow();
+            LoadHomeWindow();
 
             if (IsAnySettingActive())
             {
@@ -374,6 +374,7 @@ namespace AssetsManager.Views
 
             switch (viewTag)
             {
+                case "Home": LoadHomeWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Models": LoadModelWindow(); break;
@@ -381,6 +382,17 @@ namespace AssetsManager.Views
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
+        }
+
+        private void LoadHomeWindow()
+        {
+            var homeWindow = _serviceProvider.GetRequiredService<HomeWindow>();
+            homeWindow.NavigationRequested += (tag) =>
+            {
+                Sidebar.SelectNavigationItem(tag);
+                OnSidebarNavigationRequested(tag);
+            };
+            MainContentArea.Content = homeWindow;
         }
 
         private void LoadExplorerWindow()
