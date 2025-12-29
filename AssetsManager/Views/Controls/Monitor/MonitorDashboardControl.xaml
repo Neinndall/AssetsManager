@@ -34,7 +34,7 @@
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Welcome back, Commander" FontSize="14" Foreground="{DynamicResource TextSecondary}"/>
+                    <TextBlock Text="Welcome back, Summoner" FontSize="14" Foreground="{DynamicResource TextSecondary}"/>
                     <TextBlock Text="System Operations Overview" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Margin="0,2,0,0"/>
                 </StackPanel>
 

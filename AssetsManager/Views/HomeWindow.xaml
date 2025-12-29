@@ -58,7 +58,7 @@
                         <RowDefinition Height="*"/>    <!-- Content -->
                     </Grid.RowDefinitions>            <!-- Header Section -->
             <StackPanel Grid.Row="0" HorizontalAlignment="Center">
-                <TextBlock Text="Welcome!" 
+                <TextBlock Text="Welcome, Summoner!" 
                            FontSize="40" 
                            FontWeight="Bold" 
                            Foreground="{StaticResource TextPrimary}"
