@@ -51,28 +51,24 @@
 
     </UserControl.Resources>
 
-    <Grid Margin="40">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Welcome Section -->
-            <RowDefinition Height="30"/>   <!-- Spacer -->
-            <RowDefinition Height="*"/>    <!-- Content -->
-        </Grid.RowDefinitions>
-
-        <!-- Header Section -->
-        <StackPanel Grid.Row="0" HorizontalAlignment="Center">
-            <TextBlock Text="Get Started" 
-                       FontSize="32" 
-                       FontWeight="Bold" 
-                       Foreground="{StaticResource TextPrimary}"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="Select a tool to begin managing your assets" 
-                       FontSize="15" 
-                       Foreground="{StaticResource TextMuted}" 
-                       Margin="0,4,0,0"
-                       HorizontalAlignment="Center"/>
-        </StackPanel>
-
-        <!-- Tools Grid -->
+                <Grid Margin="40,60,40,40">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- Welcome Section -->
+                        <RowDefinition Height="20"/>   <!-- Smaller Spacer -->
+                        <RowDefinition Height="*"/>    <!-- Content -->
+                    </Grid.RowDefinitions>            <!-- Header Section -->
+            <StackPanel Grid.Row="0" HorizontalAlignment="Center">
+                <TextBlock Text="Welcome!" 
+                           FontSize="40" 
+                           FontWeight="Bold" 
+                           Foreground="{StaticResource TextPrimary}"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="Select a tool to get started" 
+                           FontSize="16" 
+                           Foreground="{StaticResource TextMuted}" 
+                           Margin="0,8,0,0"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>        <!-- Tools Grid -->
         <ItemsControl Grid.Row="2">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
