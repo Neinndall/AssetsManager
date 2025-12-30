@@ -299,6 +299,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             catch (OperationCanceledException)
             {
+                LogService.LogWarning("WAD tree building was cancelled.");
                 await Task.Delay(1500);
                 TaskCancellationManager.CompleteCurrentOperation();
             }
@@ -347,6 +348,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             catch (OperationCanceledException)
             {
+                LogService.LogWarning("Directory tree building was cancelled.");
                 await Task.Delay(1500);
                 TaskCancellationManager.CompleteCurrentOperation();
             }
@@ -397,6 +399,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             catch (OperationCanceledException)
             {
+                LogService.LogWarning("Backup tree building was cancelled.");
                 await Task.Delay(1500);
                 TaskCancellationManager.CompleteCurrentOperation();
             }
