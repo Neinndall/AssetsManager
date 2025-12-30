@@ -341,6 +341,10 @@ namespace AssetsManager.Services.Explorer
                         }
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    throw; // Propagate cancellation
+                }
                 catch (Exception ex)
                 {
                     _logService.LogError($"Failed to load WAD file at '{pathToWad}': {ex.Message}");
