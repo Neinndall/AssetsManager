@@ -7,203 +7,256 @@
              mc:Ignorable="d" 
              d:DesignHeight="750" d:DesignWidth="300">
 
-    <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Margin="0,5,5,5">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+    <Grid Background="{DynamicResource SidebarBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-            <!-- NAVIGATION -->
-            <Border Grid.Row="0" Margin="12,12,12,8" Background="{DynamicResource SidebarBackground}" CornerRadius="6" Padding="3" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
-                <UniformGrid Columns="4">
-                    <RadioButton x:Name="TabModels" IsChecked="True" GroupName="MPT" Style="{DynamicResource SegmentedRadioButtonStyle}"><materialIcons:MaterialIcon Kind="CubeOutline" Width="18" Height="18"/></RadioButton>
-                    <RadioButton x:Name="TabMeshes" GroupName="MPT" Style="{DynamicResource SegmentedRadioButtonStyle}"><materialIcons:MaterialIcon Kind="TextureBox" Width="18" Height="18"/></RadioButton>
-                    <RadioButton x:Name="TabTransform" GroupName="MPT" Style="{DynamicResource SegmentedRadioButtonStyle}"><materialIcons:MaterialIcon Kind="AxisArrow" Width="18" Height="18"/></RadioButton>
-                    <RadioButton x:Name="TabAnimations" GroupName="MPT" Style="{DynamicResource SegmentedRadioButtonStyle}"><materialIcons:MaterialIcon Kind="AnimationPlay" Width="18" Height="18"/></RadioButton>
-                </UniformGrid>
-            </Border>
+        <!-- NAVIGATION (Segmented Control) -->
+        <Border Grid.Row="0" Margin="16,16,16,12" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+            <UniformGrid Columns="4">
+                <RadioButton x:Name="TabModels" IsChecked="True" GroupName="MPT" Style="{DynamicResource SegmentedRadioButtonStyle}" ToolTip="Models List">
+                    <materialIcons:MaterialIcon Kind="CubeOutline" Width="18" Height="18"/>
+                </RadioButton>
+                <RadioButton x:Name="TabMeshes" GroupName="MPT" Style="{DynamicResource SegmentedRadioButtonStyle}" ToolTip="Meshes &amp; Textures">
+                    <materialIcons:MaterialIcon Kind="TextureBox" Width="18" Height="18"/>
+                </RadioButton>
+                <RadioButton x:Name="TabTransform" GroupName="MPT" Style="{DynamicResource SegmentedRadioButtonStyle}" ToolTip="Position, Rotation &amp; Scale">
+                    <materialIcons:MaterialIcon Kind="AxisArrow" Width="18" Height="18"/>
+                </RadioButton>
+                <RadioButton x:Name="TabAnimations" GroupName="MPT" Style="{DynamicResource SegmentedRadioButtonStyle}" ToolTip="Animations">
+                    <materialIcons:MaterialIcon Kind="AnimationPlay" Width="18" Height="18"/>
+                </RadioButton>
+            </UniformGrid>
+        </Border>
 
-            <!-- CONTENT AREA -->
-            <Grid Grid.Row="1" Margin="12,0,12,0">
-                <!-- MODELS -->
-                <Grid x:Name="ModelsPanel">
-                    <Grid.Style>
-                        <Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabModels}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
-                    </Grid.Style>
-                    <ListBox x:Name="ModelsListBox" Style="{DynamicResource SmoothScrollListBox}" SelectionChanged="ModelsListBox_SelectionChanged" Background="Transparent" BorderThickness="0">
-                        <ListBox.ItemTemplate>
+        <!-- CONTENT AREA -->
+        <Grid Grid.Row="1" Margin="16,0,16,0">
+                            <!-- MODELS -->
+                            <Grid x:Name="ModelsPanel">
+                                <Grid.Style>
+                                    <Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabModels}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
+                                </Grid.Style>
+                                <ListBox x:Name="ModelsListBox" Style="{DynamicResource SmoothScrollListBox}" SelectionChanged="ModelsListBox_SelectionChanged" Background="Transparent" BorderThickness="0">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <ContentPresenter />
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource CardBackground}" CornerRadius="8" Margin="0,0,0,8" Padding="12,8" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                    
+                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimary}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="Model File" Foreground="{DynamicResource TextSecondary}" FontSize="11" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+            
+                                                    <ToggleButton Grid.Column="1" IsChecked="{Binding AreAllPartsVisible, Mode=TwoWay}" Style="{DynamicResource TransparentIconToggleButton}" Width="32" Height="32" Margin="0,0,4,0" ToolTip="Toggle Visibility">
+                                                        <materialIcons:MaterialIcon Width="16" Height="16">
+                                                            <materialIcons:MaterialIcon.Style>
+                                                                <Style TargetType="materialIcons:MaterialIcon"><Setter Property="Kind" Value="Eye" /><Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="False"><Setter Property="Kind" Value="EyeOff" /><Setter Property="Foreground" Value="{DynamicResource TextMuted}"/></DataTrigger></Style.Triggers></Style>
+                                                            </materialIcons:MaterialIcon.Style>
+                                                        </materialIcons:MaterialIcon>
+                                                    </ToggleButton>
+                                                    
+                                                    <Button Grid.Column="2" x:Name="DeleteModelButton" Click="DeleteModelButton_Click" Tag="{Binding}" Style="{DynamicResource TransparentIconButton}" Width="32" Height="32" ToolTip="Remove Model">
+                                                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{DynamicResource AccentRed}"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+            <!-- MESHES -->
+            <Grid x:Name="MeshesPanel">
+                <Grid.Style>
+                    <Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabMeshes}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
+                </Grid.Style>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="MeshesItemsControl">
+                        <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{DynamicResource HoverColor}" CornerRadius="6" Margin="0,0,0,4" Padding="8,4">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimary}" FontWeight="SemiBold" FontSize="12"/>
-                                        <ToggleButton Grid.Column="1" IsChecked="{Binding AreAllPartsVisible, Mode=TwoWay}" Style="{DynamicResource TransparentIconToggleButton}" Width="28" Height="28">
-                                            <materialIcons:MaterialIcon Width="14" Height="14">
-                                                <materialIcons:MaterialIcon.Style>
-                                                    <Style TargetType="materialIcons:MaterialIcon"><Setter Property="Kind" Value="Eye" /><Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="False"><Setter Property="Kind" Value="EyeOff" /></DataTrigger></Style.Triggers></Style>
-                                                </materialIcons:MaterialIcon.Style>
-                                            </materialIcons:MaterialIcon>
-                                        </ToggleButton>
-                                        <Button Grid.Column="2" x:Name="DeleteModelButton" Click="DeleteModelButton_Click" Tag="{Binding}" Style="{DynamicResource TransparentIconButton}" Width="28" Height="28"><materialIcons:MaterialIcon Kind="TrashCanOutline" Width="14" Foreground="{DynamicResource AccentRed}"/></Button>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Grid>
-
-                <!-- MESHES -->
-                <Grid x:Name="MeshesPanel">
-                    <Grid.Style>
-                        <Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabMeshes}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
-                    </Grid.Style>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="MeshesItemsControl">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <GroupBox Style="{DynamicResource SettingsGroupBoxStyle}" Padding="8" Margin="0,0,0,6">
-                                        <GroupBox.Header>
-                                            <StackPanel Orientation="Horizontal">
-                                                <CheckBox Style="{DynamicResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource TextPrimary}"/>
-                                            </StackPanel>
-                                        </GroupBox.Header>
-                                        <StackPanel Margin="0,4,0,0">
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                                <materialIcons:MaterialIcon Kind="ImageOutline" Foreground="{DynamicResource AccentBrush}" Width="12" Margin="0,0,6,0"/>
-                                                <TextBlock Text="Active Texture" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}"/>
-                                            </StackPanel>
-                                            <ComboBox Style="{DynamicResource ModernComboBox}" Height="32" FontSize="12" ItemsSource="{Binding AvailableTextureNames}" SelectedItem="{Binding SelectedTextureName}"/>
+                                <GroupBox Style="{DynamicResource SettingsGroupBoxStyle}" Padding="12" Margin="0,0,0,12">
+                                    <GroupBox.Header>
+                                        <StackPanel Orientation="Horizontal">
+                                            <CheckBox Style="{DynamicResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimary}"/>
                                         </StackPanel>
-                                    </GroupBox>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Grid>
-
-                <!-- TRANSFORM -->
-                <ScrollViewer x:Name="TransformPanel" VerticalScrollBarVisibility="Auto">
-                    <ScrollViewer.Style>
-                        <Style TargetType="ScrollViewer"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabTransform}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
-                    </ScrollViewer.Style>
-                    <StackPanel>
-                        <GroupBox Header="Position" Style="{DynamicResource SettingsGroupBoxStyle}" Margin="0,0,0,10">
-                            <GroupBox.HeaderTemplate><DataTemplate><Grid Width="210"><TextBlock Text="Position" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource TextPrimary}"/><Button HorizontalAlignment="Right" Click="ResetPosition_Click" Style="{DynamicResource TransparentIconButton}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="Refresh" Width="14"/></Button></Grid></DataTemplate></GroupBox.HeaderTemplate>
-                            <StackPanel>
-                                <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <materialIcons:MaterialIcon Kind="ArrowRight" Width="14" Foreground="{DynamicResource AccentOrange}" Margin="0,0,8,0"/>
-                                    <Slider Grid.Column="1" x:Name="PositionXSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionXSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="10" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    <ToggleButton Grid.Column="3" x:Name="PositionXLock" Style="{DynamicResource TransparentIconToggleButton}" Width="24"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="12"/></ToggleButton>
-                                </Grid>
-                                <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <materialIcons:MaterialIcon Kind="ArrowUp" Width="14" Foreground="{DynamicResource AccentGreen}" Margin="0,0,8,0"/>
-                                    <Slider Grid.Column="1" x:Name="PositionYSlider" Minimum="-1000" Maximum="3000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionYSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="10" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    <ToggleButton Grid.Column="3" x:Name="PositionYLock" Style="{DynamicResource TransparentIconToggleButton}" Width="24"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="12"/></ToggleButton>
-                                </Grid>
-                                <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <materialIcons:MaterialIcon Kind="ArrowDown" Width="14" Foreground="{DynamicResource AccentBlue}" Margin="0,0,8,0"/>
-                                    <Slider Grid.Column="1" x:Name="PositionZSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionZSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="10" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    <ToggleButton Grid.Column="3" x:Name="PositionZLock" Style="{DynamicResource TransparentIconToggleButton}" Width="24"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="12"/></ToggleButton>
-                                </Grid>
-                            </StackPanel>
-                        </GroupBox>
-                        <!-- (Rotation and Scale Groups follow same logic with Triggers) -->
-                        <GroupBox Header="Rotation" Style="{DynamicResource SettingsGroupBoxStyle}" Margin="0,0,0,10">
-                            <GroupBox.HeaderTemplate><DataTemplate><Grid Width="210"><TextBlock Text="Rotation" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource TextPrimary}"/><Button HorizontalAlignment="Right" Click="ResetRotation_Click" Style="{DynamicResource TransparentIconButton}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="Refresh" Width="14"/></Button></Grid></DataTemplate></GroupBox.HeaderTemplate>
-                            <StackPanel>
-                                <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <materialIcons:MaterialIcon Kind="Rotate3d" Width="14" Foreground="{DynamicResource AccentOrange}" Margin="0,0,8,0"/>
-                                    <Slider Grid.Column="1" x:Name="RotationXSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationXSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="10" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    <ToggleButton Grid.Column="3" x:Name="RotationXLock" Style="{DynamicResource TransparentIconToggleButton}" Width="24"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="12"/></ToggleButton>
-                                </Grid>
-                                <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <materialIcons:MaterialIcon Kind="Rotate3d" Width="14" Foreground="{DynamicResource AccentGreen}" Margin="0,0,8,0"/>
-                                    <Slider Grid.Column="1" x:Name="RotationYSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationYSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="10" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    <ToggleButton Grid.Column="3" x:Name="RotationYLock" Style="{DynamicResource TransparentIconToggleButton}" Width="24"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="12"/></ToggleButton>
-                                </Grid>
-                                <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <materialIcons:MaterialIcon Kind="Rotate3d" Width="14" Foreground="{DynamicResource AccentBlue}" Margin="0,0,8,0"/>
-                                    <Slider Grid.Column="1" x:Name="RotationZSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationZSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="10" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    <ToggleButton Grid.Column="3" x:Name="RotationZLock" Style="{DynamicResource TransparentIconToggleButton}" Width="24"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="12"/></ToggleButton>
-                                </Grid>
-                            </StackPanel>
-                        </GroupBox>
-                        <GroupBox Header="Scale" Style="{DynamicResource SettingsGroupBoxStyle}">
-                            <GroupBox.HeaderTemplate><DataTemplate><Grid Width="210"><TextBlock Text="Scale" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource TextPrimary}"/><Button HorizontalAlignment="Right" Click="ResetScale_Click" Style="{DynamicResource TransparentIconButton}" Width="24" Height="24"><materialIcons:MaterialIcon Kind="Refresh" Width="14"/></Button></Grid></DataTemplate></GroupBox.HeaderTemplate>
-                            <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon Kind="Resize" Width="14" Foreground="{DynamicResource AccentPurple}" Margin="0,0,8,0"/>
-                                <Slider Grid.Column="1" x:Name="ScaleSlider" Minimum="0.1" Maximum="5" Value="1" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ElementName=ScaleSlider, Path=Value, StringFormat={}{0:F2}}" FontSize="10" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                <ToggleButton Grid.Column="3" x:Name="ScaleLock" Style="{DynamicResource TransparentIconToggleButton}" Width="24"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="12"/></ToggleButton>
-                            </Grid>
-                        </GroupBox>
-                    </StackPanel>
+                                    </GroupBox.Header>
+                                    <StackPanel Margin="0,8,0,0">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <materialIcons:MaterialIcon Kind="ImageOutline" Foreground="{DynamicResource AccentBrush}" Width="14" Margin="0,0,8,0"/>
+                                            <TextBlock Text="Active Texture" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}"/>
+                                        </StackPanel>
+                                        <ComboBox Style="{DynamicResource ModernComboBox}" Height="36" FontSize="13" ItemsSource="{Binding AvailableTextureNames}" SelectedItem="{Binding SelectedTextureName}"/>
+                                    </StackPanel>
+                                </GroupBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </ScrollViewer>
-
-                <!-- ANIMATIONS -->
-                <Grid x:Name="AnimationsPanel">
-                    <Grid.Style>
-                        <Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabAnimations}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
-                    </Grid.Style>
-                    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                    <ListBox x:Name="AnimationsListBox" SelectionChanged="AnimationsListBox_SelectionChanged" Background="Transparent" BorderThickness="0" Style="{DynamicResource SmoothScrollListBox}">
-                        <ListBox.ItemTemplate><DataTemplate><Border Background="{DynamicResource HoverColor}" CornerRadius="6" Margin="0,0,0,4" Padding="10,8"><TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimary}" FontSize="12"/></Border></DataTemplate></ListBox.ItemTemplate>
-                    </ListBox>
-                    <Border Grid.Row="1" x:Name="AnimationControlsPanel" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="12" Margin="0,8,0,0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Visibility="Collapsed">
-                        <StackPanel>
-                            <Grid Margin="0,0,0,12">
-                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="150" HorizontalAlignment="Left"/>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button Click="PlayButton_Click" Style="{DynamicResource IconButton}" Width="28" Height="28"><materialIcons:MaterialIcon Kind="Play" Width="16" Foreground="{DynamicResource AccentGreen}"/></Button>
-                                    <ToggleButton Click="StopButton_Click" IsChecked="{Binding IsPlaying, Mode=OneWay}" Style="{DynamicResource IconToggleButton}" Width="28" Height="28" Margin="4,0,0,0"><materialIcons:MaterialIcon Kind="Pause" Width="16" Foreground="{DynamicResource AccentRed}"/></ToggleButton>
-                                </StackPanel>
-                            </Grid>
-                            <Slider Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Height="20" Margin="0,0,0,8"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon Kind="Speedometer" Width="14" Foreground="{DynamicResource TextMuted}" Margin="0,0,8,0"/>
-                                <Slider Grid.Column="1" Minimum="0.1" Maximum="4.0" Value="{Binding Speed, Mode=TwoWay}" VerticalAlignment="Center" Height="20"/>
-                                <TextBlock Grid.Column="2" Text="{Binding Speed, StringFormat={}{0:F1}x}" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </Grid>
             </Grid>
 
-            <!-- BOTTOM ACTIONS -->
-            <Border Grid.Row="2" Background="{DynamicResource SidebarBackground}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0" Padding="12">
-                <UniformGrid Columns="3">
-                    <Button x:Name="LoadModelButton" Click="LoadModelButton_Click" Style="{DynamicResource SecondaryButton}" Height="50" Margin="0,0,4,0" Padding="0">
-                        <StackPanel VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon x:Name="LoadModelIcon" Kind="CubeOutline" Width="18" Height="18" Foreground="{DynamicResource AccentBrush}"/>
-                            <TextBlock x:Name="LoadModelText" Text="Model" FontSize="10" FontWeight="SemiBold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+            <!-- TRANSFORM -->
+            <ScrollViewer x:Name="TransformPanel" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabTransform}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
+                </ScrollViewer.Style>
+                <StackPanel>
+                    <!-- POSITION -->
+                    <GroupBox Header="Position" Style="{DynamicResource SettingsGroupBoxStyle}" Margin="0,0,0,16">
+                        <GroupBox.HeaderTemplate><DataTemplate><Grid Width="230"><TextBlock Text="Position" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimary}"/><Button HorizontalAlignment="Right" Click="ResetPosition_Click" Style="{DynamicResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Position"><materialIcons:MaterialIcon Kind="Refresh" Width="16"/></Button></Grid></DataTemplate></GroupBox.HeaderTemplate>
+                        <StackPanel>
+                            <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="ArrowRight" Width="16" Foreground="{DynamicResource AccentOrange}" Margin="0,0,10,0"/>
+                                <Slider Grid.Column="1" x:Name="PositionXSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionXSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <ToggleButton Grid.Column="3" x:Name="PositionXLock" Style="{DynamicResource TransparentIconToggleButton}" Width="28"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/></ToggleButton>
+                            </Grid>
+                            <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="ArrowUp" Width="16" Foreground="{DynamicResource AccentGreen}" Margin="0,0,10,0"/>
+                                <Slider Grid.Column="1" x:Name="PositionYSlider" Minimum="-1000" Maximum="3000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionYSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <ToggleButton Grid.Column="3" x:Name="PositionYLock" Style="{DynamicResource TransparentIconToggleButton}" Width="28"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/></ToggleButton>
+                            </Grid>
+                            <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="ArrowDown" Width="16" Foreground="{DynamicResource AccentBlue}" Margin="0,0,10,0"/>
+                                <Slider Grid.Column="1" x:Name="PositionZSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionZSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <ToggleButton Grid.Column="3" x:Name="PositionZLock" Style="{DynamicResource TransparentIconToggleButton}" Width="28"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/></ToggleButton>
+                            </Grid>
                         </StackPanel>
-                    </Button>
-                    <Button x:Name="LoadChromaModelButton" Click="LoadChromaModelButton_Click" Style="{DynamicResource SecondaryButton}" Height="50" Margin="2,0,2,0" Padding="0">
-                        <StackPanel VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon x:Name="LoadChromaModelIcon" Kind="Palette" Width="18" Height="18" Foreground="{DynamicResource AccentPurple}"/>
-                            <TextBlock Text="Chroma" FontSize="10" FontWeight="SemiBold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+                    </GroupBox>
+                    
+                    <!-- ROTATION -->
+                    <GroupBox Header="Rotation" Style="{DynamicResource SettingsGroupBoxStyle}" Margin="0,0,0,16">
+                        <GroupBox.HeaderTemplate><DataTemplate><Grid Width="230"><TextBlock Text="Rotation" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimary}"/><Button HorizontalAlignment="Right" Click="ResetRotation_Click" Style="{DynamicResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Rotation"><materialIcons:MaterialIcon Kind="Refresh" Width="16"/></Button></Grid></DataTemplate></GroupBox.HeaderTemplate>
+                        <StackPanel>
+                            <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="Rotate3d" Width="16" Foreground="{DynamicResource AccentOrange}" Margin="0,0,10,0"/>
+                                <Slider Grid.Column="1" x:Name="RotationXSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationXSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <ToggleButton Grid.Column="3" x:Name="RotationXLock" Style="{DynamicResource TransparentIconToggleButton}" Width="28"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/></ToggleButton>
+                            </Grid>
+                            <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="Rotate3d" Width="16" Foreground="{DynamicResource AccentGreen}" Margin="0,0,10,0"/>
+                                <Slider Grid.Column="1" x:Name="RotationYSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationYSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <ToggleButton Grid.Column="3" x:Name="RotationYLock" Style="{DynamicResource TransparentIconToggleButton}" Width="28"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/></ToggleButton>
+                            </Grid>
+                            <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="Rotate3d" Width="16" Foreground="{DynamicResource AccentBlue}" Margin="0,0,10,0"/>
+                                <Slider Grid.Column="1" x:Name="RotationZSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationZSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <ToggleButton Grid.Column="3" x:Name="RotationZLock" Style="{DynamicResource TransparentIconToggleButton}" Width="28"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/></ToggleButton>
+                            </Grid>
                         </StackPanel>
-                    </Button>
-                    <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{DynamicResource SecondaryButton}" Height="50" Margin="4,0,0,0" Padding="0">
-                        <StackPanel VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="AnimationPlay" Width="18" Height="18" Foreground="{DynamicResource AccentGreen}"/>
-                            <TextBlock Text="Anims" FontSize="10" FontWeight="SemiBold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                </UniformGrid>
-            </Border>
-            
-            <TextBlock x:Name="LoadModelTextHidden" Visibility="Collapsed"/><Button x:Name="PlayButtonHidden" Visibility="Collapsed"/>
+                    </GroupBox>
+                    
+                    <!-- SCALE -->
+                    <GroupBox Header="Scale" Style="{DynamicResource SettingsGroupBoxStyle}">
+                        <GroupBox.HeaderTemplate><DataTemplate><Grid Width="230"><TextBlock Text="Scale" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimary}"/><Button HorizontalAlignment="Right" Click="ResetScale_Click" Style="{DynamicResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Scale"><materialIcons:MaterialIcon Kind="Refresh" Width="16"/></Button></Grid></DataTemplate></GroupBox.HeaderTemplate>
+                        <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="50"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <materialIcons:MaterialIcon Kind="Resize" Width="16" Foreground="{DynamicResource AccentPurple}" Margin="0,0,10,0"/>
+                            <Slider Grid.Column="1" x:Name="ScaleSlider" Minimum="0.1" Maximum="5" Value="1" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="{Binding ElementName=ScaleSlider, Path=Value, StringFormat={}{0:F2}}" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            <ToggleButton Grid.Column="3" x:Name="ScaleLock" Style="{DynamicResource TransparentIconToggleButton}" Width="28"><materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/></ToggleButton>
+                        </Grid>
+                    </GroupBox>
+                </StackPanel>
+            </ScrollViewer>
+
+                            <!-- ANIMATIONS -->
+                            <Grid x:Name="AnimationsPanel">
+                                <Grid.Style>
+                                    <Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabAnimations}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
+                                </Grid.Style>
+                                <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <ListBox x:Name="AnimationsListBox" SelectionChanged="AnimationsListBox_SelectionChanged" Background="Transparent" BorderThickness="0" Style="{DynamicResource SmoothScrollListBox}">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <ContentPresenter />
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource CardBackground}" CornerRadius="8" Margin="0,0,0,6" Padding="12,10" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimary}" FontSize="13"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>                
+                <!-- Animation Controls -->
+                <Border Grid.Row="1" x:Name="AnimationControlsPanel" Background="{DynamicResource CardBackground}" CornerRadius="12" Padding="16" Margin="0,12,0,0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Visibility="Collapsed">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="150" HorizontalAlignment="Left"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Click="PlayButton_Click" Style="{DynamicResource IconButton}" Width="32" Height="32"><materialIcons:MaterialIcon Kind="Play" Width="18" Foreground="{DynamicResource AccentGreen}"/></Button>
+                                <ToggleButton Click="StopButton_Click" IsChecked="{Binding IsPlaying, Mode=OneWay}" Style="{DynamicResource IconToggleButton}" Width="32" Height="32" Margin="4,0,0,0"><materialIcons:MaterialIcon Kind="Pause" Width="18" Foreground="{DynamicResource AccentRed}"/></ToggleButton>
+                            </StackPanel>
+                        </Grid>
+                        <Slider Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Height="24" Margin="0,0,0,12"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <materialIcons:MaterialIcon Kind="Speedometer" Width="16" Foreground="{DynamicResource TextMuted}" Margin="0,0,10,0"/>
+                            <Slider Grid.Column="1" Minimum="0.1" Maximum="4.0" Value="{Binding Speed, Mode=TwoWay}" VerticalAlignment="Center" Height="24"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Speed, StringFormat={}{0:F1}x}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
-    </Border>
+
+        <!-- BOTTOM ACTIONS -->
+        <Border Grid.Row="2" Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0" Padding="16">
+            <UniformGrid Columns="3">
+                <Button x:Name="LoadModelButton" Click="LoadModelButton_Click" Style="{DynamicResource SecondaryButton}" Height="56" Margin="0,0,6,0" Padding="0">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon x:Name="LoadModelIcon" Kind="CubeOutline" Width="20" Height="20" Foreground="{DynamicResource AccentBrush}"/>
+                        <TextBlock x:Name="LoadModelText" Text="Model" FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="LoadChromaModelButton" Click="LoadChromaModelButton_Click" Style="{DynamicResource SecondaryButton}" Height="56" Margin="3,0,3,0" Padding="0">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon x:Name="LoadChromaModelIcon" Kind="Palette" Width="20" Height="20" Foreground="{DynamicResource AccentPurple}"/>
+                        <TextBlock Text="Chroma" FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{DynamicResource SecondaryButton}" Height="56" Margin="6,0,0,0" Padding="0">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="AnimationPlay" Width="20" Height="20" Foreground="{DynamicResource AccentGreen}"/>
+                        <TextBlock Text="Anims" FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </UniformGrid>
+        </Border>
+        
+        <!-- Hidden controls needed for logic -->
+        <TextBlock x:Name="LoadModelTextHidden" Visibility="Collapsed"/><Button x:Name="PlayButtonHidden" Visibility="Collapsed"/>
+    </Grid>
 </UserControl>
