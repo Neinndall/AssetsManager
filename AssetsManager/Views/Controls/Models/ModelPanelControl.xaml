@@ -7,14 +7,18 @@
              mc:Ignorable="d" 
              d:DesignHeight="750" d:DesignWidth="300">
 
-    <Grid Background="{DynamicResource SidebarBackground}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <Border Background="{DynamicResource SidebarBackground}" 
+            BorderBrush="{DynamicResource BorderColor}" 
+            BorderThickness="1" 
+            Margin="0,4,4,4">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <!-- NAVIGATION (Segmented Control) -->
+            <!-- NAVIGATION (Segmented Control) -->
         <Border Grid.Row="0" Margin="16,16,16,12" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
             <UniformGrid Columns="4">
                 <RadioButton x:Name="TabModels" IsChecked="True" GroupName="MPT" Style="{DynamicResource SegmentedRadioButtonStyle}" ToolTip="Models List">
@@ -259,4 +263,5 @@
         <!-- Hidden controls needed for logic -->
         <TextBlock x:Name="LoadModelTextHidden" Visibility="Collapsed"/><Button x:Name="PlayButtonHidden" Visibility="Collapsed"/>
     </Grid>
+    </Border>
 </UserControl>

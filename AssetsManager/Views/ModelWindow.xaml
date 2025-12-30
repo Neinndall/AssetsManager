@@ -221,8 +221,8 @@
                               x:Name="MainGridSplitter"
                               HorizontalAlignment="Center"
                               VerticalAlignment="Stretch"
-                              Width="1"
-                              Background="{StaticResource BorderColor}"
+                              Width="4"
+                              Background="Transparent"
                               ResizeBehavior="PreviousAndNext"
                               ResizeDirection="Columns"/>
                 

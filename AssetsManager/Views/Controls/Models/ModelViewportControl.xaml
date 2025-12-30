@@ -8,143 +8,154 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
-    <Grid Background="{StaticResource CardBackground}">
-        <!-- 3D VIEWPORT -->
-        <helix:HelixViewport3D x:Name="Viewport3D" 
-                               Background="Transparent"
-                               ShowFrameRate="False"
-                               ShowCameraInfo="False"
-                               ShowViewCube="False"
-                               IsRotationEnabled="False"
-                               PanGesture="RightClick"
-                               SnapsToDevicePixels="False"
-                               UseLayoutRounding="False"
-                               ClipToBounds="True"
-                               RenderOptions.EdgeMode="Unspecified"
-                               RenderOptions.BitmapScalingMode="HighQuality">
-            <ModelVisual3D>
-                <ModelVisual3D.Content>
-                    <AmbientLight Color="White"/>
-                </ModelVisual3D.Content>
-            </ModelVisual3D>
-        </helix:HelixViewport3D>
+    <!-- CONTAINER CARD (Technical Canvas Style) -->
+    <Border Background="{StaticResource SidebarBackground}"
+            BorderBrush="{StaticResource BorderColor}"
+            BorderThickness="1"
+            CornerRadius="0"
+            Margin="4,4,0,4">
+        
+        <!-- Clipping Border (Thickness 0 to avoid double borders) -->
+        <Border CornerRadius="0" ClipToBounds="True" BorderThickness="0">
+            <Grid>
+                <!-- 3D VIEWPORT -->
+                <helix:HelixViewport3D x:Name="Viewport3D" 
+                                       Background="Transparent"
+                                       ShowFrameRate="False"
+                                       ShowCameraInfo="False"
+                                       ShowViewCube="False"
+                                       IsRotationEnabled="False"
+                                       PanGesture="RightClick"
+                                       SnapsToDevicePixels="False"
+                                       UseLayoutRounding="False"
+                                       ClipToBounds="True"
+                                       RenderOptions.EdgeMode="Unspecified"
+                                       RenderOptions.BitmapScalingMode="HighQuality">
+                    <ModelVisual3D>
+                        <ModelVisual3D.Content>
+                            <AmbientLight Color="White"/>
+                        </ModelVisual3D.Content>
+                    </ModelVisual3D>
+                </helix:HelixViewport3D>
 
-        <!-- FLOATING TOOLBAR -->
-        <Border HorizontalAlignment="Center" 
-                VerticalAlignment="Bottom" 
-                Margin="0,0,0,24"
-                Background="#CC18181B" 
-                CornerRadius="24"
-                Padding="16,8"
-                BorderBrush="{StaticResource BorderColor}"
-                BorderThickness="1">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Visibility" Value="Visible"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsChecked, ElementName=ToolbarToggle}" Value="False">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-            <Border.Effect>
-                <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="4" Opacity="0.3"/>
-            </Border.Effect>
-            
-            <StackPanel Orientation="Horizontal">
-                <!-- FPS Toggle -->
-                <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
-                              x:Name="FpsToggleButton"
-                              ToolTip="Show/Hide FPS"
-                              Click="FpsToggleButton_Click"
-                              Width="32" Height="32"
-                              IsChecked="False">
-                    <materialIcons:MaterialIcon Kind="Speedometer" Width="16" Height="16"/>
-                </ToggleButton>
-                
-                <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
+                <!-- FLOATING TOOLBAR -->
+                <Border HorizontalAlignment="Center" 
+                        VerticalAlignment="Bottom" 
+                        Margin="0,0,0,24"
+                        Background="#CC18181B" 
+                        CornerRadius="24"
+                        Padding="16,8"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=ToolbarToggle}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="4" Opacity="0.3"/>
+                    </Border.Effect>
+                    
+                    <StackPanel Orientation="Horizontal">
+                        <!-- FPS Toggle -->
+                        <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
+                                      x:Name="FpsToggleButton"
+                                      ToolTip="Show/Hide FPS"
+                                      Click="FpsToggleButton_Click"
+                                      Width="32" Height="32"
+                                      IsChecked="False">
+                            <materialIcons:MaterialIcon Kind="Speedometer" Width="16" Height="16"/>
+                        </ToggleButton>
+                        
+                        <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
 
-                <!-- Camera Controls -->
-                <Button Style="{StaticResource TransparentIconButton}"
-                        ToolTip="Reset Camera"
-                        Click="ResetCameraButton_Click"
-                        Width="32" Height="32">
-                    <materialIcons:MaterialIcon Kind="Refresh" Width="16" Height="16"/>
-                </Button>
-                
-                <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
-                              x:Name="AutoRotateToggleButton"
-                              ToolTip="Auto-Rotate"
-                              Click="AutoRotateToggleButton_Click"
-                              Width="32" Height="32"
-                              IsChecked="False">
-                    <materialIcons:MaterialIcon Kind="Autorenew" Width="16" Height="16"/>
-                </ToggleButton>
-                
-                <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
+                        <!-- Camera Controls -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Reset Camera"
+                                Click="ResetCameraButton_Click"
+                                Width="32" Height="32">
+                            <materialIcons:MaterialIcon Kind="Refresh" Width="16" Height="16"/>
+                        </Button>
+                        
+                        <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
+                                      x:Name="AutoRotateToggleButton"
+                                      ToolTip="Auto-Rotate"
+                                      Click="AutoRotateToggleButton_Click"
+                                      Width="32" Height="32"
+                                      IsChecked="False">
+                            <materialIcons:MaterialIcon Kind="Autorenew" Width="16" Height="16"/>
+                        </ToggleButton>
+                        
+                        <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
 
-                <!-- Visuals -->
-                <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
-                              ToolTip="Show/Hide Skybox"
-                              Click="SkyboxToggleButton_Click"
-                              Width="32" Height="32"
-                              IsChecked="False">
-                    <materialIcons:MaterialIcon Kind="Panorama" Width="16" Height="16"/>
-                </ToggleButton>
-                
-                <Button Style="{StaticResource TransparentIconButton}"
-                        ToolTip="Take Screenshot"
-                        Click="ScreenshotButton_Click"
-                        Width="32" Height="32">
-                    <materialIcons:MaterialIcon Kind="CameraIris" Width="16" Height="16"/>
-                </Button>
-                
-                <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
+                        <!-- Visuals -->
+                        <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
+                                      ToolTip="Show/Hide Skybox"
+                                      Click="SkyboxToggleButton_Click"
+                                      Width="32" Height="32"
+                                      IsChecked="False">
+                            <materialIcons:MaterialIcon Kind="Panorama" Width="16" Height="16"/>
+                        </ToggleButton>
+                        
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Take Screenshot"
+                                Click="ScreenshotButton_Click"
+                                Width="32" Height="32">
+                            <materialIcons:MaterialIcon Kind="CameraIris" Width="16" Height="16"/>
+                        </Button>
+                        
+                        <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
 
-                <!-- Layout -->
-                <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
-                              x:Name="MaximizeToggleButton"
-                              ToolTip="Maximize/Restore Viewport"
-                              Click="MaximizeToggleButton_Click"
-                              Width="32" Height="32"
-                              IsChecked="False">
-                    <materialIcons:MaterialIcon Kind="AspectRatio" Width="16" Height="16"/>
+                        <!-- Layout -->
+                        <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
+                                      x:Name="MaximizeToggleButton"
+                                      ToolTip="Maximize/Restore Viewport"
+                                      Click="MaximizeToggleButton_Click"
+                                      Width="32" Height="32"
+                                      IsChecked="False">
+                            <materialIcons:MaterialIcon Kind="AspectRatio" Width="16" Height="16"/>
+                        </ToggleButton>
+                    </StackPanel>
+                </Border>
+
+                <!-- TOOLBAR TOGGLE FAB -->
+                <ToggleButton x:Name="ToolbarToggle"
+                              IsChecked="False"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Bottom"
+                              Margin="0,0,24,24"
+                              ToolTip="Show/Hide Toolbar"
+                              Cursor="Hand">
+                    <ToggleButton.Template>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border x:Name="border"
+                                    Width="48" Height="48"
+                                    CornerRadius="24"
+                                    Background="#CC18181B"
+                                    BorderBrush="{StaticResource BorderColor}"
+                                    BorderThickness="1">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black" BlurRadius="10" ShadowDepth="2" Opacity="0.3"/>
+                                </Border.Effect>
+                                <materialIcons:MaterialIcon Kind="Tune" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                     <Setter TargetName="border" Property="Background" Value="#E618181B"/>
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="False">
+                                    <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </ToggleButton.Template>
                 </ToggleButton>
-            </StackPanel>
+            </Grid>
         </Border>
-
-        <!-- TOOLBAR TOGGLE FAB -->
-        <ToggleButton x:Name="ToolbarToggle"
-                      IsChecked="False"
-                      HorizontalAlignment="Right"
-                      VerticalAlignment="Bottom"
-                      Margin="0,0,24,24"
-                      ToolTip="Show/Hide Toolbar"
-                      Cursor="Hand">
-            <ToggleButton.Template>
-                <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="border"
-                            Width="48" Height="48"
-                            CornerRadius="24"
-                            Background="#CC18181B"
-                            BorderBrush="{StaticResource BorderColor}"
-                            BorderThickness="1">
-                        <Border.Effect>
-                            <DropShadowEffect Color="Black" BlurRadius="10" ShadowDepth="2" Opacity="0.3"/>
-                        </Border.Effect>
-                        <materialIcons:MaterialIcon Kind="Tune" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                             <Setter TargetName="border" Property="Background" Value="#E618181B"/>
-                        </Trigger>
-                        <Trigger Property="IsChecked" Value="False">
-                            <Setter TargetName="border" Property="Opacity" Value="0.6"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </ToggleButton.Template>
-        </ToggleButton>
-    </Grid>
+    </Border>
 </UserControl>
