@@ -86,7 +86,17 @@ namespace AssetsManager.Services.Core
         {
             if (_taskCancellationManager.IsCancelling)
             {
-                UpdateStatusBar("Cancelling Task...");
+                UpdateStatusBar(_taskCancellationManager.CancellationMessage);
+            }
+            else
+            {
+                _owner.Dispatcher.Invoke(() =>
+                {
+                    if (_statusTextBlock != null && _statusTextBlock.Text == _taskCancellationManager.CancellationMessage)
+                    {
+                        UpdateStatusBar("Ready");
+                    }
+                });
             }
         }
 

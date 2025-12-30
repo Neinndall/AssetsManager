@@ -8,6 +8,7 @@ namespace AssetsManager.Utils
         private CancellationTokenSource _cancellationTokenSource;
 
         public bool IsCancelling { get; private set; }
+        public string CancellationMessage { get; private set; } = "Cancelling Task...";
 
         public event EventHandler OperationStateChanged;
 
@@ -23,14 +24,26 @@ namespace AssetsManager.Utils
             return _cancellationTokenSource.Token;
         }
 
-        public void CancelCurrentOperation()
+        public void CancelCurrentOperation(bool notifyUI = true, string message = "Cancelling Task...")
         {
             if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
             {
-                IsCancelling = true;
-                OperationStateChanged?.Invoke(this, EventArgs.Empty);
+                if (notifyUI)
+                {
+                    CancellationMessage = message;
+                    IsCancelling = true;
+                    OperationStateChanged?.Invoke(this, EventArgs.Empty);
+                }
                 _cancellationTokenSource.Cancel();
             }
+        }
+
+        public void CompleteCurrentOperation()
+        {
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+            IsCancelling = false;
+            OperationStateChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void Dispose()

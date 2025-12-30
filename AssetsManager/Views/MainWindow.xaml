@@ -141,6 +141,14 @@
                                                 <Setter Property="Kind" Value="AlertCircleOutline"/>
                                                 <Setter Property="Foreground" Value="Orange"/>
                                             </DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="Cancelling tree building...">
+                                                <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                <Setter Property="Foreground" Value="Orange"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="Cancelling tree building...">
+                                                <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                <Setter Property="Foreground" Value="Orange"/>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </materialIcons:MaterialIcon.Style>

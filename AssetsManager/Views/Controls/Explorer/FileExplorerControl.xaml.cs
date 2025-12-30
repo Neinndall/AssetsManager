@@ -76,7 +76,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void CleanupResources()
         {
-            TaskCancellationManager.CancelCurrentOperation(); // Use the manager
+            TaskCancellationManager.CancelCurrentOperation(true, "Cancelling tree building...");
 
             // 1. Detener el timer PRIMERO
             if (_searchTimer != null)
@@ -294,10 +294,13 @@ namespace AssetsManager.Views.Controls.Explorer
                     CustomMessageBoxService.ShowError("Error", "Could not find any WAD files in 'Game' or 'Plugins' subdirectories.", Window.GetWindow(this));
                     NoDirectoryMessage.Visibility = Visibility.Visible;
                 }
+
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (OperationCanceledException)
             {
-                LogService.Log("WAD tree building was cancelled.");
+                await Task.Delay(1500);
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {
@@ -339,10 +342,13 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     RootNodes.Add(node);
                 }
+
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (OperationCanceledException)
             {
-                LogService.Log("Directory tree building was cancelled.");
+                await Task.Delay(1500);
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {
@@ -386,10 +392,13 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     RootNodes.Add(node);
                 }
+
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (OperationCanceledException)
             {
-                LogService.Log("Backup tree building was cancelled.");
+                await Task.Delay(1500);
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {
@@ -454,6 +463,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath, cancellationToken);
 
                     LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name}.", logPath, selectedNode.Name);
+                    
+                    TaskCancellationManager.CompleteCurrentOperation();
                 }
                 catch (OperationCanceledException)
                 {
@@ -526,6 +537,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken);
 
                     LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name}.", finalLogPath, selectedNode.Name);
+
+                    TaskCancellationManager.CompleteCurrentOperation();
                 }
                 catch (OperationCanceledException)
                 {
