@@ -74,7 +74,10 @@
                     <Button Name="LoadMoreButton" Content="Load More" Click="LoadMoreButton_Click" Style="{DynamicResource SecondaryButton}" Height="32" Padding="16,0"/>
                 </StackPanel>
 
-                <Button Grid.Column="3" Name="DownloadButton" Content="Download Found" Click="DownloadButton_Click" Style="{DynamicResource ModernButton}" Height="32" Padding="16,0"/>
+                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                    <Button Name="DownloadButton" Content="Download Found" Click="DownloadButton_Click" Style="{DynamicResource ModernButton}" Height="32" Padding="16,0" Margin="0,0,8,0"/>
+                    <Button Name="RemoveFoundButton" Content="Remove Found" Click="RemoveFoundButton_Click" Style="{DynamicResource DestructiveButton}" Height="32" Padding="16,0"/>
+                </StackPanel>
             </Grid>
         </Border>
 

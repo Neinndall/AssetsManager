@@ -291,5 +291,22 @@ namespace AssetsManager.Views.Controls.Monitor
                 RefreshAssetList();
             }
         }
+
+        private void RemoveFoundButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (SelectedCategory == null || !Assets.Any(a => a.Status == "OK"))
+            {
+                CustomMessageBoxService.ShowInfo("Info", "There are no found assets to remove in this category.", Window.GetWindow(this));
+                return;
+            }
+
+            var result = CustomMessageBoxService.ShowYesNo("Warning", $"Are you sure you want to remove ALL found assets ({Assets.Count(a => a.Status == "OK")}) from this category? This action is permanent and they will be marked as ignored.", Window.GetWindow(this));
+            if (result == true)
+            {
+                MonitorService.RemoveAllFoundAssets(SelectedCategory);
+                RefreshAssetList();
+                CustomMessageBoxService.ShowInfo("Success", "All found assets have been removed and marked as ignored.", Window.GetWindow(this));
+            }
+        }
     }
 }
