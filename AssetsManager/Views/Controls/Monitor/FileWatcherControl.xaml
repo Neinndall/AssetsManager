@@ -70,7 +70,6 @@
         <!-- 3. MONITORS LIST -->
         <ListView x:Name="MonitoredItemsListView" 
                   Grid.Row="2" 
-                  ItemsSource="{Binding MonitoredItems}" 
                   Style="{StaticResource ModernListView}"
                   Background="Transparent" BorderThickness="0">
             <ListView.ItemContainerStyle>
