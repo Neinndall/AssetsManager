@@ -81,7 +81,7 @@
                                 </StackPanel>
                                 <TextBox x:Name="newLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0" VerticalContentAlignment="Center"/>
                             </StackPanel>
-                            <Button Grid.Column="1" Click="btnSelectNewLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New Directory" Height="36" Padding="16,0">
+                            <Button Grid.Column="1" Click="btnSelectNewLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New Directory">
                                 <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
@@ -98,7 +98,7 @@
                                 </StackPanel>
                                 <TextBox x:Name="oldLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0" VerticalContentAlignment="Center"/>
                             </StackPanel>
-                            <Button Grid.Column="1" Click="btnSelectOldLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old Directory" Height="36" Padding="16,0">
+                            <Button Grid.Column="1" Click="btnSelectOldLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old Directory">
                                 <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
@@ -118,7 +118,7 @@
                                 </StackPanel>
                                 <TextBox x:Name="newWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0" VerticalContentAlignment="Center"/>
                             </StackPanel>
-                            <Button Grid.Column="1" Click="btnSelectNewWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New File" Height="36" Padding="16,0">
+                            <Button Grid.Column="1" Click="btnSelectNewWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New File">
                                 <materialIcons:MaterialIcon Kind="FileFindOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
@@ -135,7 +135,7 @@
                                 </StackPanel>
                                 <TextBox x:Name="oldWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0" VerticalContentAlignment="Center"/>
                             </StackPanel>
-                            <Button Grid.Column="1" Click="btnSelectOldWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old File" Height="36" Padding="16,0">
+                            <Button Grid.Column="1" Click="btnSelectOldWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old File">
                                 <materialIcons:MaterialIcon Kind="FileFindOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
@@ -167,8 +167,8 @@
                                 Grid.Column="1"
                                 Click="compareWadButton_Click"
                                 Style="{StaticResource ModernButton}"
-                                Height="40"
-                                Padding="16,0"
+                                HorizontalContentAlignment="Left"
+                                Padding="12,0,16,0"
                                 FontSize="13">
                             <StackPanel Orientation="Horizontal">
                                 <materialIcons:MaterialIcon Kind="Flash" Margin="0,0,8,0" Width="16" Height="16" VerticalAlignment="Center"/>

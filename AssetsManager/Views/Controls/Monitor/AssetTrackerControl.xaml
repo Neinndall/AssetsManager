@@ -37,7 +37,6 @@
                 <Border Grid.Column="2" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,8" VerticalAlignment="Center" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal">
                         <materialIcons:MaterialIcon Kind="Database" Width="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
-                        <TextBlock Text="Found: " FontSize="11" Foreground="{StaticResource TextMuted}"/>
                         <TextBlock Text="{Binding SelectedCategory.FoundUrls.Count, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                     </StackPanel>
                 </Border>
@@ -82,13 +81,13 @@
 
                 <!-- Actions -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Name="CheckButton" Click="CheckButton_Click" Style="{StaticResource ModernButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
+                    <Button Name="CheckButton" Click="CheckButton_Click" Style="{StaticResource ModernButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0" Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="Radar" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Scan CDN" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button>
-                    <Button Name="LoadMoreButton" Click="LoadMoreButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left">
+                    <Button Name="LoadMoreButton" Click="LoadMoreButton_Click" Style="{StaticResource SecondaryButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="Plus" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Load More" VerticalAlignment="Center" FontWeight="SemiBold"/>
@@ -98,13 +97,13 @@
 
                 <!-- Bulk Actions -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
-                    <Button Name="DownloadButton" Click="DownloadButton_Click" Style="{StaticResource ModernButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
+                    <Button Name="DownloadButton" Click="DownloadButton_Click" Style="{StaticResource ModernButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0" Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="DownloadOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Download All" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button>
-                    <Button Name="RemoveFoundButton" Click="RemoveFoundButton_Click" Style="{StaticResource DestructiveButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left">
+                    <Button Name="RemoveFoundButton" Click="RemoveFoundButton_Click" Style="{StaticResource DestructiveButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="Broom" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Remove Found" VerticalAlignment="Center" FontWeight="SemiBold"/>
@@ -180,10 +179,10 @@
                                     
                                     <!-- Actions Area (Split 50/50) -->
                                     <UniformGrid Columns="2">
-                                        <Button Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource ModernButton}" Height="32" Margin="0,0,4,0" ToolTip="Save to Disk">
+                                        <Button Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource ModernButton}" Padding="8" Margin="0,0,4,0" ToolTip="Save to Disk">
                                             <materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="16" Height="16" Foreground="White"/>
                                         </Button>
-                                        <Button Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Opacity="0.8" Height="32" Margin="4,0,0,0" ToolTip="Ignore Asset">
+                                        <Button Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Opacity="0.8" Padding="8" Margin="4,0,0,0" ToolTip="Ignore Asset">
                                             <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="White"/>
                                         </Button>
                                     </UniformGrid>

@@ -50,9 +50,8 @@
                 <Button Grid.Column="2"
                         x:Name="buttonReportBug" 
                         Content="Report on GitHub"
-                        Padding="24,0"
-                        Height="44"
                         Click="buttonReportBug_Click"
+                        VerticalAlignment="Center"
                         Style="{StaticResource ModernButton}"/>
             </Grid>
         </Border>

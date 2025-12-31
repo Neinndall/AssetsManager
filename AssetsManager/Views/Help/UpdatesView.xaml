@@ -50,9 +50,8 @@
                 <Button Grid.Column="2"
                         x:Name="buttonCheckUpdates" 
                         Content="Check for Updates"
-                        Padding="24,0"
-                        Height="44"
                         Click="buttonCheckUpdates_Click"
+                        VerticalAlignment="Center"
                         Style="{StaticResource ModernButton}"/>
             </Grid>
         </Border>

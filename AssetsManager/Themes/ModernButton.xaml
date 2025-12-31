@@ -69,7 +69,7 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Height" Value="42"/>
+        <Setter Property="Height" Value="34"/>
         <Setter Property="Margin" Value="0,1"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
@@ -80,18 +80,18 @@
                         <Border x:Name="BackgroundBorder"
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="6"
-                                Margin="12,2,12,2"
+                                Margin="12,2"
                                 BorderThickness="0"/>
 
                         <!-- Capa 2: Borde de Selección (Solo Borde Derecho) - Superpuesto para seguir la curva -->
                         <Border x:Name="SelectionBorder"
                                 Background="Transparent"
                                 CornerRadius="6"
-                                Margin="12,2,12,2"
+                                Margin="12,2"
                                 BorderThickness="0,0,2,0"
                                 BorderBrush="Transparent"/>
 
-                        <Grid VerticalAlignment="Center" Margin="24,0,20,0">
+                        <Grid VerticalAlignment="Center" Margin="20,0,12,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
@@ -147,7 +147,8 @@
         <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="Padding" Value="14,7"/>
+        <Setter Property="Height" Value="35"/>
         <Setter Property="MinWidth" Value="80"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -186,7 +187,7 @@
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="MinWidth" Value="0"/>
-        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="Padding" Value="14,7"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
