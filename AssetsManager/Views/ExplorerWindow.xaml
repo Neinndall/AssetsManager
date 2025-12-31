@@ -7,9 +7,64 @@
              xmlns:explorer="clr-namespace:AssetsManager.Views.Controls.Explorer"
              mc:Ignorable="d" 
              FontFamily="{StaticResource AppFontFamily}">
-    <Grid>
+    <Grid Background="{StaticResource SidebarBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- CABECERA -->
+        <Border Grid.Row="0" 
+                Background="{StaticResource CardBackground}"
+                BorderBrush="{StaticResource BorderColor}"
+                BorderThickness="0,0,0,1"
+                Padding="32,20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Icono con Brillo -->
+                <materialIcons:MaterialIcon x:Name="ExplorerIcon"
+                                             Kind="FolderSearchOutline"
+                                             Height="48"
+                                             Width="48"
+                                             VerticalAlignment="Center"
+                                             Foreground="{StaticResource AccentBrush}"
+                                             Grid.Column="0">
+                    <materialIcons:MaterialIcon.Effect>
+                        <DropShadowEffect Color="{Binding Foreground.Color, ElementName=ExplorerIcon}" 
+                                          BlurRadius="15" 
+                                          ShadowDepth="0" 
+                                          Opacity="0.4"/>
+                    </materialIcons:MaterialIcon.Effect>
+                </materialIcons:MaterialIcon>
+
+                <!-- Separador Vertical -->
+                <Rectangle Grid.Column="1" 
+                           Width="1" 
+                           Fill="{StaticResource BorderColor}" 
+                           Margin="12,8" 
+                           VerticalAlignment="Stretch"/>
+
+                <!-- Textos -->
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="WAD EXPLORER" 
+                               FontSize="24" 
+                               FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Browse, preview and extract assets from game containers"
+                               FontSize="12" 
+                               Foreground="{StaticResource TextSecondary}"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- Cuerpo Principal -->
-        <Grid>
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="420" MinWidth="250" MaxWidth="700"/>
                 <ColumnDefinition Width="Auto"/>

@@ -7,7 +7,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:comparator="clr-namespace:AssetsManager.Views.Controls.Comparator"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
-    <Grid>
+    <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -51,11 +51,11 @@
 
                 <!-- Textos -->
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="COMPARATOR" 
+                    <TextBlock Text="WAD COMPARATOR" 
                                FontSize="24" 
                                FontWeight="Bold"
                                Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Compare WAD files and view differences"
+                    <TextBlock Text="Compare game files, identify changes and extract assets"
                                FontSize="12" 
                                Foreground="{StaticResource TextSecondary}"
                                Margin="0,4,0,0"/>
@@ -65,8 +65,8 @@
 
         <!-- CUERPO -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="32,24,32,24">
-                <comparator:WadComparisonControl x:Name="WadComparisonControl"/>
+            <Grid Margin="40,40,40,40" MaxWidth="1100" HorizontalAlignment="Stretch">
+                <comparator:WadComparisonControl x:Name="WadComparisonControl" HorizontalAlignment="Stretch"/>
             </Grid>
         </ScrollViewer>
     </Grid>

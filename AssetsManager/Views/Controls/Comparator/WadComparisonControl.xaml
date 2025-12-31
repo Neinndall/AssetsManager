@@ -11,13 +11,21 @@
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </UserControl.Resources>
 
-    <StackPanel>
-        <!-- Main Comparison Card -->
-        <Border Style="{StaticResource SettingsCard}" Padding="0">
+    <StackPanel HorizontalAlignment="Stretch">
+        <!-- Main Premium Comparison Card -->
+        <Border Background="{StaticResource CardBackground}" 
+                BorderBrush="{StaticResource BorderColor}" 
+                BorderThickness="1" 
+                CornerRadius="16" 
+                Padding="0"
+                HorizontalAlignment="Stretch">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="4" Opacity="0.2"/>
+            </Border.Effect>
+            
             <StackPanel>
-                
-                <!-- CARD HEADER & MODE SELECTOR -->
-                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="24,20" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
+                <!-- 1. CARD HEADER & MODE SELECTOR -->
+                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="24,20" Background="{StaticResource SidebarBackground}" CornerRadius="16,16,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/> <!-- Icon Box -->
@@ -26,7 +34,7 @@
                         </Grid.ColumnDefinitions>
                         
                         <!-- Icon Box -->
-                        <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="8" Width="44" Height="44" Margin="0,0,16,0">
+                        <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Width="44" Height="44" Margin="0,0,16,0">
                             <materialIcons:MaterialIcon Kind="SourceBranch" 
                                                        Foreground="{StaticResource AccentBrush}"
                                                        Width="22" Height="22"
@@ -35,12 +43,12 @@
                         
                         <!-- Titles -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="WAD Comparator" FontWeight="Bold" FontSize="16" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Compare versions to identify new and modified assets" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                            <TextBlock Text="CONFIGURATION" FontWeight="Bold" FontSize="16" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Define paths to start version analysis" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                         </StackPanel>
 
-                        <!-- Segmented Control -->
-                        <Border Grid.Column="2" Background="{DynamicResource SidebarBackground}" CornerRadius="6" Padding="3" VerticalAlignment="Center" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                        <!-- Segmented Control (Mode Switch) -->
+                        <Border Grid.Column="2" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="3" VerticalAlignment="Center" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton x:Name="ModeDirectory" 
                                              Content="Directory" 
@@ -56,45 +64,41 @@
                     </Grid>
                 </Border>
 
-                <!-- CONTENT AREA -->
-                <StackPanel Margin="24">
+                <!-- 2. CONTENT AREA (Inputs) -->
+                <StackPanel Margin="32">
                     
                     <!-- MODE: DIRECTORY -->
                     <StackPanel Visibility="{Binding IsChecked, ElementName=ModeDirectory, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <!-- New Version Row -->
                         <Grid Margin="0,0,0,20">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FolderStarOutline" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="New Directory" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                    <Border Background="#1A57CC99" CornerRadius="4" Padding="4" Margin="0,0,10,0">
+                                        <materialIcons:MaterialIcon Kind="FolderStarOutline" Foreground="{StaticResource AccentGreen}" Width="16" Height="16"/>
+                                    </Border>
+                                    <TextBlock Text="New Directory" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBox x:Name="newLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
+                                <TextBox x:Name="newLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0" VerticalContentAlignment="Center"/>
                             </StackPanel>
-
-                            <Button Grid.Column="1" Click="btnSelectNewLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New Directory">
+                            <Button Grid.Column="1" Click="btnSelectNewLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New Directory" Height="36" Padding="16,0">
                                 <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
 
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/> <!-- Button -->
-                            </Grid.ColumnDefinitions>
-                            
+                        <!-- Old Version Row -->
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FolderClockOutline" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Old Directory" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                    <Border Background="#1AFFD166" CornerRadius="4" Padding="4" Margin="0,0,10,0">
+                                        <materialIcons:MaterialIcon Kind="FolderClockOutline" Foreground="{StaticResource AccentOrange}" Width="16" Height="16"/>
+                                    </Border>
+                                    <TextBlock Text="Old Directory" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBox x:Name="oldLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
+                                <TextBox x:Name="oldLolPbeDirectoryTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0" VerticalContentAlignment="Center"/>
                             </StackPanel>
-                            
-                            <Button Grid.Column="1" Click="btnSelectOldLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old Directory">
+                            <Button Grid.Column="1" Click="btnSelectOldLolPbeDirectory_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old Directory" Height="36" Padding="16,0">
                                 <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
@@ -102,40 +106,36 @@
 
                     <!-- MODE: FILE -->
                     <StackPanel Visibility="{Binding IsChecked, ElementName=ModeFile, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <!-- New File Row -->
                         <Grid Margin="0,0,0,20">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FileStarOutline" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <Border Background="#1A57CC99" CornerRadius="4" Padding="4" Margin="0,0,10,0">
+                                        <materialIcons:MaterialIcon Kind="FileStarOutline" Foreground="{StaticResource AccentGreen}" Width="16" Height="16"/>
+                                    </Border>
                                     <TextBlock Text="New WAD File" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBox x:Name="newWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
+                                <TextBox x:Name="newWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0" VerticalContentAlignment="Center"/>
                             </StackPanel>
-
-                            <Button Grid.Column="1" Click="btnSelectNewWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New File">
+                            <Button Grid.Column="1" Click="btnSelectNewWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse New File" Height="36" Padding="16,0">
                                 <materialIcons:MaterialIcon Kind="FileFindOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
 
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
+                        <!-- Old File Row -->
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FileClockOutline" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <Border Background="#1AFFD166" CornerRadius="4" Padding="4" Margin="0,0,10,0">
+                                        <materialIcons:MaterialIcon Kind="FileClockOutline" Foreground="{StaticResource AccentOrange}" Width="16" Height="16"/>
+                                    </Border>
                                     <TextBlock Text="Old WAD File" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBox x:Name="oldWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0"/>
+                                <TextBox x:Name="oldWadFileTextBox" Style="{StaticResource ModernTextBox}" Height="36" IsReadOnly="True" Padding="10,0" VerticalContentAlignment="Center"/>
                             </StackPanel>
-
-                            <Button Grid.Column="1" Click="btnSelectOldWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old File">
+                            <Button Grid.Column="1" Click="btnSelectOldWadFile_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" ToolTip="Browse Old File" Height="36" Padding="16,0">
                                 <materialIcons:MaterialIcon Kind="FileFindOutline" Width="18" Height="18"/>
                             </Button>
                         </Grid>
@@ -143,8 +143,8 @@
 
                 </StackPanel>
 
-                <!-- ACTION FOOTER -->
-                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,8,8">
+                <!-- 3. ACTION FOOTER -->
+                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,20" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,16,16">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -152,14 +152,14 @@
                         </Grid.ColumnDefinitions>
                         
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="CheckCircleOutline" 
-                                                       Foreground="{StaticResource AccentBrush}"
-                                                       Width="24" Height="24"
-                                                       Margin="0,0,12,0"
+                            <materialIcons:MaterialIcon Kind="InformationOutline" 
+                                                       Foreground="{StaticResource AccentBlue}"
+                                                       Width="22" Height="22"
+                                                       Margin="0,0,16,0"
                                                        VerticalAlignment="Center"/>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Ready to Compare?" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="The process might take a while depending on file size." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                <TextBlock Text="Ready to analyze?" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Differences will be calculated between both selected versions." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -168,10 +168,11 @@
                                 Click="compareWadButton_Click"
                                 Style="{StaticResource ModernButton}"
                                 Height="40"
-                                Padding="12,0">
+                                Padding="16,0"
+                                FontSize="13">
                             <StackPanel Orientation="Horizontal">
-                                <materialIcons:MaterialIcon Kind="PlayCircleOutline" Margin="0,0,8,0" Width="16" Height="16" VerticalAlignment="Center"/>
-                                <TextBlock Text="START COMPARISON" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <materialIcons:MaterialIcon Kind="Flash" Margin="0,0,8,0" Width="16" Height="16" VerticalAlignment="Center"/>
+                                <TextBlock Text="START ANALYSIS" FontWeight="Bold" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                     </Grid>

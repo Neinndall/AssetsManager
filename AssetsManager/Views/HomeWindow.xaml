@@ -42,12 +42,6 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                                 <Setter TargetName="CardBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                <Setter TargetName="AccentStrip" Property="Opacity" Value="1"/>
-                                <Setter TargetName="CardBorder" Property="Effect">
-                                    <Setter.Value>
-                                        <DropShadowEffect BlurRadius="15" ShadowDepth="2" Opacity="0.2" Color="Black"/>
-                                    </Setter.Value>
-                                </Setter>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
@@ -69,8 +63,8 @@
     <Grid>
         <!-- Background Pattern (Subtle Gradient) -->
         <Grid.Background>
-            <RadialGradientBrush Center="0.5,-0.2" RadiusX="1" RadiusY="1">
-                <GradientStop Color="#1A5577CC" Offset="0"/>
+            <RadialGradientBrush Center="0.5,-0.1" RadiusX="1.2" RadiusY="1.2">
+                <GradientStop Color="#0D5577CC" Offset="0"/>
                 <GradientStop Color="Transparent" Offset="1"/>
             </RadialGradientBrush>
         </Grid.Background>
