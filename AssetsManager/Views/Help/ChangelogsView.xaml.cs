@@ -33,7 +33,6 @@ namespace AssetsManager.Views.Help
                 if (changelogData != null && changelogData.Count > 0)
                 {
                     changelogData[0].IsLatest = true;
-                    changelogData[0].IsExpanded = true; // Open the latest by default
                 }
 
                 ChangelogItemsControl.ItemsSource = changelogData;
