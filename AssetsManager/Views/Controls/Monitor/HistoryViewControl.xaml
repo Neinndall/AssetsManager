@@ -10,61 +10,77 @@
 
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- 0. Header -->
-            <RowDefinition Height="Auto"/> <!-- 1. Pagination (Moved Up) -->
-            <RowDefinition Height="*"/>    <!-- 2. List -->
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="Auto"/> <!-- Pagination -->
+            <RowDefinition Height="*"/>    <!-- List -->
         </Grid.RowDefinitions>
 
-        <!-- 0. HEADER -->
-        <Border Grid.Row="0" Margin="0,0,0,16" Background="{DynamicResource CardBackground}" CornerRadius="12" Padding="24,20" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+        <!-- 1. HEADER -->
+        <Border Grid.Row="0" Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="24,20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 
-                <Border Grid.Column="0" Background="{DynamicResource HoverColor}" CornerRadius="10" Width="50" Height="50" Margin="0,0,20,0">
-                    <materialIcons:MaterialIcon Kind="History" Width="26" Height="26" Foreground="{DynamicResource AccentOrange}"/>
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="50" Height="50" Margin="0,0,20,0">
+                    <materialIcons:MaterialIcon Kind="History" Width="26" Height="26" Foreground="{StaticResource AccentOrange}"/>
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Change History" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                    <TextBlock Text="Review and compare previous versions of monitored files" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,2,0,0"/>
+                    <TextBlock Text="Change History" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Review previous versions and explore historical data changes" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- 1. PAGINATION (Now at the top, minimal style) -->
-        <Grid Grid.Row="1" Margin="0,0,0,12">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <StackPanel.Style>
-                    <Style TargetType="StackPanel">
-                        <Setter Property="Visibility" Value="Visible"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Paginator.TotalPages}" Value="0">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </StackPanel.Style>
+        <!-- 2. PAGINATION TOOLBAR -->
+        <Border Grid.Row="1" Margin="0,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                <Button Style="{DynamicResource TransparentIconButton}" Click="PrevPage_Click" IsEnabled="{Binding Paginator.CanGoToPreviousPage}" Width="24" Height="24">
-                    <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{DynamicResource TextSecondary}"/>
-                </Button>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="FilterList" Width="16" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
+                    <TextBlock Text="Historical Log Entries" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                </StackPanel>
 
-                <TextBlock Text="{Binding Paginator.PageInfo}" Foreground="{DynamicResource TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="12,0"/>
+                <!-- Pagination Controls -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Paginator.TotalPages}" Value="0">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
 
-                <Button Style="{DynamicResource TransparentIconButton}" Click="NextPage_Click" IsEnabled="{Binding Paginator.CanGoToNextPage}" Width="24" Height="24">
-                    <materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{DynamicResource TextSecondary}"/>
-                </Button>
-            </StackPanel>
-        </Grid>
+                    <Button Style="{StaticResource TransparentIconButton}" Click="PrevPage_Click" IsEnabled="{Binding Paginator.CanGoToPreviousPage}" Width="28" Height="28">
+                        <materialIcons:MaterialIcon Kind="ChevronLeft" Width="20" Foreground="{StaticResource TextSecondary}"/>
+                    </Button>
 
-        <!-- 2. HISTORY LIST -->
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="12,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <TextBlock Text="{Binding Paginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <Button Style="{StaticResource TransparentIconButton}" Click="NextPage_Click" IsEnabled="{Binding Paginator.CanGoToNextPage}" Width="28" Height="28">
+                        <materialIcons:MaterialIcon Kind="ChevronRight" Width="20" Foreground="{StaticResource TextSecondary}"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 3. HISTORY LIST -->
         <ListView x:Name="DiffHistoryListView" 
                   Grid.Row="2"
                   ItemsSource="{Binding Paginator.PagedItems}" 
-                  Style="{DynamicResource ModernListView}"
+                  Style="{StaticResource ModernListView}"
                   Background="Transparent" BorderThickness="0"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListView.ItemContainerStyle>
@@ -83,34 +99,45 @@
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate>
-                    <Border Background="{DynamicResource CardBackground}" CornerRadius="10" Padding="16,12" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="12" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                                <ColumnDefinition Width="*"/>    <!-- Info -->
-                                <ColumnDefinition Width="Auto"/> <!-- Actions -->
-                            </Grid.ColumnDefinitions>
+                            <!-- Accent Strip (Orange for History) -->
+                            <Border Width="4" HorizontalAlignment="Left" CornerRadius="12,0,0,12" Background="{StaticResource AccentOrange}"/>
 
-                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8" Background="{DynamicResource HoverColor}" Margin="0,0,16,0">
-                                <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="20" Height="20" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                            </Border>
+                            <Grid Margin="16,16,16,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                                    <ColumnDefinition Width="*"/>    <!-- Info -->
+                                    <ColumnDefinition Width="Auto"/> <!-- Actions -->
+                                </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextPrimary}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <materialIcons:MaterialIcon Kind="ClockOutline" Width="12" Height="12" Foreground="{DynamicResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:dd/MM/yyyy HH:mm:ss}'}" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/>
+                                <!-- File Icon Box -->
+                                <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
+                                    <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Border>
+
+                                <!-- Info -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource TextPrimary}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <materialIcons:MaterialIcon Kind="ClockOutline" Width="12" Height="12" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                    </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
 
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Click="btnViewDiff_Click" Style="{DynamicResource TransparentIconButton}" Width="32" Height="32" Margin="0,0,8,0" ToolTip="View Differences">
-                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{DynamicResource AccentBrush}"/>
-                                </Button>
-                                <Button Click="btnRemoveSelected_Click" Style="{DynamicResource TransparentIconButton}" Width="32" Height="32" ToolTip="Remove Entry">
-                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{DynamicResource AccentRed}"/>
-                                </Button>
-                            </StackPanel>
+                                <!-- Actions -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Click="btnViewDiff_Click" ToolTip="View Historical Differences" 
+                                            Style="{StaticResource TransparentIconButton}" 
+                                            Width="32" Height="32" Margin="0,0,8,0">
+                                        <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                    </Button>
+                                    
+                                    <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Delete Entry">
+                                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{StaticResource AccentRed}"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
                         </Grid>
                     </Border>
                 </DataTemplate>
