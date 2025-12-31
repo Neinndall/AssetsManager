@@ -67,10 +67,10 @@
                     
                     <StackPanel Grid.Column="1">
                         <CheckBox IsChecked="{Binding Settings.SyncHashesWithCDTB, Mode=TwoWay}" Content="Synchronization with CDTB" Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Automatically sync with the latest hash database from CDTB servers" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap" FontStyle="Italic"/>
+                        <TextBlock Text="Automatically sync with the latest hash database from CDTB servers" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
                         <CheckBox IsChecked="{Binding Settings.SaveDiffHistory, Mode=TwoWay}" Content="Save differences history" Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Save a history of all JSON file differences detected during updates" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,0" TextWrapping="Wrap" FontStyle="Italic"/>
+                        <TextBlock Text="Save a history of all JSON file differences detected during updates" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Grid>
             </StackPanel>
@@ -103,7 +103,7 @@
 
                     <StackPanel Grid.Column="1">
                         <CheckBox x:Name="checkBoxBackgroundUpdates" IsChecked="{Binding Settings.BackgroundUpdates, Mode=TwoWay}" Content="Background updates" Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Periodically check for updates while the application is running" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap" FontStyle="Italic"/>
+                        <TextBlock Text="Periodically check for updates while the application is running" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
                         <!-- Frequency Selector -->
                         <Border Margin="28,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
@@ -129,7 +129,7 @@
                         </Border>
 
                         <CheckBox IsChecked="{Binding Settings.CheckJsonDataUpdates, Mode=TwoWay}" Content="Check for files updates" Style="{StaticResource ModernCheckBox}"/>
-                        <TextBlock Text="Check for updates to json files and their differences" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,0" TextWrapping="Wrap" FontStyle="Italic"/>
+                        <TextBlock Text="Check for updates to json files and their differences" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Grid>
             </StackPanel>
@@ -170,7 +170,7 @@
                                 </Style>
                             </CheckBox.Style>
                         </CheckBox>
-                        <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap" FontStyle="Italic"/>
+                        <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
                         <CheckBox IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}" Content="Organize extracted files into folders">
                             <CheckBox.Style>
@@ -181,7 +181,7 @@
                                 </Style>
                             </CheckBox.Style>
                         </CheckBox>
-                        <TextBlock Text="If enabled, extracted assets will be organized into folders" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,0" TextWrapping="Wrap" FontStyle="Italic"/>
+                        <TextBlock Text="If enabled, extracted assets will be organized into folders" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Grid>
             </StackPanel>
@@ -222,7 +222,7 @@
                                 </Style>
                             </CheckBox.Style>
                         </CheckBox>
-                        <TextBlock Text="An assets.log file will be created instead of extracting the assets" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap" FontStyle="Italic"/>
+                        <TextBlock Text="An assets.log file will be created instead of extracting the assets" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
                         <!-- Filter Options -->
                         <Border Margin="28,0,0,8" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
