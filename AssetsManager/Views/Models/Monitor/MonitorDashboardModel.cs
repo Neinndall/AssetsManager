@@ -201,12 +201,12 @@ namespace AssetsManager.Views.Models.Monitor
 
                 if (!anyOtherChecking)
                 {
-                    AssetTrackerStatus = "Idle";
+                    AssetTrackerStatus = "Service Idle - Waiting...";
                 }
 
                 RefreshAssetTrackerData();
             };
-            _monitorService.CategoryCheckStarted += (category) => AssetTrackerStatus = $"Checking {category.Name}...";
+            _monitorService.CategoryCheckStarted += (category) => AssetTrackerStatus = $"Category: {category.Name} - Checking...";
 
             _pbeStatusService.StatusChecked += () =>
             {
