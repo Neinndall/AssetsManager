@@ -40,12 +40,12 @@
                         </Grid.RowDefinitions>
 
                         <!-- Version Header with Hero Icon -->
-                        <Button Grid.Row="0" Click="VersionHeader_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Stretch" Cursor="Hand">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
+                        <ToggleButton Grid.Row="0" IsChecked="{Binding IsExpanded}" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Stretch" Cursor="Hand">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
                                     <ContentPresenter />
                                 </ControlTemplate>
-                            </Button.Template>
+                            </ToggleButton.Template>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="50"/>
@@ -161,7 +161,7 @@
                                     </materialIcons:MaterialIcon.Style>
                                 </materialIcons:MaterialIcon>
                             </Grid>
-                        </Button>
+                        </ToggleButton>
 
                         <!-- Content Area with Vertical Line -->
                         <Grid Grid.Row="1" Margin="0,8,0,0">

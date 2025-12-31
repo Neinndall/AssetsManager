@@ -33,6 +33,7 @@ namespace AssetsManager.Views.Help
                 if (changelogData != null && changelogData.Count > 0)
                 {
                     changelogData[0].IsLatest = true;
+                    // IsExpanded is false by default
                 }
 
                 ChangelogItemsControl.ItemsSource = changelogData;
@@ -40,14 +41,6 @@ namespace AssetsManager.Views.Help
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to load or parse changelog.txt.");
-            }
-        }
-
-        private void VersionHeader_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.DataContext is ChangelogVersion version)
-            {
-                version.IsExpanded = !version.IsExpanded;
             }
         }
 
@@ -116,9 +109,6 @@ namespace AssetsManager.Views.Help
 
                 if (string.IsNullOrWhiteSpace(trimmedLine))
                 {
-                    // Keep newlines in description if we are in the middle of it, 
-                    // but usually double newline means paragraph break. 
-                    // For simplicity, we add a space if we are collecting description.
                     if (isCollectingDescription && !string.IsNullOrEmpty(accumulatedDescription))
                     {
                         accumulatedDescription += "\n\n";
@@ -128,20 +118,14 @@ namespace AssetsManager.Views.Help
 
                 // Check for explicit UPDATE TYPE lines in text file to ignore them (since we auto-calculate)
                 // OR check for Group Titles
-                // We use trimmedLine so leading spaces don't break header detection, unless it's a bullet point.
                 if (!trimmedLine.StartsWith("*") && !trimmedLine.StartsWith("-"))
                 {
                     string titleLower = trimmedLine.ToLower();
 
                     // Check for explicit Update Type Override in text file
                     // Strict check: Must contain keywords AND be short (< 40 chars).
-                    // This prevents descriptions like "This update introduces a major change..." 
-                    // from being mistaken for a "MAJOR UPDATE" tag.
                     if (trimmedLine.Length < 40 && titleLower.Contains("update") && (titleLower.Contains("major") || titleLower.Contains("medium") || titleLower.Contains("hotfix")))
                     {
-                        // The text file explicitly defines the type, so we OVERRIDE the auto-determined one.
-                        // This allows versions like 2.5.0.0 to be "MAJOR" if the text says so.
-                        
                         if (titleLower.Contains("major")) 
                         {
                             currentVersion.UpdateType = "MAJOR UPDATE";
@@ -157,15 +141,11 @@ namespace AssetsManager.Views.Help
                             currentVersion.UpdateType = "HOTFIX UPDATE";
                             currentVersion.UpdateTypeColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#FFD740");
                         }
-
-                        // We consumed this line as metadata, so skip it (don't add to description)
                         continue;
                     }
 
                     // Check for known Group Titles
                     // Ultra-strict check: Must be an EXACT match for the category titles.
-                    // This ensures that descriptions starting with "Improvements..." or containing 
-                    // "bug fixes" are never mistaken for section headers.
                     bool isGroupTitle = titleLower.Equals("new features") || 
                                       titleLower.Equals("improvements") || 
                                       titleLower.Equals("bug fixes") || 
@@ -256,21 +236,13 @@ namespace AssetsManager.Views.Help
             int build = parts.Length > 2 ? int.Parse(parts[2]) : 0;
             int revision = parts.Length > 3 ? int.Parse(parts[3]) : 0;
 
-            // Rule 1: X.X.X.Y (Revision > 0) -> HOTFIX
             if (revision > 0)
-            {
                 return ("HOTFIX UPDATE", (SolidColorBrush)new BrushConverter().ConvertFrom("#FFD740")); // Amber
-            }
             
-            // Rule 2: X.X.Y.0 (Build > 0) -> MEDIUM
             if (build > 0)
-            {
                 return ("MEDIUM UPDATE", (SolidColorBrush)new BrushConverter().ConvertFrom("#448AFF")); // Blue
-            }
 
-            // Rule 3: X.X.0.0 (Remainder) -> MAJOR
             return ("MAJOR UPDATE", (SolidColorBrush)new BrushConverter().ConvertFrom("#FF5252")); // Red
         }
     }
-
 }
