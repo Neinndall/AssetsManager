@@ -61,7 +61,7 @@ namespace AssetsManager.Views
         private string _extractionNewLolPath;
         private List<SerializableChunkDiff> _diffsForExtraction;
 
-        private GridLength _lastLogHeight = new GridLength(185);
+        private GridLength _lastLogHeight;
         private bool _isLogMinimized = false;
 
         public MainWindow(
@@ -117,7 +117,7 @@ namespace AssetsManager.Views
 
             _logService.SetLogOutput(LogView.richTextBoxLogs);
             LogView.ToggleLogSizeRequested += OnToggleLogSizeRequested;
-            LogView.LogExpandedManually += OnLogExpandedManually;
+            LogView.LogExpandedManually += (s, e) => _isLogMinimized = false;
 
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
@@ -350,11 +350,6 @@ namespace AssetsManager.Views
                 LogRowDefinition.Height = GridLength.Auto;
                 _isLogMinimized = true;
             }
-        }
-
-        private void OnLogExpandedManually(object sender, EventArgs e)
-        {
-            _isLogMinimized = false;
         }
 
         private async void NotificationButton_Click(object sender, RoutedEventArgs e)
