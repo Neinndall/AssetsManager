@@ -16,19 +16,21 @@
         </Grid.RowDefinitions>
 
         <!-- 1. HEADER -->
-        <Border Grid.Row="0" Margin="0,0,0,20" Background="{DynamicResource CardBackground}" CornerRadius="12" Padding="24,20" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+        <Border Grid.Row="0" Margin="0,0,0,24" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="24,20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="{DynamicResource HoverColor}" CornerRadius="10" Width="50" Height="50" Margin="0,0,20,0"><materialIcons:MaterialIcon Kind="BackupRestore" Width="26" Height="26" Foreground="{DynamicResource AccentBrush}"/></Border>
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="50" Height="50" Margin="0,0,20,0">
+                    <materialIcons:MaterialIcon Kind="BackupRestore" Width="26" Height="26" Foreground="{StaticResource AccentBrush}"/>
+                </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Backup Manager" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                    <TextBlock Text="Manage and restore League of Legends directory snapshots" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,2,0,0"/>
+                    <TextBlock Text="Backup Manager" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Manage and restore snapshots of your League of Legends directory" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- 2. TOOLBAR -->
-        <Border Grid.Row="1" Margin="0,0,0,16" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="12" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+        <Border Grid.Row="1" Margin="0,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -36,24 +38,21 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <Button Content="Create Backup" Click="createLolBackupButton_Click" Margin="0,0,8,0">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
-                                <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                </StackPanel>
+                <Button Grid.Column="0" Click="createLolBackupButton_Click" Style="{StaticResource ModernButton}" Height="32" Padding="12,0">
+                    <StackPanel Orientation="Horizontal">
+                        <materialIcons:MaterialIcon Kind="Plus" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Create Backup" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
 
-                <Button Grid.Column="2" Click="DeleteSelectedBackups_Click" Style="{DynamicResource TransparentIconButton}" Width="32" Height="32" ToolTip="Delete Selected">
-                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{DynamicResource AccentRed}"/>
+                <Button Grid.Column="2" Click="DeleteSelectedBackups_Click" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Delete Selected Snapshots">
+                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
                 </Button>
             </Grid>
         </Border>
 
         <!-- 3. BACKUPS LIST -->
-        <ListView Grid.Row="2" x:Name="BackupsListView" ItemsSource="{Binding AllBackups}" Style="{DynamicResource ModernListView}" Background="Transparent" BorderThickness="0">
+        <ListView Grid.Row="2" x:Name="BackupsListView" ItemsSource="{Binding AllBackups}" Style="{StaticResource ModernListView}" Background="Transparent" BorderThickness="0">
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <EventSetter Event="PreviewMouseLeftButtonDown" Handler="ListViewItem_PreviewMouseLeftButtonDown" />
@@ -62,62 +61,53 @@
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="ListViewItem">
-                                <Border x:Name="SelectionBorder" Background="{DynamicResource CardBackground}" CornerRadius="10" Padding="16,12" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                                <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                     <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/> <!-- Status LED -->
-                                            <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                                            <ColumnDefinition Width="*"/>    <!-- Info -->
-                                            <ColumnDefinition Width="Auto"/> <!-- Check -->
-                                        </Grid.ColumnDefinitions>
+                                        <!-- Accent Strip (Purple for Backups) -->
+                                        <Border Width="4" HorizontalAlignment="Left" CornerRadius="12,0,0,12" Background="{StaticResource AccentPurple}"/>
 
-                                        <!-- Status Indicator (LED) -->
-                                        <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4" Background="{Binding StatusColor}" VerticalAlignment="Center" Margin="0,0,16,0">
-                                            <Border.Effect><DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="0" Opacity="0.4"/></Border.Effect>
-                                        </Border>
+                                        <Grid Margin="16,16,16,16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                                                <ColumnDefinition Width="*"/>    <!-- Info -->
+                                                <ColumnDefinition Width="Auto"/> <!-- Status -->
+                                            </Grid.ColumnDefinitions>
 
-                                        <!-- Folder Icon -->
-                                        <Border Grid.Column="1" Width="40" Height="40" CornerRadius="8" Background="{DynamicResource HoverColor}" Margin="0,0,16,0">
-                                            <materialIcons:MaterialIcon Kind="FolderZipOutline" Width="20" Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
+                                            <!-- Folder Icon Box -->
+                                            <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
+                                                <materialIcons:MaterialIcon Kind="FolderZipOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
 
-                                        <!-- Info -->
-                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Path}" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                                <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{DynamicResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" FontSize="11" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/>
-                                                
-                                                <!-- NEW Badge with Trigger -->
-                                                <Border x:Name="NewBadge" Background="{DynamicResource HoverColor}" CornerRadius="4" Padding="6,1" Margin="12,0,0,0">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsCurrentSessionBackup}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                    <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
-                                                </Border>
+                                            <!-- Info -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Path}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                    <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    
+                                                    <!-- NEW Badge -->
+                                                    <Border x:Name="NewBadge" Background="{StaticResource AccentPurple}" CornerRadius="4" Padding="6,1" Margin="12,0,0,0" Visibility="Collapsed">
+                                                        <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
                                             </StackPanel>
-                                        </StackPanel>
 
-                                        <!-- Selection Indicator -->
-                                        <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="3" Kind="CheckCircle" Foreground="{DynamicResource AccentBrush}" Width="20" Visibility="Collapsed"/>
+                                            <!-- Selection Check -->
+                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentPurple}" Width="24" Height="24" Visibility="Collapsed"/>
+                                        </Grid>
                                     </Grid>
                                 </Border>
                                 <ControlTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsCurrentSessionBackup}" Value="True">
+                                        <Setter TargetName="NewBadge" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
                                     <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentPurple}"/>
                                         <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="2"/>
-                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HoverColor}"/>
                                         <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                                     </Trigger>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HoverColor}"/>
+                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
