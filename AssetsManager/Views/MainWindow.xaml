@@ -31,7 +31,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" MinHeight="200"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="185" MinHeight="38"/> <!-- LogView Height -->
+                    <RowDefinition x:Name="LogRowDefinition" Height="185" MinHeight="38"/> <!-- LogView Height -->
                     <RowDefinition Height="Auto"/> <!-- Status Bar Height -->
                 </Grid.RowDefinitions>
 

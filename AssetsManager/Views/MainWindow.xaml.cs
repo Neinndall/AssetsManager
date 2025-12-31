@@ -61,6 +61,9 @@ namespace AssetsManager.Views
         private string _extractionNewLolPath;
         private List<SerializableChunkDiff> _diffsForExtraction;
 
+        private GridLength _lastLogHeight = new GridLength(185);
+        private bool _isLogMinimized = false;
+
         public MainWindow(
             IServiceProvider serviceProvider,
             LogService logService,
@@ -113,6 +116,8 @@ namespace AssetsManager.Views
             _progressUIManager.Initialize(ProgressSummaryButton, StatusTextBlock, ProgressPercentageTextBlock, this);
 
             _logService.SetLogOutput(LogView.richTextBoxLogs);
+            LogView.ToggleLogSizeRequested += OnToggleLogSizeRequested;
+            LogView.LogExpandedManually += OnLogExpandedManually;
 
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
@@ -328,6 +333,28 @@ namespace AssetsManager.Views
         {
             _progressUIManager.ClearStatusText();
             ShowNotification(false);
+        }
+
+        private void OnToggleLogSizeRequested(object sender, EventArgs e)
+        {
+            if (_isLogMinimized)
+            {
+                // Restore
+                LogRowDefinition.Height = _lastLogHeight;
+                _isLogMinimized = false;
+            }
+            else
+            {
+                // Minimize
+                _lastLogHeight = LogRowDefinition.Height;
+                LogRowDefinition.Height = GridLength.Auto;
+                _isLogMinimized = true;
+            }
+        }
+
+        private void OnLogExpandedManually(object sender, EventArgs e)
+        {
+            _isLogMinimized = false;
         }
 
         private async void NotificationButton_Click(object sender, RoutedEventArgs e)

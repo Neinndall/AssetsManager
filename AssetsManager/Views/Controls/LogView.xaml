@@ -25,6 +25,15 @@
 
                 <!-- Actions -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <!-- Show/Hide Logger -->
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="ToggleLogSize_Click"
+                            ToolTip="Show/Hide Logger"
+                            Width="28" Height="28"
+                            Margin="0,0,4,0">
+                        <materialIcons:MaterialIcon x:Name="ToggleIcon" Kind="ChevronDown" Width="14" Height="14"/>
+                    </Button>
+
                     <!-- Reset Status Bar -->
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="ClearStatusBar_Click"
@@ -33,7 +42,7 @@
                             Margin="0,0,4,0">
                         <materialIcons:MaterialIcon Kind="BellOffOutline" Width="14" Height="14"/>
                     </Button>
-                    
+
                     <!-- Clear Log -->
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="ClearLogs_Click"
