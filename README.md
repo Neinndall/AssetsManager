@@ -37,12 +37,15 @@ AssetsManager includes a professional suite of tools to automatically track chan
 
 *   **Animation Playback:** Apply `.anm` files to loaded skeletons to see models in motion with high-performance skinning.
 *   **Smart Saving:** Automatically converts raw game formats (like textures to `.png` or binary data to `.json`) while preserving the original folder structure during extraction.
+*   **3D Models & MapGeometry:** Inspect 3D models of champions `.skn` with their animations `.anm` and MapGeometry Environments `.mapgeo`.
+*   **Animation Playback:** Apply `.anm` (animation) files to a loaded skeleton to see the model come to life with full skinning support.
+*   **Scene Control:** Manipulate the 3D camera, manage loaded parts, and inspect model geometry.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-*   [.NET 8.0 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) or higher installed on your system.
+*   [.NET 8.0 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.8-windows-x64-installer) (or higher) installed on your system.
 
 ### Installation
 
@@ -58,9 +61,11 @@ All application settings are managed through a dedicated `Settings` window and p
 
 Contributions are welcome! If you have suggestions for improvements, bug reports, or want to contribute code, please feel free to:
 
-1.  Fork the repository and submit a pull request.
-2.  Open an issue to discuss your ideas or report bugs.
+1.  Fork the repository and submit a [pull requests](https://github.com/Neinndall/AssetsManager/pulls). 
+2.  Open an [issues](https://github.com/Neinndall/AssetsManager/issues) to discuss your ideas or report bugs.
+
+Please ensure your code adheres to the project's existing style and conventions.
 
 ## 📄 License
 
-This project is licensed under the **GNU General Public License v3.0**.
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
