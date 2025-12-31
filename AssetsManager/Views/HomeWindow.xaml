@@ -26,13 +26,13 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="12">
                             <Grid>
-                                <!-- Accent Strip (Left) -->
+                                <!-- Accent Strip (Left) - Perfectly aligned with card rounding -->
                                 <Border x:Name="AccentStrip" 
                                         Background="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" 
                                         Width="4" 
                                         HorizontalAlignment="Left" 
                                         CornerRadius="12,0,0,12"
-                                        Opacity="0.6"/>
+                                        Opacity="0.8"/>
                                 
                                 <ContentPresenter />
                             </Grid>
@@ -42,6 +42,7 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                                 <Setter TargetName="CardBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="AccentStrip" Property="Opacity" Value="1"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
@@ -111,7 +112,7 @@
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="WAD Comparator" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Analyze differences between versions and extract new content." FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="Compare version manifests and track incremental changes in game files." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Grid>
                     </Button>
@@ -126,7 +127,7 @@
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="File Explorer" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Deep dive into WAD containers and preview game assets." FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="Browse virtual file systems, extract assets, and preview contents." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Grid>
                     </Button>
@@ -141,7 +142,7 @@
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="3D Models" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Visualize champions, skins, and animations in real-time." FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="Render champion skins, skeletons, and animations in high definition." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Grid>
                     </Button>
@@ -156,7 +157,7 @@
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="Live Monitor" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Automatic tracking of PBE updates and remote assets." FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="Monitor PBE status, remote JSON changes, and CDN asset discovery." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Grid>
                     </Button>
@@ -166,27 +167,27 @@
                 <TextBlock Text="APPLICATION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="10,0,0,10"/>
                 <UniformGrid Columns="2">
                     <!-- Settings -->
-                    <Button Style="{StaticResource SecondaryTileStyle}" Click="Button_Click" Tag="{StaticResource TextMuted}">
+                    <Button Style="{StaticResource SecondaryTileStyle}" Click="Button_Click" Tag="{StaticResource TextSecondary}">
                         <Button.CommandParameter>Settings</Button.CommandParameter>
                         <Grid Margin="20,10">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <materialIcons:MaterialIcon Kind="CogOutline" Width="22" Height="22" Foreground="{StaticResource TextSecondary}" Margin="0,0,16,0"/>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="Settings" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Preferences &amp; Paths" FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="Configure app behavior and game paths." FontSize="12" Foreground="{StaticResource TextMuted}"/>
                             </StackPanel>
                         </Grid>
                     </Button>
 
                     <!-- Help -->
-                    <Button Style="{StaticResource SecondaryTileStyle}" Click="Button_Click" Tag="{StaticResource TextMuted}">
+                    <Button Style="{StaticResource SecondaryTileStyle}" Click="Button_Click" Tag="{StaticResource TextSecondary}">
                         <Button.CommandParameter>Help</Button.CommandParameter>
                         <Grid Margin="20,10">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <materialIcons:MaterialIcon Kind="HelpCircleOutline" Width="22" Height="22" Foreground="{StaticResource TextSecondary}" Margin="0,0,16,0"/>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="Help &amp; Documentation" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Guides &amp; About" FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="User guides and application information." FontSize="12" Foreground="{StaticResource TextMuted}"/>
                             </StackPanel>
                         </Grid>
                     </Button>

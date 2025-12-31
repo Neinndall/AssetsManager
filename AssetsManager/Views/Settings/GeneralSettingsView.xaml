@@ -198,7 +198,7 @@
                     </Grid.ColumnDefinitions>
 
                     <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="40" Height="40" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <materialIcons:MaterialIcon Kind="FileDocumentOutline" Foreground="{StaticResource TextPrimary}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="FileDocumentOutline" Foreground="{StaticResource AccentOrange}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
@@ -210,7 +210,7 @@
                 <!-- Content -->
                 <Grid Margin="8,0,0,0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Width="2" Background="{StaticResource TextPrimary}" Opacity="0.2" CornerRadius="1" Margin="0,4,20,4"/>
+                    <Border Grid.Column="0" Width="2" Background="{StaticResource AccentOrange}" Opacity="0.2" CornerRadius="1" Margin="0,4,20,4"/>
 
                     <StackPanel Grid.Column="1">
                         <CheckBox x:Name="ReportGenerationCheckBox" IsChecked="{Binding Settings.ReportGeneration.Enabled, Mode=TwoWay}" Content="Generate asset report">
@@ -225,7 +225,7 @@
                         <TextBlock Text="An assets.log file will be created instead of extracting the assets" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap" FontStyle="Italic"/>
 
                         <!-- Filter Options -->
-                        <Border Margin="28,0,0,0" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <Border Margin="28,0,0,8" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -239,12 +239,12 @@
                             
                             <StackPanel>
                                 <TextBlock Text="Include in report:" Foreground="{StaticResource TextSecondary}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,12"/>
-                                <UniformGrid Columns="4">
-                                    <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterNew, Mode=TwoWay}" Content="New" Style="{StaticResource ModernCheckBox}"/>
-                                    <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterModified, Mode=TwoWay}" Content="Modified" Style="{StaticResource ModernCheckBox}"/>
-                                    <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRenamed, Mode=TwoWay}" Content="Renamed" Style="{StaticResource ModernCheckBox}"/>
-                                    <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRemoved, Mode=TwoWay}" Content="Removed" Style="{StaticResource ModernCheckBox}"/>
-                                </UniformGrid>
+                                <WrapPanel Orientation="Horizontal">
+                                    <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterNew, Mode=TwoWay}" Content="New" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,8"/>
+                                    <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterModified, Mode=TwoWay}" Content="Modified" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,8"/>
+                                    <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRenamed, Mode=TwoWay}" Content="Renamed" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,8"/>
+                                    <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRemoved, Mode=TwoWay}" Content="Removed" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,8"/>
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>
