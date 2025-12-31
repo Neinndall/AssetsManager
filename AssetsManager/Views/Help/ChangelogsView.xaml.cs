@@ -7,33 +7,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Material.Icons;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.Help;
 
 namespace AssetsManager.Views.Help
 {
-    public class ChangeItem
-    {
-        public string Text { get; set; }
-        public bool IsSubheading { get; set; }
-        public bool IsDescription { get; set; }
-        public int IndentationLevel { get; set; }
-    }
-
-    public class ChangelogVersion
-    {
-        public string Version { get; set; }
-        public List<ChangeGroup> Groups { get; set; } = new List<ChangeGroup>();
-    }
-
-    public class ChangeGroup
-    {
-        public string Title { get; set; }
-        public MaterialIconKind Icon { get; set; }
-        public SolidColorBrush IconColor { get; set; }
-        public List<ChangeItem> Changes { get; set; } = new List<ChangeItem>();
-    }
-
     public partial class ChangelogsView : UserControl
     {
         private readonly LogService _logService;
@@ -51,11 +29,26 @@ namespace AssetsManager.Views.Help
             {
                 var changelogText = LoadEmbeddedChangelog();
                 var changelogData = ParseChangelog(changelogText);
+                
+                if (changelogData != null && changelogData.Count > 0)
+                {
+                    changelogData[0].IsLatest = true;
+                    changelogData[0].IsExpanded = true; // Open the latest by default
+                }
+
                 ChangelogItemsControl.ItemsSource = changelogData;
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to load or parse changelog.txt.");
+            }
+        }
+
+        private void VersionHeader_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is ChangelogVersion version)
+            {
+                version.IsExpanded = !version.IsExpanded;
             }
         }
 
@@ -82,55 +75,144 @@ namespace AssetsManager.Views.Help
 
             ChangelogVersion currentVersion = null;
             ChangeGroup currentGroup = null;
+            bool isCollectingDescription = false;
+            string accumulatedDescription = "";
 
             foreach (var line in lines)
             {
                 var trimmedLine = line.Trim();
 
+                // 1. Version Header detection
                 if (line.StartsWith("AssetsManager - League of Legends |"))
                 {
-                    currentVersion = new ChangelogVersion { Version = trimmedLine };
+                    // Save description for previous version if exists
+                    if (currentVersion != null && !string.IsNullOrWhiteSpace(accumulatedDescription))
+                    {
+                        currentVersion.UpdateDescription = accumulatedDescription.Trim();
+                    }
+
+                    string verStr = trimmedLine.Split('|').Last().Trim();
+                    currentVersion = new ChangelogVersion { Version = verStr };
+                    
+                    // Auto-determine type based on version number
+                    var typeInfo = DetermineUpdateType(verStr);
+                    currentVersion.UpdateType = typeInfo.Type;
+                    currentVersion.UpdateTypeColor = typeInfo.Color;
+
                     versions.Add(currentVersion);
                     currentGroup = null;
+                    isCollectingDescription = true;
+                    accumulatedDescription = "";
                     continue;
                 }
 
                 if (currentVersion == null) continue;
-                if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith(">>>>>")) continue;
-
-                if (!line.StartsWith(" ") && !line.StartsWith("\t") && !trimmedLine.StartsWith("*") && !trimmedLine.StartsWith("-"))
+                
+                // End of version block check
+                if (trimmedLine.StartsWith(">>>>>"))
                 {
-                    if (trimmedLine.Split(' ').Length <= 3)
+                    isCollectingDescription = false;
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(trimmedLine))
+                {
+                    // Keep newlines in description if we are in the middle of it, 
+                    // but usually double newline means paragraph break. 
+                    // For simplicity, we add a space if we are collecting description.
+                    if (isCollectingDescription && !string.IsNullOrEmpty(accumulatedDescription))
                     {
-                        currentGroup = new ChangeGroup { Title = trimmedLine };
-                        string titleLower = trimmedLine.ToLower();
-                        if (titleLower.Contains("major update")) { currentGroup.Icon = MaterialIconKind.AlertDecagram; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#F44336"); }
-                        else if (titleLower.Contains("medium update")) { currentGroup.Icon = MaterialIconKind.ArrowUpCircleOutline; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#2196F3"); }
-                        else if (titleLower.Contains("hotfix update")) { currentGroup.Icon = MaterialIconKind.Wrench; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#2196F3"); }
-                        else if (titleLower.Contains("app name")) { currentGroup.Icon = MaterialIconKind.Label; currentGroup.IconColor = (SolidColorBrush)Application.Current.FindResource("TextMuted"); }
-                        else if (titleLower.Contains("new features")) { currentGroup.Icon = MaterialIconKind.Star; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#FFC107"); }
-                        else if (titleLower.Contains("improvements")) { currentGroup.Icon = MaterialIconKind.ArrowUpBoldCircle; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#4CAF50"); }
-                        else if (titleLower.Contains("bug fixes")) { currentGroup.Icon = MaterialIconKind.Bug; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#F44336"); }
-                        else if (titleLower.Contains("changes")) { currentGroup.Icon = MaterialIconKind.Pencil; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#2196F3"); }
-                        else if (titleLower.Contains("notes")) { currentGroup.Icon = MaterialIconKind.Notebook; currentGroup.IconColor = (SolidColorBrush)Application.Current.FindResource("TextMuted"); }
-                        else { currentGroup.Icon = MaterialIconKind.Info; currentGroup.IconColor = (SolidColorBrush)Application.Current.FindResource("TextMuted"); }
-                        currentVersion.Groups.Add(currentGroup);
+                        accumulatedDescription += "\n\n";
                     }
-                    else
+                    continue;
+                }
+
+                // Check for explicit UPDATE TYPE lines in text file to ignore them (since we auto-calculate)
+                // OR check for Group Titles
+                // We use trimmedLine so leading spaces don't break header detection, unless it's a bullet point.
+                if (!trimmedLine.StartsWith("*") && !trimmedLine.StartsWith("-"))
+                {
+                    string titleLower = trimmedLine.ToLower();
+
+                    // Check for explicit Update Type Override in text file
+                    // Strict check: Must contain keywords AND be short (< 40 chars).
+                    // This prevents descriptions like "This update introduces a major change..." 
+                    // from being mistaken for a "MAJOR UPDATE" tag.
+                    if (trimmedLine.Length < 40 && titleLower.Contains("update") && (titleLower.Contains("major") || titleLower.Contains("medium") || titleLower.Contains("hotfix")))
                     {
-                        if (currentGroup != null)
+                        // The text file explicitly defines the type, so we OVERRIDE the auto-determined one.
+                        // This allows versions like 2.5.0.0 to be "MAJOR" if the text says so.
+                        
+                        if (titleLower.Contains("major")) 
                         {
-                            var item = new ChangeItem { IsDescription = true, Text = trimmedLine, IndentationLevel = 1 };
-                            currentGroup.Changes.Add(item);
+                            currentVersion.UpdateType = "MAJOR UPDATE";
+                            currentVersion.UpdateTypeColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#FF5252");
                         }
+                        else if (titleLower.Contains("medium")) 
+                        {
+                            currentVersion.UpdateType = "MEDIUM UPDATE";
+                            currentVersion.UpdateTypeColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#448AFF");
+                        }
+                        else if (titleLower.Contains("hotfix")) 
+                        {
+                            currentVersion.UpdateType = "HOTFIX UPDATE";
+                            currentVersion.UpdateTypeColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#FFD740");
+                        }
+
+                        // We consumed this line as metadata, so skip it (don't add to description)
+                        continue;
+                    }
+
+                    // Check for known Group Titles
+                    // Ultra-strict check: Must be an EXACT match for the category titles.
+                    // This ensures that descriptions starting with "Improvements..." or containing 
+                    // "bug fixes" are never mistaken for section headers.
+                    bool isGroupTitle = titleLower.Equals("new features") || 
+                                      titleLower.Equals("improvements") || 
+                                      titleLower.Equals("bug fixes") || 
+                                      titleLower.Equals("changes");
+
+                    if (isGroupTitle)
+                    {
+                        // Stop collecting description as we hit the first group
+                        if (isCollectingDescription)
+                        {
+                            currentVersion.UpdateDescription = accumulatedDescription.Trim();
+                            isCollectingDescription = false;
+                        }
+
+                        currentGroup = new ChangeGroup { Title = trimmedLine };
+                        
+                        if (titleLower.Contains("new features")) { currentGroup.Icon = MaterialIconKind.PlusCircleOutline; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#69F0AE"); }
+                        else if (titleLower.Contains("improvements")) { currentGroup.Icon = MaterialIconKind.TrendingUp; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#40C4FF"); }
+                        else if (titleLower.Contains("bug fixes")) { currentGroup.Icon = MaterialIconKind.BugOutline; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#FF5252"); }
+                        else if (titleLower.Contains("changes")) { currentGroup.Icon = MaterialIconKind.Update; currentGroup.IconColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#B2FF59"); }
+                        else { currentGroup.Icon = MaterialIconKind.InformationOutline; currentGroup.IconColor = (SolidColorBrush)Application.Current.FindResource("TextSecondary"); }
+                        
+                        currentVersion.Groups.Add(currentGroup);
+                        continue;
+                    }
+                    
+                    // If it's not a group title and not an update type header, and we are collecting description
+                    if (isCollectingDescription)
+                    {
+                        if (!string.IsNullOrEmpty(accumulatedDescription) && !accumulatedDescription.EndsWith("\n\n"))
+                            accumulatedDescription += " ";
+                        
+                        accumulatedDescription += trimmedLine;
+                        continue;
                     }
                 }
-                else if (currentGroup != null)
+                
+                // Process Change Items
+                if (currentGroup != null)
                 {
-                    var indentation = line.Length - line.TrimStart().Length;
+                    int spaces = line.TakeWhile(c => c == ' ').Count();
+                    int indentation = spaces / 2;
+
                     var item = new ChangeItem
                     {
-                        IndentationLevel = indentation / 4
+                        IndentationLevel = indentation
                     };
 
                     if (trimmedLine.StartsWith("-"))
@@ -147,12 +229,48 @@ namespace AssetsManager.Views.Help
                     {
                         item.IsDescription = true;
                         item.Text = trimmedLine;
-                        item.IndentationLevel = 1;
+                        item.IndentationLevel += 1;
                     }
                     currentGroup.Changes.Add(item);
                 }
             }
+
+            // Capture description for the very last version if file ends
+            if (currentVersion != null && isCollectingDescription && !string.IsNullOrWhiteSpace(accumulatedDescription))
+            {
+                currentVersion.UpdateDescription = accumulatedDescription.Trim();
+            }
+
             return versions;
+        }
+
+        private (string Type, SolidColorBrush Color) DetermineUpdateType(string version)
+        {
+            // Remove 'v' prefix if exists
+            version = version.ToLower().Replace("v", "");
+            
+            var parts = version.Split('.');
+            if (parts.Length < 2) return ("UPDATE", Brushes.Gray);
+
+            int major = int.Parse(parts[0]);
+            int minor = int.Parse(parts[1]);
+            int build = parts.Length > 2 ? int.Parse(parts[2]) : 0;
+            int revision = parts.Length > 3 ? int.Parse(parts[3]) : 0;
+
+            // Rule 1: X.X.X.Y (Revision > 0) -> HOTFIX
+            if (revision > 0)
+            {
+                return ("HOTFIX UPDATE", (SolidColorBrush)new BrushConverter().ConvertFrom("#FFD740")); // Amber
+            }
+            
+            // Rule 2: X.X.Y.0 (Build > 0) -> MEDIUM
+            if (build > 0)
+            {
+                return ("MEDIUM UPDATE", (SolidColorBrush)new BrushConverter().ConvertFrom("#448AFF")); // Blue
+            }
+
+            // Rule 3: X.X.0.0 (Remainder) -> MAJOR
+            return ("MAJOR UPDATE", (SolidColorBrush)new BrushConverter().ConvertFrom("#FF5252")); // Red
         }
     }
 
