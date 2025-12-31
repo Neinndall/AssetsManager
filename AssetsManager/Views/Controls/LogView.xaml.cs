@@ -22,12 +22,23 @@ namespace AssetsManager.Views.Controls
 
         private void LogView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            // If the user manually resizes the log view (e.g. using the GridSplitter) while it is collapsed
-            if (richTextBoxLogs.Visibility == Visibility.Collapsed && e.NewSize.Height > 60)
+            // Update icon and visibility based on manual resize (GridSplitter)
+            if (e.NewSize.Height <= 45)
             {
-                richTextBoxLogs.Visibility = Visibility.Visible;
-                ToggleIcon.Kind = MaterialIconKind.ChevronDown;
-                LogExpandedManually?.Invoke(this, EventArgs.Empty);
+                if (ToggleIcon.Kind != MaterialIconKind.ChevronUp)
+                {
+                    ToggleIcon.Kind = MaterialIconKind.ChevronUp;
+                    richTextBoxLogs.Visibility = Visibility.Collapsed;
+                }
+            }
+            else
+            {
+                if (ToggleIcon.Kind != MaterialIconKind.ChevronDown)
+                {
+                    ToggleIcon.Kind = MaterialIconKind.ChevronDown;
+                    richTextBoxLogs.Visibility = Visibility.Visible;
+                    LogExpandedManually?.Invoke(this, EventArgs.Empty);
+                }
             }
         }
 

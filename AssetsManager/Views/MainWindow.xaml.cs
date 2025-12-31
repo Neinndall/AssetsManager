@@ -337,9 +337,17 @@ namespace AssetsManager.Views
 
         private void OnToggleLogSizeRequested(object sender, EventArgs e)
         {
-            if (_isLogMinimized)
+            // If the log is currently showing only the toolbar (effectively hidden by manual resize)
+            // or is explicitly minimized, we want to expand it.
+            if (_isLogMinimized || LogRowDefinition.ActualHeight <= 45)
             {
-                // Restore
+                // Restore / Expand
+                // If the last height was too small (due to manual resize), use a default height
+                if (!_lastLogHeight.IsAbsolute || _lastLogHeight.Value <= 45)
+                {
+                    _lastLogHeight = new GridLength(185);
+                }
+
                 LogRowDefinition.Height = _lastLogHeight;
                 _isLogMinimized = false;
             }
