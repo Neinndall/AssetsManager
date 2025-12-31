@@ -42,62 +42,8 @@
     </UserControl.Resources>
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <!-- CABECERA -->
-        <Border Grid.Row="0" 
-                Background="{StaticResource CardBackground}"
-                BorderBrush="{StaticResource BorderColor}"
-                BorderThickness="0,0,0,1"
-                Padding="32,20">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Icono con Brillo -->
-                <materialIcons:MaterialIcon Kind="Cube"
-                                             Height="48"
-                                             Width="48"
-                                             VerticalAlignment="Center"
-                                             Foreground="{StaticResource AccentBrush}"
-                                             Grid.Column="0">
-                    <materialIcons:MaterialIcon.Effect>
-                        <DropShadowEffect Color="{Binding Color, Source={StaticResource AccentBrush}}" 
-                                          BlurRadius="15" 
-                                          ShadowDepth="0" 
-                                          Opacity="0.4"/>
-                    </materialIcons:MaterialIcon.Effect>
-                </materialIcons:MaterialIcon>
-
-                <!-- Separador Vertical -->
-                <Rectangle Grid.Column="1" 
-                           Width="1" 
-                           Fill="{StaticResource BorderColor}" 
-                           Margin="12,8" 
-                           VerticalAlignment="Stretch"/>
-
-                <!-- Textos -->
-                <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="3D MODELS" 
-                               FontSize="24" 
-                               FontWeight="Bold"
-                               Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Visualize characters, animations and map geometry"
-                               FontSize="12" 
-                               Foreground="{StaticResource TextSecondary}"
-                               Margin="0,4,0,0"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
         <!-- CUERPO -->
-        <Grid Grid.Row="1">
+        <Grid>
             <!-- LANDING PAGE / EMPTY STATE -->
             <Grid x:Name="EmptyStatePanel" Visibility="Visible">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -105,14 +51,14 @@
                     <!-- Default Content (Buttons) -->
                     <StackPanel x:Name="DefaultEmptyStateContent" Visibility="Visible">
                         <!-- Welcome Text -->
-                        <TextBlock Text="Welcome to Model Viewer"
+                        <TextBlock Text="Welcome to 3D Model Viewer"
                                    FontSize="28"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimary}"
                                    HorizontalAlignment="Center"
                                    Margin="0,0,0,8"/>
                         
-                        <TextBlock Text="Select an option to start visualizing assets"
+                        <TextBlock Text="Visualize models, animations and maps. Select an option to start visualizing models."
                                    FontSize="14"
                                    Foreground="{StaticResource TextSecondary}"
                                    HorizontalAlignment="Center"
