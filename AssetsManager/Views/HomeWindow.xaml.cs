@@ -15,7 +15,7 @@ namespace AssetsManager.Views
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is string destination)
+            if (sender is Button button && button.CommandParameter is string destination)
             {
                 NavigationRequested?.Invoke(destination);
             }
