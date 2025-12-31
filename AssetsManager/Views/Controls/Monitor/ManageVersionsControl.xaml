@@ -177,11 +177,11 @@
                                 <ControlTemplate TargetType="ListViewItem">
                                     <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
                                         <Grid>
-                                            <Border Width="4" HorizontalAlignment="Left" Background="{StaticResource AccentBlue}" CornerRadius="12,0,0,12"/>
+                                            <Border Width="4" HorizontalAlignment="Left" Background="{StaticResource AccentBrush}" CornerRadius="12,0,0,12"/>
                                             <Grid Margin="16,16,16,16">
                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                                 <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
-                                                    <materialIcons:MaterialIcon Kind="DesktopClassic" Width="22" Height="22" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <materialIcons:MaterialIcon Kind="DesktopClassic" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                 </Border>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource TextPrimary}"/>

@@ -132,11 +132,6 @@ namespace AssetsManager.Views
             Sidebar.NavigationRequested += OnSidebarNavigationRequested;
             LoadHomeWindow();
 
-            if (IsAnySettingActive())
-            {
-                _logService.Log("Settings configured on startup.");
-            }
-
             _updateCheckService.Start();
             InitializeApplicationAsync();
 
@@ -304,16 +299,6 @@ namespace AssetsManager.Views
             var resultWindow = new WadComparisonResultWindow(diffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, _appSettings, oldPath, newPath);
             resultWindow.Owner = this;
             resultWindow.Show();
-        }
-
-        private bool IsAnySettingActive()
-        {
-            return _appSettings.SyncHashesWithCDTB ||
-                   _appSettings.EnableExtraction ||
-                   _appSettings.ReportGeneration.Enabled ||
-                   _appSettings.CheckJsonDataUpdates ||
-                   _appSettings.SaveDiffHistory ||
-                   _appSettings.BackgroundUpdates;
         }
 
         public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
