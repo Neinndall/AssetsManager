@@ -43,14 +43,35 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Button Grid.Column="0" Click="AddUrl_Click" Style="{StaticResource ModernButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Plus" Width="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="Add File" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
-                
-                <TextBox Grid.Column="2" x:Name="txtSearch" Style="{StaticResource StandardSearchBoxStyle}" Width="240" Height="36" TextChanged="TxtSearch_TextChanged" Tag="Search monitors..."/>
+                <!-- Left: Actions & Search -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <!-- Add Action -->
+                    <Button Click="AddUrl_Click" Style="{StaticResource ModernButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0">
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="Plus" Width="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Add File" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Separator -->
+                    <Rectangle Width="1" Height="24" Fill="{StaticResource BorderColor}" Margin="16,0,16,0" VerticalAlignment="Center"/>
+
+                    <!-- Search (Compact) -->
+                    <TextBox x:Name="txtSearch" Style="{StaticResource StandardSearchBoxStyle}" Width="180" Height="36" TextChanged="TxtSearch_TextChanged" Tag="Search monitors..."/>
+                </StackPanel>
+
+                <!-- Right: Status -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="FileEyeOutline" Width="16" Height="16" Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Active Monitors:" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,0" Height="18" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding MonitoredItems.Count, FallbackValue='0'}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
