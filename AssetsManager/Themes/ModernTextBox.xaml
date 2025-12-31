@@ -128,13 +128,13 @@
                             CornerRadius="6">
                         <Grid>
                             <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="12,2,25,2"
+                                          Margin="4,2,25,2"
                                           VerticalAlignment="Center"/>
                             <StackPanel Orientation="Horizontal"
                                         IsHitTestVisible="False"
                                         VerticalAlignment="Center"
                                         HorizontalAlignment="Left"
-                                        Margin="12,0,0,0">
+                                        Margin="10,0,0,0">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed"/>
