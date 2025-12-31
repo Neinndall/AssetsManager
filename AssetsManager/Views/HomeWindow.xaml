@@ -70,10 +70,10 @@
         </Grid.Background>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="60,80,60,60" MaxWidth="900">
+            <StackPanel Margin="60,60,60,60" MaxWidth="900">
                 
                 <!-- HEADER HERO SECTION -->
-                <StackPanel Margin="0,0,0,50" HorizontalAlignment="Left">
+                <StackPanel Margin="0,0,0,40" HorizontalAlignment="Left">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -99,7 +99,7 @@
 
                 <!-- MAIN TOOLS GRID (2x2) -->
                 <TextBlock Text="PRIMARY TOOLS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="10,0,0,10"/>
-                <UniformGrid Columns="2" Margin="0,0,0,40">
+                <UniformGrid Columns="2" Margin="0,0,0,20">
                     
                     <!-- Comparator -->
                     <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBrush}">

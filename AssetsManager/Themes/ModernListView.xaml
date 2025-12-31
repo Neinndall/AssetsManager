@@ -24,31 +24,6 @@
             </Setter>
         </Style>
 
-        <!-- Estilo para los headers de las columnas edit: BorderThickness: Izquierda, Arriba, Derecha, Abajo -->
-        <Style x:Key="FirstModernGridViewColumnHeader" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-            <Setter Property="BorderThickness" Value="1,1,0,1"/>
-            <Setter Property="Padding" Value="16,4"/>
-            <Setter Property="CornerRadius" Value="4,0,0,4"/>
-        </Style>
-
-        <Style x:Key="HalfModernGridViewColumnHeader" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-            <Setter Property="BorderThickness" Value="1,1,1,1"/>
-            <Setter Property="Padding" Value="16,4"/>
-            <Setter Property="CornerRadius" Value="0"/>
-        </Style>
-
-        <Style x:Key="LastModernGridViewColumnHeader" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-            <Setter Property="BorderThickness" Value="0,1,1,1"/>
-            <Setter Property="Padding" Value="16,4"/>
-            <Setter Property="CornerRadius" Value="0,4,4,0"/>
-        </Style>
-
         <!-- Estilo para las filas -->
         <Style x:Key="ModernListViewItem" TargetType="ListViewItem">
             <Setter Property="ClipToBounds" Value="True"/>
@@ -90,30 +65,6 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-        </Style>
-
-        <!-- Estilo para los iconos en headers -->
-        <Style x:Key="HeaderIconStyle" TargetType="materialIcons:MaterialIcon">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-            <Setter Property="Width" Value="14"/>
-            <Setter Property="Height" Value="14"/>
-            <Setter Property="Margin" Value="0,0,8,0"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <!-- Estilo para texto en headers -->
-        <Style x:Key="HeaderTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <!-- Estilo para texto en celdas -->
-        <Style x:Key="CellTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
         <!-- Estilo para tipo Models/Paneles Seleccioanables (Models) -->
