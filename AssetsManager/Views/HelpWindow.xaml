@@ -62,22 +62,28 @@
                                GroupName="HelpNavigation" 
                                IsChecked="True" 
                                Style="{StaticResource SettingsTabStyle}"/>
-                    
+
                     <RadioButton x:Name="NavChangelogs" 
                                Content="Changelogs" 
                                Tag="History"
                                GroupName="HelpNavigation" 
                                Style="{StaticResource SettingsTabStyle}"/>
-                    
+
                     <RadioButton x:Name="NavBugsReport" 
                                Content="Bug Reports" 
                                Tag="BugOutline"
                                GroupName="HelpNavigation" 
                                Style="{StaticResource SettingsTabStyle}"/>
-                    
+
                     <RadioButton x:Name="NavUpdates" 
                                Content="Updates" 
                                Tag="Update"
+                               GroupName="HelpNavigation" 
+                               Style="{StaticResource SettingsTabStyle}"/>
+
+                    <RadioButton x:Name="NavDocumentation" 
+                               Content="Documentation" 
+                               Tag="BookOpenVariant"
                                GroupName="HelpNavigation" 
                                Style="{StaticResource SettingsTabStyle}"/>
                 </StackPanel>

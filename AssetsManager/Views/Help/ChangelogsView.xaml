@@ -7,17 +7,27 @@
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="800">
     <StackPanel>
-        <!-- Page Header -->
-        <StackPanel Margin="0,0,0,24">
-            <TextBlock Text="Changelogs"
-                       FontSize="24"
-                       FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimary}"
-                       Margin="0,0,0,4"/>
-            <TextBlock Text="Version history and feature updates"
-                       FontSize="14"
-                       Foreground="{StaticResource TextSecondary}"/>
-        </StackPanel>
+        <!-- MODERN INTEGRATED HEADER (Compact) -->
+        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <materialIcons:MaterialIcon Kind="History" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="Changelogs" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Version history and feature updates" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                </StackPanel>
+
+                <!-- Subtle Decorative Background Icon -->
+                <materialIcons:MaterialIcon Grid.Column="1" Kind="Tag" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
+            </Grid>
+        </Border>
 
         <ItemsControl x:Name="ChangelogItemsControl">
             <ItemsControl.ItemTemplate>

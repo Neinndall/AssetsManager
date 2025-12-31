@@ -7,49 +7,64 @@
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="800">
     <StackPanel>
-        <!-- Page Header (Standard) -->
-        <StackPanel Margin="0,0,0,24">
-            <TextBlock Text="About"
-                       FontSize="24"
-                       FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimary}"
-                       Margin="0,0,0,4"/>
-            <TextBlock Text="Information about the application"
-                       FontSize="14"
-                       Foreground="{StaticResource TextSecondary}"/>
-        </StackPanel>
+        <!-- MODERN INTEGRATED HEADER (Compact) -->
+        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-        <!-- HERO SECTION: Branding -->
-        <StackPanel HorizontalAlignment="Center" Margin="0,0,0,32">
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <materialIcons:MaterialIcon Kind="InformationOutline" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="About" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Information about the application" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                </StackPanel>
+
+                <!-- Subtle Decorative Background Icon -->
+                <materialIcons:MaterialIcon Grid.Column="1" Kind="RocketLaunch" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
+            </Grid>
+        </Border>
+
+        <!-- HERO SECTION: Branding (Integrated and Refined) -->
+        <StackPanel HorizontalAlignment="Center" Margin="0,0,0,40">
+            <materialIcons:MaterialIcon Kind="DatabaseSearch" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,16"/>
+            
             <TextBlock Text="AssetsManager" 
-                       FontSize="32" 
+                       FontSize="36" 
                        FontWeight="Bold" 
                        Foreground="{StaticResource TextPrimary}"
                        HorizontalAlignment="Center"/>
             
-            <Border Background="{StaticResource CardBackground}" 
+            <Border Background="{StaticResource SidebarBackground}" 
                     BorderBrush="{StaticResource BorderColor}" 
                     BorderThickness="1" 
                     CornerRadius="12" 
-                    Padding="12,4" 
-                    Margin="0,8,0,0"
+                    Padding="16,6" 
+                    Margin="0,12,0,0"
                     HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Version " Foreground="{StaticResource TextMuted}" FontSize="12"/>
-                    <TextBlock Text="{Binding ApplicationVersion, FallbackValue='3.0.0.0'}" 
-                               Foreground="{StaticResource AccentBrush}" 
-                               FontWeight="SemiBold" 
-                               FontSize="12"/>
+                    <TextBlock Text="PREMIUM VERSION " Foreground="{StaticResource TextMuted}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="8,2" Margin="8,0,0,0">
+                        <TextBlock Text="{Binding ApplicationVersion, FallbackValue='v3.0.0.0'}" 
+                                   Foreground="White" 
+                                   FontWeight="Bold" 
+                                   FontSize="11"/>
+                    </Border>
                 </StackPanel>
             </Border>
             
             <TextBlock Text="The ultimate tool for League of Legends PBE analysis and asset management."
                        Foreground="{StaticResource TextSecondary}"
-                       FontSize="14"
+                       FontSize="15"
                        HorizontalAlignment="Center"
-                       Margin="0,16,0,0"
+                       Margin="0,20,0,0"
                        TextAlignment="Center"
-                       MaxWidth="500"
+                       MaxWidth="550"
+                       LineHeight="22"
                        TextWrapping="Wrap"/>
         </StackPanel>
 
@@ -74,7 +89,7 @@
                                VerticalAlignment="Center"/>
                 </Grid>
 
-                <UniformGrid Columns="2" Rows="4">
+                <UniformGrid Columns="2">
                     <!-- Feature 1: Download -->
                     <Grid Margin="0,0,16,24">
                         <Grid.ColumnDefinitions>
@@ -82,7 +97,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="CloudDownload" Foreground="{StaticResource AccentBlue}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="CloudDownload" Foreground="{StaticResource AccentBlue}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="Auto Downloads" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -97,7 +112,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="FileCompare" Foreground="{StaticResource AccentOrange}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="FileCompare" Foreground="{StaticResource AccentOrange}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="WAD Comparator" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -112,7 +127,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="FolderSearch" Foreground="{StaticResource AccentGreen}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="FolderSearch" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="File Explorer" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -127,7 +142,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="3D Viewer" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -142,7 +157,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="Radar" Foreground="{StaticResource AccentRed}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="Radar" Foreground="{StaticResource AccentRed}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="Live Monitoring" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -157,7 +172,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="Layers" Foreground="{StaticResource AccentPurple}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="Layers" Foreground="{StaticResource AccentPurple}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="Version Management" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -172,7 +187,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="MusicNote" Foreground="{StaticResource AccentBrush}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="MusicNote" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="Audio Banks" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -182,5 +197,12 @@
                 </UniformGrid>
             </StackPanel>
         </Border>
+
+        <!-- FOOTER -->
+        <TextBlock Text="© 2025 AssetsManager. All rights reserved." 
+                   FontSize="11" 
+                   Foreground="{StaticResource TextMuted}" 
+                   HorizontalAlignment="Center" 
+                   Margin="0,40,0,0"/>
     </StackPanel>
 </UserControl>

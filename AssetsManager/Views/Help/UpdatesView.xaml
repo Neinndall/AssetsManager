@@ -5,19 +5,29 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="600" d:DesignWidth="800">
+             d:DesignHeight="800" d:DesignWidth="800">
     <StackPanel>
-        <!-- Page Header -->
-        <StackPanel Margin="0,0,0,24">
-            <TextBlock Text="Application Updates" 
-                       FontSize="24" 
-                       FontWeight="Bold" 
-                       Foreground="{StaticResource TextPrimary}"
-                       Margin="0,0,0,4"/>
-            <TextBlock Text="Keep your application up to date with the latest features" 
-                       FontSize="14" 
-                       Foreground="{StaticResource TextSecondary}"/>
-        </StackPanel>
+        <!-- MODERN INTEGRATED HEADER (Compact) -->
+        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <materialIcons:MaterialIcon Kind="Update" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="Application Updates" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Keep your application up to date with the latest features" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                </StackPanel>
+
+                <!-- Subtle Decorative Background Icon -->
+                <materialIcons:MaterialIcon Grid.Column="1" Kind="CloudSyncOutline" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
+            </Grid>
+        </Border>
 
         <!-- UPDATE STATUS CARD -->
         <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,20">
@@ -67,7 +77,8 @@
                     <materialIcons:MaterialIcon Kind="InformationOutline" 
                                                Foreground="{StaticResource AccentBrush}"
                                                Width="24" Height="24"
-                                               VerticalAlignment="Center"/>
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Center"/>
                     <TextBlock Grid.Column="1" 
                                Text="Update Policy &amp; Information" 
                                FontSize="18" 
@@ -85,7 +96,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentBlue}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentBlue}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="Regular Releases" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -100,7 +111,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="BellOutline" Foreground="{StaticResource AccentOrange}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="BellOutline" Foreground="{StaticResource AccentOrange}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="Notifications" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -115,7 +126,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="HandBackLeftOutline" Foreground="{StaticResource AccentGreen}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="HandBackLeftOutline" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="Manual Control" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
@@ -130,7 +141,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border Background="{StaticResource HoverColor}" Width="40" Height="40" CornerRadius="8" VerticalAlignment="Top">
-                            <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Foreground="{StaticResource AccentPurple}" Width="20" Height="20"/>
+                            <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Foreground="{StaticResource AccentPurple}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,0,0">
                             <TextBlock Text="Safe Updates" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>

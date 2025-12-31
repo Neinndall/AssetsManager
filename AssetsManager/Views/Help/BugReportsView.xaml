@@ -5,19 +5,29 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="600" d:DesignWidth="800">
+             d:DesignHeight="800" d:DesignWidth="800">
     <StackPanel>
-        <!-- Page Header -->
-        <StackPanel Margin="0,0,0,24">
-            <TextBlock Text="Bug Reports" 
-                       FontSize="24" 
-                       FontWeight="Bold" 
-                       Foreground="{StaticResource TextPrimary}"
-                       Margin="0,0,0,4"/>
-            <TextBlock Text="Report issues and help improve the application" 
-                       FontSize="14" 
-                       Foreground="{StaticResource TextSecondary}"/>
-        </StackPanel>
+        <!-- MODERN INTEGRATED HEADER (Compact) -->
+        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <materialIcons:MaterialIcon Kind="BugOutline" Width="22" Height="22" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="Bug Reports" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Report issues and help improve the application" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                </StackPanel>
+
+                <!-- Subtle Decorative Background Icon -->
+                <materialIcons:MaterialIcon Grid.Column="1" Kind="Bug" Width="64" Height="64" Foreground="{StaticResource AccentOrange}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
+            </Grid>
+        </Border>
 
         <!-- MAIN ACTION CARD -->
         <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,20">
@@ -141,21 +151,19 @@
             </StackPanel>
         </Border>
 
-        <!-- HELP BOX -->
-        <Border Background="{StaticResource HoverColor}" 
-                CornerRadius="12" 
-                Padding="16" 
-                Margin="0,20,0,0"
-                BorderBrush="{StaticResource BorderColor}"
-                BorderThickness="1">
-            <StackPanel Orientation="Horizontal">
-                <materialIcons:MaterialIcon Kind="InformationOutline" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" VerticalAlignment="Center"/>
-                <TextBlock Text="You can find the logs folder in the application root directory." 
-                           Foreground="{StaticResource TextSecondary}" 
+        <!-- FOOTER (Professional Info) -->
+        <StackPanel Margin="0,48,0,0">
+            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Margin="40,0,40,24" Opacity="0.5"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="28" Height="28" Margin="0,0,12,0">
+                    <materialIcons:MaterialIcon Kind="InformationVariant" Foreground="{StaticResource AccentBrush}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="Tip: The application logs are located in the 'logs' folder within the root directory." 
                            FontSize="12" 
+                           Foreground="{StaticResource TextSecondary}" 
                            VerticalAlignment="Center"
-                           Margin="12,0,0,0"/>
+                           FontStyle="Italic"/>
             </StackPanel>
-        </Border>
+        </StackPanel>
     </StackPanel>
 </UserControl>

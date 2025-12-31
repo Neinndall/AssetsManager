@@ -162,6 +162,7 @@ namespace AssetsManager
       services.AddTransient<AdvancedSettingsView>();
       services.AddTransient<DefaultPathsSettingsView>();
       services.AddTransient<AboutView>();
+      services.AddTransient<DocumentationView>();
       services.AddTransient<BugReportsView>();
       services.AddTransient<ChangelogsView>();
       services.AddTransient<UpdatesView>();

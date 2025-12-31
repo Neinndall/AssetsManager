@@ -22,6 +22,7 @@ namespace AssetsManager.Views
         private void SetupNavigation()
         {
             NavAbout.Checked += NavAbout_Checked;
+            NavDocumentation.Checked += NavDocumentation_Checked;
             NavChangelogs.Checked += NavChangelogs_Checked;
             NavBugsReport.Checked += NavBugsReport_Checked;
             NavUpdates.Checked += NavUpdates_Checked;
@@ -30,6 +31,11 @@ namespace AssetsManager.Views
         private void NavAbout_Checked(object sender, RoutedEventArgs e)
         {
             NavigateToView(_serviceProvider.GetRequiredService<AboutView>());
+        }
+
+        private void NavDocumentation_Checked(object sender, RoutedEventArgs e)
+        {
+            NavigateToView(_serviceProvider.GetRequiredService<DocumentationView>());
         }
 
         private void NavChangelogs_Checked(object sender, RoutedEventArgs e)
@@ -55,6 +61,7 @@ namespace AssetsManager.Views
         private void HelpWindow_Closed(object sender, EventArgs e)
         {
             NavAbout.Checked -= NavAbout_Checked;
+            NavDocumentation.Checked -= NavDocumentation_Checked;
             NavChangelogs.Checked -= NavChangelogs_Checked;
             NavBugsReport.Checked -= NavBugsReport_Checked;
             NavUpdates.Checked -= NavUpdates_Checked;
