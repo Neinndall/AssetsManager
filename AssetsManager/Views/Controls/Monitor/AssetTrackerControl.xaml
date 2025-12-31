@@ -32,14 +32,6 @@
                     <TextBlock Text="Asset Tracker" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Discover and catalog assets from remote game servers" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
-
-                <!-- Stats Badge -->
-                <Border Grid.Column="2" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,8" VerticalAlignment="Center" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Database" Width="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding SelectedCategory.FoundUrls.Count, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    </StackPanel>
-                </Border>
             </Grid>
         </Border>
 
@@ -177,15 +169,15 @@
                                 <StackPanel>
                                     <TextBlock Text="{Binding DisplayName}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,0,12"/>
                                     
-                                    <!-- Actions Area (Split 50/50) -->
-                                    <UniformGrid Columns="2">
-                                        <Button Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource ModernButton}" Padding="8" Margin="0,0,4,0" ToolTip="Save to Disk">
+                                    <!-- Actions Area (Centered Icons) -->
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <Button Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource ModernButton}" Width="32" Height="32" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip="Save to Disk">
                                             <materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="16" Height="16" Foreground="White"/>
                                         </Button>
-                                        <Button Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Opacity="0.8" Padding="8" Margin="4,0,0,0" ToolTip="Ignore Asset">
+                                        <Button Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Opacity="0.8" Width="32" Height="32" MinWidth="0" Padding="0" Margin="6,0,0,0" ToolTip="Ignore Asset">
                                             <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="White"/>
                                         </Button>
-                                    </UniformGrid>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
