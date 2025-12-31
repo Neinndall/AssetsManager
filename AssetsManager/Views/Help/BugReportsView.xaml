@@ -21,16 +21,15 @@
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="Bug Reports" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Report issues and help improve the application" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                    <TextBlock Text="Help us improve the application by providing quality feedback" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
                 </StackPanel>
 
-                <!-- Subtle Decorative Background Icon -->
                 <materialIcons:MaterialIcon Grid.Column="1" Kind="Bug" Width="64" Height="64" Foreground="{StaticResource AccentOrange}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
             </Grid>
         </Border>
 
-        <!-- MAIN ACTION CARD -->
-        <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,20">
+        <!-- HERO ACTION SECTION -->
+        <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,20" Padding="32">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -38,23 +37,14 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="60" Height="60">
-                    <materialIcons:MaterialIcon Kind="Bug" 
-                                               Foreground="{StaticResource AccentOrange}"
-                                               Width="32" Height="32"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Width="64" Height="64">
+                    <materialIcons:MaterialIcon Kind="Github" Foreground="{StaticResource TextPrimary}" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,20,0">
-                    <TextBlock Text="Found an issue?" 
-                               FontSize="18" 
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Your feedback is essential to making AssetsManager better for everyone." 
-                               FontSize="13" 
-                               Foreground="{StaticResource TextSecondary}"
-                               TextWrapping="Wrap"
-                               Margin="0,2,0,0"/>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="24,0,24,0">
+                    <TextBlock Text="Found an Issue?" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Your feedback is essential. Help us by reporting bugs on our official GitHub repository." 
+                               FontSize="13" Foreground="{StaticResource TextSecondary}" Opacity="0.8" TextWrapping="Wrap" Margin="0,4,0,0"/>
                 </StackPanel>
 
                 <Button Grid.Column="2"
@@ -62,99 +52,73 @@
                         Content="Report on GitHub"
                         Click="buttonReportBug_Click"
                         VerticalAlignment="Center"
-                        Style="{StaticResource ModernButton}"/>
+                        Style="{StaticResource ModernButton}"
+                        FontWeight="Bold"
+                        Padding="20,8"
+                        MinHeight="40"/>
             </Grid>
         </Border>
 
         <!-- REPORTING GUIDE SECTION -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <Grid Margin="0,0,0,24">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <materialIcons:MaterialIcon Kind="TextBoxCheckOutline" 
-                                               Foreground="{StaticResource AccentBrush}"
-                                               Width="24" Height="24"
-                                               VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" 
-                               Text="How to write an effective report" 
-                               FontSize="18" 
-                               FontWeight="SemiBold" 
-                               Foreground="{StaticResource TextPrimary}"
-                               Margin="12,0,0,0"
-                               VerticalAlignment="Center"/>
-                </Grid>
-
-                <UniformGrid Columns="2">
-                    <!-- Step 1 -->
-                    <Grid Margin="0,0,16,24">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
-                            <TextBlock Text="1" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <TextBlock Text="QUALITY CHECKLIST" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,16"/>
+        <UniformGrid Columns="2">
+            <!-- Step 1 -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,0,8,8" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="Pencil" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                            <TextBlock Text="Be Descriptive" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                            <TextBlock Text="Include what happened and what you expected to see instead." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Grid>
+                        <TextBlock Text="Be Descriptive" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="Include what happened and what you expected to see instead." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
 
-                    <!-- Step 2 -->
-                    <Grid Margin="0,0,0,24">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
-                            <TextBlock Text="2" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- Step 2 -->
+            <Border Style="{StaticResource SettingsCard}" Margin="8,0,0,8" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="FormatListNumbered" Foreground="{StaticResource AccentBlue}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                            <TextBlock Text="Steps to Reproduce" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                            <TextBlock Text="Explain exactly how to trigger the bug so we can find it." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Grid>
+                        <TextBlock Text="Steps to Reproduce" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="Explain exactly how to trigger the bug so we can find it." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
 
-                    <!-- Step 3 -->
-                    <Grid Margin="0,0,16,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
-                            <TextBlock Text="3" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- Step 3 -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,0" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="Monitor" Foreground="{StaticResource AccentPurple}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                            <TextBlock Text="System Info" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                            <TextBlock Text="Mention your OS and application version for context." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Grid>
+                        <TextBlock Text="System Info" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="Mention your OS and application version for context." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
 
-                    <!-- Step 4 -->
-                    <Grid Margin="0,0,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
-                            <TextBlock Text="4" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- Step 4 -->
+            <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,0" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="FileDocumentOutline" Foreground="{StaticResource AccentRed}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                            <TextBlock Text="Attach Logs" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                            <TextBlock Text="Add relevant files from the 'logs' folder to your report." FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Grid>
-                </UniformGrid>
-            </StackPanel>
-        </Border>
+                        <TextBlock Text="Attach Logs" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="Add relevant files from the 'logs' folder to your report." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
 
         <!-- FOOTER (Professional Info) -->
         <StackPanel Margin="0,48,0,0" HorizontalAlignment="Stretch">
             <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Margin="40,0,40,24" Opacity="0.5"/>
-            <Grid HorizontalAlignment="Center" Margin="20,0">
+            <Grid HorizontalAlignment="Left" Margin="20,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>

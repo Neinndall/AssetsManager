@@ -131,7 +131,7 @@
                                      FontWeight="SemiBold"
                                      Foreground="{StaticResource TextPrimary}" 
                                      FontSize="13"/>
-                            <TextBlock Text="Visit our documentation or join the community"
+                            <TextBlock Text="Visit our documentation"
                                      Foreground="{StaticResource TextMuted}" 
                                      FontSize="11"/>
                         </StackPanel>
