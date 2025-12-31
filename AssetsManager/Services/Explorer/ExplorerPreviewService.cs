@@ -79,10 +79,8 @@ namespace AssetsManager.Services.Explorer
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
-            if (node != null && _currentlyDisplayedNode != null && _currentlyDisplayedNode.FullPath == node.FullPath)
-            {
-                return;
-            }
+            await SetPreviewerAsync(Previewer.None); // Blank the preview area immediately
+
             _currentlyDisplayedNode = node;
 
             if (node == null || node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || SupportedFileTypes.AudioBank.Contains(node.Extension))
@@ -182,7 +180,7 @@ namespace AssetsManager.Services.Explorer
                     await ShowAudioVideoPreviewAsync(data, extension);
                 }
             }
-            else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
+            else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.Troybin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.Preload.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
             else { await ShowUnsupportedPreviewAsync(extension); }
         }
 
@@ -194,7 +192,7 @@ namespace AssetsManager.Services.Explorer
                 string textContent = await _contentFormatterService.GetFormattedStringAsync(dataType, data);
 
                 IHighlightingDefinition syntaxHighlighting = null;
-                if (dataType == "json" || dataType == "bin" || dataType == "css" || dataType == "stringtable" || dataType == "js")
+                if (dataType == "json" || dataType == "bin" || dataType == "troybin" || dataType == "css" || dataType == "stringtable" || dataType == "js" || dataType == "preload")
                 {
                     syntaxHighlighting = GetJsonHighlighting();
                 }
@@ -543,6 +541,52 @@ namespace AssetsManager.Services.Explorer
         private async Task ShowUnsupportedPreviewAsync(string extension)
         {
             await SetPreviewerAsync(Previewer.Placeholder, extension);
+        }
+
+        public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node)
+        {
+            if (node == null || (!SupportedFileTypes.Images.Contains(node.Extension) && !SupportedFileTypes.Textures.Contains(node.Extension)))
+            {
+                return null;
+            }
+
+            try
+            {
+                byte[] data = node.Type switch
+                {
+                    NodeType.VirtualFile => await _wadExtractionService.GetVirtualFileBytesAsync(node),
+                    NodeType.RealFile => await File.ReadAllBytesAsync(node.FullPath),
+                    _ => null
+                };
+
+                if (data == null) return null;
+
+                if (SupportedFileTypes.Images.Contains(node.Extension))
+                {
+                    return await Task.Run(() =>
+                    {
+                        using var stream = new MemoryStream(data);
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.StreamSource = stream;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        return bmp;
+                    });
+                }
+                else if (SupportedFileTypes.Textures.Contains(node.Extension))
+                {
+                    return await Task.Run(() => TextureUtils.LoadTexture(new MemoryStream(data), node.Extension));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to get image preview for '{node.FullPath}'.");
+                return null;
+            }
+
+            return null;
         }
     }
 }

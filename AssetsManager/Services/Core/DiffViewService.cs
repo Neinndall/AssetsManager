@@ -164,8 +164,8 @@ namespace AssetsManager.Services.Core
             diffWindow.Owner = owner;
             await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, diff.OldPath, diff.NewPath);
 
-            loadingWindow.Close();
             _logService.Log("[HandleAudioBankDiffAsync] Displaying diff window.");
+            diffWindow.ContentRendered += (s, e) => loadingWindow.Close();
             diffWindow.ShowDialog();
         }
 
@@ -207,7 +207,7 @@ namespace AssetsManager.Services.Core
             diffWindow.Owner = owner;
             await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath);
 
-            loadingWindow.Close();
+            diffWindow.ContentRendered += (s, e) => loadingWindow.Close();
             diffWindow.ShowDialog();
         }
 
@@ -257,7 +257,7 @@ namespace AssetsManager.Services.Core
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath));
 
-                loadingWindow.Close();
+                diffWindow.ContentRendered += (s, e) => loadingWindow.Close();
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)
@@ -291,6 +291,8 @@ namespace AssetsManager.Services.Core
                    SupportedFileTypes.Css.Contains(extension) ||
                    SupportedFileTypes.Bin.Contains(extension) ||
                    SupportedFileTypes.StringTable.Contains(extension) ||
+                   SupportedFileTypes.Troybin.Contains(extension) ||
+                   SupportedFileTypes.Preload.Contains(extension) ||
                    extension == ".bnk" ||
                    SupportedFileTypes.PlainText.Contains(extension);
         }

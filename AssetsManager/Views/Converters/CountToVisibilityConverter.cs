@@ -11,6 +11,11 @@ namespace AssetsManager.Views.Converters
         {
             if (value is int count)
             {
+                bool invert = parameter is string str && str.Equals("Invert", StringComparison.OrdinalIgnoreCase);
+                if (invert)
+                {
+                    return count <= 0 ? Visibility.Visible : Visibility.Collapsed;
+                }
                 return count > 0 ? Visibility.Visible : Visibility.Collapsed;
             }
             return Visibility.Collapsed; // Default for non-int values

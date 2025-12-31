@@ -139,7 +139,7 @@ namespace AssetsManager.Views.Controls.Comparator
             try
             {
                 var cancellationToken = TaskCancellationManager.PrepareNewOperation();
-                if (wadComparatorTabControl.SelectedIndex == 0) // By Directory
+                if (ModeDirectory.IsChecked == true) // By Directory
                 {
                     if (string.IsNullOrEmpty(oldLolPbeDirectoryTextBox.Text) || string.IsNullOrEmpty(newLolPbeDirectoryTextBox.Text))
                     {

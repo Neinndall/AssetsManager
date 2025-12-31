@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Windows.Media;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
 

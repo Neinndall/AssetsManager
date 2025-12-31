@@ -9,141 +9,239 @@
              xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:avalonedit="http://icsharpcode.net/sharpdevelop/avalonedit"
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
-             mc:Ignorable="d" PreviewKeyDown="FilePreviewerControl_PreviewKeyDown">
+             mc:Ignorable="d" 
+             PreviewKeyDown="FilePreviewerControl_PreviewKeyDown">
              
-        <UserControl.Resources>
-            <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
-            <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
-        </UserControl.Resources>
-        
-        <DockPanel>
-            <Grid DockPanel.Dock="Top" Background="{StaticResource SidebarBackground}" Margin="0,8,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+    <UserControl.Resources>
+        <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
+        <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+        <converters:PathToIconConverter x:Key="PathToIconConverter"/>
+    </UserControl.Resources>
+    
+    <DockPanel>
+        <!-- Pinned Tabs Area -->
+        <Grid DockPanel.Dock="Top" 
+              Background="{StaticResource SidebarBackground}" 
+              Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-                <Button x:Name="ScrollLeftButton" Grid.Column="0" Style="{StaticResource TransparentIconButton}" Click="ScrollLeftButton_Click" Visibility="Collapsed" VerticalAlignment="Center" Padding="4,2">
-                    <materialIcons:MaterialIcon Kind="ChevronLeft" Width="16" Height="16" />
-                </Button>
+            <Button x:Name="ScrollLeftButton" 
+                    Grid.Column="0" 
+                    Style="{StaticResource TransparentIconButton}" 
+                    Click="ScrollLeftButton_Click" 
+                    Visibility="Collapsed" 
+                    VerticalAlignment="Center" 
+                    Padding="4,2">
+                <materialIcons:MaterialIcon Kind="ChevronLeft" Width="16" Height="16" />
+            </Button>
 
-                <ScrollViewer Grid.Column="1" x:Name="TabsScrollViewer" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" ScrollChanged="TabsScrollViewer_ScrollChanged">
-                    <ItemsControl ItemsSource="{Binding PinnedFiles}" >
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{Binding IsSelected, Converter={StaticResource BoolToBrushConverter}}" CornerRadius="5,5,0,0" Margin="2,0,2,0" MouseDown="Tab_MouseDown">
-                                    <StackPanel Orientation="Horizontal" Margin="8,2,8,2">
-                                        <TextBlock Text="{Binding Header}" VerticalAlignment="Center">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                            <Setter Property="Foreground" Value="White"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                        <Button Click="CloseTabButton_Click" Margin="5,0,0,0">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-                                                    <Style.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter Property="Background" Value="#33FFFFFF"/>
-                                                            <Setter Property="Foreground" Value="White"/>
-                                                        </Trigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                            <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12"/>
-                                        </Button>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+            <ScrollViewer Grid.Column="1" 
+                          x:Name="TabsScrollViewer" 
+                          HorizontalScrollBarVisibility="Hidden" 
+                          VerticalScrollBarVisibility="Disabled" 
+                          ScrollChanged="TabsScrollViewer_ScrollChanged">
+                <ItemsControl ItemsSource="{Binding PinnedFiles}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="TabBorder"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="0,2,0,0"
+                                    CornerRadius="4,4,0,0" 
+                                    Margin="2,0,2,0" 
+                                    MouseDown="Tab_MouseDown"
+                                    MinHeight="28">
+                                <StackPanel Orientation="Horizontal" Margin="8,4,4,4" VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
+                                                                Width="14" Height="14"
+                                                                VerticalAlignment="Center"
+                                                                Margin="0,0,6,0"
+                                                                Foreground="White"/>
+                                    <TextBlock Text="{Binding Header}" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                <Setter Property="FontWeight" Value="Normal"/>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <Button x:Name="CloseButton" 
+                                            Click="CloseTabButton_Click" 
+                                            Margin="8,0,0,0"
+                                            Visibility="Hidden">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                        <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12"/>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <!-- Active Tab Style -->
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource CardBackground}"/>
+                                    <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    <Setter TargetName="CloseButton" Property="Visibility" Value="Visible"/>
+                                    <Setter TargetName="TabBorder" Property="TextElement.Foreground" Value="White"/>
+                                    <Setter TargetName="TabBorder" Property="TextElement.FontWeight" Value="SemiBold"/>
+                                </DataTrigger>
+                                <!-- Hover on Inactive Tab -->
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
+                                        <Condition Binding="{Binding IsSelected}" Value="False"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                    <Setter TargetName="CloseButton" Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
 
-                <Button x:Name="ScrollRightButton" Grid.Column="2" Style="{StaticResource TransparentIconButton}" Click="ScrollRightButton_Click" Visibility="Collapsed" VerticalAlignment="Center" Padding="4,2">
-                    <materialIcons:MaterialIcon Kind="ChevronRight" Width="16" Height="16" />
-                </Button>
-            </Grid>
-        <Border x:Name="PinnedTabsSeparator" DockPanel.Dock="Top" Height="1" Background="{StaticResource BorderColor}" Margin="0,5,5,5" Visibility="{Binding PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
+            <Button x:Name="ScrollRightButton" 
+                    Grid.Column="2" 
+                    Style="{StaticResource TransparentIconButton}" 
+                    Click="ScrollRightButton_Click" 
+                    Visibility="Collapsed" 
+                    VerticalAlignment="Center" 
+                    Padding="4,2">
+                <materialIcons:MaterialIcon Kind="ChevronRight" Width="16" Height="16" />
+            </Button>
+        </Grid>
 
-        <Grid x:Name="PreviewContainer" Margin="5">
-            <local:DetailsTabView x:Name="DetailsPreview" Visibility="Collapsed"/>
-            <StackPanel x:Name="PreviewPlaceholder"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Visibility="Visible">
-                <StackPanel x:Name="SelectFileMessagePanel"
-                            Orientation="Vertical"
-                            HorizontalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="FileUploadOutline"
-                                                Width="48" Height="48"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource TextMuted}"
-                                                Opacity="0.5"/>
-                    <TextBlock x:Name="SelectFileMessage"
-                               Text="SELECT A FILE"
-                               FontSize="18" 
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextMuted}"
-                               HorizontalAlignment="Center"
-                               Margin="0,16,0,0"/>
-                    <TextBlock x:Name="SelectFileSubMessage"
-                               Text="Select a file from the tree to preview its content"
-                               FontSize="14"
-                               Foreground="{StaticResource TextMuted}"
-                               HorizontalAlignment="Center"
-                               Margin="0,8,0,0"
-                               Opacity="0.7"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"/>
-                </StackPanel>
+        <Border x:Name="PinnedTabsSeparator" 
+                DockPanel.Dock="Top" 
+                Height="1" 
+                Background="{StaticResource BorderColor}" 
+                Margin="0,5,5,5" 
+                Visibility="{Binding PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
 
-                <StackPanel x:Name="UnsupportedFileMessagePanel"
-                            Orientation="Vertical"
+        <!-- Breadcrumbs Area -->
+        <Grid DockPanel.Dock="Top">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <local:BreadcrumbControl x:Name="Breadcrumbs" 
+                                     Grid.Row="0" 
+                                     Margin="5,2,5,0" 
+                                     VerticalAlignment="Center" 
+                                     Visibility="Collapsed"/>
+            <Border x:Name="BreadcrumbSeparator" 
+                    Grid.Row="1" 
+                    Height="1" 
+                    Background="{StaticResource BorderColor}" 
+                    Margin="0,5,5,5" 
+                    Visibility="Collapsed"/>
+        </Grid>
+
+        <!-- Main Content Area -->
+        <Grid Margin="5">
+            <local:FileGridView x:Name="FileGridView" Visibility="Collapsed"/>
+            
+            <Grid x:Name="PreviewContainer" Visibility="Visible">
+                <local:DetailsTabView x:Name="DetailsPreview" Visibility="Collapsed"/>
+                
+                <!-- Placeholders -->
+                <StackPanel x:Name="PreviewPlaceholder"
                             HorizontalAlignment="Center"
-                            Visibility="Collapsed">
-                    <materialIcons:MaterialIcon Kind="FileCancelOutline"
-                                                Width="48" Height="48"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource TextMuted}"
-                                                Opacity="0.5"/>
-                    <TextBlock x:Name="UnsupportedFileMessage"
-                               Text="Preview not available for this file type"
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextMuted}"
-                               HorizontalAlignment="Center"
-                               Margin="0,8,0,0"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"/>
-                </StackPanel>
-            </StackPanel>
-            <Image x:Name="ImagePreview" Visibility="Collapsed" Stretch="Uniform"/>
-            <avalonedit:TextEditor x:Name="TextEditorPreview"
-                                   Style="{StaticResource BaseTextEditorStyle}"
-                                   Visibility="Collapsed"
-                                   Margin="-4,0,0,0"/>
-            <Grid x:Name="WebViewContainer"/>
+                            VerticalAlignment="Center"
+                            Margin="20"
+                            Visibility="Visible">
+                    <!-- Default State -->
+                    <StackPanel x:Name="SelectFileMessagePanel"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="FileSearchOutline"
+                                                    Width="64" Height="64"
+                                                    HorizontalAlignment="Center"
+                                                    Foreground="{StaticResource TextMuted}"
+                                                    Opacity="0.4"/>
+                        <TextBlock x:Name="SelectFileMessage"
+                                   Text="No file selected"
+                                   FontSize="20" 
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Margin="0,16,0,0"/>
+                        <TextBlock x:Name="SelectFileSubMessage"
+                                   Text="Select a file from the explorer to preview its content"
+                                   FontSize="14"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   HorizontalAlignment="Center"
+                                   Margin="20,8,20,0"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"/>
+                    </StackPanel>
 
-            <shared:FindInDocumentControl x:Name="FindInDocumentControl"
-                                          Grid.Row="0"
-                                          HorizontalAlignment="Right"
-                                          VerticalAlignment="Top"
-                                          Margin="0,0,15,0"
-                                          Visibility="Collapsed"
-                                          TargetTextEditor="{Binding ElementName=TextEditorPreview}"
-                                          Close="FindInDocumentControl_Close"/>
+                    <!-- Unsupported State -->
+                    <StackPanel x:Name="UnsupportedFileMessagePanel"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                Visibility="Collapsed">
+                        <materialIcons:MaterialIcon Kind="FileRemoveOutline" 
+                                                    Width="64" Height="64"
+                                                    HorizontalAlignment="Center"
+                                                    Foreground="{StaticResource TextMuted}"
+                                                    Opacity="0.4"/>
+                        <TextBlock x:Name="UnsupportedFileMessage"
+                                   Text="Preview Unavailable"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Margin="0,16,0,0"/>
+                         <TextBlock Text="This file format is not supported for internal preview."
+                                   FontSize="14"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   HorizontalAlignment="Center"
+                                   Margin="20,8,20,0"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Previews -->
+                <Image x:Name="ImagePreview" Visibility="Collapsed" Stretch="Uniform"/>
+                <avalonedit:TextEditor x:Name="TextEditorPreview"
+                                       Style="{StaticResource BaseTextEditorStyle}"
+                                       Visibility="Collapsed"
+                                       Margin="-4,0,0,0"/>
+                <Grid x:Name="WebViewContainer"/>
+
+                <!-- Search inside document -->
+                <shared:FindInDocumentControl x:Name="FindInDocumentControl"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Top"
+                                              Margin="0,0,15,0"
+                                              Visibility="Collapsed"
+                                              TargetTextEditor="{Binding ElementName=TextEditorPreview}"
+                                              Close="FindInDocumentControl_Close"/>
+            </Grid>
         </Grid>
     </DockPanel>
 </UserControl>

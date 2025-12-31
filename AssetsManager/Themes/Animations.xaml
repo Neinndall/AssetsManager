@@ -31,6 +31,26 @@
                          From="0" To="360" Duration="0:0:1" RepeatBehavior="Forever"/>
     </Storyboard>
 
+    <!-- Estilo para aplicar la animación de giro automáticamente -->
+    <Style x:Key="SpinningIconStyle" TargetType="{x:Type FrameworkElement}">
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <RotateTransform Angle="0"/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="Visibility" Value="Visible">
+                <Trigger.EnterActions>
+                    <BeginStoryboard x:Name="SpinningStoryboard" Storyboard="{StaticResource SpinningIconAnimation}"/>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <StopStoryboard BeginStoryboardName="SpinningStoryboard"/>
+                </Trigger.ExitActions>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Estilo para el texto de los botones de la barra lateral -->
     <Style x:Key="SidebarMenuTextStyle" TargetType="TextBlock">
         <Setter Property="Opacity" Value="0"/>

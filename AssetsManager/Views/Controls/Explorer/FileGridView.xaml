@@ -1,0 +1,170 @@
+<UserControl x:Class="AssetsManager.Views.Controls.Explorer.FileGridView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
+             mc:Ignorable="d">
+    <UserControl.Resources>
+        <converters:PathToIconConverter x:Key="PathToIconConverter"/>
+        
+        <DataTemplate x:Key="FileGridItemTemplate">
+            <!-- Main Card Container -->
+            <Border Margin="8" Width="140" Height="170" CornerRadius="12"
+                    MouseLeftButtonUp="FileGridView_Item_MouseLeftButtonUp" Cursor="Hand"
+                    Background="{StaticResource CardBackground}"
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>   <!-- Hero / Thumbnail -->
+                        <RowDefinition Height="Auto"/> <!-- Info -->
+                    </Grid.RowDefinitions>
+
+                    <!-- HERO AREA -->
+                    <Border Grid.Row="0" CornerRadius="11,11,0,0" Background="Transparent" ClipToBounds="True">
+                        <Grid>
+                            <!-- Folder/Generic Background Pattern (Optional subtle tint) -->
+                            <Border Background="{StaticResource SidebarBackground}" Opacity="0.3"/>
+
+                            <!-- Material Icon Fallback -->
+                            <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
+                                                        Width="56" Height="56" 
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center" 
+                                                        Foreground="{StaticResource TextSecondary}" Opacity="0.8">
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ImagePreview}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialIcons:MaterialIcon.Style>
+                            </materialIcons:MaterialIcon>
+                            
+                            <!-- Image Preview (using Border+ImageBrush for perfect corner clipping) -->
+                            <Border CornerRadius="11,11,0,0">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ImagePreview}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Border.Background>
+                                    <ImageBrush ImageSource="{Binding ImagePreview}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                </Border.Background>
+                            </Border>
+
+                            <!-- Top-Right Badge (Type Indicator) -->
+                            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0" 
+                                    CornerRadius="4" Padding="6,2" Background="#CC000000">
+                                <TextBlock FontSize="9" FontWeight="Bold" Foreground="White">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="FILE"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                                                    <Setter Property="Text" Value="DIR"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                                <!-- You could add more triggers here for specific extensions if available in VM -->
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- INFO AREA -->
+                    <Border Grid.Row="1" Background="Transparent" Padding="10,8,10,12">
+                        <StackPanel>
+                            <!-- File Name -->
+                            <TextBlock Text="{Binding DisplayNameShort}" 
+                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Left"
+                                       Foreground="{StaticResource TextPrimary}" 
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Height="34"/> <!-- Fixed height for 2 lines -->
+
+                            <!-- Metadata Line -->
+                            <Grid Margin="0,4,0,0">
+                                <!-- Folder Stats: Subfolders and Assets split -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    
+                                    <!-- Subfolders -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                                        <materialIcons:MaterialIcon Kind="FolderOutline" Width="10" Height="10" Foreground="{StaticResource AccentOrange}" Margin="0,0,3,0"/>
+                                        <TextBlock Text="{Binding SubfolderCount}" FontSize="10" Foreground="{StaticResource TextSecondary}" FontWeight="Medium"/>
+                                    </StackPanel>
+
+                                    <!-- Assets -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="FileOutline" Width="10" Height="10" Foreground="{StaticResource AccentBlue}" Margin="0,0,3,0"/>
+                                        <TextBlock Text="{Binding AssetCount}" FontSize="10" Foreground="{StaticResource TextSecondary}" FontWeight="Medium"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                
+                                <!-- File Hint (if not folder) -->
+                                <TextBlock Text="Asset" FontSize="10" Foreground="{StaticResource TextMuted}" FontStyle="Italic">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsFolder}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+    
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
+        <ItemsControl x:Name="FileGridViewItemsControl"
+                      ItemTemplate="{StaticResource FileGridItemTemplate}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+        </ItemsControl>
+    </ScrollViewer>
+</UserControl>

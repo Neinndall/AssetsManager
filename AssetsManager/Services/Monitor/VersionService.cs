@@ -182,6 +182,7 @@ namespace AssetsManager.Services.Monitor
             finally
             {
                 CleanupManifestDownloader();
+                VersionDownloadCompleted?.Invoke(this, ("Downloading League Client Executable", true, "Finished"));
             }
 
             return versions;

@@ -1,25 +1,29 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-
+    
     <!-- Lo usamos para Styles.xaml / SidebarMenuButton -->
     <SolidColorBrush x:Key="AccentBrush" Color="#FF5577CC"/> 
     <SolidColorBrush x:Key="ModernButtonHoverBrush" Color="#FF6A88D9"/>
     <SolidColorBrush x:Key="ModernButtonPressedBrush" Color="#FF405DAB"/>
-    
+
     <!-- Modern Dark Theme Colors -->
     <SolidColorBrush x:Key="DarkBackground" Color="#FF1E1E1E"/>
-    <SolidColorBrush x:Key="CardBackground" Color="#FF2D2D30"/>     <!-- Este color lo usaremos para cuando tengamos una seleccion encima del raton -->
-    <SolidColorBrush x:Key="SidebarBackground" Color="#FF252526"/>  <!-- Este color lo usaremos para fondos -->
-    <SolidColorBrush x:Key="AccentBlue" Color="#FF007ACC"/>
-    <SolidColorBrush x:Key="AccentGreen" Color="#FF16825D"/>
-    <SolidColorBrush x:Key="AccentPurple" Color="#9370DB"/>
-    <SolidColorBrush x:Key="AccentOrange" Color="#FFD7BA7D"/>
+    <SolidColorBrush x:Key="CardBackground" Color="#FF2D2D30"/>     <!-- Restaurado: Original lighter color for Sidebar/Cards -->
+    <SolidColorBrush x:Key="SidebarBackground" Color="#FF252526"/>
+    <SolidColorBrush x:Key="AccentBlue" Color="#FF4FC1FF"/>   <!-- Más brillante para modo oscuro -->
+    <SolidColorBrush x:Key="AccentGreen" Color="#FF57CC99"/>  <!-- Más moderno -->
+    <SolidColorBrush x:Key="AccentPurple" Color="#FFC77DFF"/>
+    <SolidColorBrush x:Key="AccentOrange" Color="#FFFFD166"/>
     <SolidColorBrush x:Key="AccentRed" Color="#FFCC3333"/>
-    <SolidColorBrush x:Key="TextPrimary" Color="#FFCCCCCC"/>
-    <SolidColorBrush x:Key="TextSecondary" Color="#FF969696"/>
-    <SolidColorBrush x:Key="TextMuted" Color="#FF6A6A6A"/>
+
+    <SolidColorBrush x:Key="TextPrimary" Color="#FFD1D1D1"/>  <!-- Más suave que el blanco intenso -->
+    <SolidColorBrush x:Key="TextSecondary" Color="#FFAAAAAA"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#FF757575"/>
     <SolidColorBrush x:Key="BorderColor" Color="#FF3F3F46"/>
-    <SolidColorBrush x:Key="HoverColor" Color="#FF3A3A3C"/>
+    <SolidColorBrush x:Key="HoverColor" Color="#FF3E3E42"/>
+    
+    <!-- Dialog Colors -->
+    <SolidColorBrush x:Key="OptionCardBrush" Color="#FF29292C"/> 
     
     <!-- Colores que usará CustomScrollbarStyles.xaml -->
     <SolidColorBrush x:Key="ScrollBarBackground" Color="#252526" />

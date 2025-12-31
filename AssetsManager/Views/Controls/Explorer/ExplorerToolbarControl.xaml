@@ -6,88 +6,104 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
     <Grid>
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,6,0,0">
-            <!-- Action Buttons on the left -->
-            <Button x:Name="CollapseToContainerButton" 
-                    Style="{StaticResource TransparentIconButton}" 
-                    ToolTip="Collapse to container" 
-                    Margin="5,0" 
-                    Click="CollapseToContainerButton_Click">
-                <materialIcons:MaterialIcon Kind="ArrowCollapseAll" Width="18" Height="18"/>
-            </Button>
-            <Button x:Name="LoadComparisonButton" 
-                    Style="{StaticResource TransparentIconButton}" 
-                    ToolTip="Load Comparison Backup" 
-                    Margin="5,0" 
-                    Click="LoadComparisonButton_Click">
-                <materialIcons:MaterialIcon Kind="FileUpload" Width="18" Height="18"/>
-            </Button>
-            <ToggleButton x:Name="SortToggleButton"
-                          Style="{StaticResource TransparentIconToggleButton}"
-                          Click="SortToggleButton_Click"
-                          ToolTip="Group by paths/categories"
-                          Margin="5,0"
-                          IsChecked="True"
-                          Visibility="Collapsed">
-                <materialIcons:MaterialIcon Kind="SortAlphabeticalAscending" Width="18" Height="18"/>
-            </ToggleButton>
-            <Button x:Name="SwitchModeButton" 
-                    Style="{StaticResource TransparentIconButton}" 
-                    ToolTip="Switch Mode" 
-                    Margin="5,0" 
-                    Click="SwitchModeButton_Click">
-                <materialIcons:MaterialIcon Kind="Sync" Width="18" Height="18"/>
-            </Button>
-            <ToggleButton x:Name="BreadcrumbToggleButton"
-                          Style="{StaticResource TransparentIconToggleButton}"
-                          Click="BreadcrumbToggleButton_Click"
-                          ToolTip="Show Breadcrumb"
-                          Margin="5,0"
-                          IsChecked="False">
-                <materialIcons:MaterialIcon Kind="CodeTags" Width="18" Height="18"/>
-            </ToggleButton>
-            <ToggleButton x:Name="SearchToggleButton" 
-                          Style="{StaticResource SearchToggleStyle}" 
-                          Margin="5,0"
-                          ToolTip="Filter/Searcher"/>
+        <Border Background="{StaticResource CardBackground}" 
+                CornerRadius="6" 
+                Padding="4" 
+                BorderBrush="{StaticResource BorderColor}" 
+                BorderThickness="1"
+                HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Action Group -->
+                <Button x:Name="CollapseToContainerButton" 
+                        Style="{StaticResource TransparentIconButton}" 
+                        ToolTip="Collapse all folders" 
+                        Margin="0,0,2,0" 
+                        Click="CollapseToContainerButton_Click">
+                    <materialIcons:MaterialIcon Kind="ArrowCollapseAll" Width="18" Height="18"/>
+                </Button>
+                <Button x:Name="LoadComparisonButton" 
+                        Style="{StaticResource TransparentIconButton}" 
+                        ToolTip="Load Comparison Backup" 
+                        Margin="0,0,2,0" 
+                        Click="LoadComparisonButton_Click">
+                    <materialIcons:MaterialIcon Kind="FileUpload" Width="18" Height="18"/>
+                </Button>
+                <ToggleButton x:Name="SortToggleButton"
+                              Style="{StaticResource TransparentIconToggleButton}"
+                              Click="SortToggleButton_Click"
+                              ToolTip="Group by paths/categories"
+                              Margin="0,0,2,0"
+                              IsChecked="True"
+                              Visibility="Collapsed">
+                    <materialIcons:MaterialIcon Kind="SortAlphabeticalAscending" Width="18" Height="18"/>
+                </ToggleButton>
+                
+                <Rectangle Width="1" Height="16" Fill="{StaticResource BorderColor}" Margin="4,0,8,0" VerticalAlignment="Center"/>
+                
+                <!-- View Mode Group -->
+                <Button x:Name="SwitchModeButton" 
+                        Style="{StaticResource TransparentIconButton}" 
+                        ToolTip="Switch Mode (WAD / Directory)" 
+                        Margin="0,0,2,0" 
+                        Click="SwitchModeButton_Click">
+                    <materialIcons:MaterialIcon Kind="Sync" Width="18" Height="18"/>
+                </Button>
+                <ToggleButton x:Name="GridViewToggleButton" 
+                              Style="{StaticResource TransparentIconToggleButton}"
+                              ToolTip="Toggle Grid View"
+                              Margin="0,0,2,0" 
+                              Click="GridViewToggle_Click">
+                    <materialIcons:MaterialIcon Kind="ViewGridOutline" Width="18" Height="18"/>
+                </ToggleButton>
+                <ToggleButton x:Name="BreadcrumbToggleButton"
+                              Style="{StaticResource TransparentIconToggleButton}"
+                              Click="BreadcrumbToggleButton_Click"
+                              ToolTip="Show Breadcrumb"
+                              Margin="0,0,2,0"
+                              IsChecked="True">
+                    <materialIcons:MaterialIcon Kind="CodeTags" Width="18" Height="18"/>
+                </ToggleButton>
 
-            <!-- Search controls now appear next to the toggle button -->
-            <Grid>
-                <TextBox x:Name="SearchTextBox" 
-                         Style="{StaticResource AnimatedSearchBoxStyle}" 
-                         Tag="{Binding IsChecked, ElementName=SearchToggleButton}"
-                         TextChanged="SearchTextBox_TextChanged"/>
-                <StackPanel Orientation="Horizontal"
-                            IsHitTestVisible="False"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Left"
-                            Margin="15,0,0,0">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding Text, ElementName=SearchTextBox}" Value=""/>
-                                        <Condition Binding="{Binding IsChecked, ElementName=SearchToggleButton}" Value="True"/>
-                                        <Condition Binding="{Binding IsFocused, ElementName=SearchTextBox}" Value="False"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
-                    <materialIcons:MaterialIcon Kind="Magnify"
-                                                Width="14"
-                                                Height="14"
-                                                Foreground="{StaticResource TextSecondary}"
-                                                Margin="0,0,5,0"
-                                                VerticalAlignment="Center"/>
-                    <TextBlock Text="Search..."
+                <Rectangle Width="1" Height="16" Fill="{StaticResource BorderColor}" Margin="4,0,8,0" VerticalAlignment="Center"/>
+
+                <!-- Search Group -->
+                <ToggleButton x:Name="SearchToggleButton" 
+                              Style="{StaticResource SearchToggleStyle}" 
+                              Margin="0,0,0,0"
+                              ToolTip="Toggle Search"/>
+
+                <Grid VerticalAlignment="Center" Margin="2,0,0,0">
+                    <TextBox x:Name="SearchTextBox" 
+                             Style="{StaticResource AnimatedSearchBoxStyle}" 
+                             Tag="{Binding IsChecked, ElementName=SearchToggleButton}"
+                             TextChanged="SearchTextBox_TextChanged"/>
+                    
+                    <TextBlock Text="Search files..."
                                Foreground="{StaticResource TextSecondary}"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
-            </Grid>
-        </StackPanel>
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left"
+                               FontSize="12"
+                               Opacity="0.7"
+                               IsHitTestVisible="False"
+                               Margin="12,0,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding Text, ElementName=SearchTextBox}" Value=""/>
+                                            <Condition Binding="{Binding IsChecked, ElementName=SearchToggleButton}" Value="True"/>
+                                            <Condition Binding="{Binding IsFocused, ElementName=SearchTextBox}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

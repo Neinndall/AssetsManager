@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
@@ -9,8 +11,11 @@ using System.Windows.Input;
 using Microsoft.Web.WebView2.Core;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Controls.Explorer;
+using NodeClickedEventArgs = AssetsManager.Views.Controls.Explorer.NodeClickedEventArgs;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -20,12 +25,20 @@ namespace AssetsManager.Views.Controls.Explorer
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public DirectoriesCreator DirectoriesCreator { get; set; }
         public ExplorerPreviewService ExplorerPreviewService { get; set; }
+        public TreeUIManager TreeUIManager { get; set; }
+
+        public event EventHandler<NodeClickedEventArgs> BreadcrumbNodeClicked;
 
         public PinnedFilesManager ViewModel { get; set; }
         private bool _isLoaded = false;
 
         private FileSystemNodeModel _currentNode;
+        private FileSystemNodeModel _currentFolderNode;
+        private ObservableCollection<FileSystemNodeModel> _rootNodes;
         private bool _isShowingTemporaryPreview = false;
+        private bool _isGridMode = false;
+        private string _currentSearchFilter = string.Empty;
+        private bool _isBreadcrumbToggleOn = true; // Default to true to match Toolbar XAML state
 
         public FilePreviewerControl()
         {
@@ -36,6 +49,47 @@ namespace AssetsManager.Views.Controls.Explorer
             this.Loaded += FilePreviewerControl_Loaded;
             this.Unloaded += FilePreviewerControl_Unloaded;
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+        }
+
+        public void SetSearchFilter(string searchText)
+        {
+            _currentSearchFilter = searchText;
+            if (_isGridMode && _currentFolderNode != null)
+            {
+                UpdateSelectedNode(_currentFolderNode, _rootNodes);
+            }
+        }
+
+        public void SetViewMode(bool isGridMode)
+        {
+            if (_isGridMode != isGridMode)
+            {
+                _isGridMode = isGridMode;
+                // No need to fire event here because this is called BY the parent
+            }
+            // Force update regardless to ensure UI sync
+            _isGridMode = isGridMode;
+
+            if (_isGridMode)
+            {
+                if (_currentFolderNode != null)
+                {
+                    // This will also set the ItemsSource if it's a new folder
+                    UpdateSelectedNode(_currentFolderNode, _rootNodes);
+                }
+            }
+            else // Preview Mode
+            {
+                SwitchToFilePreview();
+                if (_currentNode != null && _currentNode != _currentFolderNode)
+                {
+                    _ = ShowPreviewAsync(_currentNode);
+                }
+                else
+                {
+                    _ = ExplorerPreviewService.ResetPreviewAsync();
+                }
+            }
         }
 
         private void PinnedFiles_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -107,6 +161,10 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
                     return;
                 }
+                
+                // When a pin is selected, use the helper to ensure the view and buttons are synced
+                SwitchToFilePreview();
+                UpdateBreadcrumbs(selectedPin.Node);
 
                 if (selectedPin.IsDetailsTab)
                 {
@@ -160,6 +218,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     DetailsPreview
                 );
 
+                Breadcrumbs.NodeClicked += Breadcrumbs_NodeClicked;
+                FileGridView.NodeClicked += FileGridView_NodeClicked;
                 UpdateScrollButtonsVisibility();
 
                 _isLoaded = true;
@@ -175,8 +235,10 @@ namespace AssetsManager.Views.Controls.Explorer
             try
             {
                 await ExplorerPreviewService.ResetPreviewAsync();
-                ViewModel.PropertyChanged -= ViewModel_PropertyChanged; // Unsubscribe to prevent memory leaks
+                ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
                 ViewModel.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
+                FileGridView.NodeClicked -= FileGridView_NodeClicked;
             }
             catch (Exception ex)
             {
@@ -192,21 +254,24 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (existingPin != null)
             {
-                ViewModel.SelectedFile = existingPin;
+                // If the pin is already selected, the PropertyChanged event won't fire.
+                // So, we need to explicitly show the preview content again.
+                if (ViewModel.SelectedFile == existingPin)
+                {
+                    await ExplorerPreviewService.ShowPreviewAsync(node);
+                }
+                else
+                {
+                    // If a different pin was selected, setting the property will trigger the update.
+                    ViewModel.SelectedFile = existingPin;
+                }
             }
             else
             {
                 _isShowingTemporaryPreview = true;
                 ViewModel.SelectedFile = null;
 
-                bool wasDetailsVisible = DetailsPreview.Visibility == Visibility.Visible;
-
                 DetailsPreview.Visibility = Visibility.Collapsed;
-
-                if (wasDetailsVisible)
-                {
-                    PreviewPlaceholder.Visibility = Visibility.Visible;
-                }
 
                 await ExplorerPreviewService.ShowPreviewAsync(node);
                 _isShowingTemporaryPreview = false;
@@ -229,6 +294,147 @@ namespace AssetsManager.Views.Controls.Explorer
                 };
                 ViewModel.PinnedFiles.Add(newDetailsPin);
             }
+        }
+
+        public async Task ResetToDefaultState()
+        {
+            FileGridView.Visibility = Visibility.Collapsed;
+            PreviewContainer.Visibility = Visibility.Visible;
+            _isGridMode = false;
+            UpdateSelectedNode(null, null);
+            await ExplorerPreviewService.ResetPreviewAsync();
+        }
+
+        public void UpdateSelectedNode(FileSystemNodeModel node, ObservableCollection<FileSystemNodeModel> rootNodes)
+        {
+            _currentNode = node;
+            _rootNodes = rootNodes;
+            UpdateBreadcrumbs(node);
+            UpdateBreadcrumbAndSeparatorVisibility();
+
+            if (node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent))
+            {
+                _currentFolderNode = node; // Track the last folder
+
+                var gridItems = new ObservableCollection<FileGridViewModel>(
+                    (!string.IsNullOrEmpty(_currentSearchFilter)
+                        ? node.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+                        : node.Children)
+                    .Select(n => new FileGridViewModel(n)));
+
+                FileGridView.ItemsSource = gridItems;
+
+                // If the user is on Preview mode, do not switch to GridView automatically.
+                if (!_isGridMode)
+                {
+                    // A folder is selected, so reset the preview to show the default placeholder.
+                    _ = ExplorerPreviewService.ResetPreviewAsync();
+                }
+                else
+                {
+                    // Otherwise, the user is in GridView, so show the folder's content.
+                    SwitchToFolderView();
+                }
+
+                // Asynchronously load image previews for the children
+                foreach (var vm in gridItems)
+                {
+                    if (SupportedFileTypes.Images.Contains(vm.Node.Extension) || SupportedFileTypes.Textures.Contains(vm.Node.Extension))
+                    {
+                        // Fire and forget
+                        _ = LoadImagePreviewAsync(vm);
+                    }
+                }
+            }
+            else
+            {
+                SwitchToFilePreview();
+                // We do NOT force _isGridMode to false here anymore.
+                // If the user was in Grid Mode, we show the file, but we keep the "Grid" state active
+                // so when they click a folder again, it goes back to Grid view automatically.
+            }
+        }
+
+        private void SwitchToFolderView()
+        {
+            PreviewContainer.Visibility = Visibility.Collapsed;
+            FileGridView.Visibility = Visibility.Visible;
+        }
+
+        private void SwitchToFilePreview()
+        {
+            FileGridView.Visibility = Visibility.Collapsed;
+            PreviewPlaceholder.Visibility = Visibility.Collapsed; // Hide placeholder to prevent flicker
+            PreviewContainer.Visibility = Visibility.Visible;
+        }
+
+
+        private async Task LoadImagePreviewAsync(FileGridViewModel vm)
+        {
+            if (vm.ImagePreview != null) return; // Already loaded
+
+            var image = await ExplorerPreviewService.GetImagePreviewAsync(vm.Node);
+            if (image != null)
+            {
+                vm.ImagePreview = image;
+            }
+        }
+
+        private void FileGridView_NodeClicked(object sender, NodeClickedEventArgs e)
+        {
+            // We always notify the parent (ExplorerWindow) to select the node in the tree.
+            // This keeps the TreeView and the Previewer in sync, which fixes navigation bugs.
+            BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(e.Node));
+        }
+        
+        public void SetBreadcrumbToggleState(bool isToggleOn)
+        {
+            _isBreadcrumbToggleOn = isToggleOn;
+            UpdateBreadcrumbAndSeparatorVisibility();
+        }
+
+        private void UpdateBreadcrumbAndSeparatorVisibility()
+        {
+            bool shouldBeVisible = _isBreadcrumbToggleOn && _currentNode != null;
+            Visibility newVisibility = shouldBeVisible ? Visibility.Visible : Visibility.Collapsed;
+            Breadcrumbs.Visibility = newVisibility;
+            BreadcrumbSeparator.Visibility = newVisibility;
+        }
+
+        private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)
+        {
+            Breadcrumbs.Nodes.Clear();
+            if (selectedNode == null || _rootNodes == null) return;
+
+            var path = TreeUIManager.FindNodePath(_rootNodes, selectedNode);
+            if (path == null) return;
+
+            const int maxItems = 5;
+
+            if (path.Count > maxItems)
+            {
+                var truncatedPath = new List<FileSystemNodeModel>();
+                truncatedPath.Add(path[0]);
+                truncatedPath.Add(path[1]);
+
+                truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
+
+                for (int i = path.Count - 2; i < path.Count; i++)
+                {
+                    truncatedPath.Add(path[i]);
+                }
+                path = truncatedPath;
+            }
+
+            foreach (var node in path)
+            {
+                Breadcrumbs.Nodes.Add(node);
+            }
+        }
+
+        private void Breadcrumbs_NodeClicked(object sender, NodeClickedEventArgs e)
+        {
+            BreadcrumbNodeClicked?.Invoke(this, e);
         }
     }
 }

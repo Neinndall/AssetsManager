@@ -5,61 +5,36 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:explorer="clr-namespace:AssetsManager.Views.Controls.Explorer"
-             mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <!-- CABECERA -->
-        <Border Grid.Row="0" 
-                Background="{StaticResource CardBackground}"
-                BorderBrush="{StaticResource BorderColor}"
-                BorderThickness="0,0,0,1"
-                Padding="32,24">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <materialIcons:MaterialIcon Kind="FolderSearchOutline"
-                                             Height="54"
-                                             Width="54"
-                                             Margin="0,0,10,0"
-                                             VerticalAlignment="Center"
-                                             Foreground="{StaticResource AccentBrush}"
-                                             Grid.Column="0"/>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="WAD EXPLORER" 
-                               FontSize="26" 
-                               FontWeight="Bold"
-                               Foreground="{StaticResource AccentBrush}"
-                               Margin="0,2,0,0"/>
-                    <TextBlock Text="Select a directory to explore its WAD files" 
-                               FontSize="12" 
-                               Foreground="{StaticResource TextMuted}"
-                               Margin="0,2,0,0"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- CUERPO -->
-        <Grid Grid.Row="1">
+             mc:Ignorable="d" 
+             FontFamily="{StaticResource AppFontFamily}">
+    <Grid Background="{StaticResource SidebarBackground}">
+        <!-- Cuerpo Principal -->
+        <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="60*" MinWidth="150"/>
+                <ColumnDefinition Width="390" MinWidth="250" MaxWidth="700"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="40*" MinWidth="200"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <explorer:FileExplorerControl x:Name="FileExplorer" Grid.Column="0" FileSelected="FileExplorer_FileSelected"/>
+            <!-- Panel Izquierdo: Explorador -->
+            <Border Grid.Column="0" 
+                    BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="0,0,1,0">
+                <explorer:FileExplorerControl x:Name="FileExplorer" 
+                                              FileSelected="FileExplorer_FileSelected"/>
+            </Border>
 
-            <Border Grid.Column="1" BorderBrush="{StaticResource BorderColor}" BorderThickness="1,0,0,0" Margin="0,10" />
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" 
+                          Width="5" 
+                          HorizontalAlignment="Center" 
+                          VerticalAlignment="Stretch" 
+                          Background="Transparent"/>
 
-            <explorer:FilePreviewerControl x:Name="FilePreviewer" Grid.Column="2"/>
+            <!-- Panel Derecho: Previsualizador -->
+            <Border Grid.Column="2">
+                <explorer:FilePreviewerControl x:Name="FilePreviewer"/>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>

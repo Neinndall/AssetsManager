@@ -11,25 +11,46 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Border Grid.Row="0" Style="{StaticResource LogHeaderBorderStyle}">
+        <!-- MINIMALIST TOOLBAR HEADER -->
+        <Border Grid.Row="0" 
+                Background="{DynamicResource CardBackground}" 
+                BorderBrush="{DynamicResource BorderColor}" 
+                BorderThickness="0,0,0,1" 
+                Padding="12,2">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
+                <!-- Actions -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <!-- Show/Hide Logger -->
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="ToggleLogSize_Click"
+                            ToolTip="Show/Hide Logger"
+                            Width="28" Height="28"
+                            Margin="0,0,4,0">
+                        <materialIcons:MaterialIcon x:Name="ToggleIcon" Kind="ChevronDown" Width="14" Height="14"/>
+                    </Button>
 
+                    <!-- Reset Status Bar -->
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="ClearStatusBar_Click"
+                            ToolTip="Clear Status Bar &amp; Notifications"
+                            Width="28" Height="28"
+                            Margin="0,0,4,0">
+                        <materialIcons:MaterialIcon Kind="BellOffOutline" Width="14" Height="14"/>
+                    </Button>
 
-                <!-- Icono y texto "Logger" eliminados. Se pueden volver a añadir aquí si es necesario. -->
-                <Button Grid.Column="1"
-                        Style="{StaticResource TransparentIconButton}"
-                        Click="ClearLogs_Click"
-                        ToolTip="Clear Logger">
-                    <materialIcons:MaterialIcon Kind="TrashCan" 
-                                                Width="15" 
-                                                Height="15"/>
-                </Button>
+                    <!-- Clear Log -->
+                    <Button Style="{StaticResource TransparentIconButton}"
+                            Click="ClearLogs_Click"
+                            ToolTip="Clear All Logs"
+                            Width="28" Height="28">
+                        <materialIcons:MaterialIcon Kind="Broom" Width="14" Height="14" Foreground="{DynamicResource AccentRed}"/>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Downloads
@@ -14,7 +15,7 @@ namespace AssetsManager.Services.Downloads
     {
         // URL Server where obtain the info for the hashes
         private const string STATUS_URL = "https://raw.communitydragon.org/data/hashes/lol/";
-
+		
         // Game Hashes
         private const string GAME_HASHES_FILENAME = "hashes.game.txt";
         private const string LCU_HASHES_FILENAME = "hashes.lcu.txt";
@@ -41,6 +42,10 @@ namespace AssetsManager.Services.Downloads
         private readonly HttpClient _httpClient;
         private readonly DirectoriesCreator _directoriesCreator;
 
+        public event Action HashSyncStarted;
+        public event Action HashSyncCompleted;
+        public bool IsSyncing { get; private set; } = false;
+
         public Status(
             LogService logService,
             Requests requests,
@@ -60,35 +65,46 @@ namespace AssetsManager.Services.Downloads
             var outdatedFiles = await GetOutdatedHashFilesAsync(silent, onUpdateFound);
             if (outdatedFiles.Any())
             {
-                if (!silent) _logService.Log("Server updated or local files out of date. Starting hash synchronization...");
-
-                if (syncHashesWithCDTB)
+                await HashResolverService._hashFileAccessLock.WaitAsync();
+                try
                 {
-                    await _directoriesCreator.CreateHashesDirectories();
-                    await _requests.DownloadSpecificHashesAsync(outdatedFiles);
+                    if (!silent) _logService.Log("Server updated or local files out of date. Starting hash synchronization...");
 
-                    // Comprobamos si es una sincronización inicial.
-                    // Una forma de detectarlo es si la carpeta 'olds' está vacía.
-                    bool isInitialSync = !Directory.EnumerateFileSystemEntries(_directoriesCreator.HashesOldPath).Any();
-
-                    if (isInitialSync)
+                    if (syncHashesWithCDTB)
                     {
-                        var filesToCopyToOld = new[] { GAME_HASHES_FILENAME, LCU_HASHES_FILENAME };
-                        foreach (var fileName in filesToCopyToOld)
+                        await _directoriesCreator.CreateHashesDirectories();
+                        await _requests.DownloadSpecificHashesAsync(outdatedFiles);
+
+                        // Comprobamos si es una sincronización inicial.
+                        // Una forma de detectarlo es si la carpeta 'olds' está vacía.
+                        bool isInitialSync = !Directory.EnumerateFileSystemEntries(_directoriesCreator.HashesOldPath).Any();
+
+                        if (isInitialSync)
                         {
-                            var sourceFile = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
-                            var destFile = Path.Combine(_directoriesCreator.HashesOldPath, fileName);
-                            if (File.Exists(sourceFile))
+                            var filesToCopyToOld = new[] { GAME_HASHES_FILENAME, LCU_HASHES_FILENAME };
+                            foreach (var fileName in filesToCopyToOld)
                             {
-                                File.Copy(sourceFile, destFile, true);
+                                var sourceFile = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
+                                var destFile = Path.Combine(_directoriesCreator.HashesOldPath, fileName);
+                                if (File.Exists(sourceFile))
+                                {
+                                    File.Copy(sourceFile, destFile, true);
+                                }
                             }
                         }
                     }
+
+                    UpdateConfigWithLocalFileSizes();
+
+                    if (!silent) _logService.LogSuccess("Synchronization completed.");
+                }
+                finally
+                {
+                    HashResolverService._hashFileAccessLock.Release();
+                    IsSyncing = false;
+                    HashSyncCompleted?.Invoke();
                 }
 
-                UpdateConfigWithLocalFileSizes();
-
-                if (!silent) _logService.LogSuccess("Synchronization completed.");
                 return true;
             }
 
@@ -172,8 +188,8 @@ namespace AssetsManager.Services.Downloads
             if (localOutOfSync.Any())
             {
                 onUpdateFound?.Invoke();
-                // If files are out of sync locally, we might need to sync everything
-                // depending on the strategy, but for now, let's just return the list.
+                IsSyncing = true;
+                HashSyncStarted?.Invoke(); // Disparar evento para desincronización local
                 return localOutOfSync;
             }
 
@@ -200,6 +216,8 @@ namespace AssetsManager.Services.Downloads
                         if (!notificationSent)
                         {
                             onUpdateFound?.Invoke();
+                            IsSyncing = true;
+                            HashSyncStarted?.Invoke(); // Disparar evento para desincronización remota
                             notificationSent = true;
                         }
                     }

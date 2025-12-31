@@ -20,7 +20,7 @@
                 Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1"
-                Padding="32,24">
+                Padding="24,20">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -28,19 +28,18 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <icons:MaterialIcon Kind="ImageMultipleOutline" 
-                                        Width="32" Height="32" 
-                                        Margin="0,0,12,0" 
-                                        VerticalAlignment="Center" 
-                                        Foreground="{StaticResource AccentBrush}"/>
-                    <StackPanel>
-                        <TextBlock Text="IMAGE COMPARISON"
-                                   FontSize="24"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource AccentBrush}"/>
-                        <TextBlock Text="Compare old and new image versions"
-                                   FontSize="14"
-                                   Foreground="{StaticResource TextMuted}"/>
+                    <Border Background="{DynamicResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
+                         <icons:MaterialIcon Kind="ImageMultipleOutline" Width="24" Height="24" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Image Comparison" 
+                                   FontSize="20" 
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Visual analysis of modified assets" 
+                                   FontSize="13" 
+                                   Foreground="{StaticResource TextSecondary}"
+                                   Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Grid>
@@ -55,35 +54,27 @@
             </Grid.ColumnDefinitions>
 
             <!-- Old Image Card -->
-            <Border Grid.Column="0" Style="{StaticResource SettingsCard}">
+            <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
-                        <TextBlock Text="📜" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                        <StackPanel>
-                            <TextBlock Text="Old Version"
-                                     FontSize="16"
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock x:Name="OldFileNameLabel"
-                                     Text=""
-                                     FontSize="12"
-                                     Foreground="{StaticResource TextMuted}"/>
+                    <!-- Sub-Header -->
+                    <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{DynamicResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock x:Name="OldFileNameLabel" FontSize="12" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
+                    </Border>
 
                     <!-- Content -->
-                    <Border Grid.Row="1"
-                            Background="{StaticResource DarkBackground}"
-                            BorderBrush="{StaticResource BorderColor}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                        <Image x:Name="OldImage" Stretch="Uniform" Margin="5"/>
+                    <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16">
+                        <Image x:Name="OldImage" Stretch="Uniform"/>
                     </Border>
                 </Grid>
             </Border>
@@ -97,35 +88,27 @@
                           ResizeBehavior="PreviousAndNext"/>
 
             <!-- New Image Card -->
-            <Border Grid.Column="2" Style="{StaticResource SettingsCard}">
+            <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
-                        <TextBlock Text="✨" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                        <StackPanel>
-                            <TextBlock Text="New Version"
-                                     FontSize="16"
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock x:Name="NewFileNameLabel"
-                                     Text=""
-                                     FontSize="12"
-                                     Foreground="{StaticResource TextMuted}"/>
+                    <!-- Sub-Header -->
+                    <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{DynamicResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock x:Name="NewFileNameLabel" FontSize="12" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
+                    </Border>
 
                     <!-- Content -->
-                    <Border Grid.Row="1"
-                            Background="{StaticResource DarkBackground}"
-                            BorderBrush="{StaticResource BorderColor}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                        <Image x:Name="NewImage" Stretch="Uniform" Margin="5"/>
+                    <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16">
+                        <Image x:Name="NewImage" Stretch="Uniform"/>
                     </Border>
                 </Grid>
             </Border>

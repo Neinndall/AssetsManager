@@ -1,4 +1,4 @@
-﻿<Window x:Class="AssetsManager.Views.HelpWindow"
+<Window x:Class="AssetsManager.Views.HelpWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
@@ -20,50 +20,72 @@
                 Background="{StaticResource SidebarBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,1,0">
-            <StackPanel>
-                <!-- Header -->
-                <Border Background="{StaticResource CardBackground}" 
-                        BorderBrush="{StaticResource BorderColor}"
+            <StackPanel Margin="0,0,0,0">
+                <!-- Header Elaborado -->
+                <Border Padding="16,32,12,24" 
+                        BorderBrush="{StaticResource BorderColor}" 
                         BorderThickness="0,0,0,1"
-                        Padding="20,24">
-                    <StackPanel>
-                        <TextBlock Text="🔧 HELP" 
-                                  FontSize="16" 
-                                  FontWeight="Bold"
-                                  Foreground="{StaticResource AccentBrush}"/>
-                        <TextBlock Text="Support and Information" 
-                                  FontSize="11" 
-                                  Foreground="{StaticResource TextMuted}"
-                                  Margin="0,4,0,0"/>
+                        Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal">
+                        <!-- Icon Box -->
+                        <Border Background="{StaticResource CardBackground}" 
+                                CornerRadius="8" 
+                                Width="44" Height="44"
+                                BorderBrush="{StaticResource BorderColor}"
+                                BorderThickness="1">
+                            <materialIcons:MaterialIcon Kind="HelpCircleOutline" 
+                                                       Width="22" Height="22" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- Titles -->
+                        <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                            <TextBlock Text="HELP CENTER" 
+                                       FontWeight="Bold" 
+                                       FontSize="14" 
+                                       Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Support &amp; Information" 
+                                       FontSize="11" 
+                                       Foreground="{StaticResource TextSecondary}" 
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <!-- Navigation Items -->
-                <StackPanel Margin="0,16,0,0">
+                <StackPanel>
                     <RadioButton x:Name="NavAbout" 
                                Content="About" 
-                               Tag="ℹ️"
+                               Tag="InformationOutline"
                                GroupName="HelpNavigation" 
                                IsChecked="True" 
-                               Style="{StaticResource NavButtonStyle}"/>
-                    
+                               Style="{StaticResource SettingsTabStyle}"/>
+
                     <RadioButton x:Name="NavChangelogs" 
                                Content="Changelogs" 
-                               Tag="📜"
+                               Tag="History"
                                GroupName="HelpNavigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
-                    
+                               Style="{StaticResource SettingsTabStyle}"/>
+
                     <RadioButton x:Name="NavBugsReport" 
                                Content="Bug Reports" 
-                               Tag="🐛"
+                               Tag="BugOutline"
                                GroupName="HelpNavigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
-                    
+                               Style="{StaticResource SettingsTabStyle}"/>
+
                     <RadioButton x:Name="NavUpdates" 
                                Content="Updates" 
-                               Tag="🔄"
+                               Tag="Update"
                                GroupName="HelpNavigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
+
+                    <RadioButton x:Name="NavDocumentation" 
+                               Content="Documentation" 
+                               Tag="BookOpenVariant"
+                               GroupName="HelpNavigation" 
+                               Style="{StaticResource SettingsTabStyle}"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -83,36 +105,47 @@
                 <ContentControl x:Name="HelpContentArea"/>
             </ScrollViewer>
 
-            <!-- Bottom Action Bar -->
+            <!-- Bottom Action Bar (Improved) -->
             <Border Grid.Row="1" 
                   Background="{StaticResource CardBackground}"
                   BorderBrush="{StaticResource BorderColor}"
                   BorderThickness="0,1,0,0"
-                  Padding="32,16">
+                  Padding="24,16">
                 <Grid>
-                    <StackPanel Orientation="Horizontal" 
-                              HorizontalAlignment="Left">
-                        <materialIcons:MaterialIcon Kind="LightbulbOn" 
-                                                     FontSize="12" 
-                                                     Margin="0,0,8,0" 
-                                                     VerticalAlignment="Center"
-                                                     Foreground="Gold"/>
-                        <TextBlock Text="Need more help?"
-                                 Foreground="{StaticResource TextMuted}" 
-                                 FontSize="12" 
-                                 VerticalAlignment="Center"/>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="{StaticResource HoverColor}" CornerRadius="16" Width="32" Height="32" Margin="0,0,12,0">
+                            <materialIcons:MaterialIcon Kind="Lifebuoy" 
+                                                       Width="16" Height="16" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                        </Border>
+                        
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Need more help?"
+                                     FontWeight="SemiBold"
+                                     Foreground="{StaticResource TextPrimary}" 
+                                     FontSize="13"/>
+                            <TextBlock Text="Visit our documentation"
+                                     Foreground="{StaticResource TextMuted}" 
+                                     FontSize="11"/>
+                        </StackPanel>
                     </StackPanel>
-                    <!-- Aun no se implementará nada de esto lo ponemos collapsed -->
-                    <StackPanel Orientation="Horizontal" 
-                              HorizontalAlignment="Right">
-                        <Button x:Name="BtnOpenDocs" 
-                              Content="Documentation" 
-                              Height="36" 
-                              Width="140"
-                              Style="{StaticResource SecondaryButton}" 
-                              Margin="0,0,12,0"
-                              Visibility="Collapsed"/>
-                    </StackPanel>
+
+                    <!-- Documentation Button (Hidden for now) -->
+                    <Button Grid.Column="1"
+                          x:Name="BtnOpenDocs" 
+                          Content="Documentation" 
+                          Height="32" 
+                          Padding="16,0"
+                          Style="{StaticResource ModernButton}"
+                          IsEnabled="False"
+                          Visibility="Collapsed"/> 
                 </Grid>
             </Border>
         </Grid>

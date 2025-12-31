@@ -6,159 +6,115 @@
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
-    <StackPanel Margin="15">
-        <!-- Header -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel Orientation="Horizontal">
-                <materialIcons:MaterialIcon Kind="Backup" 
-                                           FontSize="20" 
-                                           Foreground="{StaticResource AccentBrush}"
-                                           Margin="0,0,12,0"
-                                           VerticalAlignment="Center"/>
-                <StackPanel>
-                    <TextBlock Text="Manage Backups" 
-                               FontSize="18" 
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Manage and delete LoL directory backups."
-                               FontSize="12" 
-                               Foreground="{StaticResource TextMuted}"/>
+             d:DesignHeight="800" d:DesignWidth="800">
+
+    <Grid Margin="0,10,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="Auto"/> <!-- Toolbar -->
+            <RowDefinition Height="*"/>    <!-- Backups List -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. HEADER -->
+        <Border Grid.Row="0" Margin="0,0,0,24" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="24,20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="50" Height="50" Margin="0,0,20,0">
+                    <materialIcons:MaterialIcon Kind="BackupRestore" Width="26" Height="26" Foreground="{StaticResource AccentBrush}"/>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="Backup Manager" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Manage and restore snapshots of your League of Legends directory" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
-            </StackPanel>
+            </Grid>
         </Border>
 
-        <!-- Action Card -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                    <materialIcons:MaterialIcon Kind="DeleteSweep"
-                                                   Foreground="{StaticResource AccentOrange}"
-                                                   FontSize="20"
-                                                   Margin="0,0,12,0"
-                                                   VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Actions"
-                                     FontSize="15"
-                                     FontWeight="SemiBold"
-                                     Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Delete selected backups."
-                                     TextWrapping="Wrap"
-                                     FontSize="12"
-                                     Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="22,0,0,0">
+        <!-- 2. TOOLBAR -->
+        <Border Grid.Row="1" Margin="0,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                    <Button Content="Create LoL Backup"
-                            Click="createLolBackupButton_Click"
-                            Style="{StaticResource SecondaryButton}"
-                            HorizontalAlignment="Left"
-                            Margin="10,0,0,0"
-                            ToolTip="Create a backup of the current LoL directory"/>
-                    <Button Content="Delete Selected"
-                            Click="DeleteSelectedBackups_Click"
-                            Style="{StaticResource DestructiveButton}"
-                            HorizontalAlignment="Left"
-                            Margin="10,0,0,0"
-                            ToolTip="Delete Selected Backups"/>
-                </StackPanel>
-            </StackPanel>
+                <Button Grid.Column="0" Click="createLolBackupButton_Click" Style="{StaticResource ModernButton}" Padding="12,0,16,0" HorizontalContentAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <materialIcons:MaterialIcon Kind="Plus" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Create Backup" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Grid.Column="2" Click="DeleteSelectedBackups_Click" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Delete Selected Snapshots">
+                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
+                </Button>
+            </Grid>
         </Border>
 
-        <!-- Backups List -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <materialIcons:MaterialIcon Kind="FormatListBulleted" 
-                                                       Foreground="{StaticResource AccentBrush}"
-                                                       FontSize="20" 
-                                                       Margin="0,0,12,0" 
-                                                       VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="Backups" 
-                                         FontSize="15" 
-                                         FontWeight="SemiBold"
-                                         Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="List of available backups" 
-                                         FontSize="12" 
-                                         Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </StackPanel>
+        <!-- 3. BACKUPS LIST -->
+        <ListView Grid.Row="2" x:Name="BackupsListView" ItemsSource="{Binding AllBackups}" Style="{StaticResource ModernListView}" Background="Transparent" BorderThickness="0">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <EventSetter Event="PreviewMouseLeftButtonDown" Handler="ListViewItem_PreviewMouseLeftButtonDown" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Background" Value="Transparent"/><Setter Property="Margin" Value="0,0,0,8"/>
+                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListViewItem">
+                                <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <Grid>
+                                        <!-- Accent Strip (Purple for Backups) -->
+                                        <Border Width="4" HorizontalAlignment="Left" CornerRadius="12,0,0,12" Background="{StaticResource AccentPurple}"/>
 
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Grid Grid.Column="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="20*"/>
-                                    <ColumnDefinition Width="50*"/>
-                                    <ColumnDefinition Width="30*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0"
-                                        Style="{StaticResource FirstModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="Info" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Status" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Grid.Column="1"
-                                        Style="{StaticResource HalfModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="Folder" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Path" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Grid.Column="2"
-                                        Style="{StaticResource LastModernGridViewColumnHeader}">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="Calendar" Style="{StaticResource HeaderIconStyle}"/>
-                                        <TextBlock Text="Creation Date" Style="{StaticResource HeaderTextStyle}"/>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                            <ListView Grid.Row="1" x:Name="BackupsListView"
-                                      ItemsSource="{Binding AllBackups}"
-                                      Style="{StaticResource ModernListView}"
-                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                <ListView.ItemContainerStyle>
-                                    <Style TargetType="ListViewItem" BasedOn="{StaticResource ModernListViewItem}">
-                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                    </Style>
-                                </ListView.ItemContainerStyle>
-                                <ListView.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid>
+                                        <Grid Margin="16,16,16,16">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="20*"/>
-                                                <ColumnDefinition Width="50*"/>
-                                                <ColumnDefinition Width="30*"/>
+                                                <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                                                <ColumnDefinition Width="*"/>    <!-- Info -->
+                                                <ColumnDefinition Width="Auto"/> <!-- Status -->
                                             </Grid.ColumnDefinitions>
-                                            <Border Grid.Column="0">
-                                                <Ellipse Width="10" Height="10" Fill="{Binding StatusColor}" ToolTip="{Binding StatusText}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,12,0"/>
+
+                                            <!-- Folder Icon Box -->
+                                            <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
+                                                <materialIcons:MaterialIcon Kind="FolderZipOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
-                                            <Border Grid.Column="1">
-                                                <TextBlock Text="{Binding Path}" Style="{StaticResource CellTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
-                                            <TextBlock Grid.Column="2" Text="{Binding CreationDate, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Style="{StaticResource CellTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0,0,0" />
+
+                                            <!-- Info -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Path}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                    <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    
+                                                    <!-- NEW Badge -->
+                                                    <Border x:Name="NewBadge" Background="{StaticResource AccentPurple}" CornerRadius="4" Padding="6,1" Margin="12,0,0,0" Visibility="Collapsed">
+                                                        <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <!-- Selection Check -->
+                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentPurple}" Width="24" Height="24" Visibility="Collapsed"/>
                                         </Grid>
-                                    </DataTemplate>
-                                </ListView.ItemTemplate>
-                            </ListView>
-                        </Grid>
-                    </Grid>
-                </StackPanel>
-            </StackPanel>
-        </Border>
-    </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsCurrentSessionBackup}" Value="True">
+                                        <Setter TargetName="NewBadge" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentPurple}"/>
+                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="2"/>
+                                        <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListView.ItemContainerStyle>
+        </ListView>
+    </Grid>
 </UserControl>

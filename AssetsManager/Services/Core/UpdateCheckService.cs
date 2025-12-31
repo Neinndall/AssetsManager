@@ -26,6 +26,8 @@ namespace AssetsManager.Services.Core
 
         public event Action<string, string> UpdatesFound;
 
+        public string AvailableVersion { get; private set; }
+
         public UpdateCheckService(AppSettings appSettings, Status status, JsonDataService jsonDataService, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService)
         {
             _appSettings = appSettings;
@@ -194,7 +196,12 @@ namespace AssetsManager.Services.Core
 
             if (appUpdateAvailable)
             {
+                AvailableVersion = newVersion;
                 UpdatesFound?.Invoke($"Version {newVersion} is available", newVersion);
+            }
+            else 
+            {
+                AvailableVersion = null;
             }
 
             if (_appSettings.SyncHashesWithCDTB)
@@ -210,7 +217,21 @@ namespace AssetsManager.Services.Core
 
             if (_appSettings.CheckJsonDataUpdates)
             {
-                await _jsonDataService.CheckJsonDataUpdatesAsync(silent, () => { UpdatesFound?.Invoke("Monitored files have been updated", null); });
+                await _jsonDataService.CheckJsonDataUpdatesAsync(silent, (updatedFiles) =>
+                {
+                    if (updatedFiles != null && updatedFiles.Any())
+                    {
+                        if (updatedFiles.Count == 1)
+                        {
+                            UpdatesFound?.Invoke($"Monitored file updated: {updatedFiles[0]}", null);
+                        }
+                        else
+                        {
+                            string files = string.Join(", ", updatedFiles);
+                            UpdatesFound?.Invoke($"Monitored files updated: {files}", null);
+                        }
+                    }
+                });
             }
         }
 

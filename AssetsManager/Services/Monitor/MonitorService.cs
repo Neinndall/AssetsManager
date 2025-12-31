@@ -480,6 +480,35 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
+        public void RemoveAllFoundAssets(AssetCategory category)
+        {
+            if (category == null || !category.FoundUrls.Any()) return;
+
+            bool changed = false;
+            var foundIds = new List<long>(category.FoundUrls);
+
+            foreach (var id in foundIds)
+            {
+                if (!category.UserRemovedUrls.Contains(id))
+                {
+                    category.UserRemovedUrls.Add(id);
+                    changed = true;
+                }
+            }
+
+            if (foundIds.Any())
+            {
+                category.FoundUrls.Clear();
+                category.FoundUrlOverrides.Clear();
+                changed = true;
+            }
+
+            if (changed)
+            {
+                SaveCategoryProgress(category);
+            }
+        }
+
         #endregion
     }
 }

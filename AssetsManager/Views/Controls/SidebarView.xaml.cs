@@ -60,5 +60,17 @@ namespace AssetsManager.Views.Controls
             var storyboard = (Storyboard)this.FindResource("CollapseSidebar");
             storyboard.Begin(this);
         }
+
+        public void SelectNavigationItem(string viewTag)
+        {
+            foreach (var child in ((StackPanel)JsonDiffToolButton.Parent).Children)
+            {
+                if (child is RadioButton rb && rb.Tag?.ToString() == viewTag)
+                {
+                    rb.IsChecked = true;
+                    return;
+                }
+            }
+        }
     }
 }

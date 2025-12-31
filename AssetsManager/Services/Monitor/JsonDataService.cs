@@ -86,7 +86,7 @@ namespace AssetsManager.Services.Monitor
             return fileUrls;
         }
 
-        public async Task<bool> CheckJsonDataUpdatesAsync(bool silent = false, Action onUpdateFound = null)
+        public async Task<bool> CheckJsonDataUpdatesAsync(bool silent = false, Action<List<string>> onUpdateFound = null)
         {
             if (!_appSettings.CheckJsonDataUpdates || (_appSettings.MonitoredJsonFiles == null))
             {
@@ -96,7 +96,6 @@ namespace AssetsManager.Services.Monitor
             if (!silent) _logService.Log("Checking for JSON file updates...");
             var serverJsonDataEntries = new Dictionary<string, (DateTime Date, string FullUrl)>();
             bool anyUrlProcessed = false;
-            bool notificationSent = false; // Flag to ensure we only notify once
 
             // Process MonitoredJsonFiles
             if (_appSettings.MonitoredJsonFiles != null)
@@ -155,8 +154,8 @@ namespace AssetsManager.Services.Monitor
                 return false;
             }
 
-            // Use a temporary dictionary to track updates for the current run
-            var currentRunUpdates = new Dictionary<string, DateTime>();
+            // Use a list to track updated file names for the current run
+            var updatedFiles = new List<string>();
             bool wasUpdated = false;
 
             foreach (var serverEntry in serverJsonDataEntries)
@@ -170,14 +169,9 @@ namespace AssetsManager.Services.Monitor
 
                 if (lastUpdated != serverDate)
                 {
-                    if (!notificationSent)
-                    {
-                        onUpdateFound?.Invoke();
-                        notificationSent = true;
-                    }
-
                     _appSettings.JsonDataModificationDates[fullUrl] = serverDate; // Update the date in the AppSettings object
                     wasUpdated = true;
+                    updatedFiles.Add(key);
 
                     string oldFilePath = Path.Combine(_directoriesCreator.JsonCacheOldPath, key);
                     string newFilePath = Path.Combine(_directoriesCreator.JsonCacheNewPath, key);
@@ -265,6 +259,9 @@ namespace AssetsManager.Services.Monitor
 
             if (wasUpdated)
             {
+                // Invoke the callback with the list of updated files
+                onUpdateFound?.Invoke(updatedFiles);
+
                 // Save settings only if there was an update to persist the LastUpdated date
                 AppSettings.SaveSettings(_appSettings);
                 if (!silent) _logService.LogSuccess("JSON files are updated.");

@@ -26,7 +26,8 @@ namespace AssetsManager.Views.Controls.Explorer
     public partial class FileExplorerControl : UserControl
     {
         public event RoutedPropertyChangedEventHandler<object> FileSelected;
-
+        public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
+        
         public FilePreviewerControl FilePreviewer { get; set; }
 
         public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "PinMenuItem");
@@ -75,7 +76,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void CleanupResources()
         {
-            TaskCancellationManager.CancelCurrentOperation(); // Use the manager
+            TaskCancellationManager.CancelCurrentOperation(true, "Cancelling tree building...");
 
             // 1. Detener el timer PRIMERO
             if (_searchTimer != null)
@@ -93,12 +94,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
                 Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
                 Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
-            }
-
-            // Desuscribir eventos del Breadcrumbs
-            if (Breadcrumbs != null)
-            {
-                Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
+                Toolbar.ViewModeChanged -= Toolbar_ViewModeChanged;
             }
 
             // 3. Desuscribir eventos propios
@@ -123,7 +119,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
 
             // 6. Romper referencias cruzadas
-            FilePreviewer = null;
+            FilePreviewer = null; // Remove reference
 
             // 8. Limpiar paths
             _currentRootPath = null;
@@ -158,7 +154,8 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
-
+            Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
+            
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
             {
@@ -170,15 +167,34 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private void Toolbar_ViewModeChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        {
+            if (FilePreviewer != null)
+            {
+                FilePreviewer.SetViewMode(e.NewValue);
+            }
+        }
+
+        public void SetToolbarViewMode(bool isGridMode)
+        {
+            Toolbar.SetViewMode(isGridMode);
+        }
+
         private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
         {
             _isWadMode = !_isWadMode;
+            // Mode switched, we keep the current view mode (Grid/Preview) preference.
+            
+            if (FilePreviewer != null)
+            {
+                await FilePreviewer.ResetToDefaultState();
+            }
             await ReloadTreeAsync();
         }
 
         private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
-            Breadcrumbs.Visibility = e.NewValue ? Visibility.Visible : Visibility.Collapsed;
+            BreadcrumbVisibilityChanged?.Invoke(this, e);
         }
 
         private async void Toolbar_SortStateChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
@@ -278,10 +294,14 @@ namespace AssetsManager.Views.Controls.Explorer
                     CustomMessageBoxService.ShowError("Error", "Could not find any WAD files in 'Game' or 'Plugins' subdirectories.", Window.GetWindow(this));
                     NoDirectoryMessage.Visibility = Visibility.Visible;
                 }
+
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (OperationCanceledException)
             {
-                LogService.Log("WAD tree building was cancelled.");
+                LogService.LogWarning("WAD tree building was cancelled.");
+                await Task.Delay(1500);
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {
@@ -294,7 +314,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
-                ToolbarSeparator.Visibility = Visibility.Visible;
+
             }
         }
 
@@ -323,10 +343,14 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     RootNodes.Add(node);
                 }
+
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (OperationCanceledException)
             {
-                LogService.Log("Directory tree building was cancelled.");
+                LogService.LogWarning("Directory tree building was cancelled.");
+                await Task.Delay(1500);
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {
@@ -342,7 +366,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
-                ToolbarSeparator.Visibility = Visibility.Visible;
+
             }
         }
 
@@ -370,10 +394,14 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     RootNodes.Add(node);
                 }
+
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (OperationCanceledException)
             {
-                LogService.Log("Backup tree building was cancelled.");
+                LogService.LogWarning("Backup tree building was cancelled.");
+                await Task.Delay(1500);
+                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {
@@ -386,7 +414,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
-                ToolbarSeparator.Visibility = Visibility.Visible;
+
             }
         }
 
@@ -438,6 +466,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath, cancellationToken);
 
                     LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name}.", logPath, selectedNode.Name);
+                    
+                    TaskCancellationManager.CompleteCurrentOperation();
                 }
                 catch (OperationCanceledException)
                 {
@@ -510,6 +540,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken);
 
                     LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name}.", finalLogPath, selectedNode.Name);
+
+                    TaskCancellationManager.CompleteCurrentOperation();
                 }
                 catch (OperationCanceledException)
                 {
@@ -621,65 +653,13 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
-                UpdateBreadcrumbs(selectedNode);
-
                 if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
                     await HandleAudioBankExpansion(selectedNode);
                 }
-                else
-                {
-                    FileSelected?.Invoke(this, e);
-                }
+                
+                FileSelected?.Invoke(this, e);
             }
-        }
-
-        private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)
-        {
-            Breadcrumbs.Nodes.Clear();
-            if (selectedNode == null) return;
-
-            var path = TreeUIManager.FindNodePath(RootNodes, selectedNode);
-            if (path == null) return;
-
-            if (selectedNode.Type == NodeType.RealFile ||
-                selectedNode.Type == NodeType.VirtualFile ||
-                selectedNode.Type == NodeType.WemFile ||
-                selectedNode.Type == NodeType.AudioEvent)
-            {
-                if (path.Count > 0)
-                {
-                    path.RemoveAt(path.Count - 1);
-                }
-            }
-
-            const int maxItems = 5;
-
-            if (path.Count > maxItems)
-            {
-                var truncatedPath = new List<FileSystemNodeModel>();
-                truncatedPath.Add(path[0]);
-                truncatedPath.Add(path[1]);
-
-                truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
-
-                for (int i = path.Count - 2; i < path.Count; i++)
-                {
-                    truncatedPath.Add(path[i]);
-                }
-                path = truncatedPath;
-            }
-
-            foreach (var node in path)
-            {
-                Breadcrumbs.Nodes.Add(node);
-            }
-        }
-
-        private void Breadcrumbs_NodeClicked(object sender, NodeClickedEventArgs e)
-        {
-            if (e.Node == null) return;
-            TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, e.Node, false);
         }
 
         private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
@@ -821,6 +801,11 @@ namespace AssetsManager.Views.Controls.Explorer
             _searchTimer.Stop();
             string searchText = Toolbar.SearchText;
 
+            if (FilePreviewer != null)
+            {
+                FilePreviewer.SetSearchFilter(searchText);
+            }
+
             var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, RootNodes, LoadAllChildrenForSearch);
 
             if (nodeToSelect != null)
@@ -846,6 +831,12 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
         {
             await TreeBuilderService.LoadAllChildren(node, _currentRootPath);
+        }
+
+        public void SelectNode(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+            TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, node, false);
         }
     }
 }

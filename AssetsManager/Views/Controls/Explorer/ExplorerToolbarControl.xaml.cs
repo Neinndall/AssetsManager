@@ -11,6 +11,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public event RoutedEventHandler SwitchModeClicked;
         public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
         public event RoutedPropertyChangedEventHandler<bool> SortStateChanged;
+        public event RoutedPropertyChangedEventHandler<bool> ViewModeChanged; // True for Grid, False for Preview
 
         public string SearchText => SearchTextBox.Text;
 
@@ -20,9 +21,21 @@ namespace AssetsManager.Views.Controls.Explorer
             set => SortToggleButton.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        public bool IsBreadcrumbChecked => BreadcrumbToggleButton.IsChecked ?? false;
+
         public ExplorerToolbarControl()
         {
             InitializeComponent();
+        }
+
+        public void SetViewMode(bool isGridMode)
+        {
+            GridViewToggleButton.IsChecked = isGridMode;
+        }
+
+        private void GridViewToggle_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModeChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(GridViewToggleButton.IsChecked ?? false), GridViewToggleButton.IsChecked ?? false));
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)

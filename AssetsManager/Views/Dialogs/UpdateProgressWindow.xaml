@@ -5,49 +5,75 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Title="Downloading Update" Height="150" Width="400"
+        Title="Downloading Update" Height="Auto" Width="400"
         ResizeMode="NoResize" WindowStyle="None"
         AllowsTransparency="True" Background="Transparent"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
 
-    <Border Background="{StaticResource CardBackground}" CornerRadius="5" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+    <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="12">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="25" ShadowDepth="10" Direction="270" Opacity="0.25" Color="Black"/>
+        </Border.Effect>
+
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="{StaticResource AccentBrush}" CornerRadius="5,5,0,0" MouseDown="TitleBar_MouseDown">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+            <!-- Header -->
+            <Grid Grid.Row="0" Margin="16,10,16,10" MouseDown="TitleBar_MouseDown" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Download" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White" Width="16" Height="16"/>
-                        <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Medium" FontSize="13" Margin="5,10" Foreground="White"/>
-                    </StackPanel>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="CloudDownload" 
+                                                Foreground="{StaticResource AccentBrush}" 
+                                                Width="16" Height="16" Margin="0,0,10,0"
+                                                VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" 
+                               FontWeight="SemiBold" FontSize="14" 
+                               Foreground="{StaticResource TextPrimary}" 
+                               VerticalAlignment="Center"/>
+                </StackPanel>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,5,0">
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click">
-                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
-                        </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Margin="5,0,0,0">
-                            <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
-                        </Button>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click">
+                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="12" Height="12"/>
+                    </Button>
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Margin="6,0,0,0">
+                        <materialIcons:MaterialIcon Kind="WindowClose" Width="12" Height="12"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+            
+            <!-- Separator -->
+            <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Opacity="0.1"/>
+
+            <!-- Dark Body Area -->
+            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,12,12" Padding="0">
+                <Grid Margin="24,24,24,32">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                             <TextBlock x:Name="MessageTextBlock" 
+                                       Text="Initializing download..." 
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       FontSize="16"
+                                       VerticalAlignment="Bottom"/>
+                        </Grid>
+
+                        <ProgressBar x:Name="DownloadProgressBar" 
+                                     Height="8" 
+                                     Minimum="0" Maximum="100" 
+                                     HorizontalAlignment="Stretch" 
+                                     Style="{DynamicResource ModernProgressBar}" 
+                                     BorderThickness="0"/>
                     </StackPanel>
                 </Grid>
             </Border>
-
-            <StackPanel Grid.Row="1" Margin="15,20">
-                <TextBlock x:Name="MessageTextBlock" Margin="0,0,0,10"
-                           HorizontalAlignment="Center" TextWrapping="Wrap"
-                           Text="Initializing download..." Foreground="{DynamicResource TextSecondary}"/>
-                           
-                <ProgressBar x:Name="DownloadProgressBar" Height="20" Minimum="0" Maximum="100" HorizontalAlignment="Stretch" Style="{DynamicResource ModernProgressBar}"/>
-            </StackPanel>
         </Grid>
     </Border>
 </Window>

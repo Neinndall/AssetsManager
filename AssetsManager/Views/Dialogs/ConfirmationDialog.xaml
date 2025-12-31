@@ -6,50 +6,97 @@
         xmlns:local="clr-namespace:AssetsManager.Views.Dialogs"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Title="Confirmation" Height="Auto" Width="350"
+        Title="Confirmation" Height="Auto" Width="420"
         SizeToContent="Height" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+
+    <!-- Fondo de la Cabecera (CardBackground) -->
+    <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="12">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="25" ShadowDepth="10" Direction="270" Opacity="0.25" Color="Black"/>
+        </Border.Effect>
         
-    <Border Background="{StaticResource CardBackground}" CornerRadius="5" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="*"/>    <!-- Content + Footer -->
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="{StaticResource AccentBrush}" CornerRadius="5,5,0,0" MouseDown="TitleBar_MouseDown">
+            <!-- Header -->
+            <Grid Grid.Row="0" Margin="16,10,16,10" MouseDown="TitleBar_MouseDown" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon x:Name="iconType" Kind="QuestionMarkCircle" 
+                                                Foreground="{StaticResource AccentBrush}" 
+                                                Width="16" Height="16" Margin="0,0,10,0"
+                                                VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" 
+                               FontWeight="SemiBold" FontSize="14" 
+                               Foreground="{StaticResource TextPrimary}" 
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click" ToolTip="Minimize">
+                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="12" Height="12"/>
+                    </Button>
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="btnNo_Click" Margin="6,0,0,0" ToolTip="Close">
+                        <materialIcons:MaterialIcon Kind="WindowClose" Width="12" Height="12"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+            
+            <!-- Separator -->
+            <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Opacity="0.1"/>
+
+            <!-- Dark Body Area (Content + Footer) -->
+            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,12,12" Padding="0">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Content -->
+                    <Grid Grid.Row="0" Margin="24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <!-- Decorative Icon -->
+                        <materialIcons:MaterialIcon Kind="AlertCircleOutline" 
+                                                    Foreground="{StaticResource TextMuted}" 
+                                                    Width="32" Height="32" 
+                                                    VerticalAlignment="Top" 
+                                                    Margin="0,2,16,0"
+                                                    Opacity="0.5"/>
 
-                    <StackPanel Grid.Column="0" Orientation="Horizontal">
-                        <materialIcons:MaterialIcon x:Name="iconType" Kind="QuestionMarkCircle" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White" Width="16" Height="16"/>
-                        <TextBlock Grid.Column="1" Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Medium" FontSize="13" Margin="5,10" Foreground="White"/>
-                    </StackPanel>
+                        <TextBlock Grid.Column="1" x:Name="textBlockMessage" 
+                                   TextWrapping="Wrap" 
+                                   Foreground="{StaticResource TextPrimary}" 
+                                   FontSize="13"
+                                   LineHeight="20"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,10,0">
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click">
-                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
-                        </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="btnNo_Click" Margin="8,0,0,0">
-                            <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
-                        </Button>
-                    </StackPanel>
+                    <!-- Footer -->
+                    <Grid Grid.Row="1" Margin="24,0,24,24">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <StackPanel x:Name="YesNoButtons" Orientation="Horizontal">
+                                <Button x:Name="btnNo" Content="Cancel" Style="{StaticResource SecondaryButton}" Width="90" Click="btnNo_Click"/>
+                                <Button x:Name="btnYes" Content="Confirm" Style="{StaticResource ModernButton}" Width="90" Margin="12,0,0,0" Click="btnYes_Click"/>
+                            </StackPanel>
+                            <Button x:Name="btnOk" Content="OK" Style="{StaticResource ModernButton}" Width="90" Click="btnOk_Click" Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </Border>
-
-            <TextBlock x:Name="textBlockMessage" Grid.Row="1" TextWrapping="Wrap" Margin="15,20" Foreground="{StaticResource TextPrimary}" FontWeight="Normal"/>
-
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="15">
-                <StackPanel x:Name="YesNoButtons" Orientation="Horizontal">
-                    <Button x:Name="btnYes" Content="Yes" Style="{StaticResource ModernButton}" Width="80" Margin="0,0,10,0" Click="btnYes_Click"/>
-                    <Button x:Name="btnNo" Content="No" Style="{StaticResource SecondaryButton}" Width="80" Click="btnNo_Click"/>
-                </StackPanel>
-                <Button x:Name="btnOk" Content="OK" Style="{StaticResource ModernButton}" Width="80" Click="btnOk_Click" Visibility="Collapsed"/>
-            </StackPanel>
         </Grid>
     </Border>
 </Window>

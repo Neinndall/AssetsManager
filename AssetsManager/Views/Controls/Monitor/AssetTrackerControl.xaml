@@ -6,164 +6,184 @@
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
-             
-    <DockPanel Margin="15">
-        <!-- Header -->
-        <Border DockPanel.Dock="Top"
-                Style="{StaticResource SettingsCard}"
-                Margin="0,0,0,16">
-            <StackPanel Orientation="Horizontal">
-                <materialIcons:MaterialIcon Kind="ImageSearchOutline" 
-                                           FontSize="20" 
-                                           Foreground="{StaticResource AccentBrush}"
-                                           Margin="0,0,12,0"
-                                           VerticalAlignment="Center"/>
-                <StackPanel>
-                    <TextBlock Text="Asset Tracker" 
-                               FontSize="18" 
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Automatically discover new assets from the CDN" 
-                               FontSize="12" 
-                               Foreground="{StaticResource TextMuted}"/>
+             d:DesignHeight="800" d:DesignWidth="900">
+
+    <Grid Margin="0,10,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="Auto"/> <!-- Toolbar -->
+            <RowDefinition Height="*"/>    <!-- Grid -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. HEADER -->
+        <Border Grid.Row="0" Margin="0,0,0,24" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="24,20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="50" Height="50" Margin="0,0,20,0">
+                    <materialIcons:MaterialIcon Kind="ImageSearchOutline" Width="26" Height="26" Foreground="{StaticResource AccentGreen}"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="Asset Tracker" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Discover and catalog assets from remote game servers" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
-            </StackPanel>
+            </Grid>
         </Border>
 
-        <!-- Top Controls -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
-            <Label Content="Category:" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-            <ComboBox Name="CategoryComboBox" 
-                      Style="{StaticResource ModernComboBox}"
-                      SelectionChanged="CategoryComboBox_SelectionChanged"
-                      Width="200" Margin="5,0,10,0">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center">
-                                <Ellipse.Style>
-                                    <Style TargetType="Ellipse">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Setter Property="Fill" Value="Transparent"/> <!-- Explicitly set fill to transparent when collapsed -->
-                                        <Style.Triggers>
-                                            <!-- Prioritize HasNewAssets if no other status is active -->
-                                            <DataTrigger Binding="{Binding HasNewAssets}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Setter Property="Fill" Value="{StaticResource AccentBrush}"/>
-                                            </DataTrigger>
-                                            <!-- Checking status takes precedence -->
-                                            <DataTrigger Binding="{Binding Status}" Value="Checking">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Setter Property="Fill" Value="Blue"/>
-                                            </DataTrigger>
-                                            <!-- CompletedSuccess status takes precedence -->
-                                            <DataTrigger Binding="{Binding Status}" Value="CompletedSuccess">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Setter Property="Fill" Value="Green"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Ellipse.Style>
-                            </Ellipse>
-                            <TextBlock Text="{Binding Name}"/>
-                        </StackPanel>
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-            <Button Name="CheckButton" Content="Check Category" Style="{StaticResource ModernButton}" Click="CheckButton_Click" Margin="0,0,5,0"/>
-            <Button Name="DownloadButton" Content="Download All" Style="{StaticResource ModernButton}" Click="DownloadButton_Click" Margin="0,0,5,0"/>
-            <Button Name="LoadMoreButton" Content="Load More" Style="{StaticResource ModernButton}" Click="LoadMoreButton_Click" Margin="0,0,10,0"/>
-        </StackPanel>
+        <!-- 2. TOOLBAR -->
+        <Border Grid.Row="1" Margin="0,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-        <!-- Asset Grid -->
-        <ItemsControl Name="AssetsItemsControl" Margin="-20 0">
-            <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <UniformGrid IsItemsHost="True" Columns="4"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel HorizontalAlignment="Center" Margin="20">
-                            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="3" Width="160" Height="160">
-                                <Grid>
-                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Visible" />
+                <!-- Category -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <TextBlock Text="Category" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ComboBox Name="CategoryComboBox" Style="{StaticResource ModernComboBox}" Width="180" Height="32" SelectionChanged="CategoryComboBox_SelectionChanged">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Status}" Value="OK">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding HasNewAssets}" Value="True"><Setter Property="Visibility" Value="Visible"/><Setter Property="Background" Value="{StaticResource AccentBrush}"/></DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Checking"><Setter Property="Visibility" Value="Visible"/><Setter Property="Background" Value="{StaticResource AccentBlue}"/></DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="CompletedSuccess"><Setter Property="Visibility" Value="Visible"/><Setter Property="Background" Value="{StaticResource AccentGreen}"/></DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </StackPanel.Style>
+                                        </Border.Style>
+                                    </Border>
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="200"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
 
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <materialIcons:MaterialIcon Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,5,0">
+                <!-- Actions -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Name="CheckButton" Click="CheckButton_Click" Style="{StaticResource ModernButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="Radar" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Scan CDN" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Name="LoadMoreButton" Click="LoadMoreButton_Click" Style="{StaticResource SecondaryButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0">
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="Plus" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Load More" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Bulk Actions -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                    <Button Name="DownloadButton" Click="DownloadButton_Click" Style="{StaticResource ModernButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="DownloadOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Download All" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Name="RemoveFoundButton" Click="RemoveFoundButton_Click" Style="{StaticResource DestructiveButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0">
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="Broom" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Remove Found" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 3. ASSET GRID -->
+        <ItemsControl Grid.Row="2" Name="AssetsItemsControl">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid IsItemsHost="True" Columns="4"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="12" Margin="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel>
+                            <!-- Image Area (Perfect Rounded Clipping) -->
+                            <Border Margin="12,12,12,0" Height="140">
+                                <Grid>
+                                    <!-- Shadow Container -->
+                                    <Border CornerRadius="12" Background="{StaticResource SidebarBackground}">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                                        </Border.Effect>
+                                        
+                                        <!-- Clipping Container (Holds the image) -->
+                                        <Border CornerRadius="12" 
+                                                BorderBrush="{StaticResource BorderColor}"
+                                                BorderThickness="1"
+                                                ClipToBounds="True">
+                                            <Grid>
+                                                <!-- Placeholder Icon (Watermark) -->
+                                                <materialIcons:MaterialIcon Kind="ImageOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                
+                                                <Border CornerRadius="12">
+                                                    <Border.Background>
+                                                        <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                                                    </Border.Background>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </Border>
+
+                                    <!-- Status Badge (Overlay) -->
+                                    <Border VerticalAlignment="Top" HorizontalAlignment="Right" Margin="8" Padding="8,4" CornerRadius="6" Background="#CC18181B">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialIcons:MaterialIcon Width="12" Height="12" Margin="0,0,6,0">
                                                 <materialIcons:MaterialIcon.Style>
                                                     <Style TargetType="materialIcons:MaterialIcon">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Status}" Value="Pending">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                <Setter Property="Kind" Value="ClockOutline" />
-                                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Status}" Value="Checking">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                <Setter Property="Kind" Value="Sync" />
-                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Status}" Value="Not Found">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                <Setter Property="Kind" Value="CloseCircleOutline" />
-                                                                <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
-                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="OK"><Setter Property="Kind" Value="CheckCircle"/><Setter Property="Foreground" Value="{StaticResource AccentGreen}"/></DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Pending"><Setter Property="Kind" Value="ClockOutline"/><Setter Property="Foreground" Value="{StaticResource TextMuted}"/></DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Checking"><Setter Property="Kind" Value="Sync"/><Setter Property="Foreground" Value="{StaticResource AccentBrush}"/></DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Not Found"><Setter Property="Kind" Value="AlertCircleOutline"/><Setter Property="Foreground" Value="{StaticResource AccentRed}"/></DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </materialIcons:MaterialIcon.Style>
                                             </materialIcons:MaterialIcon>
-
-                                            <TextBlock Text="{Binding Status}" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" />
+                                            <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                                         </StackPanel>
-
-                                        <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" TextAlignment="Center" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,5,0,0"/>
-                                    </StackPanel>
-                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform"/>
+                                    </Border>
                                 </Grid>
                             </Border>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
-                                <Button Name="SaveAssetButton"
-                                        Click="SaveAssetButton_Click"
-                                        ToolTip="Save Asset"
-                                        Tag="{Binding}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="ContentSave" Width="14" Height="14"/>
-                                </Button>
-                                <Button Name="RemoveAssetButton"
-                                        Click="RemoveAssetButton_Click"
-                                        ToolTip="Remove Asset"
-                                        Margin="10,0,0,0"
-                                        Tag="{Binding}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                            <Setter Property="Background" Value="{StaticResource AccentRed}"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14"/>
-                                </Button>
-                            </StackPanel>
+
+                            <!-- Label & Actions Area -->
+                            <Border Padding="12">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,0,12"/>
+                                    
+                                    <!-- Actions Area (Centered Icons) -->
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <Button Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource ModernButton}" Width="32" Height="32" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip="Save to Disk">
+                                            <materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="16" Height="16" Foreground="White"/>
+                                        </Button>
+                                        <Button Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Opacity="0.8" Width="32" Height="32" MinWidth="0" Padding="0" Margin="6,0,0,0" ToolTip="Ignore Asset">
+                                            <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="White"/>
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </DockPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
 </UserControl>

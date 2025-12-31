@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
 using System.Windows;
-using Material.Icons.WPF;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Dialogs;
@@ -25,10 +25,10 @@ namespace AssetsManager.Services.Core
         private readonly TaskCancellationManager _taskCancellationManager; // New field
 
         private Button _progressSummaryButton;
-        private MaterialIcon _progressIcon;
+        private TextBlock _statusTextBlock;
+        private TextBlock _progressPercentageTextBlock;
         private Window _owner;
 
-        private Storyboard _spinningIconAnimationStoryboard;
         private ProgressDetailsWindow _progressDetailsWindow;
         private int _totalFiles;
 
@@ -51,47 +51,93 @@ namespace AssetsManager.Services.Core
             _wadDifferenceService = wadDifferenceService;
             _wadPackagingService = wadPackagingService;
             _diffViewService = diffViewService;
-            _taskCancellationManager = taskCancellationManager; // Assign new dependency
+            _taskCancellationManager = taskCancellationManager;
+            _taskCancellationManager.OperationStateChanged += TaskCancellationManager_OperationStateChanged;
         }
 
-        public void Initialize(Button progressSummaryButton, MaterialIcon progressIcon, Window owner)
+        public void Initialize(Button progressSummaryButton, TextBlock statusTextBlock, TextBlock progressPercentageTextBlock, Window owner)
         {
             _progressSummaryButton = progressSummaryButton;
-            _progressIcon = progressIcon;
+            _statusTextBlock = statusTextBlock;
+            _progressPercentageTextBlock = progressPercentageTextBlock;
             _owner = owner;
             _progressSummaryButton.Click += ProgressSummaryButton_Click;
         }
 
         public void Cleanup()
         {
+            if (_taskCancellationManager != null)
+            {
+                _taskCancellationManager.OperationStateChanged -= TaskCancellationManager_OperationStateChanged;
+            }
             if (_progressSummaryButton != null)
             {
                 _progressSummaryButton.Click -= ProgressSummaryButton_Click;
             }
-            _spinningIconAnimationStoryboard?.Stop();
-            _spinningIconAnimationStoryboard = null;
             _progressDetailsWindow?.Close();
             _progressDetailsWindow = null;
             _progressSummaryButton = null;
-            _progressIcon = null;
+            _statusTextBlock = null;
+            _progressPercentageTextBlock = null;
             _owner = null;
+        }
+
+        private void TaskCancellationManager_OperationStateChanged(object sender, EventArgs e)
+        {
+            if (_taskCancellationManager.IsCancelling)
+            {
+                UpdateStatusBar(_taskCancellationManager.CancellationMessage);
+            }
+            else
+            {
+                _owner.Dispatcher.Invoke(() =>
+                {
+                    if (_statusTextBlock != null && _statusTextBlock.Text == _taskCancellationManager.CancellationMessage)
+                    {
+                        UpdateStatusBar("Ready");
+                    }
+                });
+            }
+        }
+
+        private void UpdateStatusBar(string message, int completed = -1, int total = -1)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                if (_statusTextBlock != null) _statusTextBlock.Text = message;
+                
+                if (_progressPercentageTextBlock != null)
+                {
+                    if (completed >= 0 && total > 0)
+                    {
+                        double percentage = (double)completed / total * 100;
+                        _progressPercentageTextBlock.Text = $"{(int)percentage}%";
+                        _progressPercentageTextBlock.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        _progressPercentageTextBlock.Visibility = Visibility.Collapsed;
+                    }
+                }
+            });
         }
 
         public void OnDownloadProgressChanged(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage)
         {
+            UpdateStatusBar($"Downloading: {currentFileName}", completedFiles, totalFiles);
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(completedFiles, totalFiles, currentFileName, isSuccess, errorMessage);
             });
         }
 
-        public void OnDownloadCompleted()
+        public async void OnDownloadCompleted()
         {
+            if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
+            UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
-                _spinningIconAnimationStoryboard?.Stop();
-                _spinningIconAnimationStoryboard = null;
                 _progressDetailsWindow?.Close();
             });
         }
@@ -104,13 +150,7 @@ namespace AssetsManager.Services.Core
                 _progressSummaryButton.Visibility = Visibility.Visible;
                 _progressSummaryButton.ToolTip = "Click to see comparison details";
 
-                if (_spinningIconAnimationStoryboard == null)
-                {
-                    var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
-                    _spinningIconAnimationStoryboard = originalStoryboard?.Clone();
-                    if (_spinningIconAnimationStoryboard != null) Storyboard.SetTarget(_spinningIconAnimationStoryboard, _progressIcon);
-                }
-                _spinningIconAnimationStoryboard?.Begin();
+                UpdateStatusBar("Comparing WADs...", 0, totalFiles);
 
                 _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Comparator", _taskCancellationManager);
                 _progressDetailsWindow.Owner = _owner;
@@ -118,26 +158,26 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "Compare";
                 _progressDetailsWindow.HeaderText = "Comparing WADs";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
             });
         }
 
         public void OnComparisonProgressChanged(int completedFiles, string currentFile, bool isSuccess, string errorMessage)
         {
+            UpdateStatusBar($"Comparing: {currentFile}", completedFiles, _totalFiles);
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(completedFiles, _totalFiles, currentFile, isSuccess, errorMessage);
             });
         }
 
-        public void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath)
+        public async void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath)
         {
+            if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
+            UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
-                _spinningIconAnimationStoryboard?.Stop();
-                _spinningIconAnimationStoryboard = null;
                 _progressDetailsWindow?.Close();
             });
         }
@@ -149,13 +189,7 @@ namespace AssetsManager.Services.Core
                 _progressSummaryButton.Visibility = Visibility.Visible;
                 _progressSummaryButton.ToolTip = "Click to see extraction details";
 
-                if (_spinningIconAnimationStoryboard == null)
-                {
-                    var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
-                    _spinningIconAnimationStoryboard = originalStoryboard?.Clone();
-                    if (_spinningIconAnimationStoryboard != null) Storyboard.SetTarget(_spinningIconAnimationStoryboard, _progressIcon);
-                }
-                _spinningIconAnimationStoryboard?.Begin();
+                UpdateStatusBar("Extracting assets...", 0, data.totalFiles);
 
                 _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Extractor", _taskCancellationManager);
                 _progressDetailsWindow.Owner = _owner;
@@ -163,26 +197,26 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "PackageDown";
                 _progressDetailsWindow.HeaderText = "Extracting New Assets";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, data.totalFiles, data.message, true, null);
             });
         }
 
         public void OnExtractionProgressChanged(int completedFiles, int totalFiles, string currentFile)
         {
+            UpdateStatusBar($"Extracting: {currentFile}", completedFiles, totalFiles);
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(completedFiles, totalFiles, currentFile, true, null);
             });
         }
 
-        public void OnExtractionCompleted()
+        public async void OnExtractionCompleted()
         {
+            if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
+            UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
-                _spinningIconAnimationStoryboard?.Stop();
-                _spinningIconAnimationStoryboard = null;
                 _progressDetailsWindow?.Close();
             });
         }
@@ -194,13 +228,7 @@ namespace AssetsManager.Services.Core
                 _progressSummaryButton.Visibility = Visibility.Visible;
                 _progressSummaryButton.ToolTip = "Click to see download details";
 
-                if (_spinningIconAnimationStoryboard == null)
-                {
-                    var originalStoryboard = (Storyboard)_owner.FindResource("SpinningIconAnimation");
-                    _spinningIconAnimationStoryboard = originalStoryboard?.Clone();
-                    if (_spinningIconAnimationStoryboard != null) Storyboard.SetTarget(_spinningIconAnimationStoryboard, _progressIcon);
-                }
-                _spinningIconAnimationStoryboard?.Begin();
+                UpdateStatusBar($"Updating {taskName}...");
 
                 _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Versions Update", _taskCancellationManager);
                 _progressDetailsWindow.Owner = _owner;
@@ -208,37 +236,42 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.HeaderIconKind = "Download";
                 _progressDetailsWindow.HeaderText = "Versions Update";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.Show();
                 _progressDetailsWindow.UpdateProgress(0, 0, "Initializing...", true, null);
             });
         }
 
         public void OnVersionDownloadProgressChanged(object sender, (string TaskName, int Progress, string Details) data)
         {
+            UpdateStatusBar($"Downloading {data.TaskName}: {data.Details}");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(0, 1, data.Details, true, null); // Indeterminate progress, update current file
             });
         }
 
-        public void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
+        public async void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
         {
+            if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
+            UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressSummaryButton.Visibility = Visibility.Collapsed;
-                _spinningIconAnimationStoryboard?.Stop();
-                _spinningIconAnimationStoryboard = null;
                 _progressDetailsWindow?.Close();
 
                 if (data.Success)
                 {
                     _customMessageBoxService.ShowSuccess("Success", data.Message, _owner);
                 }
-                else
+                else if (!_taskCancellationManager.IsCancelling) // Don't show error if it was cancelled
                 {
                     _customMessageBoxService.ShowError("Error", data.Message, _owner);
                 }
             });
+        }
+
+        public void ClearStatusText()
+        {
+            UpdateStatusBar("");
         }
 
         private void ProgressSummaryButton_Click(object sender, RoutedEventArgs e)

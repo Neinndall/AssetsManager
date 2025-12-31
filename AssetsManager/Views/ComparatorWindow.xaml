@@ -7,7 +7,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:comparator="clr-namespace:AssetsManager.Views.Controls.Comparator"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
-    <Grid>
+    <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -18,64 +18,56 @@
                 Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1"
-                Padding="32,24">
+                Padding="32,20">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <materialIcons:MaterialIcon Kind="FileCompare"
-                                             Height="54"
-                                             Width="54"
-                                             Margin="0,0,10,0"
+                <!-- Icono con Brillo -->
+                <materialIcons:MaterialIcon x:Name="CompIcon"
+                                             Kind="Compare"
+                                             Height="48"
+                                             Width="48"
                                              VerticalAlignment="Center"
                                              Foreground="{StaticResource AccentBrush}"
-                                             Grid.Column="0"/>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="COMPARATOR" 
-                               FontSize="26" 
+                                             Grid.Column="0">
+                    <materialIcons:MaterialIcon.Effect>
+                        <DropShadowEffect Color="{Binding Foreground.Color, ElementName=CompIcon}" 
+                                          BlurRadius="15" 
+                                          ShadowDepth="0" 
+                                          Opacity="0.4"/>
+                    </materialIcons:MaterialIcon.Effect>
+                </materialIcons:MaterialIcon>
+
+                <!-- Separador Vertical -->
+                <Rectangle Grid.Column="1" 
+                           Width="1" 
+                           Fill="{StaticResource BorderColor}" 
+                           Margin="12,8" 
+                           VerticalAlignment="Stretch"/>
+
+                <!-- Textos -->
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="WAD COMPARATOR" 
+                               FontSize="24" 
                                FontWeight="Bold"
-                               Foreground="{StaticResource AccentBrush}"
-                               Margin="0,2,0,0"/>
-                    <TextBlock Text="Manually compare JSON files or WAD files"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Compare game files, identify changes and extract assets"
                                FontSize="12" 
-                               Foreground="{StaticResource TextMuted}"
-                               Margin="0,2,0,0"/>
+                               Foreground="{StaticResource TextSecondary}"
+                               Margin="0,4,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- CUERPO -->
-        <ScrollViewer Grid.Row="1" 
-                      Background="Transparent"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled"
-                      Padding="32,24,32,0">
-            <StackPanel>
-                <!-- Header Card -->
-                <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,15">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="ToolboxOutline" 
-                                                   FontSize="20" 
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   Margin="0,0,12,0"
-                                                   VerticalAlignment="Center"/>
-                        <StackPanel>
-                            <TextBlock Text="Comparison Tools" 
-                                       FontSize="18" 
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Select a tool to compare different types of assets" 
-                                       FontSize="12" 
-                                       Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <comparator:WadComparisonControl x:Name="WadComparisonControl"/>
-                <comparator:JsonComparisonControl x:Name="JsonComparisonControl" />
-            </StackPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="40,40,40,40" MaxWidth="1100" HorizontalAlignment="Stretch">
+                <comparator:WadComparisonControl x:Name="WadComparisonControl" HorizontalAlignment="Stretch"/>
+            </Grid>
         </ScrollViewer>
     </Grid>
 </UserControl>

@@ -1,0 +1,213 @@
+<UserControl x:Class="AssetsManager.Views.Help.DocumentationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             mc:Ignorable="d" 
+             d:DesignHeight="1400" d:DesignWidth="800">
+    <StackPanel Margin="0,0,0,40">
+        <!-- 1. MODERN INTEGRATED HEADER (Compact) -->
+        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <materialIcons:MaterialIcon Kind="BookOpenVariant" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="Documentation" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Learn how to get the most out of AssetsManager" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                </StackPanel>
+
+                <!-- Subtle Decorative Background Icon -->
+                <materialIcons:MaterialIcon Grid.Column="1" Kind="Library" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
+            </Grid>
+        </Border>
+
+        <!-- 2. CORE MODULES GRID -->
+        <TextBlock Text="APPLICATION MODULES" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,16"/>
+        <UniformGrid Columns="2" Margin="0,0,0,32">
+            <!-- Comparator -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,0,8,8" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="FileCompare" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="WAD Comparator" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="The core engine for finding changes between patches. Compare two LoL directories to identify new content." 
+                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Explorer -->
+            <Border Style="{StaticResource SettingsCard}" Margin="8,0,0,8" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="FolderSearchOutline" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Archive Explorer" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="A deep-dive tool into .wad files. Features 3D model previews, image rendering, and smart code formatting." 
+                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Models -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,0" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Model Viewer" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="A powerful 3D viewport to inspect champion models, skeletons, and animations. Includes map geometry loading." 
+                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Monitor -->
+            <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,0" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="Radar" Foreground="{StaticResource AccentRed}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Real-time Monitor" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="Track PBE server status, remote CDN changes, and API store data. Stay updated with the latest sales." 
+                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- 3. STEP-BY-STEP SETUP -->
+        <TextBlock Text="SETUP GUIDE" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,16"/>
+        <Border Background="{StaticResource CardBackground}" CornerRadius="16" Padding="32" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,32">
+            <StackPanel>
+                <!-- Step 1 -->
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Border Width="32" Height="32" CornerRadius="16" Background="{StaticResource AccentBrush}" VerticalAlignment="Top">
+                        <TextBlock Text="1" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                        <TextBlock Text="Directory Configuration" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                        <TextBlock Text="Navigate to Settings and set your League of Legends paths. Ensure the 'PBE Path' is correctly pointed for the Asset Tracker and Version services." 
+                                   FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Step 2 -->
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Border Width="32" Height="32" CornerRadius="16" Background="{StaticResource AccentBrush}" VerticalAlignment="Top">
+                        <TextBlock Text="2" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                        <TextBlock Text="Hash Synchronization" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                        <TextBlock Text="Files in .wad archives are encrypted with hashes. The app syncs these automatically on start. Check the 'Hash Sync' pill in the Monitor Dashboard to ensure they are up to date." 
+                                   FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Step 3 -->
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Border Width="32" Height="32" CornerRadius="16" Background="{StaticResource AccentBrush}" VerticalAlignment="Top">
+                        <TextBlock Text="3" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                        <TextBlock Text="Exploring Content" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                        <TextBlock Text="Once configured, use the WAD Comparator to start your first analysis. Select 'Old' and 'New' folders and click 'Scan' to see what's changed." 
+                                   FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- 4. USEFUL TIPS -->
+        <TextBlock Text="TIPS &amp; TRICKS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,16"/>
+        <Border Style="{StaticResource SettingsCard}" Padding="20">
+            <StackPanel>
+                <!-- Tip 1 -->
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
+                        <materialIcons:MaterialIcon Kind="LightbulbOnOutline" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Top">
+                        <TextBlock Text="Smart Extraction" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                        <TextBlock Text="Use 'Save Selected' in Explorer to automatically convert textures to PNG and data files to JSON while preserving folder structures." 
+                                   FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Tip 2 -->
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
+                        <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentBlue}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Top">
+                        <TextBlock Text="Clean Workspace" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                        <TextBlock Text="If the Log panel is taking too much space, use the Toggle button in the log header to minimize it to a slim toolbar." 
+                                   FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Tip 3 -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Top">
+                        <materialIcons:MaterialIcon Kind="CloudSyncOutline" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Top">
+                        <TextBlock Text="Always Synced" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                        <TextBlock Text="The app periodically checks for PBE status and asset changes in the background automatically, even when you are using other tools." 
+                                   FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- FOOTER (Professional Info) -->
+        <StackPanel Margin="0,48,0,0" HorizontalAlignment="Stretch">
+            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Margin="40,0,40,24" Opacity="0.5"/>
+            <Grid HorizontalAlignment="Left" Margin="20,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Width="28" Height="28" Margin="0,0,12,0" VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Github" Foreground="{StaticResource TextPrimary}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Grid.Column="1" 
+                           Text="For technical specifications and community support, visit our official GitHub repository." 
+                           FontSize="12" 
+                           Foreground="{StaticResource TextSecondary}" 
+                           VerticalAlignment="Center"
+                           FontStyle="Italic"
+                           TextWrapping="Wrap"
+                           MaxWidth="600"/>
+            </Grid>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

@@ -31,10 +31,6 @@ namespace AssetsManager.Views
         {
             InitializeComponent();
 
-            // Set services for JsonComparisonControl
-            JsonComparisonControl.CustomMessageBoxService = customMessageBoxService;
-            JsonComparisonControl.DiffViewService = diffViewService;
-
             // Set services for WadComparisonControl
             WadComparisonControl.CustomMessageBoxService = customMessageBoxService;
             WadComparisonControl.WadComparatorService = wadComparatorService;

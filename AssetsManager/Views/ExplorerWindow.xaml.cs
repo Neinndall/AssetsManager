@@ -8,8 +8,9 @@ using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Services.Audio;
-
 using AssetsManager.Services.Explorer.Tree;
+using AssetsManager.Views.Controls.Explorer;
+using NodeClickedEventArgs = AssetsManager.Views.Controls.Explorer.NodeClickedEventArgs;
 
 namespace AssetsManager.Views
 {
@@ -34,6 +35,7 @@ namespace AssetsManager.Views
         )
         {
             InitializeComponent();
+            this.Loaded += ExplorerWindow_Loaded;
 
             FileExplorer.LogService = logService;
             FileExplorer.CustomMessageBoxService = customMessageBoxService;
@@ -54,15 +56,34 @@ namespace AssetsManager.Views
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;
             FilePreviewer.DirectoriesCreator = directoriesCreator;
             FilePreviewer.ExplorerPreviewService = explorerPreviewService;
+            FilePreviewer.TreeUIManager = treeUIManager;
 
             FileExplorer.FilePreviewer = FilePreviewer; // Set the dependency
         }
 
+        private void ExplorerWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            FilePreviewer.BreadcrumbNodeClicked += FilePreviewer_BreadcrumbNodeClicked;
+            FileExplorer.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
+        }
+
+        private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        {
+            FilePreviewer.SetBreadcrumbToggleState(e.NewValue);
+        }
+
+
+        private void FilePreviewer_BreadcrumbNodeClicked(object sender, NodeClickedEventArgs e)
+        {
+            FileExplorer.SelectNode(e.Node);
+        }
 
         private async void FileExplorer_FileSelected(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
+                FilePreviewer.UpdateSelectedNode(selectedNode, FileExplorer.RootNodes);
+
                 // A Details tab should only be for a RENAMED FILE, not a directory.
                 if (selectedNode.Status == DiffStatus.Renamed && selectedNode.Type == NodeType.VirtualFile)
                 {
@@ -80,6 +101,12 @@ namespace AssetsManager.Views
             if (FileExplorer != null)
             {
                 FileExplorer.FileSelected -= FileExplorer_FileSelected;
+                FileExplorer.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
+            }
+
+            if (FilePreviewer != null)
+            {
+                FilePreviewer.BreadcrumbNodeClicked -= FilePreviewer_BreadcrumbNodeClicked;
             }
 
             // Limpiar controles hijo

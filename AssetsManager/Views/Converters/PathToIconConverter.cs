@@ -35,10 +35,15 @@ namespace AssetsManager.Views.Converters
             { ".webm", MaterialIconKind.MoviePlayOutline },
             { ".ogg", MaterialIconKind.MusicNote },
             { ".bin", MaterialIconKind.FileCodeOutline },
+            { ".troybin", MaterialIconKind.StarFourPoints },
+            { ".preload", MaterialIconKind.FormatListBulleted },
             { ".skl", MaterialIconKind.Person },
             { ".skn", MaterialIconKind.Person },
             { ".wpk", MaterialIconKind.FolderMusicOutline },
             { ".bnk", MaterialIconKind.FolderMusicOutline },
+            { ".wasm", MaterialIconKind.CodeBraces },
+            { ".bundle", MaterialIconKind.PackageVariant },
+            { ".assetbundle", MaterialIconKind.PackageVariant },
         };
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

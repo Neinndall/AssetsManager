@@ -20,44 +20,60 @@
                 Background="{StaticResource SidebarBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,1,0">
-            <StackPanel>
-                <!-- Header -->
-                <Border Background="{StaticResource CardBackground}" 
-                        BorderBrush="{StaticResource BorderColor}"
+            <StackPanel Margin="0,0,0,0">
+                <!-- Header Elaborado -->
+                <Border Padding="16,32,12,24" 
+                        BorderBrush="{StaticResource BorderColor}" 
                         BorderThickness="0,0,0,1"
-                        Padding="20,24">
-                    <StackPanel>
-                        <TextBlock Text="⚙️ SETTINGS" 
-                                  FontSize="16" 
-                                  FontWeight="Bold"
-                                  Foreground="{StaticResource AccentBrush}"/>
-                        <TextBlock Text="Configuration Panel" 
-                                  FontSize="11" 
-                                  Foreground="{StaticResource TextMuted}"
-                                  Margin="0,4,0,0"/>
+                        Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal">
+                        <!-- Icon Box -->
+                        <Border Background="{StaticResource CardBackground}" 
+                                CornerRadius="8" 
+                                Width="44" Height="44"
+                                BorderBrush="{StaticResource BorderColor}"
+                                BorderThickness="1">
+                            <materialIcons:MaterialIcon Kind="CogOutline" 
+                                                       Width="22" Height="22" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- Titles -->
+                        <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                            <TextBlock Text="SETTINGS" 
+                                       FontWeight="Bold" 
+                                       FontSize="14" 
+                                       Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Configuration Panel" 
+                                       FontSize="11" 
+                                       Foreground="{StaticResource TextSecondary}" 
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <!-- Navigation Items -->
-                <StackPanel Margin="0,16,0,0">
+                <StackPanel>
                     <RadioButton x:Name="NavGeneral" 
                                Content="General" 
-                               Tag="🔧"
+                               Tag="Wrench"
                                GroupName="Navigation" 
                                IsChecked="True" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                     
                     <RadioButton x:Name="NavAdvanced" 
                                Content="Advanced" 
-                               Tag="⚡"
+                               Tag="Flash"
                                GroupName="Navigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                     
                     <RadioButton x:Name="NavDefaultPaths" 
                                Content="Default Paths" 
-                               Tag="📁"
+                               Tag="Folder"
                                GroupName="Navigation" 
-                               Style="{StaticResource NavButtonStyle}"/>
+                               Style="{StaticResource SettingsTabStyle}"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -79,38 +95,57 @@
                 
             </ScrollViewer>
 
-            <!-- Bottom Action Bar -->
+            <!-- Bottom Action Bar (Improved Style) -->
             <Border Grid.Row="1" 
                   Background="{StaticResource CardBackground}"
                   BorderBrush="{StaticResource BorderColor}"
                   BorderThickness="0,1,0,0"
-                  Padding="32,16">
+                  Padding="24,16">
                 <Grid>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                    
-                        <materialIcons:MaterialIcon Kind="LightbulbOn" 
-                                                     FontSize="12" 
-                                                     Margin="0,0,8,0" 
-                                                     VerticalAlignment="Center"
-                                                     Foreground="Gold"/>
-                        <TextBlock Text="Changes aren´t applied immediately"
-                                 Foreground="{StaticResource TextMuted}" 
-                                 FontSize="12" 
-                                 VerticalAlignment="Center"/>
-                    </StackPanel>
-                    
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    
-                        <Button x:Name="BtnResetDefaults" 
-                              Content="Reset to Defaults"
-                              Margin="0,0,12,0"
-                              Click="BtnResetDefaults_Click"
-                              Style="{StaticResource SecondaryButton}"/>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Status/Info with Icon -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="{StaticResource HoverColor}" CornerRadius="16" Width="32" Height="32" Margin="0,0,12,0">
+                            <materialIcons:MaterialIcon Kind="Tune" 
+                                                       Width="16" Height="16" 
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                        </Border>
                         
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Configuration Manager"
+                                     FontWeight="SemiBold"
+                                     Foreground="{StaticResource TextPrimary}" 
+                                     FontSize="13"/>
+                            <TextBlock Text="Manage your application preferences and defaults"
+                                     Foreground="{StaticResource TextMuted}" 
+                                     FontSize="11"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Right: Action Buttons -->
+                    <StackPanel Grid.Column="1" 
+                                Orientation="Horizontal" 
+                                HorizontalAlignment="Right">
+                        <Button x:Name="BtnResetDefaults" 
+                                Content="Reset Defaults"
+                                Click="BtnResetDefaults_Click"
+                                Style="{StaticResource SecondaryButton}"
+                                Height="32"
+                                Padding="12,0"/>
+
                         <Button x:Name="btnSave" 
-                              Content="Save Changes"
-                              Click="btnSave_Click"
-                              Style="{StaticResource ModernButton}"/>
+                                Content="Save Changes"
+                                Margin="12,0,0,0"
+                                Click="btnSave_Click"
+                                Style="{StaticResource ModernButton}"
+                                Height="32"
+                                Padding="12,0"/>
                     </StackPanel>
                 </Grid>
             </Border>

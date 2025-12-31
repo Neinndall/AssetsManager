@@ -15,6 +15,8 @@ namespace AssetsManager.Utils
         public static readonly string[] Css = { ".css" };
         public static readonly string[] Bin = { ".bin" };
         public static readonly string[] StringTable = { ".stringtable" };
+        public static readonly string[] Troybin = { ".troybin" };
+        public static readonly string[] Preload = { ".preload" };
         public static readonly string[] PlainText = { ".txt", ".xml", ".yaml", ".yml", ".ini", ".log", ".lua", ".info" };
 
         public static bool IsExpandableAudioBank(string fileName)

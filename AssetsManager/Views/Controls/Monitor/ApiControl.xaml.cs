@@ -455,7 +455,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 Orientation = Orientation.Vertical
             };
 
-            var itemTemplate = this.FindResource("MythicShopItemTemplate") as DataTemplate;
+            var itemTemplate = this.FindResource("MythicItemTemplate") as DataTemplate;
 
             foreach (var category in categories)
             {
@@ -508,6 +508,16 @@ namespace AssetsManager.Views.Controls.Monitor
             _lcuConnectionTimer.Stop();
             // Unsubscribe to prevent potential memory leaks if the control is frequently loaded/unloaded
             _lcuConnectionTimer.Tick -= LcuConnectionTimer_Tick;
+        }
+
+        private void TabSales_Click(object sender, RoutedEventArgs e)
+        {
+            MainTabControl.SelectedIndex = 0;
+        }
+
+        private void TabMythic_Click(object sender, RoutedEventArgs e)
+        {
+            MainTabControl.SelectedIndex = 1;
         }
     }
 }

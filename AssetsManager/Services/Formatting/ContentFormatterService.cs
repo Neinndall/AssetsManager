@@ -80,6 +80,12 @@ namespace AssetsManager.Services.Formatting
                 case "bin":
                     formattedContent = await GetBinJsonStringAsync(data);
                     break;
+                case "troybin":
+                    formattedContent = await GetTroybinJsonStringAsync(data);
+                    break;
+                case "preload":
+                    formattedContent = await GetPreloadJsonStringAsync(data);
+                    break;
                 case "stringtable":
                     formattedContent = await GetStringTableJsonStringAsync(data);
                     break;
@@ -202,6 +208,52 @@ namespace AssetsManager.Services.Formatting
         {
             var rawJson = Encoding.UTF8.GetString(data);
             return await _jsonFormatterService.FormatJsonAsync(rawJson);
+        }
+
+        private async Task<string> GetTroybinJsonStringAsync(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return "{}";
+            }
+
+            try
+            {
+                using var troybinStream = new MemoryStream(data);
+                using var jsonStream = new MemoryStream();
+                var inibinFile = new LeagueToolkit.IO.Inibin.InibinFile(troybinStream);
+                await TroybinUtils.WriteInibinAsJsonAsync(jsonStream, inibinFile, _hashResolverService);
+                jsonStream.Position = 0;
+                using var reader = new StreamReader(jsonStream);
+                return await reader.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse .troybin file content.");
+                return "Error parsing .troybin file. See logs for details.";
+            }
+        }
+
+        private async Task<string> GetPreloadJsonStringAsync(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return "{}";
+            }
+
+            try
+            {
+                using var jsonStream = new MemoryStream();
+                await PreloadUtils.WritePreloadAsJsonAsync(jsonStream, data);
+                jsonStream.Position = 0;
+                using var reader = new StreamReader(jsonStream);
+                return await reader.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse .preload file content.");
+                return "Error parsing .preload file. See logs for details.";
+            }
         }
     }
 }

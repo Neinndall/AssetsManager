@@ -61,6 +61,9 @@ namespace AssetsManager.Views
         private string _extractionNewLolPath;
         private List<SerializableChunkDiff> _diffsForExtraction;
 
+        private GridLength _lastLogHeight;
+        private bool _isLogMinimized = false;
+
         public MainWindow(
             IServiceProvider serviceProvider,
             LogService logService,
@@ -110,9 +113,11 @@ namespace AssetsManager.Views
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
 
-            _progressUIManager.Initialize(ProgressSummaryButton, ProgressIcon, this);
+            _progressUIManager.Initialize(ProgressSummaryButton, StatusTextBlock, ProgressPercentageTextBlock, this);
 
             _logService.SetLogOutput(LogView.richTextBoxLogs);
+            LogView.ToggleLogSizeRequested += OnToggleLogSizeRequested;
+            LogView.LogExpandedManually += (s, e) => _isLogMinimized = false;
 
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
@@ -130,12 +135,7 @@ namespace AssetsManager.Views
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
             Sidebar.NavigationRequested += OnSidebarNavigationRequested;
-            LoadComparatorWindow();
-
-            if (IsAnySettingActive())
-            {
-                _logService.Log("Settings configured on startup.");
-            }
+            LoadHomeWindow();
 
             _updateCheckService.Start();
             InitializeApplicationAsync();
@@ -279,7 +279,7 @@ namespace AssetsManager.Views
 
             if (_appSettings.ReportGeneration.Enabled) // Prioritize report generation
             {
-                await _reportGenerationService.GenerateReportAsync(serializableDiffs);
+                await _reportGenerationService.GenerateReportAsync(serializableDiffs, oldLolPath, newLolPath);
             }
             else if (_appSettings.EnableExtraction) // Only extract if report generation is NOT enabled
             {
@@ -306,16 +306,6 @@ namespace AssetsManager.Views
             resultWindow.Show();
         }
 
-        private bool IsAnySettingActive()
-        {
-            return _appSettings.SyncHashesWithCDTB ||
-                   _appSettings.EnableExtraction ||
-                   _appSettings.ReportGeneration.Enabled ||
-                   _appSettings.CheckJsonDataUpdates ||
-                   _appSettings.SaveDiffHistory ||
-                   _appSettings.BackgroundUpdates;
-        }
-
         public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
         {
             Dispatcher.Invoke(() =>
@@ -332,12 +322,45 @@ namespace AssetsManager.Views
                     _notificationMessages.Clear();
                 }
 
-                UpdateNotificationIcon.Visibility = _notificationMessages.Any() ? Visibility.Visible : Visibility.Collapsed;
-                NotificationTextBlock.Text = string.Join(Environment.NewLine, _notificationMessages);
+                NotificationButton.Visibility = _notificationMessages.Any() ? Visibility.Visible : Visibility.Collapsed;
+                string fullMessage = string.Join(" | ", _notificationMessages);
+                NotificationMessageText.Text = fullMessage;
+                NotificationToolTipText.Text = fullMessage;
             });
         }
 
-        private async void UpdateNotificationIcon_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        public void ClearStatusBar()
+        {
+            _progressUIManager.ClearStatusText();
+            ShowNotification(false);
+        }
+
+        private void OnToggleLogSizeRequested(object sender, EventArgs e)
+        {
+            // If the log is currently showing only the toolbar (effectively hidden by manual resize)
+            // or is explicitly minimized, we want to expand it.
+            if (_isLogMinimized || LogRowDefinition.ActualHeight <= 45)
+            {
+                // Restore / Expand
+                // If the last height was too small (due to manual resize), use a default height
+                if (!_lastLogHeight.IsAbsolute || _lastLogHeight.Value <= 45)
+                {
+                    _lastLogHeight = new GridLength(185);
+                }
+
+                LogRowDefinition.Height = _lastLogHeight;
+                _isLogMinimized = false;
+            }
+            else
+            {
+                // Minimize
+                _lastLogHeight = LogRowDefinition.Height;
+                LogRowDefinition.Height = GridLength.Auto;
+                _isLogMinimized = true;
+            }
+        }
+
+        private async void NotificationButton_Click(object sender, RoutedEventArgs e)
         {
             ShowNotification(false);
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
@@ -366,6 +389,7 @@ namespace AssetsManager.Views
 
             switch (viewTag)
             {
+                case "Home": LoadHomeWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Models": LoadModelWindow(); break;
@@ -373,6 +397,17 @@ namespace AssetsManager.Views
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
+        }
+
+        private void LoadHomeWindow()
+        {
+            var homeWindow = _serviceProvider.GetRequiredService<HomeWindow>();
+            homeWindow.NavigationRequested += (tag) =>
+            {
+                Sidebar.SelectNavigationItem(tag);
+                OnSidebarNavigationRequested(tag);
+            };
+            MainContentArea.Content = homeWindow;
         }
 
         private void LoadExplorerWindow()

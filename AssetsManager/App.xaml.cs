@@ -141,6 +141,7 @@ namespace AssetsManager
 
       // Windows, Views, and Dialogs
       services.AddTransient<MainWindow>();
+      services.AddTransient<HomeWindow>(); // New Home View
       services.AddTransient<ExplorerWindow>();
       services.AddTransient<ComparatorWindow>();
       services.AddTransient<ModelWindow>();
@@ -161,6 +162,7 @@ namespace AssetsManager
       services.AddTransient<AdvancedSettingsView>();
       services.AddTransient<DefaultPathsSettingsView>();
       services.AddTransient<AboutView>();
+      services.AddTransient<DocumentationView>();
       services.AddTransient<BugReportsView>();
       services.AddTransient<ChangelogsView>();
       services.AddTransient<UpdatesView>();

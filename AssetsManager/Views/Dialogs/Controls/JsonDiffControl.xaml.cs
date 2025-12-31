@@ -294,6 +294,13 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
+        private void WordWrapButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool isEnabled = WordWrapButton.IsChecked ?? false;
+            OldJsonContent.WordWrap = isEnabled;
+            NewJsonContent.WordWrap = isEnabled;
+        }
+
         private void NextDiffButton_Click(object sender, RoutedEventArgs e)
         {
             DiffNavigationPanel?.NavigateToNextDifference(NewJsonContent.TextArea.Caret.Line);

@@ -107,7 +107,11 @@ namespace AssetsManager.Views
 
             AppSettings.SaveSettings(_settingsModel.Settings);
 
+            _customMessageBoxService.ShowSuccess("Success", "Settings have been saved successfully.", this);
+
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = false });
         }
+
+
     }
 }

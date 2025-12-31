@@ -7,6 +7,7 @@ using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
+using System.Collections.Generic;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -37,7 +38,9 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void btnViewDiff_Click(object sender, RoutedEventArgs e)
         {
-            if (DiffHistoryListView.SelectedItem is JsonDiffHistoryEntry selectedEntry)
+            var selectedEntry = (sender as FrameworkElement)?.DataContext as JsonDiffHistoryEntry ?? DiffHistoryListView.SelectedItem as JsonDiffHistoryEntry;
+
+            if (selectedEntry != null)
             {
                 await DiffViewService.ShowFileDiffAsync(selectedEntry.OldFilePath, selectedEntry.NewFilePath, Window.GetWindow(this));
             }
@@ -49,10 +52,13 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void btnRemoveSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (DiffHistoryListView.SelectedItems.Count > 0)
-            {
-                var itemsToRemove = DiffHistoryListView.SelectedItems.Cast<JsonDiffHistoryEntry>().ToList();
+            var entryToRemove = (sender as FrameworkElement)?.DataContext as JsonDiffHistoryEntry;
+            var itemsToRemove = entryToRemove != null 
+                ? new List<JsonDiffHistoryEntry> { entryToRemove }
+                : DiffHistoryListView.SelectedItems.Cast<JsonDiffHistoryEntry>().ToList();
 
+            if (itemsToRemove.Count > 0)
+            {
                 string message = itemsToRemove.Count == 1
                     ? $"Are you sure you want to delete the history entry for '{itemsToRemove.First().FileName}' from {itemsToRemove.First().Timestamp}? This will delete the backup files and cannot be undone."
                     : $"Are you sure you want to delete the {itemsToRemove.Count} selected history entries? This will delete their backup files and cannot be undone.";

@@ -8,8 +8,8 @@
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d"
         Title="AssetsManager"
-        Width="950" Height="800"
-        MinWidth="950" MinHeight="800"
+        Width="1000" Height="850"
+        MinWidth="1000" MinHeight="850"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource SidebarBackground}"
         FontFamily="{StaticResource AppFontFamily}">
@@ -26,12 +26,13 @@
             <controls:SidebarView x:Name="Sidebar"
                                   Grid.Column="0"/>
 
-            <!-- Main Content Area and Logger -->
+            <!-- Main Content Area, Logger and Status Bar -->
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" MinHeight="200"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="180" MinHeight="38"/> <!-- LogView Height -->
+                    <RowDefinition x:Name="LogRowDefinition" Height="185" MinHeight="38"/> <!-- LogView Height -->
+                    <RowDefinition Height="Auto"/> <!-- Status Bar Height -->
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0"
@@ -44,7 +45,7 @@
                 </Border>
 
                 <GridSplitter Grid.Row="1"
-                              Height="6" HorizontalAlignment="Stretch"
+                              Height="8" HorizontalAlignment="Stretch"
                               VerticalAlignment="Center"
                               Background="Transparent"
                               Cursor="SizeNS"
@@ -52,93 +53,151 @@
                               ResizeBehavior="PreviousAndNext">
                     <GridSplitter.Template>
                         <ControlTemplate TargetType="GridSplitter">
-                            <Grid Background="Transparent">
-                                <StackPanel Orientation="Horizontal"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center">
-                                    <Ellipse Width="3" Height="3" Fill="{StaticResource BorderColor}" Margin="1,0"/>
-                                    <Ellipse Width="3" Height="3" Fill="{StaticResource BorderColor}" Margin="1,0"/>
-                                    <Ellipse Width="3" Height="3" Fill="{StaticResource BorderColor}" Margin="1,0"/>
-                                    <Ellipse Width="3" Height="3" Fill="{StaticResource BorderColor}" Margin="1,0"/>
-                                    <Ellipse Width="3" Height="3" Fill="{StaticResource BorderColor}" Margin="1,0"/>
-                                </StackPanel>
-                            </Grid>
+                            <Border Background="Transparent" x:Name="RootBorder">
+                                <Border x:Name="Handle" 
+                                        Width="36" Height="4" 
+                                        Background="{StaticResource BorderColor}" 
+                                        CornerRadius="2" 
+                                        VerticalAlignment="Center" 
+                                        HorizontalAlignment="Center"
+                                        Opacity="0.6"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Handle" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                    <Setter TargetName="Handle" Property="Opacity" Value="1"/>
+                                    <Setter TargetName="Handle" Property="Width" Value="48"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </GridSplitter.Template>
                 </GridSplitter>
 
                 <!-- LogView -->
                 <Border Grid.Row="2"
-                    Background="{StaticResource SidebarBackground}"
-                    BorderBrush="{StaticResource BorderColor}"
-                    BorderThickness="0,1,0,0"
-                    Padding="0">
-                <controls:LogView x:Name="LogView"/>
+                        Background="{StaticResource SidebarBackground}"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="0,1,0,0"
+                        Padding="0">
+                    <controls:LogView x:Name="LogView"/>
+                </Border>
+
+                <!-- MODERN STATUS BAR -->
+                <Border Grid.Row="3" 
+                        Background="{StaticResource SidebarBackground}" 
+                        BorderBrush="{StaticResource BorderColor}" 
+                        Height="32"
+                        Padding="16,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Text, ElementName=StatusTextBlock}" Value=""/>
+                                        <Condition Binding="{Binding Visibility, ElementName=NotificationButton}" Value="Collapsed"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left Side: Notifications & Status Text -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="NotificationButton"
+                                    Style="{StaticResource TransparentIconButton}"
+                                    Visibility="Collapsed"
+                                    Cursor="Hand"
+                                    Margin="0,0,16,0"
+                                    Padding="0"
+                                    VerticalAlignment="Center"
+                                    Click="NotificationButton_Click">
+                                <Button.ToolTip>
+                                    <ToolTip Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}">
+                                        <TextBlock x:Name="NotificationToolTipText" TextWrapping="Wrap" MaxWidth="350" Foreground="{StaticResource TextPrimary}" FontSize="12"/>
+                                    </ToolTip>
+                                </Button.ToolTip>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="BellRingOutline" Width="14" Height="14" Foreground="LightSkyBlue" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="NotificationMessageText" Text="" FontSize="11" Foreground="LightSkyBlue" FontWeight="Medium" VerticalAlignment="Center" MaxWidth="300" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Button>
+
+                            <materialIcons:MaterialIcon x:Name="ReadyIcon" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon">
+                                        <!-- Default values moved here -->
+                                        <Setter Property="Kind" Value="CheckCircleOutline"/>
+                                        <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="Cancelling Task...">
+                                                <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                <Setter Property="Foreground" Value="Orange"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="Cancelling tree building...">
+                                                <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                <Setter Property="Foreground" Value="Orange"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="Cancelling tree building...">
+                                                <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                <Setter Property="Foreground" Value="Orange"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialIcons:MaterialIcon.Style>
+                            </materialIcons:MaterialIcon>
+                            <TextBlock x:Name="StatusTextBlock" Text="" FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Right Side: Progress Indicator -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <Button x:Name="ProgressSummaryButton"
+                                    Style="{StaticResource TransparentIconButton}"
+                                    Visibility="Collapsed"
+                                    Padding="4,0"
+                                    VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="ProgressPercentageTextBlock" Text="0%" FontSize="11" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                    <materialIcons:MaterialIcon x:Name="ProgressIcon" Kind="Sync"
+                                                                Width="16" Height="16"
+                                                                Foreground="{StaticResource AccentBrush}"
+                                                                VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon.Style>
+                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Visibility, ElementName=ProgressSummaryButton}" Value="Visible">
+                                                        <DataTrigger.EnterActions>
+                                                            <BeginStoryboard x:Name="SpinAnimation" Storyboard="{StaticResource SpinningIconAnimation}"/>
+                                                        </DataTrigger.EnterActions>
+                                                        <DataTrigger.ExitActions>
+                                                            <StopStoryboard BeginStoryboardName="SpinAnimation"/>
+                                                        </DataTrigger.ExitActions>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialIcons:MaterialIcon.Style>
+                                        <materialIcons:MaterialIcon.RenderTransform>
+                                            <RotateTransform CenterX="8" CenterY="8"/>
+                                        </materialIcons:MaterialIcon.RenderTransform>
+                                    </materialIcons:MaterialIcon>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </Grid>
         </Grid>
-
-        <!-- Update Notification Icon -->
-        <materialIcons:MaterialIcon x:Name="UpdateNotificationIcon"
-                                    Kind="AlertCircle"
-                                    Width="20"
-                                    Height="20"
-                                    Foreground="LightSkyBlue"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Bottom"
-                                    Margin="0,0,30,39"
-                                    Visibility="Collapsed"
-                                    MouseLeftButtonDown="UpdateNotificationIcon_MouseLeftButtonDown">
-            <materialIcons:MaterialIcon.ToolTip>
-                <ToolTip>
-                    <TextBlock x:Name="NotificationTextBlock"
-                               TextWrapping="Wrap"
-                               MaxWidth="200"/>
-                </ToolTip>
-            </materialIcons:MaterialIcon.ToolTip>
-            <materialIcons:MaterialIcon.Effect>
-                <DropShadowEffect Color="Black" ShadowDepth="1" BlurRadius="3" Opacity="0.5"/>
-            </materialIcons:MaterialIcon.Effect>
-        </materialIcons:MaterialIcon>
-
-                        <!-- Progress Icon -->
-
-                        <Button x:Name="ProgressSummaryButton"
-
-                                Style="{StaticResource TransparentIconButton}"
-
-                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
-
-                                Background="Transparent" BorderThickness="0"
-
-                                Visibility="Collapsed"
-
-                                Margin="0,0,26,10"
-
-                                ToolTip="">
-
-                            <materialIcons:MaterialIcon x:Name="ProgressIcon" Kind="Sync"
-
-                                                        Width="20" Height="20"
-
-                                                        Foreground="{StaticResource AccentBrush}"
-
-                                                        VerticalAlignment="Center">
-
-                                <materialIcons:MaterialIcon.RenderTransform>
-
-                                    <RotateTransform CenterX="10" CenterY="10"/>
-
-                                </materialIcons:MaterialIcon.RenderTransform>
-
-                            </materialIcons:MaterialIcon>
-
-                        </Button>
-
-                    </Grid>
-
-                </Window>
-
-                
-
-        
+    </Grid>
+</Window>

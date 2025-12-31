@@ -5,81 +5,130 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="800" d:DesignWidth="800">
     <StackPanel>
-        <!-- Page Header -->
-        <StackPanel Margin="0,0,0,32">
-            <TextBlock Text="Application Updates" 
-                       FontSize="28" 
-                       FontWeight="Medium" 
-                       Foreground="{StaticResource TextPrimary}"
-                       Margin="0,4,0,0"/>
-            <TextBlock Text="Keep your application up to date with the latest features" 
-                       FontSize="14" 
-                       Foreground="{StaticResource TextMuted}"
-                       Margin="0,2,0,0"/>
-        </StackPanel>
+        <!-- MODERN INTEGRATED HEADER (Compact) -->
+        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-        <!-- Update Check Card -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialIcons:MaterialIcon Kind="Update"
-                                               Foreground="{StaticResource AccentGreen}"
-                                               FontSize="20"
-                                               Margin="0,0,12,0"
-                                               VerticalAlignment="Center"/>
-                    <StackPanel>
-                        <TextBlock Text="Update Check" 
-                                   FontSize="18" 
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource AccentGreen}"/>
-                        <TextBlock Text="Check for the latest version and download updates" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <materialIcons:MaterialIcon Kind="Update" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="Application Updates" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Keep your application up to date with the latest features" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
                 </StackPanel>
-                
-                <TextBlock Text="Stay up to date with the latest features, improvements, and bug fixes by checking for updates regularly."
-                           Foreground="{StaticResource TextSecondary}" 
-                           FontWeight="Normal"
-                           FontSize="13" 
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,20"/>
-                
-                <Button x:Name="buttonCheckUpdates" 
-                        Content="Check Updates"
-                        HorizontalAlignment="Left"
-                        Click="buttonCheckUpdates_Click"
-                        Style="{StaticResource ModernButton}"/>
-            </StackPanel>
+                <materialIcons:MaterialIcon Grid.Column="1" Kind="CloudSyncOutline" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
+            </Grid>
         </Border>
 
-        <!-- Update Information Card -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <materialIcons:MaterialIcon Kind="PackageVariant"
-                                               Foreground="SaddleBrown"
-                                               FontSize="20"
-                                               Margin="0,0,12,0"
-                                               VerticalAlignment="Center"/>
+        <!-- VERSION HUB CARD -->
+        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24" Margin="0,0,0,20">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+                    <Style.Triggers>
+                        <!-- Style for when an update is available -->
+                        <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
+                            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter Property="BorderBrush" Value="Transparent"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+
+            <Grid>
+                <StackPanel>
+                    <!-- Up to Date State -->
                     <StackPanel>
-                        <TextBlock Text="Update Information" 
-                                   FontSize="18" 
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="About automatic updates and release cycle" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextMuted}"/>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        
+                        <materialIcons:MaterialIcon Kind="CheckCircleOutline" Foreground="{StaticResource AccentGreen}" Width="40" Height="40" HorizontalAlignment="Center"/>
+                        <TextBlock Text="You are up to date!" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                        <TextBlock HorizontalAlignment="Center" Margin="0,4,0,0" Foreground="{StaticResource TextSecondary}">
+                            <Run Text="AssetsManager"/>
+                            <Run Text="{Binding CurrentVersion}"/>
+                            <Run Text="is the latest version."/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Update Available State -->
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Foreground="White" Width="40" Height="40" HorizontalAlignment="Center"/>
+                        <TextBlock Text="New Version Available!" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                        <TextBlock HorizontalAlignment="Center" Margin="0,4,0,24" Foreground="White" Opacity="0.8">
+                            <Run Text="Version"/>
+                            <Run Text="{Binding AvailableVersion}" FontWeight="Bold"/>
+                            <Run Text="is ready to be installed."/>
+                        </TextBlock>
+                        
+                        <Button x:Name="buttonInstallUpdate" 
+                                Content="Download &amp; Install" 
+                                Click="buttonInstallUpdate_Click"
+                                Style="{StaticResource ModernButton}" 
+                                Background="White"
+                                Foreground="{StaticResource AccentBrush}"
+                                FontWeight="Bold"
+                                Padding="24,12"
+                                HorizontalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
-
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• Updates are released regularly with new features and fixes"/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• The application will notify you when updates are available"/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• You can always check manually using the button above"/>
-                <TextBlock Margin="0,4" FontSize="13" Foreground="{StaticResource TextSecondary}" Text="• Backup your settings before major updates"/>
-            </StackPanel>
+            </Grid>
         </Border>
+
+        <!-- INFORMATION SECTION -->
+        <TextBlock Text="UPDATE POLICY" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,8,0,16"/>
+        <UniformGrid Columns="2">
+            <!-- Point 1 -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,0,8,8" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentBlue}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Regular Releases" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="Updates are released frequently with new features and critical fixes." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Point 2 -->
+            <Border Style="{StaticResource SettingsCard}" Margin="8,0,0,8" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="BellOutline" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Automatic Notifications" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="The app checks for updates on startup and will notify you if a new version is available." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
     </StackPanel>
 </UserControl>

@@ -76,13 +76,12 @@ namespace AssetsManager.Services.Explorer
                         {
                             foreach (var dep in file.Dependencies)
                             {
-                                _logService.Log($"[LoadFromBackupAsync] Processing dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
-
+                                _logService.LogDebug($"[LoadFromBackupAsync] Processing dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
                                 // In this view, we add dependencies as top-level entries to respect the file path structure.
                                 // We only do this for dependencies that were originally top-level diffs to avoid clutter.
                                 if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                 {
-                                    _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions (WasTopLevelDiff and Type.HasValue). Adding to tree.");
+                                    _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions (WasTopLevelDiff and Type.HasValue). Adding to tree.");
                                     var depType = dep.Type.Value;
                                     var depStatus = GetDiffStatus(depType);
                                     string depStatusPrefix = GetStatusPrefix(depType);
@@ -104,7 +103,7 @@ namespace AssetsManager.Services.Explorer
                                     };
                                     depNode.BackupChunkPath = depNode.ChunkDiff.BackupChunkPath;
                                 } else {
-                                    _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Skipping addition to tree in sorted view.");
+                                    _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Skipping addition to tree in sorted view.");
                                 }
                             }
                         }
@@ -115,7 +114,6 @@ namespace AssetsManager.Services.Explorer
                 else
                 {
                     var statusGroups = wadGroup.GroupBy(d => d.Type).ToDictionary(g => g.Key, g => g.ToList());
-
                     var statusOrder = new[] { ChunkDiffType.New, ChunkDiffType.Modified, ChunkDiffType.Renamed, ChunkDiffType.Removed };
 
                     foreach (var statusType in statusOrder)
@@ -145,13 +143,13 @@ namespace AssetsManager.Services.Explorer
 
                                 if (file.Dependencies != null)
                                 {
-                                    _logService.Log($"[LoadFromBackupAsync] Processing audio bank '{file.Path}' dependencies (isSortingEnabled=false). Count: {file.Dependencies.Count}");
+                                    _logService.LogDebug($"[LoadFromBackupAsync] Processing audio bank '{file.Path}' dependencies (isSortingEnabled=false). Count: {file.Dependencies.Count}");
                                     foreach (var dep in file.Dependencies)
                                     {
-                                        _logService.Log($"[LoadFromBackupAsync] Dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
+                                        _logService.LogDebug($"[LoadFromBackupAsync] Dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
                                         if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                         {
-                                            _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions. Adding as child node.");
+                                            _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions. Adding as child node.");
                                             // New format: Create a visible child node with status
                                             string depStatusPrefix = GetStatusPrefix(dep.Type.Value);
                                             string depFileName = Path.GetFileName(dep.Path);
@@ -180,7 +178,7 @@ namespace AssetsManager.Services.Explorer
                                         }
                                         else
                                         {
-                                            _logService.Log($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Adding as fallback.");
+                                            _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Adding as fallback.");
                                             // Fallback for old backups or unchanged dependencies
                                             string depFileName = Path.GetFileName(dep.Path);
                                             var depNode = new FileSystemNodeModel(depFileName, false, dep.Path, wadGroup.Key)
@@ -311,33 +309,45 @@ namespace AssetsManager.Services.Explorer
                 cancellationToken.ThrowIfCancellationRequested();
                 string pathToWad = wadNode.Type == NodeType.WadFile ? wadNode.FullPath : wadNode.SourceWadPath;
                 var rootVirtualNode = new FileSystemNodeModel(wadNode.Name, true, wadNode.FullPath, pathToWad);
-                using (var wadFile = new WadFile(pathToWad))
+                
+                try
                 {
-                    foreach (var chunk in wadFile.Chunks.Values)
+                    using (var wadFile = new WadFile(pathToWad))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
-
-                        bool isUnresolved = virtualPath == chunk.PathHash.ToString("x16");
-                        bool noExtension = !Path.HasExtension(virtualPath);
-
-                        if (isUnresolved || noExtension)
+                        foreach (var chunk in wadFile.Chunks.Values)
                         {
-                            using (var stream = wadFile.OpenChunk(chunk))
+                            cancellationToken.ThrowIfCancellationRequested();
+                            string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
+
+                            bool isUnresolved = virtualPath == chunk.PathHash.ToString("x16");
+                            bool noExtension = !Path.HasExtension(virtualPath);
+
+                            if (isUnresolved || noExtension)
                             {
-                                var buffer = new byte[256];
-                                var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                                var data = new Span<byte>(buffer, 0, bytesRead);
-                                string extension = FileTypeDetector.GuessExtension(data);
-                                if (!string.IsNullOrEmpty(extension))
+                                using (var stream = wadFile.OpenChunk(chunk))
                                 {
-                                    virtualPath = virtualPath + "." + extension;
+                                    var buffer = new byte[256];
+                                    var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                                    var data = new Span<byte>(buffer, 0, bytesRead);
+                                    string extension = FileTypeDetector.GuessExtension(data);
+                                    if (!string.IsNullOrEmpty(extension))
+                                    {
+                                        virtualPath = virtualPath + "." + extension;
+                                    }
                                 }
                             }
-                        }
 
-                        AddNodeToVirtualTree(rootVirtualNode, virtualPath, pathToWad, chunk.PathHash);
+                            AddNodeToVirtualTree(rootVirtualNode, virtualPath, pathToWad, chunk.PathHash);
+                        }
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw; // Propagate cancellation
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError($"Failed to load WAD file at '{pathToWad}': {ex.Message}");
                 }
 
                 SortChildrenRecursively(rootVirtualNode);
@@ -357,22 +367,29 @@ namespace AssetsManager.Services.Explorer
                     return fileNodes; // Return empty list if WAD file doesn't exist
                 }
 
-                using (var wadFile = new WadFile(wadPath))
+                try
                 {
-                    foreach (var chunk in wadFile.Chunks.Values)
+                    using (var wadFile = new WadFile(wadPath))
                     {
-                        string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
-                        if (string.IsNullOrEmpty(virtualPath) || virtualPath == chunk.PathHash.ToString("x16"))
+                        foreach (var chunk in wadFile.Chunks.Values)
                         {
-                            virtualPath = chunk.PathHash.ToString("x16"); // Use hash as name if not resolved
-                        }
+                            string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
+                            if (string.IsNullOrEmpty(virtualPath) || virtualPath == chunk.PathHash.ToString("x16"))
+                            {
+                                virtualPath = chunk.PathHash.ToString("x16"); // Use hash as name if not resolved
+                            }
 
-                        var fileNode = new FileSystemNodeModel(Path.GetFileName(virtualPath), false, virtualPath, wadPath)
-                        {
-                            SourceChunkPathHash = chunk.PathHash
-                        };
-                        fileNodes.Add(fileNode);
+                            var fileNode = new FileSystemNodeModel(Path.GetFileName(virtualPath), false, virtualPath, wadPath)
+                            {
+                                SourceChunkPathHash = chunk.PathHash
+                            };
+                            fileNodes.Add(fileNode);
+                        }
                     }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError($"Failed to load WAD content at '{wadPath}': {ex.Message}");
                 }
                 return fileNodes;
             });

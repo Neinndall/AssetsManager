@@ -1,0 +1,199 @@
+<UserControl x:Class="AssetsManager.Views.HomeWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             mc:Ignorable="d" 
+             d:DesignHeight="700" d:DesignWidth="1000">
+    <UserControl.Resources>
+        
+        <!-- Premium Dashboard Tile Style -->
+        <Style x:Key="DashboardTileStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="CardBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <Grid>
+                                <!-- Accent Strip (Left) - Perfectly aligned with card rounding -->
+                                <Border x:Name="AccentStrip" 
+                                        Background="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" 
+                                        Width="4" 
+                                        HorizontalAlignment="Left" 
+                                        CornerRadius="12,0,0,12"
+                                        Opacity="0.8"/>
+                                
+                                <ContentPresenter />
+                            </Grid>
+                        </Border>
+                        
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="AccentStrip" Property="Opacity" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
+                                <Setter TargetName="CardBorder" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Secondary (Small) Card Style -->
+        <Style x:Key="SecondaryTileStyle" TargetType="Button" BasedOn="{StaticResource DashboardTileStyle}">
+            <Setter Property="Height" Value="80"/>
+        </Style>
+
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- Background Pattern (Subtle Gradient) -->
+        <Grid.Background>
+            <RadialGradientBrush Center="0.5,-0.1" RadiusX="1.2" RadiusY="1.2">
+                <GradientStop Color="#0D5577CC" Offset="0"/>
+                <GradientStop Color="Transparent" Offset="1"/>
+            </RadialGradientBrush>
+        </Grid.Background>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="60,60,60,60" MaxWidth="900">
+                
+                <!-- HEADER HERO SECTION -->
+                <StackPanel Margin="0,0,0,40" HorizontalAlignment="Left">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <Border Grid.Column="0" Width="64" Height="64" Background="{StaticResource SidebarBackground}" CornerRadius="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,24,0">
+                            <materialIcons:MaterialIcon Kind="AutoFix" Width="36" Height="36" Foreground="{StaticResource AccentBrush}"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Welcome back, Summoner" 
+                                       FontSize="32" 
+                                       FontWeight="Bold" 
+                                       Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="What would you like to do today?" 
+                                       FontSize="16" 
+                                       Foreground="{StaticResource TextSecondary}" 
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <!-- MAIN TOOLS GRID (2x2) -->
+                <TextBlock Text="PRIMARY TOOLS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="10,0,0,10"/>
+                <UniformGrid Columns="2" Margin="0,0,0,20">
+                    
+                    <!-- Comparator -->
+                    <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBrush}">
+                        <Button.CommandParameter>Comparator</Button.CommandParameter>
+                        <Grid Margin="24,20">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Width="48" Height="48" CornerRadius="12" Background="#1A5577CC" Margin="0,0,20,0">
+                                <materialIcons:MaterialIcon Kind="Compare" Width="28" Height="28" Foreground="{StaticResource AccentBrush}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="WAD Comparator" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Compare version manifests and track incremental changes in game files." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+
+                    <!-- Explorer -->
+                    <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBlue}">
+                        <Button.CommandParameter>Explorer</Button.CommandParameter>
+                        <Grid Margin="24,20">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Width="48" Height="48" CornerRadius="12" Background="#1A4FC1FF" Margin="0,0,20,0">
+                                <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="28" Height="28" Foreground="{StaticResource AccentBlue}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="File Explorer" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Browse virtual file systems, extract assets, and preview contents." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+
+                    <!-- Models -->
+                    <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentPurple}">
+                        <Button.CommandParameter>Models</Button.CommandParameter>
+                        <Grid Margin="24,20">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Width="48" Height="48" CornerRadius="12" Background="#1AC77DFF" Margin="0,0,20,0">
+                                <materialIcons:MaterialIcon Kind="CubeOutline" Width="28" Height="28" Foreground="{StaticResource AccentPurple}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="3D Models" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Render champion skins, skeletons, and animations in high definition." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+
+                    <!-- Monitor -->
+                    <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentGreen}">
+                        <Button.CommandParameter>Monitor</Button.CommandParameter>
+                        <Grid Margin="24,20">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Width="48" Height="48" CornerRadius="12" Background="#1A57CC99" Margin="0,0,20,0">
+                                <materialIcons:MaterialIcon Kind="Radar" Width="28" Height="28" Foreground="{StaticResource AccentGreen}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Live Monitor" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Monitor PBE status, remote JSON changes, and CDN asset discovery." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                </UniformGrid>
+
+                <!-- SYSTEM SECTION -->
+                <TextBlock Text="APPLICATION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="10,0,0,10"/>
+                <UniformGrid Columns="2">
+                    <!-- Settings -->
+                    <Button Style="{StaticResource SecondaryTileStyle}" Click="Button_Click" Tag="{StaticResource TextSecondary}">
+                        <Button.CommandParameter>Settings</Button.CommandParameter>
+                        <Grid Margin="20,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <materialIcons:MaterialIcon Kind="CogOutline" Width="22" Height="22" Foreground="{StaticResource TextSecondary}" Margin="0,0,16,0"/>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Settings" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Configure app behavior and game paths." FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+
+                    <!-- Help -->
+                    <Button Style="{StaticResource SecondaryTileStyle}" Click="Button_Click" Tag="{StaticResource TextSecondary}">
+                        <Button.CommandParameter>Help</Button.CommandParameter>
+                        <Grid Margin="20,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <materialIcons:MaterialIcon Kind="HelpCircleOutline" Width="22" Height="22" Foreground="{StaticResource TextSecondary}" Margin="0,0,16,0"/>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Help &amp; Documentation" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="User guides and application information." FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                </UniformGrid>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

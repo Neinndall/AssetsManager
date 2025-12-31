@@ -103,13 +103,15 @@ namespace AssetsManager.Views.Controls.Models
             {
                 LoadModelIcon.Kind = MaterialIconKind.Map;
                 LoadModelButton.ToolTip = "Load MapGeometry";
-                LoadAnimationButton.IsEnabled = false;
-                LoadChromaModelButton.IsEnabled = false;
+                LoadAnimationButton.Visibility = Visibility.Collapsed;
+                LoadChromaModelButton.Visibility = Visibility.Collapsed;
             }
             else
             {
                 LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
                 LoadModelButton.ToolTip = "Load Model";
+                LoadAnimationButton.Visibility = Visibility.Visible;
+                LoadChromaModelButton.Visibility = Visibility.Visible;
                 LoadAnimationButton.IsEnabled = true;
             }
         }
@@ -363,8 +365,8 @@ namespace AssetsManager.Views.Controls.Models
                 CameraResetRequested?.Invoke();
 
                 LoadModelButton.IsEnabled = false;
-                LoadAnimationButton.IsEnabled = false;
-                LoadChromaModelButton.IsEnabled = false;
+                LoadAnimationButton.Visibility = Visibility.Collapsed;
+                LoadChromaModelButton.Visibility = Visibility.Collapsed;
             }
         }
 
