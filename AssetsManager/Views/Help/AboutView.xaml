@@ -47,7 +47,7 @@
                     Margin="0,12,0,0"
                     HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="PREMIUM VERSION " Foreground="{StaticResource TextMuted}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <TextBlock Text="VERSION " Foreground="{StaticResource TextMuted}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
                     <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="8,2" Margin="8,0,0,0">
                         <TextBlock Text="{Binding ApplicationVersion, FallbackValue='v3.0.0.0'}" 
                                    Foreground="White" 

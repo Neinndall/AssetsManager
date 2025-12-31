@@ -163,18 +163,25 @@
         </Border>
 
         <!-- FOOTER (Professional Info) -->
-        <StackPanel Margin="0,48,0,0">
+        <StackPanel Margin="0,48,0,0" HorizontalAlignment="Stretch">
             <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Margin="40,0,40,24" Opacity="0.5"/>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="28" Height="28" Margin="0,0,12,0">
+            <Grid HorizontalAlignment="Center" Margin="20,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Width="28" Height="28" Margin="0,0,12,0" VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="Github" Foreground="{StaticResource TextPrimary}" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Text="For technical specifications and community support, visit our official GitHub repository." 
+                <TextBlock Grid.Column="1" 
+                           Text="For technical specifications and community support, visit our official GitHub repository." 
                            FontSize="12" 
                            Foreground="{StaticResource TextSecondary}" 
                            VerticalAlignment="Center"
-                           FontStyle="Italic"/>
-            </StackPanel>
+                           FontStyle="Italic"
+                           TextWrapping="Wrap"
+                           MaxWidth="600"/>
+            </Grid>
         </StackPanel>
     </StackPanel>
 </UserControl>
