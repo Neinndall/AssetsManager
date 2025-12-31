@@ -226,10 +226,10 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <Button Click="RequestsSales_Click" IsEnabled="{Binding Status.IsConnected}" Style="{StaticResource ModernButton}" Height="32" Padding="16,0" Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="Refresh" Width="16" Margin="0,0,8,0"/><TextBlock Text="Refresh Sales" FontWeight="SemiBold"/></StackPanel>
+                        <Button Click="RequestsSales_Click" IsEnabled="{Binding Status.IsConnected}" Style="{StaticResource ModernButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
+                            <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="Refresh" Width="16" Margin="0,0,8,0"/><TextBlock Text="Fetch Sales" FontWeight="SemiBold"/></StackPanel>
                         </Button>
-                        <Button Click="SaveButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="16,0">
+                        <Button Click="SaveButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left">
                             <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="ImageOutline" Width="16" Margin="0,0,8,0"/><TextBlock Text="Export PNG" FontWeight="SemiBold"/></StackPanel>
                         </Button>
                     </StackPanel>
@@ -246,10 +246,10 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <Button Click="RequestsMythicShop_Click" IsEnabled="{Binding Status.IsConnected}" Style="{StaticResource ModernButton}" Height="32" Padding="16,0" Margin="0,0,8,0">
+                        <Button Click="RequestsMythicShop_Click" IsEnabled="{Binding Status.IsConnected}" Style="{StaticResource ModernButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
                             <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="AutoFix" Width="16" Margin="0,0,8,0"/><TextBlock Text="Fetch Shop" FontWeight="SemiBold"/></StackPanel>
                         </Button>
-                        <Button Click="SaveMythicShopButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="16,0">
+                        <Button Click="SaveMythicShopButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left">
                             <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="ImageOutline" Width="16" Margin="0,0,8,0"/><TextBlock Text="Export PNG" FontWeight="SemiBold"/></StackPanel>
                         </Button>
                     </StackPanel>

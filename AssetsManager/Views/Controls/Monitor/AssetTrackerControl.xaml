@@ -82,13 +82,13 @@
 
                 <!-- Actions -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Name="CheckButton" Click="CheckButton_Click" Style="{StaticResource ModernButton}" Height="32" Padding="16,0" Margin="0,0,8,0">
+                    <Button Name="CheckButton" Click="CheckButton_Click" Style="{StaticResource ModernButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="Radar" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Scan CDN" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button>
-                    <Button Name="LoadMoreButton" Click="LoadMoreButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="16,0">
+                    <Button Name="LoadMoreButton" Click="LoadMoreButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="Plus" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Load More" VerticalAlignment="Center" FontWeight="SemiBold"/>
@@ -98,13 +98,13 @@
 
                 <!-- Bulk Actions -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
-                    <Button Name="DownloadButton" Click="DownloadButton_Click" Style="{StaticResource ModernButton}" Height="32" Padding="16,0" Margin="0,0,8,0">
+                    <Button Name="DownloadButton" Click="DownloadButton_Click" Style="{StaticResource ModernButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="DownloadOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Download All" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button>
-                    <Button Name="RemoveFoundButton" Click="RemoveFoundButton_Click" Style="{StaticResource DestructiveButton}" Height="32" Padding="16,0">
+                    <Button Name="RemoveFoundButton" Click="RemoveFoundButton_Click" Style="{StaticResource DestructiveButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="Broom" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Remove Found" VerticalAlignment="Center" FontWeight="SemiBold"/>

@@ -42,19 +42,19 @@
                     </Grid.ColumnDefinitions>
                     
                     <StackPanel Orientation="Horizontal">
-                        <Button Click="FetchVersions_Click" Style="{StaticResource ModernButton}" Height="32" Padding="12,0" Margin="0,0,8,0">
+                        <Button Click="FetchVersions_Click" Style="{StaticResource ModernButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
                             <StackPanel Orientation="Horizontal">
                                 <materialIcons:MaterialIcon Kind="Refresh" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="Fetch All" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Click="GetLeagueClient_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" Margin="0,0,8,0">
+                        <Button Click="GetLeagueClient_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
                             <StackPanel Orientation="Horizontal">
                                 <materialIcons:MaterialIcon Kind="DesktopClassic" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="Get Client" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Click="GetLoLGameClient_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0">
+                        <Button Click="GetLoLGameClient_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left">
                             <StackPanel Orientation="Horizontal">
                                 <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="Get Game" FontWeight="SemiBold" VerticalAlignment="Center"/>

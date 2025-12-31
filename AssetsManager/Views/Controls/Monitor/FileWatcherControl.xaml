@@ -43,7 +43,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Button Grid.Column="0" Click="AddUrl_Click" Style="{StaticResource ModernButton}" Height="32" Padding="16,0">
+                <Button Grid.Column="0" Click="AddUrl_Click" Style="{StaticResource ModernButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left">
                     <StackPanel Orientation="Horizontal">
                         <materialIcons:MaterialIcon Kind="Plus" Width="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                         <TextBlock Text="Add Monitor" FontWeight="SemiBold" VerticalAlignment="Center"/>
