@@ -14,7 +14,7 @@
             BorderThickness="0,0,1,0" 
             ClipToBounds="True">
 
-        <Grid Margin="0,12,0,12">
+        <Grid Margin="0,16,0,12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- Toggle Header -->
                 <RowDefinition Height="Auto"/> <!-- Main Tools -->
@@ -23,15 +23,15 @@
             </Grid.RowDefinitions>
 
             <!-- Header: Toggle Button -->
-            <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel Grid.Row="0" Margin="0,0,0,24">
                 <RadioButton x:Name="ToggleExpansionButton" Style="{StaticResource ModernSidebarNavigationStyle}" Click="ToggleExpansion_Click" Margin="0,0,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Menu" Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="Panel" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Menu" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Panel" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
             </StackPanel>
@@ -44,8 +44,8 @@
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Home" Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="Home" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Home" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Home" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -55,8 +55,8 @@
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Compare" Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="Comparator" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Compare" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Comparator" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -66,8 +66,8 @@
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderSearchOutline" Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="Explorer" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderSearchOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Explorer" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -77,8 +77,8 @@
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="CubeOutline" Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="Models" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="CubeOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Models" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -88,16 +88,16 @@
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Radar" Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="Monitor" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Radar" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Monitor" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
             </StackPanel>
 
             <!-- Bottom System Links -->
             <StackPanel Grid.Row="3">
-                <!-- Visual Separator (Optional, adds nice touch) -->
-                <Border Height="1" Background="{StaticResource BorderColor}" Margin="12,8,12,8" Opacity="0.5"/>
+                <!-- Visual Separator -->
+                <Border Height="1" Background="{StaticResource BorderColor}" Margin="16,8,16,12" Opacity="0.4"/>
 
                 <RadioButton x:Name="SettingsButton" Style="{StaticResource ModernSidebarNavigationStyle}" Click="MenuButton_Click" Tag="Settings" GroupName="SidebarNavigation">
                     <Grid>
@@ -105,8 +105,8 @@
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="CogOutline" Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="Settings" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="CogOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Settings" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
@@ -116,15 +116,16 @@
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="HelpCircleOutline" Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="Help" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="HelpCircleOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Help" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 
-                <Border Margin="0,12,0,4">
+                <!-- Version Info -->
+                <Border Margin="0,16,0,8" Opacity="0.6">
                     <TextBlock Text="{x:Static info:ApplicationInfos.Version}" 
-                               FontWeight="Normal" 
-                               FontSize="10" 
+                               FontWeight="Medium" 
+                               FontSize="9" 
                                Foreground="{StaticResource TextMuted}" 
                                HorizontalAlignment="Center" 
                                Style="{StaticResource SidebarMenuTextStyle}"/>
