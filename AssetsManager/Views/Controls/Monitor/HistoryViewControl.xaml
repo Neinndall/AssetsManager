@@ -87,7 +87,7 @@
                 <Style TargetType="ListViewItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                     <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Margin" Value="0,0,0,8"/>
+                    <Setter Property="Margin" Value="0,0,0,4"/>
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="ListViewItem">
@@ -99,12 +99,12 @@
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="12" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <Grid>
                             <!-- Accent Strip (Orange for History) -->
-                            <Border Width="4" HorizontalAlignment="Left" CornerRadius="12,0,0,12" Background="{StaticResource AccentOrange}"/>
+                            <Border Width="3" HorizontalAlignment="Left" CornerRadius="8,0,0,8" Background="{StaticResource AccentOrange}"/>
 
-                            <Grid Margin="16,16,16,16">
+                            <Grid Margin="12,8,12,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/> <!-- Icon -->
                                     <ColumnDefinition Width="*"/>    <!-- Info -->
@@ -112,16 +112,16 @@
                                 </Grid.ColumnDefinitions>
 
                                 <!-- File Icon Box -->
-                                <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
-                                    <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
+                                    <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                 </Border>
 
                                 <!-- Info -->
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource TextPrimary}"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                        <materialIcons:MaterialIcon Kind="ClockOutline" Width="12" Height="12" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <materialIcons:MaterialIcon Kind="ClockOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </StackPanel>
 
@@ -129,11 +129,11 @@
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Button Click="btnViewDiff_Click" ToolTip="View Historical Differences" 
                                             Style="{StaticResource TransparentIconButton}" 
-                                            Width="32" Height="32" Margin="0,0,8,0">
-                                        <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                            Width="28" Height="28" Margin="0,0,4,0">
+                                        <materialIcons:MaterialIcon Kind="FileCompare" Width="16" Height="16" Foreground="{StaticResource AccentBrush}"/>
                                     </Button>
                                     
-                                    <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Delete Entry">
+                                    <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Delete Entry">
                                         <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{StaticResource AccentRed}"/>
                                     </Button>
                                 </StackPanel>

@@ -169,35 +169,36 @@
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="Margin" Value="0,0,0,8"/>
+                        <Setter Property="Margin" Value="0,0,0,4"/>
                         <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
                         <EventSetter Event="PreviewMouseDown" Handler="ListViewItem_PreviewMouseDown"/>
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ListViewItem">
-                                    <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
+                                    <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
                                         <Grid>
-                                            <Border Width="4" HorizontalAlignment="Left" Background="{StaticResource AccentBrush}" CornerRadius="12,0,0,12"/>
-                                            <Grid Margin="16,16,16,16">
+                                            <Border Width="3" HorizontalAlignment="Left" Background="{StaticResource AccentBrush}" CornerRadius="8,0,0,8"/>
+                                            <Grid Margin="12,8,12,8">
                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                                <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
-                                                    <materialIcons:MaterialIcon Kind="DesktopClassic" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
+                                                    <materialIcons:MaterialIcon Kind="DesktopClassic" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                 </Border>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource TextPrimary}"/>
-                                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                        <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                        <materialIcons:MaterialIcon Kind="CalendarClock" Width="10" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </StackPanel>
-                                                <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="24" Height="24" Visibility="Collapsed"/>
+                                                <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Visibility="Collapsed"/>
                                             </Grid>
                                         </Grid>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsSelected" Value="True">
                                             <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                            <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="2"/>
+                                            <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1"/>
+                                            <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                                             <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                                         </Trigger>
                                         <Trigger Property="IsMouseOver" Value="True">
@@ -229,39 +230,40 @@
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="Margin" Value="0,0,0,8"/>
+                        <Setter Property="Margin" Value="0,0,0,4"/>
                         <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
                         <EventSetter Event="PreviewMouseDown" Handler="ListViewItem_PreviewMouseDown"/>
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ListViewItem">
-                                    <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
+                                    <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
                                         <Grid>
-                                            <Border Width="4" HorizontalAlignment="Left" Background="{StaticResource AccentGreen}" CornerRadius="12,0,0,12"/>
-                                            <Grid Margin="16,16,16,16">
+                                            <Border Width="3" HorizontalAlignment="Left" Background="{StaticResource AccentGreen}" CornerRadius="8,0,0,8"/>
+                                            <Grid Margin="12,8,12,8">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
-                                                    <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="22" Height="22" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
+                                                    <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                 </Border>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource TextPrimary}"/>
-                                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                        <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                        <materialIcons:MaterialIcon Kind="CalendarClock" Width="10" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </StackPanel>
-                                                <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentGreen}" Width="24" Height="24" Visibility="Collapsed"/>
+                                                <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" Visibility="Collapsed"/>
                                             </Grid>
                                         </Grid>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsSelected" Value="True">
                                             <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
-                                            <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="2"/>
+                                            <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1"/>
+                                            <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                                             <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                                         </Trigger>
                                         <Trigger Property="IsMouseOver" Value="True">

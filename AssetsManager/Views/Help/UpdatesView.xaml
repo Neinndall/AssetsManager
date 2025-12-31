@@ -113,7 +113,7 @@
                         </Border>
                         <TextBlock Text="Regular Releases" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Updates are released frequently with new features and critical fixes." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="We deploy frequent updates delivering performance optimizations, new features, and security patches." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -126,7 +126,7 @@
                         </Border>
                         <TextBlock Text="Automatic Notifications" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="The app checks for updates on startup and will notify you if a new version is available." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Silent background checks ensure you are always notified of the latest version immediately upon launch." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </UniformGrid>

@@ -89,6 +89,7 @@
 
                 <!-- Bulk Actions -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
+                    <Rectangle Width="1" Height="24" Fill="{StaticResource BorderColor}" Margin="0,0,16,0" VerticalAlignment="Center"/>
                     <Button Name="DownloadButton" Click="DownloadButton_Click" Style="{StaticResource ModernButton}" HorizontalContentAlignment="Left" Padding="12,0,16,0" Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="DownloadOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>

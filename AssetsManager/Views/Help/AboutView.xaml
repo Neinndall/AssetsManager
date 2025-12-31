@@ -80,7 +80,7 @@
                         </Border>
                         <TextBlock Text="Auto Downloads" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Detects and downloads new PBE assets automatically." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Seamlessly detects and downloads new PBE assets in the background." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -93,7 +93,7 @@
                         </Border>
                         <TextBlock Text="WAD Comparator" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Analyze differences between versions to find changes." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Advanced differential analysis to pinpoint modified content." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -106,7 +106,7 @@
                         </Border>
                         <TextBlock Text="File Explorer" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Explore archives with a tree view and previews." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Browse internal archives with integrated instant previews." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -119,7 +119,7 @@
                         </Border>
                         <TextBlock Text="3D Viewer" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Inspect models (.skn) and animations in real-time." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="High-performance rendering of models, skeletons, and animations." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -132,7 +132,7 @@
                         </Border>
                         <TextBlock Text="Live Monitoring" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Track JSON files and PBE server status." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Real-time surveillance of remote configs and server health." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -145,7 +145,7 @@
                         </Border>
                         <TextBlock Text="Audio Banks" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Listen to and inspect .bnk and .wpk audio events." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Decrypt, inspect, and playback encrypted audio bank events." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
