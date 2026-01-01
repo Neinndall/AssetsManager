@@ -99,7 +99,7 @@
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
                         <Grid>
                             <!-- Accent Strip (Orange for History) -->
                             <Border Width="3" HorizontalAlignment="Left" CornerRadius="8,0,0,8" Background="{StaticResource AccentOrange}"/>

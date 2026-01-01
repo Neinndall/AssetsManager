@@ -62,7 +62,7 @@
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
                                                 <Grid>
-                                                    <Border x:Name="AccentIndicator" Width="4" HorizontalAlignment="Left" Background="{StaticResource AccentBrush}" CornerRadius="8,0,0,8" Visibility="Collapsed"/>
+                                                    <Border x:Name="AccentIndicator" Width="3" HorizontalAlignment="Left" Background="{StaticResource AccentBrush}" CornerRadius="8,0,0,8" Visibility="Collapsed"/>
                                                     <Grid Margin="12,8">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*"/>
@@ -353,7 +353,7 @@
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
                                                 <Grid>
-                                                    <Border x:Name="AccentIndicator" Width="4" HorizontalAlignment="Left" Background="{StaticResource AccentBrush}" CornerRadius="8,0,0,8" Visibility="Collapsed"/>
+                                                    <Border x:Name="AccentIndicator" Width="3" HorizontalAlignment="Left" Background="{StaticResource AccentBrush}" CornerRadius="8,0,0,8" Visibility="Collapsed"/>
                                                     <Grid Margin="12,8">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*"/>

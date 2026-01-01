@@ -24,7 +24,8 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="12">
+                                CornerRadius="12"
+                                ClipToBounds="True">
                             <Grid>
                                 <!-- Accent Strip (Left) - Perfectly aligned with card rounding -->
                                 <Border x:Name="AccentStrip" 
