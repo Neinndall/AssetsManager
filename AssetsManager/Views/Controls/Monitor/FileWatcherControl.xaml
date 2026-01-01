@@ -88,101 +88,103 @@
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
-                        <Grid>
-                            <!-- Accent Strip (Left) -->
-                            <Border Width="3" HorizontalAlignment="Left" CornerRadius="8,0,0,8">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Background" Value="{StaticResource BorderColor}"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding StatusText}" Value="Updated">
-                                                <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date">
-                                                <Setter Property="Background" Value="{StaticResource AccentGreen}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusText}" Value="Error">
-                                                <Setter Property="Background" Value="{StaticResource AccentRed}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
+                    <Grid>
+                        <!-- 1. Background -->
+                        <Border x:Name="CardBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                        
+                        <!-- 2. Status Indicator (Pixel-Perfect Layer) -->
+                        <Border x:Name="StatusIndicator" BorderThickness="2,0,0,0" CornerRadius="8">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding StatusText}" Value="Updated">
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date">
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusText}" Value="Error">
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentRed}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                        </Border>
+
+                        <!-- 3. Content -->
+                        <Grid Margin="12,8,12,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/> <!-- Status Icon -->
+                                <ColumnDefinition Width="*"/>    <!-- Info -->
+                                <ColumnDefinition Width="Auto"/> <!-- Actions -->
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Status Indicator Box -->
+                            <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
+                                <materialIcons:MaterialIcon Width="18" Height="18" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon.Style>
+                                        <Style TargetType="materialIcons:MaterialIcon">
+                                            <Setter Property="Kind" Value="HelpCircleOutline" />
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date">
+                                                    <Setter Property="Kind" Value="CheckCircleOutline" />
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Updated">
+                                                    <Setter Property="Kind" Value="BellRingOutline" />
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Checking...">
+                                                    <Setter Property="Kind" Value="Sync" />
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Error">
+                                                    <Setter Property="Kind" Value="AlertCircleOutline" />
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </materialIcons:MaterialIcon.Style>
+                                </materialIcons:MaterialIcon>
                             </Border>
 
-                            <Grid Margin="12,8,12,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/> <!-- Status Icon -->
-                                    <ColumnDefinition Width="*"/>    <!-- Info -->
-                                    <ColumnDefinition Width="Auto"/> <!-- Actions -->
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Status Indicator Box -->
-                                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
-                                    <materialIcons:MaterialIcon Width="18" Height="18" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                        <materialIcons:MaterialIcon.Style>
-                                            <Style TargetType="materialIcons:MaterialIcon">
-                                                <Setter Property="Kind" Value="HelpCircleOutline" />
-                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date">
-                                                        <Setter Property="Kind" Value="CheckCircleOutline" />
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentGreen}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding StatusText}" Value="Updated">
-                                                        <Setter Property="Kind" Value="BellRingOutline" />
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding StatusText}" Value="Checking...">
-                                                        <Setter Property="Kind" Value="Sync" />
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding StatusText}" Value="Error">
-                                                        <Setter Property="Kind" Value="AlertCircleOutline" />
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialIcons:MaterialIcon.Style>
-                                    </materialIcons:MaterialIcon>
-                                </Border>
-
-                                <!-- Info -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Alias}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="6,1" Margin="0,0,8,0">
-                                            <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                                        </Border>
-                                        <TextBlock Text="|" FontSize="10" Foreground="{StaticResource BorderColor}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Text="{Binding LastChecked}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                    </StackPanel>
+                            <!-- Info -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Alias}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="6,1" Margin="0,0,8,0">
+                                        <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                                    </Border>
+                                    <TextBlock Text="|" FontSize="10" Foreground="{StaticResource BorderColor}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding LastChecked}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                 </StackPanel>
+                            </StackPanel>
 
-                                <!-- Actions -->
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                                         <!-- Compare Action -->
-                                                                        <Button Click="ViewChanges_Click" ToolTip="View Differences" Width="28" Height="28" Margin="0,0,8,0">
-                                                                            <Button.Style>
-                                                                                <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                                    <Style.Triggers>
-                                                                                        <DataTrigger Binding="{Binding HasChanges}" Value="True">
-                                                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                                                        </DataTrigger>
-                                                                                    </Style.Triggers>
-                                                                                </Style>
-                                                                            </Button.Style>
-                                                                            <materialIcons:MaterialIcon Kind="FileCompare" Width="16" Foreground="{StaticResource AccentBlue}"/>
-                                                                        </Button>                                    
-                                    <!-- Remove Action -->
-                                    <Button Click="Remove_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Remove Monitor">
-                                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{StaticResource AccentRed}"/>
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
+                            <!-- Actions -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Compare Action -->
+                                <Button Click="ViewChanges_Click" ToolTip="View Differences" Width="28" Height="28" Margin="0,0,8,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasChanges}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="16" Foreground="{StaticResource AccentBlue}"/>
+                                </Button>                                    
+                                <!-- Remove Action -->
+                                <Button Click="Remove_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Remove Monitor">
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{StaticResource AccentRed}"/>
+                                </Button>
+                            </StackPanel>
                         </Grid>
-                    </Border>
+                    </Grid>
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>

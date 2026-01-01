@@ -20,34 +20,37 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="CardBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="12"
-                                ClipToBounds="True">
-                            <Grid>
-                                <!-- Accent Strip (Left) - Perfectly aligned with card rounding -->
-                                <Border x:Name="AccentStrip" 
-                                        Background="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" 
-                                        Width="4" 
-                                        HorizontalAlignment="Left" 
-                                        CornerRadius="12,0,0,12"
-                                        Opacity="0.8"/>
-                                
-                                <ContentPresenter />
-                            </Grid>
-                        </Border>
+                        <Grid x:Name="RootGrid">
+                            <!-- 1. Background Layer -->
+                            <Border x:Name="BackgroundBorder" 
+                                    Background="{TemplateBinding Background}" 
+                                    CornerRadius="12"/>
+
+                            <!-- 2. Accent Strip Layer (Uses BorderThickness for perfect rounding) -->
+                            <Border x:Name="AccentStrip" 
+                                    BorderThickness="3,0,0,0" 
+                                    BorderBrush="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                    CornerRadius="12"
+                                    Opacity="0.8"
+                                    Margin="0"/>
+
+                            <!-- 3. Content Layer -->
+                            <ContentPresenter Margin="1"/>
+
+                            <!-- 4. Border Overlay (Changes thickness without pushing content) -->
+                            <Border x:Name="CardBorder"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="12"
+                                    IsHitTestVisible="False"/>
+                        </Grid>
                         
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                                 <Setter TargetName="CardBorder" Property="BorderBrush" Value="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                <Setter TargetName="CardBorder" Property="BorderThickness" Value="1.5"/>
                                 <Setter TargetName="AccentStrip" Property="Opacity" Value="1"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
-                                <Setter TargetName="CardBorder" Property="Opacity" Value="0.8"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

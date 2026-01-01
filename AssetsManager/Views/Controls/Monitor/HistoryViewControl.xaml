@@ -99,47 +99,49 @@
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
-                        <Grid>
-                            <!-- Accent Strip (Orange for History) -->
-                            <Border Width="3" HorizontalAlignment="Left" CornerRadius="8,0,0,8" Background="{StaticResource AccentOrange}"/>
+                    <Grid>
+                        <!-- 1. Background -->
+                        <Border x:Name="CardBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                        
+                        <!-- 2. Accent Strip (Pixel-Perfect Layer) -->
+                        <Border x:Name="AccentStrip" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentOrange}" CornerRadius="8"/>
 
-                            <Grid Margin="12,8,12,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                                    <ColumnDefinition Width="*"/>    <!-- Info -->
-                                    <ColumnDefinition Width="Auto"/> <!-- Actions -->
-                                </Grid.ColumnDefinitions>
+                        <!-- 3. Content -->
+                        <Grid Margin="12,8,12,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                                <ColumnDefinition Width="*"/>    <!-- Info -->
+                                <ColumnDefinition Width="Auto"/> <!-- Actions -->
+                            </Grid.ColumnDefinitions>
 
-                                <!-- File Icon Box -->
-                                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
-                                    <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                </Border>
+                            <!-- File Icon Box -->
+                            <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
+                                <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Border>
 
-                                <!-- Info -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                        <materialIcons:MaterialIcon Kind="ClockOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                    </StackPanel>
+                            <!-- Info -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <materialIcons:MaterialIcon Kind="ClockOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                 </StackPanel>
+                            </StackPanel>
 
-                                <!-- Actions -->
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="btnViewDiff_Click" ToolTip="View Historical Differences" 
-                                            Style="{StaticResource TransparentIconButton}" 
-                                            Width="28" Height="28" Margin="0,0,4,0">
-                                        <materialIcons:MaterialIcon Kind="FileCompare" Width="16" Height="16" Foreground="{StaticResource AccentBrush}"/>
-                                    </Button>
-                                    
-                                    <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Delete Entry">
-                                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{StaticResource AccentRed}"/>
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
+                            <!-- Actions -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Click="btnViewDiff_Click" ToolTip="View Historical Differences" 
+                                        Style="{StaticResource TransparentIconButton}" 
+                                        Width="28" Height="28" Margin="0,0,4,0">
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="16" Height="16" Foreground="{StaticResource AccentBrush}"/>
+                                </Button>
+                                
+                                <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Delete Entry">
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{StaticResource AccentRed}"/>
+                                </Button>
+                            </StackPanel>
                         </Grid>
-                    </Border>
+                    </Grid>
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>

@@ -56,54 +56,58 @@
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <EventSetter Event="PreviewMouseLeftButtonDown" Handler="ListViewItem_PreviewMouseLeftButtonDown" />
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Background" Value="Transparent"/><Setter Property="Margin" Value="0,0,0,8"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Margin" Value="0,0,0,8"/>
                     <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="ListViewItem">
-                                <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                    <Grid>
-                                        <!-- Accent Strip (Purple for Backups) -->
-                                        <Border Width="4" HorizontalAlignment="Left" CornerRadius="12,0,0,12" Background="{StaticResource AccentPurple}"/>
+                                <Grid>
+                                    <!-- 1. Background Layer -->
+                                    <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                                    
+                                    <!-- 2. Accent Indicator (Pixel-Perfect Layer) -->
+                                    <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentPurple}" CornerRadius="12"/>
 
-                                        <Grid Margin="16,16,16,16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                                                <ColumnDefinition Width="*"/>    <!-- Info -->
-                                                <ColumnDefinition Width="Auto"/> <!-- Status -->
-                                            </Grid.ColumnDefinitions>
+                                    <!-- 3. Content -->
+                                    <Grid Margin="16,16,16,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                                            <ColumnDefinition Width="*"/>    <!-- Info -->
+                                            <ColumnDefinition Width="Auto"/> <!-- Status -->
+                                        </Grid.ColumnDefinitions>
 
-                                            <!-- Folder Icon Box -->
-                                            <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
-                                                <materialIcons:MaterialIcon Kind="FolderZipOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
+                                        <!-- Folder Icon Box -->
+                                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
+                                            <materialIcons:MaterialIcon Kind="FolderZipOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
 
-                                            <!-- Info -->
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Path}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                    <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                                    
-                                                    <!-- NEW Badge -->
-                                                    <Border x:Name="NewBadge" Background="{StaticResource AccentPurple}" CornerRadius="4" Padding="6,1" Margin="12,0,0,0" Visibility="Collapsed">
-                                                        <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="White"/>
-                                                    </Border>
-                                                </StackPanel>
+                                        <!-- Info -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Path}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                
+                                                <!-- NEW Badge -->
+                                                <Border x:Name="NewBadge" Background="{StaticResource AccentPurple}" CornerRadius="4" Padding="6,1" Margin="12,0,0,0" Visibility="Collapsed">
+                                                    <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                </Border>
                                             </StackPanel>
+                                        </StackPanel>
 
-                                            <!-- Selection Check -->
-                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentPurple}" Width="24" Height="24" Visibility="Collapsed"/>
-                                        </Grid>
+                                        <!-- Selection Check -->
+                                        <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentPurple}" Width="24" Height="24" Visibility="Collapsed"/>
                                     </Grid>
-                                </Border>
+                                </Grid>
                                 <ControlTemplate.Triggers>
                                     <DataTrigger Binding="{Binding IsCurrentSessionBackup}" Value="True">
                                         <Setter TargetName="NewBadge" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
                                     <Trigger Property="IsSelected" Value="True">
                                         <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentPurple}"/>
-                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="2"/>
+                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
                                         <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                                     </Trigger>
                                     <Trigger Property="IsMouseOver" Value="True">

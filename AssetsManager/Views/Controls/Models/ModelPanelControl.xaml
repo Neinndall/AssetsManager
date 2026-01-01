@@ -60,24 +60,25 @@
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
-                                                <Grid>
-                                                    <Border x:Name="AccentIndicator" Width="3" HorizontalAlignment="Left" Background="{StaticResource AccentBrush}" CornerRadius="8,0,0,8" Visibility="Collapsed"/>
-                                                    <Grid Margin="12,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <ContentPresenter Grid.Column="0" />
-                                                        <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="1" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="8,0,0,0" Visibility="Collapsed"/>
-                                                    </Grid>
+                                            <Grid x:Name="RootGrid">
+                                                <!-- 1. Background / Selection Border -->
+                                                <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                                                
+                                                <!-- 2. Content -->
+                                                <Grid Margin="12,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <ContentPresenter Grid.Column="0" />
+                                                    <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="1" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="8,0,0,0" Visibility="Collapsed"/>
                                                 </Grid>
-                                            </Border>
+                                            </Grid>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsSelected" Value="True">
                                                     <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                    <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
                                                     <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                                    <Setter TargetName="AccentIndicator" Property="Visibility" Value="Visible"/>
                                                     <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                                                 </Trigger>
                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -351,24 +352,25 @@
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
-                                                <Grid>
-                                                    <Border x:Name="AccentIndicator" Width="3" HorizontalAlignment="Left" Background="{StaticResource AccentBrush}" CornerRadius="8,0,0,8" Visibility="Collapsed"/>
-                                                    <Grid Margin="12,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <ContentPresenter Grid.Column="0" />
-                                                        <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="1" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="16" Height="16" Margin="8,0,0,0" Visibility="Collapsed"/>
-                                                    </Grid>
+                                            <Grid x:Name="RootGrid">
+                                                <!-- 1. Background / Selection Border -->
+                                                <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                                                
+                                                <!-- 2. Content -->
+                                                <Grid Margin="12,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <ContentPresenter Grid.Column="0" />
+                                                    <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="1" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="16" Height="16" Margin="8,0,0,0" Visibility="Collapsed"/>
                                                 </Grid>
-                                            </Border>
+                                            </Grid>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsSelected" Value="True">
                                                     <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                    <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
                                                     <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                                    <Setter TargetName="AccentIndicator" Property="Visibility" Value="Visible"/>
                                                     <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                                                 </Trigger>
                                                 <Trigger Property="IsMouseOver" Value="True">
