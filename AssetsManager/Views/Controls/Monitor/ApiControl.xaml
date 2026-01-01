@@ -18,17 +18,25 @@
             <RowDefinition Height="*"/>    <!-- Content -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER -->
-        <Border Grid.Row="0" Margin="0,0,0,24" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="24,20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+        <!-- 1. HEADER: Standardized Settings Style -->
+        <Border Grid.Row="0" Margin="0,0,0,24" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="50" Height="50" Margin="0,0,20,0">
-                    <materialIcons:MaterialIcon Kind="CloudBraces" Width="26" Height="26" Foreground="{StaticResource AccentPurple}"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <materialIcons:MaterialIcon Kind="Api" Width="22" Height="22" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
+
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="API Center" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Direct interaction with League of Legends Client services and store data" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                    <TextBlock Text="API Center" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Interact with LCU and Riot API endpoints directly" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
                 </StackPanel>
+
+                <!-- Background Icon (Watermark) -->
+                <materialIcons:MaterialIcon Grid.Column="1" Kind="Web" Width="64" Height="64" Foreground="{StaticResource AccentPurple}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
             </Grid>
         </Border>
 
