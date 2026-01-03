@@ -110,31 +110,19 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Left Side: Notifications & Status Text -->
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button x:Name="NotificationButton"
-                                    Style="{StaticResource TransparentIconButton}"
-                                    Visibility="Collapsed"
-                                    Cursor="Hand"
-                                    Margin="0,0,16,0"
-                                    Padding="0"
-                                    VerticalAlignment="Center"
-                                    Click="NotificationButton_Click">
-                                <Button.ToolTip>
-                                    <ToolTip Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}">
-                                        <TextBlock x:Name="NotificationToolTipText" TextWrapping="Wrap" MaxWidth="350" Foreground="{StaticResource TextPrimary}" FontSize="12"/>
-                                    </ToolTip>
-                                </Button.ToolTip>
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="BellRingOutline" Width="14" Height="14" Foreground="LightSkyBlue" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="NotificationMessageText" Text="" FontSize="11" Foreground="LightSkyBlue" FontWeight="Medium" VerticalAlignment="Center" MaxWidth="300" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Button>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
+                        <!-- Left Side: Ready, Status Text & Notifications -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            
+                            <!-- 1. Ready Icon (First) -->
                             <materialIcons:MaterialIcon x:Name="ReadyIcon" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center">
                                 <materialIcons:MaterialIcon.Style>
                                     <Style TargetType="materialIcons:MaterialIcon">
-                                        <!-- Default values moved here -->
                                         <Setter Property="Kind" Value="CheckCircleOutline"/>
                                         <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
                                         <Setter Property="Visibility" Value="Visible"/>
@@ -150,18 +138,47 @@
                                                 <Setter Property="Kind" Value="AlertCircleOutline"/>
                                                 <Setter Property="Foreground" Value="Orange"/>
                                             </DataTrigger>
-                                            <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="Cancelling tree building...">
-                                                <Setter Property="Kind" Value="AlertCircleOutline"/>
-                                                <Setter Property="Foreground" Value="Orange"/>
-                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </materialIcons:MaterialIcon.Style>
                             </materialIcons:MaterialIcon>
-                            <TextBlock x:Name="StatusTextBlock" Text="" FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+
+                            <!-- 2. Status Text -->
+                            <TextBlock x:Name="StatusTextBlock" Text="" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,0,16,0" VerticalAlignment="Center" MaxWidth="400" TextTrimming="CharacterEllipsis">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=StatusTextBlock}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <!-- 3. Notifications -->
+                            <Button x:Name="NotificationButton"
+                                    Style="{StaticResource TransparentIconButton}"
+                                    Visibility="Collapsed"
+                                    Cursor="Hand"
+                                    Margin="0"
+                                    Padding="0"
+                                    VerticalAlignment="Center"
+                                    Click="NotificationButton_Click">
+                                <Button.ToolTip>
+                                    <ToolTip Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}">
+                                        <TextBlock x:Name="NotificationToolTipText" TextWrapping="Wrap" MaxWidth="400" Foreground="{StaticResource TextPrimary}" FontSize="12"/>
+                                    </ToolTip>
+                                </Button.ToolTip>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="BellRingOutline" Width="14" Height="14" Foreground="LightSkyBlue" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="NotificationMessageText" Text="" FontSize="11" Foreground="LightSkyBlue" FontWeight="Medium" VerticalAlignment="Center" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
 
-                        <!-- Right Side: Progress Indicator -->
+                        <!-- Right Side: Progress Indicator (Back to original position) -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
                             <Button x:Name="ProgressSummaryButton"
                                     Style="{StaticResource TransparentIconButton}"
@@ -195,6 +212,7 @@
                                 </StackPanel>
                             </Button>
                         </StackPanel>
+                    </Grid>
                     </Grid>
                 </Border>
             </Grid>
