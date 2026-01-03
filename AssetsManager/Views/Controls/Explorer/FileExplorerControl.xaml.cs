@@ -528,26 +528,31 @@ namespace AssetsManager.Views.Controls.Explorer
                     LogService.Log("Processing and saving selected files...");
 
                     var savedFiles = new List<string>();
-                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken, (savedPath) =>
-                    {
-                        savedFiles.Add(savedPath);
-                    });
+                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken, (path) => savedFiles.Add(path));
 
                     if (savedFiles.Count > 0)
                     {
+                        string finalLogPath = destinationPath;
+                        string displayName = selectedNode.Name;
+
+                        // Original logic for container paths
+                        if (selectedNode.Type == NodeType.SoundBank)
+                        {
+                            finalLogPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
+                        }
+                        else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
+                        {
+                            finalLogPath = Path.Combine(destinationPath, selectedNode.Name);
+                        }
+
+                        // Special case: If it was a single file, we use the actual saved path/name (e.g. reflects .mp3 conversion)
                         if (savedFiles.Count == 1)
                         {
-                            string finalPath = savedFiles.First();
-                            LogService.LogInteractiveSuccess($"Successfully saved {Path.GetFileName(finalPath)}.", finalPath, Path.GetFileName(finalPath));
+                            finalLogPath = savedFiles.First();
+                            displayName = Path.GetFileName(finalLogPath);
                         }
-                        else
-                        {
-                            LogService.LogInteractiveSuccess($"Successfully saved {savedFiles.Count}.", destinationPath);
-                        }
-                    }
-                    else
-                    {
-                        LogService.LogWarning($"No files were saved from '{selectedNode.Name}'. The node might have been empty or contained unsupported files.");
+
+                        LogService.LogInteractiveSuccess($"Successfully saved {displayName}.", finalLogPath, displayName);
                     }
 
                     TaskCancellationManager.CompleteCurrentOperation();
