@@ -144,7 +144,7 @@
                             </materialIcons:MaterialIcon>
 
                             <!-- 2. Status Text -->
-                            <TextBlock x:Name="StatusTextBlock" Text="" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,0,16,0" VerticalAlignment="Center" MaxWidth="400" TextTrimming="CharacterEllipsis">
+                            <TextBlock x:Name="StatusTextBlock" Text="" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,0,12,0" VerticalAlignment="Center" MaxWidth="350" TextTrimming="CharacterEllipsis">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Visible"/>
