@@ -6,6 +6,7 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Shared;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Utils
 {
@@ -35,6 +36,7 @@ namespace AssetsManager.Utils
         public string LastPbeCheckTime { get; set; }
         public string CustomFloorTexturePath { get; set; } = string.Empty;
         public Dictionary<string, long> HashesSizes { get; set; }
+        public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
 
         // Dictionary for File Watcher
         public Dictionary<string, DateTime> JsonDataModificationDates { get; set; }
@@ -167,6 +169,7 @@ namespace AssetsManager.Utils
                 LolLiveDirectory = null,
                 DefaultExtractedSelectDirectory = null,
                 CustomFloorTexturePath = null,
+                AudioExportFormat = AudioExportFormat.Ogg,
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
                 HashesSizes = new Dictionary<string, long>(),
@@ -207,6 +210,7 @@ namespace AssetsManager.Utils
             LolLiveDirectory = defaultSettings.LolLiveDirectory;
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;
             CustomFloorTexturePath = defaultSettings.CustomFloorTexturePath;
+            AudioExportFormat = defaultSettings.AudioExportFormat;
             SaveDiffHistory = defaultSettings.SaveDiffHistory;
             BackgroundUpdates = defaultSettings.BackgroundUpdates;
             CheckPbeStatus = defaultSettings.CheckPbeStatus;

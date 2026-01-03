@@ -13,6 +13,7 @@ using AssetsManager.Views.Models.Audio;
 using AssetsManager.Services.Parsers;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Models.Settings;
 
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
@@ -25,7 +26,8 @@ namespace AssetsManager.Services.Explorer
         private readonly ContentFormatterService _contentFormatterService;
         private readonly AudioBankService _audioBankService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
-        private readonly WemConversionService _wemConversionService;
+        private readonly AudioConversionService _audioConversionService;
+        private readonly AppSettings _appSettings;
 
         public WadSavingService(
             LogService logService,
@@ -33,14 +35,16 @@ namespace AssetsManager.Services.Explorer
             ContentFormatterService contentFormatterService,
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
-            WemConversionService wemConversionService)
+            AudioConversionService audioConversionService,
+            AppSettings appSettings)
         {
             _logService = logService;
             _wadExtractionService = wadExtractionService;
             _contentFormatterService = contentFormatterService;
             _audioBankService = audioBankService;
             _audioBankLinkerService = audioBankLinkerService;
-            _wemConversionService = wemConversionService;
+            _audioConversionService = audioConversionService;
+            _appSettings = appSettings;
         }
 
         public async Task ProcessAndSaveDiffAsync(SerializableChunkDiff diff, string destinationPath, string oldLolPath, string newLolPath, CancellationToken cancellationToken)
@@ -60,7 +64,7 @@ namespace AssetsManager.Services.Explorer
             await ProcessAndSaveAsync(node, destinationPath, null, basePath, cancellationToken);
         }
 
-        public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
+        public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -72,7 +76,7 @@ namespace AssetsManager.Services.Explorer
                 foreach (var child in node.Children)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await ProcessAndSaveAsync(child, currentDestinationPath, rootNodes, currentRootPath, cancellationToken);
+                    await ProcessAndSaveAsync(child, currentDestinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
                 }
                 return;
             }
@@ -88,7 +92,7 @@ namespace AssetsManager.Services.Explorer
                     
                     if (soundNode.Type == NodeType.WemFile)
                     {
-                        await HandleWemFileAsync(soundNode, eventPath, cancellationToken);
+                        await HandleWemFileAsync(soundNode, eventPath, cancellationToken, onFileSavedCallback);
                     }
                 }
                 return;
@@ -100,41 +104,82 @@ namespace AssetsManager.Services.Explorer
             {
                 case ".wpk":
                 case ".bnk":
-                    await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, cancellationToken);
+                    await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".tex":
                 case ".dds":
-                    await HandleTextureFile(node, destinationPath, cancellationToken);
+                    await HandleTextureFile(node, destinationPath, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".bin":
-                    await HandleDataFile(node, destinationPath, "bin", cancellationToken);
+                    await HandleDataFile(node, destinationPath, "bin", cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".stringtable":
-                    await HandleDataFile(node, destinationPath, "stringtable", cancellationToken);
+                    await HandleDataFile(node, destinationPath, "stringtable", cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".css":
-                    await HandleDataFile(node, destinationPath, "css", cancellationToken);
+                    await HandleDataFile(node, destinationPath, "css", cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".js":
-                    await HandleJsFile(node, destinationPath, cancellationToken);
+                    await HandleJsFile(node, destinationPath, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".wem":
-                    await HandleWemFileAsync(node, destinationPath, cancellationToken);
+                    await HandleWemFileAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    break;
+
+                case ".ogg":
+                    await HandleStandardAudioFileAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                     break;
 
                 default:
-                    await HandleRawFileExtractionAsync(node, destinationPath, cancellationToken);
+                    await HandleRawFileExtractionAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                     break;
             }
         }
 
-        private async Task HandleWemFileAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
+        private async Task HandleStandardAudioFileAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
+            if (fileBytes == null)
+            {
+                return;
+            }
+
+            var targetFormat = _appSettings.AudioExportFormat;
+            string currentExtension = Path.GetExtension(node.Name).ToLower();
+            bool conversionNeeded = true;
+
+            // Optimize: Skip conversion if source matches target (Ogg -> Ogg)
+            if (targetFormat == AudioExportFormat.Ogg && currentExtension == ".ogg") conversionNeeded = false;
+
+            if (conversionNeeded)
+            {
+                byte[] convertedData = await _audioConversionService.ConvertWemToFormatAsync(fileBytes, targetFormat, cancellationToken);
+                if (convertedData != null)
+                {
+                    string extension = targetFormat switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
+                    string fileName = Path.ChangeExtension(node.Name, extension);
+                    string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
+                    await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
+                    onFileSavedCallback?.Invoke(filePath);
+                    return;
+                }
+            }
+
+            // Fallback: If conversion wasn't needed or failed, save raw
+            string fallbackFilePath = PathUtils.GetUniqueFilePath(destinationPath, node.Name);
+            await File.WriteAllBytesAsync(fallbackFilePath, fileBytes, cancellationToken);
+            onFileSavedCallback?.Invoke(fallbackFilePath);
+        }
+
+        private async Task HandleWemFileAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -144,16 +189,19 @@ namespace AssetsManager.Services.Explorer
                 return;
             }
 
-            byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData, cancellationToken);
-            if (oggData != null)
+            var format = _appSettings.AudioExportFormat;
+            byte[] convertedData = await _audioConversionService.ConvertWemToFormatAsync(wemData, format, cancellationToken);
+            if (convertedData != null)
             {
-                string fileName = Path.ChangeExtension(node.Name, ".ogg");
+                string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
+                string fileName = Path.ChangeExtension(node.Name, extension);
                 string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
-                await File.WriteAllBytesAsync(filePath, oggData, cancellationToken);
+                await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
+                onFileSavedCallback?.Invoke(filePath);
             }
         }
 
-        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
+        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -165,9 +213,10 @@ namespace AssetsManager.Services.Explorer
             string filePath = PathUtils.GetUniqueFilePath(destinationPath, node.Name);
 
             await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
+            onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
+        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             if (!SupportedFileTypes.IsExpandableAudioBank(node.Name))
             {
@@ -185,6 +234,7 @@ namespace AssetsManager.Services.Explorer
             string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
             string audioBankPath = Path.Combine(destinationPath, PathUtils.SanitizeName(audioBankName));
             Directory.CreateDirectory(audioBankPath);
+            onFileSavedCallback?.Invoke(audioBankPath);
 
             cancellationToken.ThrowIfCancellationRequested();
             var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;
@@ -238,19 +288,22 @@ namespace AssetsManager.Services.Explorer
 
                     if (wemData != null)
                     {
-                        byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(wemData, cancellationToken);
-                        if (oggData != null)
+                        var format = _appSettings.AudioExportFormat;
+                        byte[] convertedData = await _audioConversionService.ConvertWemToFormatAsync(wemData, format, cancellationToken);
+                        if (convertedData != null)
                         {
-                            string fileName = Path.ChangeExtension(soundNode.Name, ".ogg");
+                            string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
+                            string fileName = Path.ChangeExtension(soundNode.Name, extension);
                             string filePath = PathUtils.GetUniqueFilePath(eventPath, fileName);
-                            await File.WriteAllBytesAsync(filePath, oggData, cancellationToken);
+                            await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
+                            onFileSavedCallback?.Invoke(filePath);
                         }
                     }
                 }
             }
         }
 
-        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
+        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -275,11 +328,12 @@ namespace AssetsManager.Services.Explorer
                     {
                         encoder.Save(fileStream);
                     }
+                    onFileSavedCallback?.Invoke(filePath);
                 }
             }
         }
 
-        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken)
+        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -295,9 +349,10 @@ namespace AssetsManager.Services.Explorer
             string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
 
             await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
+            onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleRawFileExtractionAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
+        private async Task HandleRawFileExtractionAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -322,6 +377,7 @@ namespace AssetsManager.Services.Explorer
 
             string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
             await File.WriteAllBytesAsync(filePath, fileBytes, cancellationToken);
+            onFileSavedCallback?.Invoke(filePath);
         }
     }
 }
