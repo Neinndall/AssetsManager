@@ -53,8 +53,7 @@ namespace AssetsManager.Views
 
         private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
-        private readonly List<string> _notificationMessages = new List<string>();
-
+        
         // New fields to manage the state of the extraction after comparison
         private bool _isExtractingAfterComparison = false;
         private string _extractionOldLolPath;
@@ -113,7 +112,11 @@ namespace AssetsManager.Views
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
 
-            _progressUIManager.Initialize(ProgressSummaryButton, StatusTextBlock, ProgressPercentageTextBlock, this);
+            // Initialize ProgressUIManager with controls from the new StatusBarView
+            _progressUIManager.Initialize(StatusBar.SummaryButton, StatusBar.StatusText, StatusBar.PercentageText, this);
+            
+            // Subscribe to Status Bar events
+            StatusBar.NotificationClicked += StatusBar_NotificationClicked;
 
             _logService.SetLogOutput(LogView.richTextBoxLogs);
             LogView.ToggleLogSizeRequested += OnToggleLogSizeRequested;
@@ -308,31 +311,15 @@ namespace AssetsManager.Views
 
         public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
         {
-            Dispatcher.Invoke(() =>
-            {
-                if (show)
-                {
-                    if (!_notificationMessages.Contains(message))
-                    {
-                        _notificationMessages.Add(message);
-                    }
-                }
-                else
-                {
-                    _notificationMessages.Clear();
-                }
-
-                NotificationButton.Visibility = _notificationMessages.Any() ? Visibility.Visible : Visibility.Collapsed;
-                string fullMessage = string.Join(" | ", _notificationMessages);
-                NotificationMessageText.Text = fullMessage;
-                NotificationToolTipText.Text = fullMessage;
-            });
+            // Delegate to StatusBar
+            StatusBar.ShowNotification(show, message);
         }
 
         public void ClearStatusBar()
         {
             _progressUIManager.ClearStatusText();
-            ShowNotification(false);
+            // Delegate to StatusBar
+            StatusBar.ClearStatusBar();
         }
 
         private void OnToggleLogSizeRequested(object sender, EventArgs e)
@@ -360,15 +347,14 @@ namespace AssetsManager.Views
             }
         }
 
-        private async void NotificationButton_Click(object sender, RoutedEventArgs e)
+        private async void StatusBar_NotificationClicked(object sender, EventArgs e)
         {
-            ShowNotification(false);
+            StatusBar.ShowNotification(false);
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
             {
                 await _updateManager.CheckForUpdatesAsync(this, true);
                 _latestAppVersionAvailable = null;
             }
-            e.Handled = true;
         }
 
         private void OnSidebarNavigationRequested(string viewTag)
