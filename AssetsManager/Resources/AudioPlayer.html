@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <script src='https://unpkg.com/wavesurfer.js@7'></script>
+    <style>
+        body { 
+            background-color: transparent !important; 
+            margin: 0; padding: 20px; 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            display: flex; align-items: center; justify-content: center; 
+            height: 100vh; overflow: hidden;
+        }
+        #waveform-container {
+            width: 100%; max-width: 500px;
+            padding: 20px; border-radius: 12px; 
+            border: 1px solid #3f3f46;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.20); /* Adjusted for subtlety */
+        }
+        #waveform { width: 100%; height: 80px; cursor: pointer; }
+        .controls { 
+            display: flex; align-items: center; justify-content: center; 
+            margin-top: 15px; gap: 16px; 
+        }
+        .play-btn {
+            width: 44px; height: 44px; border-radius: 50%; 
+            background: #4fc1ff; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .play-btn:hover { transform: scale(1.05); background: #60c9ff; }
+        .play-btn svg { fill: #1e1e1e; width: 20px; height: 20px; }
+        .time-display { font-family: 'Consolas', monospace; font-size: 13px; color: #aaaaaa; min-width: 60px; text-align: center; }
+        .file-info { margin-bottom: 15px; text-align: left; border-left: 3px solid #4fc1ff; padding-left: 12px; }
+        .file-name { font-size: 14px; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-meta { font-size: 11px; color: #757575; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div id='waveform-container'>
+        <div class='file-info'>
+            <div class='file-name'>{{DISPLAY_NAME}}</div>
+            <div class='file-meta'>Audio Asset • {{FILE_EXTENSION}}</div>
+        </div>
+        <div id='waveform'></div>
+        <div class='controls'>
+            <div class='time-display' id='current-time'>0:00</div>
+            <button class='play-btn' id='playPause'>
+                <svg id='play-icon' viewBox='0 0 24 24'><path d='M8 5v14l11-7z'/></svg>
+                <svg id='pause-icon' viewBox='0 0 24 24' style='display:none'><path d='M6 19h4V5H6v14zm8-14v14h4V5h-4z'/></svg>
+            </button>
+            <div class='time-display' id='total-duration'>0:00</div>
+        </div>
+    </div>
+
+    <script>
+        const wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#3f3f46',
+            progressColor: '#4fc1ff',
+            cursorColor: 'transparent',
+            barWidth: 2,
+            barRadius: 2,
+            responsive: true,
+            height: 80,
+            url: '{{FILE_URL}}',
+            interact: true // Allow dragging to seek
+        });
+
+        const playBtn = document.getElementById('playPause');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const curTime = document.getElementById('current-time');
+        const durTime = document.getElementById('total-duration');
+
+        const formatTime = (s) => {
+            const min = Math.floor(s / 60);
+            const sec = Math.floor(s % 60);
+            return `${min}:${sec.toString().padStart(2, '0')}`;
+        };
+
+        playBtn.onclick = () => wavesurfer.playPause();
+        wavesurfer.on('play', () => {
+            playIcon.style.display = 'none';
+            pauseIcon.style.display = 'block';
+        });
+        wavesurfer.on('pause', () => {
+            playIcon.style.display = 'block';
+            pauseIcon.style.display = 'none';
+        });
+        wavesurfer.on('finish', () => {
+            playIcon.style.display = 'block';
+            pauseIcon.style.display = 'none';
+            wavesurfer.seekTo(0);
+        });
+        wavesurfer.on('timeupdate', (t) => {
+            curTime.innerText = formatTime(t);
+        });
+        wavesurfer.on('interaction', (newTime) => {
+            curTime.innerText = formatTime(newTime);
+        });
+        wavesurfer.on('ready', (d) => {
+            durTime.innerText = formatTime(d);
+            if (window.shouldAutoplay) wavesurfer.play();
+        });
+        window.playMedia = () => wavesurfer.play();
+        window.shouldAutoplay = true;
+    </script>
+</body>
+</html>

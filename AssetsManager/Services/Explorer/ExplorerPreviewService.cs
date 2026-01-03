@@ -107,7 +107,7 @@ namespace AssetsManager.Services.Explorer
                     byte[] wemData = await _wadExtractionService.GetWemFileBytesAsync(node);
                     if (wemData != null)
                     {
-                        await DispatchPreview(wemData, ".wem");
+                        await DispatchPreview(wemData, ".wem", node);
                     }
                     else
                     {
@@ -137,7 +137,7 @@ namespace AssetsManager.Services.Explorer
             }
 
             byte[] fileData = await File.ReadAllBytesAsync(node.FullPath);
-            await DispatchPreview(fileData, node.Extension);
+            await DispatchPreview(fileData, node.Extension, node);
         }
 
         private async Task PreviewWadFile(FileSystemNodeModel node)
@@ -150,10 +150,10 @@ namespace AssetsManager.Services.Explorer
                 return;
             }
 
-            await DispatchPreview(decompressedData, node.Extension);
+            await DispatchPreview(decompressedData, node.Extension, node);
         }
 
-        private async Task DispatchPreview(byte[] data, string extension)
+        private async Task DispatchPreview(byte[] data, string extension, FileSystemNodeModel node)
         {
             // Aseguramos la creacion de la carpeta necesaria
             await _directoriesCreator.CreateDirTempPreviewAsync();
@@ -168,7 +168,7 @@ namespace AssetsManager.Services.Explorer
                     byte[] oggData = await _audioConversionService.ConvertWemToOggAsync(data);
                     if (oggData != null)
                     {
-                        await ShowAudioVideoPreviewAsync(oggData, ".ogg");
+                        await ShowAudioVideoPreviewAsync(oggData, ".ogg", node.Name);
                     }
                     else
                     {
@@ -177,7 +177,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 else
                 {
-                    await ShowAudioVideoPreviewAsync(data, extension);
+                    await ShowAudioVideoPreviewAsync(data, extension, node.Name);
                 }
             }
             else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.Troybin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.Preload.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
@@ -300,7 +300,7 @@ namespace AssetsManager.Services.Explorer
             {
                 var webView = new WebView2()
                 {
-                    DefaultBackgroundColor = System.Drawing.Color.FromArgb(37, 37, 38)
+                    DefaultBackgroundColor = System.Drawing.Color.Transparent
                 };
 
                 _webViewContainer.Children.Add(webView);
@@ -415,7 +415,7 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task ShowAudioVideoPreviewAsync(byte[] data, string extension)
+        private async Task ShowAudioVideoPreviewAsync(byte[] data, string extension, string displayName)
         {
             if (_webViewContainer == null)
             {
@@ -456,78 +456,64 @@ namespace AssetsManager.Services.Explorer
                 string extraAttributes = tag == "video" ? "muted" : "";
                 var fileUrl = $"https://preview.assets/{tempFileName}";
 
-                var htmlContent = $@"
+                string htmlContent;
+
+                if (tag == "audio")
+                {
+                    var assembly = Assembly.GetExecutingAssembly();
+                    var resourceName = "AssetsManager.Resources.AudioPlayer.html";
+                    using (var stream = assembly.GetManifestResourceStream(resourceName))
+                    using (var reader = new StreamReader(stream))
+                    {
+                        htmlContent = await reader.ReadToEndAsync();
+                    }
+
+                    htmlContent = htmlContent.Replace("{{DISPLAY_NAME}}", displayName)
+                                             .Replace("{{FILE_EXTENSION}}", extension.ToUpper().TrimStart('.'))
+                                             .Replace("{{FILE_URL}}", fileUrl);
+                }
+                else
+                {
+                    // MODERN VIDEO PLAYER
+                    htmlContent = $@"
                     <!DOCTYPE html>
                     <html>
                     <head>
                         <meta charset='UTF-8'>
                         <style>
                             html, body {{
-                                background-color: #252526 !important;
-                                margin: 0;
-                                padding: 0;
-                                height: 100vh;
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                overflow: hidden;
+                                background-color: transparent !important;
+                                margin: 0; padding: 0; height: 100vh;
+                                display: flex; justify-content: center; align-items: center; overflow: hidden;
                             }}
-                            
-                            {tag} {{
-                                width: {(tag == "audio" ? "300px" : "auto")};
-                                height: {(tag == "audio" ? "80px" : "auto")};
-                                max-width: 100%;
-                                max-height: 100%;
-                                background-color: #252526;
-                                object-fit: contain;
+                            video {{
+                                max-width: 90%; max-height: 90%;
+                                border-radius: 12px; 
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.20); /* Adjusted for subtlety */
+                                background-color: #000;
                                 opacity: 0;
-                                transition: opacity 0.1s ease-out;
+                                transition: opacity 0.3s ease-out;
                             }}
-                            
-                            {tag}.loaded {{
+                            video.loaded {{
                                 opacity: 1;
                             }}
                         </style>
                     </head>
                     <body>
-                        <{tag} id='mediaElement' controls preload='auto' {extraAttributes}>
+                        <video id='mediaElement' controls preload='auto' {extraAttributes}>
                             <source src='{fileUrl}' type='{mimeType}'>
-                            Your browser doesn't support this {(tag == "video" ? "video" : "audio")} format.
-                        </{tag}>
+                        </video>
                         <script>
                             const mediaElement = document.getElementById('mediaElement');
-                            
-                            // Función para reproducir (llamada desde C#)
-                            window.playMedia = function() {{
-                                if (mediaElement.readyState >= 2) {{
-                                    mediaElement.play().catch(e => console.log('Play error:', e));
-                                }} else {{
-                                    mediaElement.addEventListener('canplay', function() {{
-                                        mediaElement.play().catch(e => console.log('Play error:', e));
-                                    }}, {{ once: true }});
-                                }}
+                            window.playMedia = () => {{
+                                mediaElement.play().catch(e => console.log('Play error:', e));
                             }};
-                            
-                            // Mostrar el elemento una vez que esté listo
-                            mediaElement.addEventListener('loadeddata', function() {{
-                                mediaElement.classList.add('loaded');
-                            }});
-                            
-                            // Manejar errores
-                            mediaElement.addEventListener('error', function() {{
-                                console.error('Error loading media');
-                                mediaElement.style.opacity = '1';
-                            }});
-                            
-                            // Fallback: mostrar después de 1 segundo si no hay evento loadeddata
-                            setTimeout(function() {{
-                                if (!mediaElement.classList.contains('loaded')) {{
-                                    mediaElement.classList.add('loaded');
-                                }}
-                            }}, 1000);
+                            mediaElement.addEventListener('loadeddata', () => mediaElement.classList.add('loaded'));
+                            setTimeout(() => mediaElement.classList.add('loaded'), 1000); // Fallback
                         </script>
                     </body>
                     </html>";
+                }
 
                 await SetPreviewerAsync(Previewer.WebView, htmlContent, shouldAutoplay: true);
             }
