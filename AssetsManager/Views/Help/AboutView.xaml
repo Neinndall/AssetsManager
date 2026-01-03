@@ -151,7 +151,7 @@
         </UniformGrid>
 
         <!-- FOOTER -->
-        <TextBlock Text="© 2025 AssetsManager. All rights reserved." 
+        <TextBlock Text="© 2026 AssetsManager. All rights reserved." 
                    FontSize="11" 
                    Foreground="{StaticResource TextMuted}" 
                    HorizontalAlignment="Center" 
