@@ -7,10 +7,12 @@ using System.Reflection;
 using System.Threading.Tasks;
 using System.Threading; // Added to resolve CancellationToken
 using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.Settings;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Formatting
 {
-    public class WemConversionService
+    public class AudioConversionService
     {
         private readonly LogService _logService;
         private readonly string _vgmstreamExePath;
@@ -18,7 +20,7 @@ namespace AssetsManager.Services.Formatting
         private static bool _isExtracted = false;
         private static readonly object _lock = new object();
 
-        public WemConversionService(LogService logService)
+        public AudioConversionService(LogService logService)
         {
             _logService = logService;
             string tempBasePath = Path.Combine(Path.GetTempPath(), "AssetsManager");
@@ -81,7 +83,12 @@ namespace AssetsManager.Services.Formatting
             }
         }
 
-        public async Task<byte[]> ConvertWemToOggAsync(byte[] wemData, CancellationToken cancellationToken = default)
+        public Task<byte[]> ConvertWemToOggAsync(byte[] wemData, CancellationToken cancellationToken = default)
+        {
+            return ConvertWemToFormatAsync(wemData, AudioExportFormat.Ogg, cancellationToken);
+        }
+
+        public async Task<byte[]> ConvertWemToFormatAsync(byte[] wemData, AudioExportFormat format, CancellationToken cancellationToken = default)
         {
             if (!_isExtracted || !File.Exists(_vgmstreamExePath))
             {
@@ -89,8 +96,15 @@ namespace AssetsManager.Services.Formatting
                 return null;
             }
 
+            string extension = format switch
+            {
+                AudioExportFormat.Wav => ".wav",
+                AudioExportFormat.Mp3 => ".mp3",
+                _ => ".ogg"
+            };
+
             var tempWemFile = Path.Combine(_tempConversionPath, $"{Guid.NewGuid()}.wem");
-            var tempOggFile = Path.Combine(_tempConversionPath, $"{Guid.NewGuid()}.ogg");
+            var tempOutFile = Path.Combine(_tempConversionPath, $"{Guid.NewGuid()}{extension}");
 
             try
             {
@@ -99,7 +113,7 @@ namespace AssetsManager.Services.Formatting
                 var processStartInfo = new ProcessStartInfo
                 {
                     FileName = _vgmstreamExePath,
-                    Arguments = $"-o \"{tempOggFile}\" \"{tempWemFile}\"",
+                    Arguments = $"-o \"{tempOutFile}\" \"{tempWemFile}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -120,22 +134,22 @@ namespace AssetsManager.Services.Formatting
                     }
                 }
 
-                if (File.Exists(tempOggFile))
+                if (File.Exists(tempOutFile))
                 {
-                    return await File.ReadAllBytesAsync(tempOggFile, cancellationToken);
+                    return await File.ReadAllBytesAsync(tempOutFile, cancellationToken);
                 }
 
-                _logService.LogWarning("Vgmstream process succeeded but the output OGG file was not found.");
+                _logService.LogWarning($"Vgmstream process succeeded but the output {extension} file was not found.");
                 return null;
             }
             catch (OperationCanceledException)
             {
-                _logService.LogWarning("WEM to OGG conversion was cancelled.");
+                _logService.LogWarning($"WEM to {extension} conversion was cancelled.");
                 throw;
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "An error occurred during WEM to OGG conversion.");
+                _logService.LogError(ex, $"An error occurred during WEM to {extension} conversion.");
                 return null;
             }
             finally
@@ -144,9 +158,9 @@ namespace AssetsManager.Services.Formatting
                 {
                     File.Delete(tempWemFile);
                 }
-                if (File.Exists(tempOggFile))
+                if (File.Exists(tempOutFile))
                 {
-                    File.Delete(tempOggFile);
+                    File.Delete(tempOutFile);
                 }
             }
         }

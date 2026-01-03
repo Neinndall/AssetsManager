@@ -98,7 +98,7 @@ namespace AssetsManager
       services.AddSingleton<JsBeautifierService>();
       services.AddSingleton<JsonFormatterService>();
       services.AddSingleton<ContentFormatterService>();
-      services.AddSingleton<WemConversionService>();
+      services.AddSingleton<AudioConversionService>();
  
       // Explorer Services
       services.AddTransient<ExplorerPreviewService>();

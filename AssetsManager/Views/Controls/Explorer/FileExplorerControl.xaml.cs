@@ -527,19 +527,28 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     LogService.Log("Processing and saving selected files...");
 
-                    string finalLogPath = destinationPath;
-                    if (selectedNode.Type == NodeType.SoundBank)
+                    var savedFiles = new List<string>();
+                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken, (savedPath) =>
                     {
-                        finalLogPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
-                    }
-                    else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
+                        savedFiles.Add(savedPath);
+                    });
+
+                    if (savedFiles.Count > 0)
                     {
-                        finalLogPath = Path.Combine(destinationPath, selectedNode.Name);
+                        if (savedFiles.Count == 1)
+                        {
+                            string finalPath = savedFiles.First();
+                            LogService.LogInteractiveSuccess($"Successfully saved {Path.GetFileName(finalPath)}.", finalPath, Path.GetFileName(finalPath));
+                        }
+                        else
+                        {
+                            LogService.LogInteractiveSuccess($"Successfully saved {savedFiles.Count}.", destinationPath);
+                        }
                     }
-
-                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken);
-
-                    LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name}.", finalLogPath, selectedNode.Name);
+                    else
+                    {
+                        LogService.LogWarning($"No files were saved from '{selectedNode.Name}'. The node might have been empty or contained unsupported files.");
+                    }
 
                     TaskCancellationManager.CompleteCurrentOperation();
                 }

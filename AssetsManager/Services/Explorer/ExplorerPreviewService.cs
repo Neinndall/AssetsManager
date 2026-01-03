@@ -52,16 +52,16 @@ namespace AssetsManager.Services.Explorer
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly WadDifferenceService _wadDifferenceService;
         private readonly ContentFormatterService _contentFormatterService;
-        private readonly WemConversionService _wemConversionService;
+        private readonly AudioConversionService _audioConversionService;
         private readonly WadExtractionService _wadExtractionService;
 
-        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDifferenceService wadDifferenceService, ContentFormatterService contentFormatterService, WemConversionService wemConversionService, WadExtractionService wadExtractionService)
+        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDifferenceService wadDifferenceService, ContentFormatterService contentFormatterService, AudioConversionService audioConversionService, WadExtractionService wadExtractionService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _wadDifferenceService = wadDifferenceService;
             _contentFormatterService = contentFormatterService;
-            _wemConversionService = wemConversionService;
+            _audioConversionService = audioConversionService;
             _wadExtractionService = wadExtractionService;
         }
 
@@ -165,7 +165,7 @@ namespace AssetsManager.Services.Explorer
             {
                 if (extension == ".wem")
                 {
-                    byte[] oggData = await _wemConversionService.ConvertWemToOggAsync(data);
+                    byte[] oggData = await _audioConversionService.ConvertWemToOggAsync(data);
                     if (oggData != null)
                     {
                         await ShowAudioVideoPreviewAsync(oggData, ".ogg");
