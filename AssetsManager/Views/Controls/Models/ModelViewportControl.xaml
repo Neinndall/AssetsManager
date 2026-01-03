@@ -25,6 +25,7 @@
                                        ShowCameraInfo="False"
                                        ShowViewCube="False"
                                        IsRotationEnabled="False"
+                                       IsZoomEnabled="False"
                                        PanGesture="RightClick"
                                        SnapsToDevicePixels="False"
                                        UseLayoutRounding="False"
