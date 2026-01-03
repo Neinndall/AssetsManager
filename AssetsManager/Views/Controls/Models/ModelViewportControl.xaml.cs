@@ -271,7 +271,7 @@ namespace AssetsManager.Views.Controls.Models
             camera.UpDirection = upDirection;
             camera.FieldOfView = 45;
             camera.NearPlaneDistance = 1.0; // Evita clipping cercano
-            camera.FarPlaneDistance = 20000; // Asegura ver objetos lejanos
+            camera.FarPlaneDistance = 50000; // Asegura ver objetos lejanos (Mapas completos)
         }
 
         public void TakeScreenshot(string filePath)
