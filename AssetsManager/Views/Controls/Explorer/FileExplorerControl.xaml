@@ -248,8 +248,8 @@
                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <!-- Modern Spinner Animation -->
                     <materialIcons:MaterialIcon Kind="Loading" 
-                                                Width="48" 
-                                                Height="48" 
+                                                Width="38" 
+                                                Height="38" 
                                                 Foreground="{StaticResource AccentBrush}"
                                                 HorizontalAlignment="Center"
                                                 RenderTransformOrigin="0.5, 0.5">
@@ -274,7 +274,7 @@
                                FontWeight="SemiBold"
                                Foreground="{StaticResource TextPrimary}"
                                HorizontalAlignment="Center" 
-                               Margin="0,20,0,0"/>
+                               Margin="0,12,0,0"/>
                     <TextBlock Text="Preparing the file explorer"
                                FontSize="13"
                                Foreground="{StaticResource TextSecondary}"
