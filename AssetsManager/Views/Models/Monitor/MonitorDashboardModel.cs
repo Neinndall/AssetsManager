@@ -117,6 +117,50 @@ namespace AssetsManager.Views.Models.Monitor
             set { _appVersionIconKind = value; OnPropertyChanged(); }
         }
 
+        // --- Global System Status ---
+        private string _globalStatusText = "System Nominal";
+        public string GlobalStatusText
+        {
+            get => _globalStatusText;
+            set { _globalStatusText = value; OnPropertyChanged(); }
+        }
+
+        private Brush _globalStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
+        public Brush GlobalStatusColor
+        {
+            get => _globalStatusColor;
+            set { _globalStatusColor = value; OnPropertyChanged(); }
+        }
+
+        private Material.Icons.MaterialIconKind _globalStatusIconKind = Material.Icons.MaterialIconKind.ShieldCheckOutline;
+        public Material.Icons.MaterialIconKind GlobalStatusIconKind
+        {
+            get => _globalStatusIconKind;
+            set { _globalStatusIconKind = value; OnPropertyChanged(); }
+        }
+
+        // --- System Health Footer Status ---
+        private string _systemHealthFooterText = "Self-Check Passed";
+        public string SystemHealthFooterText
+        {
+            get => _systemHealthFooterText;
+            set { _systemHealthFooterText = value; OnPropertyChanged(); }
+        }
+
+        private Brush _systemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
+        public Brush SystemHealthFooterColor
+        {
+            get => _systemHealthFooterColor;
+            set { _systemHealthFooterColor = value; OnPropertyChanged(); }
+        }
+
+        private Material.Icons.MaterialIconKind _systemHealthFooterIconKind = Material.Icons.MaterialIconKind.CheckAll;
+        public Material.Icons.MaterialIconKind SystemHealthFooterIconKind
+        {
+            get => _systemHealthFooterIconKind;
+            set { _systemHealthFooterIconKind = value; OnPropertyChanged(); }
+        }
+
         public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
         {
             _monitorService = monitorService;
@@ -150,6 +194,8 @@ namespace AssetsManager.Views.Models.Monitor
                         AppVersionText = $"v{latestVersion} available!";
                         AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
                         AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
+                        UpdateGlobalStatus();
+                        UpdateSystemHealthFooter();
                     });
                 }
             };
@@ -175,11 +221,14 @@ namespace AssetsManager.Views.Models.Monitor
             // Initial Loads
             RefreshFileWatcherData();
             RefreshAssetTrackerData();
+            UpdateGlobalStatus(); // Initial global check
+            UpdateSystemHealthFooter(); // Initial footer check
 
             // Set initial Hashes status based on whether a sync is already in progress
             if (_statusService.IsSyncing)
             {
                 HashesStatus = "Updating...";
+                UpdateSystemHealthFooter();
             }
 
             // Subscriptions
@@ -221,6 +270,7 @@ namespace AssetsManager.Views.Models.Monitor
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     HashesStatus = "Updating...";
+                    UpdateSystemHealthFooter();
                 });
             };
 
@@ -229,8 +279,61 @@ namespace AssetsManager.Views.Models.Monitor
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     HashesStatus = "Synced";
+                    UpdateSystemHealthFooter();
                 });
             };
+        }
+
+        private void UpdateGlobalStatus()
+        {
+            // Priority 1: Critical (PBE Down)
+            if (PbeStatusText != "No issues detected")
+            {
+                GlobalStatusText = "System Alert";
+                GlobalStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
+                GlobalStatusIconKind = Material.Icons.MaterialIconKind.AlertCircleOutline;
+                return;
+            }
+
+            // Priority 2: Warning (Updates Pending - Files or App)
+            if (MonitoredFilesChangedCount > 0 || (AppVersionText != null && AppVersionText.Contains("available")))
+            {
+                GlobalStatusText = "Action Required";
+                GlobalStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
+                GlobalStatusIconKind = Material.Icons.MaterialIconKind.AlertOctagonOutline;
+                return;
+            }
+
+            // Priority 3: Normal
+            GlobalStatusText = "System Nominal";
+            GlobalStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
+            GlobalStatusIconKind = Material.Icons.MaterialIconKind.ShieldCheckOutline;
+        }
+
+        private void UpdateSystemHealthFooter()
+        {
+            // Case 1: Hashes Updating
+            if (HashesStatus == "Updating...")
+            {
+                SystemHealthFooterText = "Syncing Databases...";
+                SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")); // Blue
+                SystemHealthFooterIconKind = Material.Icons.MaterialIconKind.Sync;
+                return;
+            }
+
+            // Case 2: Update Available
+            if (AppVersionText != null && AppVersionText.Contains("available"))
+            {
+                SystemHealthFooterText = "Update Recommended";
+                SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
+                SystemHealthFooterIconKind = Material.Icons.MaterialIconKind.CloudDownload;
+                return;
+            }
+
+            // Case 3: All Good
+            SystemHealthFooterText = "Self-Check Passed";
+            SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
+            SystemHealthFooterIconKind = Material.Icons.MaterialIconKind.CheckAll;
         }
 
         private void MonitoredItems_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -280,6 +383,7 @@ namespace AssetsManager.Views.Models.Monitor
                 PbeStatusText = "No issues detected";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
             }
+            UpdateGlobalStatus();
         }
 
         public void RefreshFileWatcherData()
@@ -293,6 +397,8 @@ namespace AssetsManager.Views.Models.Monitor
             WatcherLastUpdate = lastItem != null && lastItem.LastChecked != "N/A"
                 ? lastItem.LastChecked.Replace("Last Update: ", "")
                 : "Never";
+
+            UpdateGlobalStatus();
         }
 
         public void RefreshAssetTrackerData()

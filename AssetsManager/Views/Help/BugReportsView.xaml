@@ -53,9 +53,7 @@
                         Click="buttonReportBug_Click"
                         VerticalAlignment="Center"
                         Style="{StaticResource ModernButton}"
-                        FontWeight="Bold"
-                        Padding="20,8"
-                        MinHeight="40"/>
+                        FontWeight="Bold"/>
             </Grid>
         </Border>
 
@@ -71,7 +69,7 @@
                         </Border>
                         <TextBlock Text="Be Descriptive" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Include what happened and what you expected to see instead." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Clearly describe the expected behavior versus what actually happened." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -84,7 +82,7 @@
                         </Border>
                         <TextBlock Text="Steps to Reproduce" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Explain exactly how to trigger the bug so we can find it." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="List the specific actions required to trigger the issue reliably." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -97,7 +95,7 @@
                         </Border>
                         <TextBlock Text="System Info" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Mention your OS and application version for context." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Include your Operating System and current Application Version." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -110,7 +108,7 @@
                         </Border>
                         <TextBlock Text="Attach Logs" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Add relevant files from the 'logs' folder to your report." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Attach the relevant log files found in the application's root 'logs' folder." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </UniformGrid>

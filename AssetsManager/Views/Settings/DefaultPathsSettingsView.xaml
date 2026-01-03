@@ -52,7 +52,7 @@
                     <StackPanel Grid.Column="1">
                         <!-- New Hash Directory -->
                         <TextBlock Text="New Hash Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Location where synchronized hash files will be stored" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10" FontStyle="Italic"/>
+                        <TextBlock Text="Location where synchronized hash files will be stored" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                         <Grid Margin="0,0,0,24">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBox x:Name="textBoxNewHashPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.NewHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -63,7 +63,7 @@
 
                         <!-- Old Hash Directory -->
                         <TextBlock Text="Old Hash Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Reference location for comparison database" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10" FontStyle="Italic"/>
+                        <TextBlock Text="Reference location for comparison database" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBox x:Name="textBoxOldHashPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.OldHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -98,7 +98,7 @@
                     <StackPanel Grid.Column="1">
                         <!-- PBE Directory -->
                         <TextBlock Text="PBE Client Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Main source for Asset Tracker and latest game data" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10" FontStyle="Italic"/>
+                        <TextBlock Text="Main source for Asset Tracker and latest game data" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                         <Grid Margin="0,0,0,24">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBox x:Name="textBoxLolPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolPbeDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -109,7 +109,7 @@
 
                         <!-- Live Directory -->
                         <TextBlock Text="Live Client Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Reference for stable version comparison" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10" FontStyle="Italic"/>
+                        <TextBlock Text="Reference for stable version comparison" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBox x:Name="textBoxLolLivePath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolLiveDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -144,7 +144,7 @@
                     <StackPanel Grid.Column="1">
                         <!-- Custom Floor -->
                         <TextBlock Text="Custom Floor Texture" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Custom image file for the 3D viewer's floor plane" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10" FontStyle="Italic"/>
+                        <TextBlock Text="Custom image file for the 3D viewer's floor plane" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                         <Grid Margin="0,0,0,24">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBox x:Name="textBoxCustomFloorTexturePath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.CustomFloorTexturePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -155,7 +155,7 @@
 
                         <!-- Extraction Select Directory -->
                         <TextBlock Text="Default Extraction Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Preset folder for exporting manual asset selections" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10" FontStyle="Italic"/>
+                        <TextBlock Text="Preset folder for exporting manual asset selections" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBox x:Name="textBoxDefaultExtractedPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.DefaultExtractedSelectDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />

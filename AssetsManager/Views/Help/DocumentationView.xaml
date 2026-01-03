@@ -41,8 +41,8 @@
                         </Border>
                         <TextBlock Text="WAD Comparator" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="The core engine for finding changes between patches. Compare two LoL directories to identify new content." 
-                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Detects changes between patches with byte-level precision. Compare two game versions to instantly isolate new content." 
+                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -55,8 +55,8 @@
                         </Border>
                         <TextBlock Text="Archive Explorer" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="A deep-dive tool into .wad files. Features 3D model previews, image rendering, and smart code formatting." 
-                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Navigate deep into .wad archives. Preview 3D models, textures, and code directly without extraction." 
+                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -69,8 +69,8 @@
                         </Border>
                         <TextBlock Text="Model Viewer" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="A powerful 3D viewport to inspect champion models, skeletons, and animations. Includes map geometry loading." 
-                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Inspect champions, skins, and maps in a high-fidelity real-time viewport with animation support." 
+                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -83,8 +83,8 @@
                         </Border>
                         <TextBlock Text="Real-time Monitor" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Track PBE server status, remote CDN changes, and API store data. Stay updated with the latest sales." 
-                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontStyle="Italic" Opacity="0.8"/>
+                    <TextBlock Text="Live tracking of PBE status, CDN assets, and API endpoints. Get instant alerts on server changes." 
+                               FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
