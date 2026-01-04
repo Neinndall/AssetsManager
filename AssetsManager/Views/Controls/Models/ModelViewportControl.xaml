@@ -93,19 +93,11 @@
                         <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
 
                         <!-- Visuals -->
-                        <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
-                                      ToolTip="Show/Hide Skybox"
-                                      Click="SkyboxToggleButton_Click"
-                                      Width="32" Height="32"
-                                      IsChecked="False">
-                            <materialIcons:MaterialIcon Kind="Panorama" Width="16" Height="16"/>
-                        </ToggleButton>
-                        
                         <Button Style="{StaticResource TransparentIconButton}"
                                 ToolTip="Take Screenshot"
                                 Click="ScreenshotButton_Click"
                                 Width="32" Height="32">
-                            <materialIcons:MaterialIcon Kind="CameraIris" Width="16" Height="16"/>
+                            <materialIcons:MaterialIcon Kind="Camera" Width="16" Height="16"/>
                         </Button>
                         
                         <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
