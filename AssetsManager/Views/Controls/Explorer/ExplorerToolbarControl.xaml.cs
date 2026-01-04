@@ -37,13 +37,15 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (isWadMode)
             {
-                ModeIcon.Kind = Material.Icons.MaterialIconKind.ArchiveOutline;
-                SwitchModeButton.ToolTip = "LoL WAD Mode (Switch Mode to Directory)";
+                // Current: WAD -> Action: Go to Directory
+                ModeIcon.Kind = Material.Icons.MaterialIconKind.FolderMultipleOutline;
+                SwitchModeButton.ToolTip = "Switch to Local Directory Mode";
             }
             else
             {
-                ModeIcon.Kind = Material.Icons.MaterialIconKind.FolderMultipleOutline;
-                SwitchModeButton.ToolTip = "Local Directory Mode (Switch Mode to WAD)";
+                // Current: Directory -> Action: Go back to WAD
+                ModeIcon.Kind = Material.Icons.MaterialIconKind.ArchiveOutline;
+                SwitchModeButton.ToolTip = "Switch back to LoL WAD Mode";
             }
         }
 
