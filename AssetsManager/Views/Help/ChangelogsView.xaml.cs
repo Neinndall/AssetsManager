@@ -196,7 +196,16 @@ namespace AssetsManager.Views.Help
 
                     if (trimmedLine.StartsWith("-"))
                     {
-                        item.IsSubheading = true;
+                        // Only treat as a subheading if it's a top-level section title
+                        if (indentation <= 1)
+                        {
+                            item.IsSubheading = true;
+                        }
+                        else
+                        {
+                            // Otherwise, it's a nested list item that happens to use a dash
+                            item.IsSubheading = false;
+                        }
                         item.Text = trimmedLine.Substring(1).Trim();
                     }
                     else if (trimmedLine.StartsWith("*"))
