@@ -20,7 +20,7 @@
 
             <!-- NAVIGATION (Segmented Control) -->
             <Border Grid.Row="0" Margin="16,16,16,12" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                <UniformGrid Columns="4">
+                <UniformGrid Columns="5">
                     <RadioButton x:Name="TabModels" IsChecked="True" GroupName="MPT" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Models List">
                         <materialIcons:MaterialIcon Kind="CubeOutline" Width="18" Height="18"/>
                     </RadioButton>
@@ -32,6 +32,9 @@
                     </RadioButton>
                     <RadioButton x:Name="TabAnimations" GroupName="MPT" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Animations">
                         <materialIcons:MaterialIcon Kind="AnimationPlay" Width="18" Height="18"/>
+                    </RadioButton>
+                    <RadioButton x:Name="TabStudio" GroupName="MPT" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Studio &amp; Render">
+                        <materialIcons:MaterialIcon Kind="CameraIris" Width="18" Height="18"/>
                     </RadioButton>
                 </UniformGrid>
             </Border>
@@ -128,6 +131,127 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </Grid>
+
+                <!-- STUDIO (New Panel) -->
+                <ScrollViewer x:Name="StudioPanel" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer.Style>
+                        <Style TargetType="ScrollViewer">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabStudio}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ScrollViewer.Style>
+                    <StackPanel Margin="0,0,0,32">
+                        <!-- ENVIRONMENT -->
+                        <GroupBox Header="Environment" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
+                            <GroupBox.HeaderTemplate>
+                                <DataTemplate>
+                                    <Grid Width="230">
+                                        <StackPanel>
+                                            <TextBlock Text="Environment" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="Visibility and background settings." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </GroupBox.HeaderTemplate>
+                            <StackPanel Margin="0,4">
+                                <CheckBox x:Name="TransparentBgCheck" Content="Transparent Background" Style="{StaticResource ModernCheckBox}" Checked="TransparentBgCheck_Changed" Unchecked="TransparentBgCheck_Changed" Margin="0,0,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- CAMERA -->
+                        <GroupBox Header="Camera Lens" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
+                            <GroupBox.HeaderTemplate>
+                                <DataTemplate>
+                                    <Grid Width="230">
+                                        <StackPanel>
+                                            <TextBlock Text="Camera Lens" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="FOV and perspective controls." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </GroupBox.HeaderTemplate>
+                            <StackPanel>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="FocusAuto" Width="16" Foreground="{StaticResource AccentBlue}" Margin="0,0,10,0" ToolTip="Field of View (FOV)"/>
+                                    <Slider Grid.Column="1" x:Name="FovSlider" Minimum="10" Maximum="120" Value="45" ValueChanged="FovSlider_ValueChanged" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=FovSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- LIGHTING -->
+                        <GroupBox Header="Studio Lighting" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
+                            <GroupBox.HeaderTemplate>
+                                <DataTemplate>
+                                    <Grid Width="230">
+                                        <StackPanel>
+                                            <TextBlock Text="Studio Lighting" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="Sun rotation and altitude." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </GroupBox.HeaderTemplate>
+                            <StackPanel>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="LightbulbOnOutline" Width="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" ToolTip="Ambient Intensity (Base Light)"/>
+                                    <Slider Grid.Column="1" x:Name="AmbientIntensitySlider" Minimum="0" Maximum="100" Value="100" ValueChanged="LightSlider_ValueChanged" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=AmbientIntensitySlider, Path=Value, StringFormat={}{0:F0}%}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Grid>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="Orbit" Width="16" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0" ToolTip="Rotation"/>
+                                    <Slider Grid.Column="1" x:Name="LightRotationSlider" Minimum="0" Maximum="360" Value="0" ValueChanged="LightSlider_ValueChanged" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=LightRotationSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Grid>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="ArrowUpBold" Width="16" Foreground="{StaticResource AccentYellow}" Margin="0,0,10,0" ToolTip="Altitude"/>
+                                    <Slider Grid.Column="1" x:Name="LightHeightSlider" Minimum="0" Maximum="90" Value="0" ValueChanged="LightSlider_ValueChanged" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=LightHeightSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- RENDER ACTIONS -->
+                        <StackPanel Margin="0,4,0,0">
+                            <Button x:Name="SnapshotButton" Click="SnapshotButton_Click" Style="{StaticResource ModernButton}" Height="36">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="Camera" Width="16" Height="16" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Take 4K Snapshot" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            
+                            <Button Click="ResetStudio_Click" Style="{StaticResource SecondaryButton}" Margin="0,6,0,0" Height="36">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="Refresh" Width="16" Height="16" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Reset Studio Settings" FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
 
                 <!-- MESHES -->
                 <Grid x:Name="MeshesPanel">

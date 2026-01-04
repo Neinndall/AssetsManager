@@ -45,6 +45,14 @@ namespace AssetsManager.Views.Controls.Models
         public event EventHandler SceneClearRequested;
         public event EventHandler MapGeometryLoadRequested;
 
+        // Studio Events
+        public event Action<double> FieldOfViewChanged;
+        public event Action<double, double> LightDirectionChanged;
+        public event Action<double> AmbientIntensityChanged;
+        public event Action<bool> BackgroundTransparencyChanged;
+        public event Action SnapshotRequested;
+        public event Action StudioResetRequested;
+
         public event Action<SceneModel> ModelReadyForViewport;
         public event Action<SceneModel> ActiveModelChanged;
         public event Action SceneSetupRequested;
@@ -577,6 +585,48 @@ namespace AssetsManager.Views.Controls.Models
                 // and update the visual transform.
                 RotationYSlider.Value = newRotationY;
             }
+        }
+
+        // STUDIO HANDLERS
+
+        private void TransparentBgCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox checkBox)
+            {
+                BackgroundTransparencyChanged?.Invoke(checkBox.IsChecked ?? false);
+            }
+        }
+
+        private void FovSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            FieldOfViewChanged?.Invoke(e.NewValue);
+        }
+
+        private void LightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (LightRotationSlider != null && LightHeightSlider != null && AmbientIntensitySlider != null)
+            {
+                LightDirectionChanged?.Invoke(LightRotationSlider.Value, LightHeightSlider.Value);
+                AmbientIntensityChanged?.Invoke(AmbientIntensitySlider.Value);
+            }
+        }
+
+        private void SnapshotButton_Click(object sender, RoutedEventArgs e)
+        {
+            SnapshotRequested?.Invoke();
+        }
+
+        private void ResetStudio_Click(object sender, RoutedEventArgs e)
+        {
+            // Reset Sliders to Neutral
+            FovSlider.Value = 45;
+            LightRotationSlider.Value = 0;
+            LightHeightSlider.Value = 0;
+            AmbientIntensitySlider.Value = 100; // Return to 100% (Normal mode)
+            TransparentBgCheck.IsChecked = false;
+
+            // Trigger Reset Event
+            StudioResetRequested?.Invoke();
         }
     }
 }

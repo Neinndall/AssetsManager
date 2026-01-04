@@ -34,7 +34,14 @@
                                        RenderOptions.BitmapScalingMode="HighQuality">
                     <ModelVisual3D>
                         <ModelVisual3D.Content>
-                            <AmbientLight Color="White"/>
+                            <Model3DGroup>
+                                <!-- Default 'Flat' Lighting (As it was before) -->
+                                <AmbientLight x:Name="GlobalAmbientLight" Color="White"/>
+                                
+                                <!-- Studio Lights (Off by default) -->
+                                <DirectionalLight x:Name="StudioLight" Color="Black" Direction="-1,-1,-1"/>
+                                <DirectionalLight x:Name="FillLight" Color="Black" Direction="1,1,1"/>
+                            </Model3DGroup>
                         </ModelVisual3D.Content>
                     </ModelVisual3D>
                 </helix:HelixViewport3D>

@@ -65,6 +65,14 @@ namespace AssetsManager.Views
             ViewportControl.AnimationProgressChanged += OnAnimationProgressChanged;
             ViewportControl.PlaybackStateChanged += OnPlaybackStateChanged;
 
+            // Studio Events
+            PanelControl.FieldOfViewChanged += OnFieldOfViewChanged;
+            PanelControl.LightDirectionChanged += OnLightDirectionChanged;
+            PanelControl.AmbientIntensityChanged += OnAmbientIntensityChanged;
+            PanelControl.BackgroundTransparencyChanged += OnBackgroundTransparencyChanged;
+            PanelControl.SnapshotRequested += OnSnapshotRequested;
+            PanelControl.StudioResetRequested += OnStudioResetRequested;
+
             // Viewport events
             ViewportControl.SkyboxVisibilityChanged += OnSkyboxVisibilityChanged;
             ViewportControl.AutoRotationStopped += OnAutoRotationStopped;
@@ -90,6 +98,78 @@ namespace AssetsManager.Views
         private void OnPlaybackStateChanged(AnimationModel model, bool isPlaying) => PanelControl.SetAnimationPlayingState(model, isPlaying);
 
         private void OnAutoRotationStopped(object sender, double angle) => PanelControl.ApplyAutoRotation(angle);
+
+        // STUDIO HANDLERS
+
+        private void OnFieldOfViewChanged(double fov)
+        {
+            ViewportControl.SetFieldOfView(fov);
+        }
+
+        private void OnLightDirectionChanged(double phi, double theta)
+        {
+            ViewportControl.SetLightDirection(phi, theta);
+        }
+
+        private void OnAmbientIntensityChanged(double intensity)
+        {
+            ViewportControl.SetAmbientIntensity(intensity);
+        }
+
+        private void OnBackgroundTransparencyChanged(bool isTransparent)
+        {
+            ViewportControl.ToggleTransparentBackground(isTransparent);
+
+            // Handle Skybox
+            if (_skyVisual != null)
+            {
+                if (isTransparent && ViewportControl.Viewport.Children.Contains(_skyVisual))
+                    ViewportControl.Viewport.Children.Remove(_skyVisual);
+                else if (!isTransparent && !ViewportControl.Viewport.Children.Contains(_skyVisual))
+                    ViewportControl.Viewport.Children.Add(_skyVisual);
+            }
+
+            // Handle Ground
+            if (_groundVisual != null)
+            {
+                if (isTransparent && ViewportControl.Viewport.Children.Contains(_groundVisual))
+                    ViewportControl.Viewport.Children.Remove(_groundVisual);
+                else if (!isTransparent && !ViewportControl.Viewport.Children.Contains(_groundVisual))
+                    ViewportControl.Viewport.Children.Add(_groundVisual);
+            }
+        }
+
+        private void OnSnapshotRequested()
+        {
+            // Determine a filename
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string defaultFileName = $"Render_{timestamp}.png";
+            
+            // Try to get model name from Panel logic (via active model in Viewport)
+            // Ideally Panel passes it or we get it from Viewport
+            // We can just use generic name or try to check active model
+            // But ModelWindow doesn't track active model easily without casting. 
+            // ViewportControl.TakeScreenshot handles the file creation, we just need path.
+            
+            var saveFileDialog = new CommonSaveFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
+                Title = "Save 4K Snapshot",
+                DefaultExtension = ".png",
+                DefaultFileName = defaultFileName
+            };
+
+            if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                // Request 4x Scale (approx 4K if window is 1080p-ish)
+                ViewportControl.TakeScreenshot(saveFileDialog.FileName, 4.0);
+            }
+        }
+
+        private void OnStudioResetRequested()
+        {
+            ViewportControl.ResetStudioLighting();
+        }
 
         private void OnSceneClearRequested(object sender, EventArgs e)
         {
@@ -128,6 +208,11 @@ namespace AssetsManager.Views
                 PanelControl.AnimationReadyForDisplay -= OnAnimationReadyForDisplay;
                 PanelControl.AnimationStopRequested -= OnAnimationStopRequested;
                 PanelControl.AnimationSeekRequested -= OnAnimationSeekRequested;
+                
+                PanelControl.FieldOfViewChanged -= OnFieldOfViewChanged;
+                PanelControl.LightDirectionChanged -= OnLightDirectionChanged;
+                PanelControl.BackgroundTransparencyChanged -= OnBackgroundTransparencyChanged;
+                PanelControl.SnapshotRequested -= OnSnapshotRequested;
             }
 
             if (ViewportControl != null)

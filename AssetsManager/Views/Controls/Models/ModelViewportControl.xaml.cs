@@ -136,6 +136,11 @@ namespace AssetsManager.Views.Controls.Models
         {
             StopAnimation();
 
+            // RESET LIGHTING TO 'NORMAL' MODE (Como antes)
+            if (GlobalAmbientLight != null) GlobalAmbientLight.Color = Colors.White;
+            if (StudioLight != null) StudioLight.Color = Colors.Black;
+            if (FillLight != null) FillLight.Color = Colors.Black;
+
             foreach (var model in _loadedModels)
             {
                 if (Viewport.Children.Contains(model.RootVisual))
@@ -274,7 +279,92 @@ namespace AssetsManager.Views.Controls.Models
             camera.FarPlaneDistance = 50000; // Asegura ver objetos lejanos (Mapas completos)
         }
 
-        public void TakeScreenshot(string filePath)
+        public void SetFieldOfView(double fov)
+        {
+            if (Viewport.Camera is PerspectiveCamera camera)
+            {
+                camera.FieldOfView = fov;
+            }
+        }
+
+        private double _currentPhi = 0;
+        private double _currentTheta = 0;
+        private double _currentAmbient = 100;
+
+        public void SetAmbientIntensity(double intensity)
+        {
+            _currentAmbient = intensity;
+            UpdateStudioLighting();
+        }
+
+        public void SetLightDirection(double phi, double theta)
+        {
+            _currentPhi = phi;
+            _currentTheta = theta;
+            UpdateStudioLighting();
+        }
+
+        private void UpdateStudioLighting()
+        {
+            if (GlobalAmbientLight == null || StudioLight == null || FillLight == null) return;
+
+            // 1. Set Ambient Color
+            byte ambVal = (byte)(255 * (_currentAmbient / 100.0));
+            GlobalAmbientLight.Color = Color.FromRgb(ambVal, ambVal, ambVal);
+
+            // 2. Set Studio Lights Intensity (Inverse of Ambient)
+            // If Ambient is 100, Studio lights are 0 (Black).
+            // If Ambient is 0, Studio lights are 100 (Full Color).
+            double studioFactor = 1.0 - (_currentAmbient / 100.0);
+            
+            if (studioFactor <= 0)
+            {
+                StudioLight.Color = Colors.Black;
+                FillLight.Color = Colors.Black;
+            }
+            else
+            {
+                byte keyVal = (byte)(255 * studioFactor);
+                byte fillVal = (byte)(64 * studioFactor);
+                StudioLight.Color = Color.FromRgb(keyVal, keyVal, keyVal);
+                FillLight.Color = Color.FromRgb(fillVal, fillVal, fillVal);
+            }
+
+            // 3. Update Studio Light Direction
+            double phiRad = _currentPhi * Math.PI / 180.0;
+            double thetaRad = _currentTheta * Math.PI / 180.0;
+            double x = Math.Cos(thetaRad) * Math.Sin(phiRad);
+            double y = Math.Sin(thetaRad);
+            double z = Math.Cos(thetaRad) * Math.Cos(phiRad);
+            StudioLight.Direction = new Vector3D(-x, -y, -z);
+        }
+
+        public void ResetStudioLighting()
+        {
+            _currentAmbient = 100;
+            _currentPhi = 0;
+            _currentTheta = 0;
+            UpdateStudioLighting();
+            if (Viewport.Camera is PerspectiveCamera camera) camera.FieldOfView = 45;
+        }
+
+        public void ToggleTransparentBackground(bool isTransparent)
+        {
+            if (isTransparent)
+            {
+                // Hide Skybox/Ground if managed externally, but here we ensure Viewport background is transparent
+                // and maybe trigger an event to hide external visuals
+                Viewport3D.Background = Brushes.Transparent;
+            }
+            else
+            {
+                // Restore default background if needed, though usually it is transparent and skybox covers it.
+                // If the user wants a solid color, we could set it here.
+                Viewport3D.Background = Brushes.Transparent; 
+            }
+        }
+
+        public void TakeScreenshot(string filePath, double scaleFactor = 1.0)
         {
             string finalFilePath = filePath;
             if (Path.GetExtension(finalFilePath).ToLower() != ".png")
@@ -288,9 +378,15 @@ namespace AssetsManager.Views.Controls.Models
             {
                 Viewport3D.ShowFrameRate = false;
 
-                int supersamplingFactor = 4;
+                // Base size logic
                 int baseWidth = (int)Viewport3D.ActualWidth;
                 int baseHeight = (int)Viewport3D.ActualHeight;
+                
+                // If scaleFactor is high (e.g. 4 for 4K-ish), we use that. 
+                // Helix RenderBitmap uses a scaling factor (supersampling).
+                // If we want exact resolution (e.g. 3840x2160), we might need a different approach, 
+                // but scaling the current view is usually what "Snapshot" implies.
+                int supersamplingFactor = (int)Math.Max(1, scaleFactor);
 
                 if (baseWidth <= 0 || baseHeight <= 0)
                 {
@@ -306,7 +402,7 @@ namespace AssetsManager.Views.Controls.Models
                     return;
                 }
 
-                // Use the built-in helper from HelixToolkit, providing the base size and a supersampling factor.
+                // Use the built-in helper from HelixToolkit
                 var backgroundBrush = Viewport3D.Background ?? Brushes.Transparent;
                 var rtb = Viewport3DHelper.RenderBitmap(underlyingViewport, baseWidth, baseHeight, backgroundBrush, supersamplingFactor);
 
@@ -319,7 +415,7 @@ namespace AssetsManager.Views.Controls.Models
                     pngEncoder.Save(stream);
                 }
 
-                LogService.LogInteractiveSuccess($"Screenshot saved to {Path.GetFileName(finalFilePath)}", finalFilePath, Path.GetFileName(finalFilePath));
+                LogService.LogInteractiveSuccess($"Snapshot saved ({baseWidth * supersamplingFactor}x{baseHeight * supersamplingFactor})", finalFilePath, Path.GetFileName(finalFilePath));
             }
             catch (Exception ex)
             {

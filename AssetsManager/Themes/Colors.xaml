@@ -14,6 +14,7 @@
     <SolidColorBrush x:Key="AccentGreen" Color="#FF57CC99"/>  <!-- Más moderno -->
     <SolidColorBrush x:Key="AccentPurple" Color="#FFC77DFF"/>
     <SolidColorBrush x:Key="AccentOrange" Color="#FFFFD166"/>
+    <SolidColorBrush x:Key="AccentYellow" Color="#FFFFEE32"/>
     <SolidColorBrush x:Key="AccentRed" Color="#FFCC3333"/>
 
     <SolidColorBrush x:Key="TextPrimary" Color="#FFD1D1D1"/>  <!-- Más suave que el blanco intenso -->
