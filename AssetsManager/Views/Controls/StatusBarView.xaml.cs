@@ -21,6 +21,16 @@ namespace AssetsManager.Views.Controls
         public TextBlock StatusText => StatusTextBlock;
         public TextBlock PercentageText => ProgressPercentageTextBlock;
 
+        // Dependency Property for Notification Count
+        public static readonly DependencyProperty NotificationCountProperty =
+            DependencyProperty.Register("NotificationCount", typeof(int), typeof(StatusBarView), new PropertyMetadata(0));
+
+        public int NotificationCount
+        {
+            get { return (int)GetValue(NotificationCountProperty); }
+            set { SetValue(NotificationCountProperty, value); }
+        }
+
         public StatusBarView()
         {
             InitializeComponent();
@@ -51,7 +61,8 @@ namespace AssetsManager.Views.Controls
                     _notificationCycleTimer.Stop();
                 }
 
-                NotificationButton.Visibility = _notificationMessages.Any() ? Visibility.Visible : Visibility.Collapsed;
+                // Update the DependencyProperty
+                NotificationCount = _notificationMessages.Count;
 
                 if (_notificationMessages.Count > 1)
                 {

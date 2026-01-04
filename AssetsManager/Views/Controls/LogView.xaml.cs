@@ -3,8 +3,6 @@ using System.Windows;
 using Material.Icons;
 using System;
 
-using System.Windows.Media.Animation;
-
 namespace AssetsManager.Views.Controls
 {
     public partial class LogView : UserControl
@@ -13,6 +11,16 @@ namespace AssetsManager.Views.Controls
 
         public event EventHandler ToggleLogSizeRequested;
         public event EventHandler LogExpandedManually;
+
+        // Dependency Property for Notification Count
+        public static readonly DependencyProperty NotificationCountProperty =
+            DependencyProperty.Register("NotificationCount", typeof(int), typeof(LogView), new PropertyMetadata(0));
+
+        public int NotificationCount
+        {
+            get { return (int)GetValue(NotificationCountProperty); }
+            set { SetValue(NotificationCountProperty, value); }
+        }
 
         public LogView()
         {
