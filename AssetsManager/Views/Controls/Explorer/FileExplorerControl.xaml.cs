@@ -155,6 +155,8 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
             Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
+
+            Toolbar.SetWadMode(_isWadMode);
             
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
@@ -183,6 +185,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
         {
             _isWadMode = !_isWadMode;
+            Toolbar.SetWadMode(_isWadMode);
             // Mode switched, we keep the current view mode (Grid/Preview) preference.
             
             if (FilePreviewer != null)

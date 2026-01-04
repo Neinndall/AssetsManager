@@ -55,7 +55,7 @@
                       Style="{StaticResource ModernTreeView}">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type models:FileSystemNodeModel}" ItemsSource="{Binding Children}">
-                        <Grid>
+                        <Grid Margin="0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -89,7 +89,7 @@
                                                     </BeginStoryboard>
                                                 </DataTrigger.EnterActions>
                                             </DataTrigger>
-
+                                            
                                             <!-- Status Colors ONLY for Grouping Folders (e.g. [+] New) -->
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
@@ -132,7 +132,8 @@
                             <!-- Standard Text -->
                             <TextBlock Grid.Column="1" 
                                        VerticalAlignment="Center" 
-                                       FontSize="13">
+                                       FontSize="13"
+                                       FontWeight="Normal">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Visible"/>
@@ -142,7 +143,7 @@
                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                             </DataTrigger>
                                             
-                                            <!-- Status Colors for Text -->
+                                            <!-- Status Colors for Text - Still useful for diffs -->
                                             <DataTrigger Binding="{Binding Status}" Value="New">
                                                 <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
                                             </DataTrigger>

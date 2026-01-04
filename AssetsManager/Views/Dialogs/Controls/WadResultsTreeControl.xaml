@@ -21,31 +21,31 @@
         </ContextMenu>
 
         <HierarchicalDataTemplate x:Key="DiffItemTemplate" ItemsSource="{Binding Files}">
-            <Grid Margin="3,2,0,2">
+            <Grid Margin="0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
-                                             Width="18" Height="18"
-                                             VerticalAlignment="Center" 
-                                             Margin="0,0,5,0"/>
-                <TextBlock Grid.Column="1" Text="{Binding FileName}" VerticalAlignment="Center"/>
+                                            Width="16" Height="16"
+                                            VerticalAlignment="Center" 
+                                            Margin="0,0,6,0"
+                                            Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Grid.Column="1" Text="{Binding FileName}" VerticalAlignment="Center" FontSize="13"/>
             </Grid>
         </HierarchicalDataTemplate>
-
-        <HierarchicalDataTemplate x:Key="DiffTypeTemplate" ItemsSource="{Binding Diffs}" ItemTemplate="{StaticResource DiffItemTemplate}">
-            <Grid Margin="3,2,0,2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}"
-                                             Width="18" Height="18"
-                                             VerticalAlignment="Center" 
-                                             Margin="0,0,5,0" 
-                                             Foreground="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}"/>
-                <TextBlock Grid.Column="1" Text="{Binding TypeNameWithCount}" VerticalAlignment="Center">
+                <HierarchicalDataTemplate x:Key="DiffTypeTemplate" ItemsSource="{Binding Diffs}" ItemTemplate="{StaticResource DiffItemTemplate}">
+                    <Grid Margin="0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}"
+                                                    Width="16" Height="16"
+                                                    VerticalAlignment="Center" 
+                                                    Margin="0,0,6,0" 
+                                                    Foreground="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding TypeNameWithCount}" VerticalAlignment="Center" FontSize="13">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Foreground" Value="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}"/>
@@ -61,16 +61,17 @@
         </HierarchicalDataTemplate>
 
         <HierarchicalDataTemplate x:Key="WadGroupTemplate" ItemsSource="{Binding Types}" ItemTemplate="{StaticResource DiffTypeTemplate}">
-            <Grid Margin="3,2,0,2">
+            <Grid Margin="0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}"
-                                             Width="18" Height="18"
+                                             Width="16" Height="16"
                                              VerticalAlignment="Center" 
-                                             Margin="0,0,5,0"/>
-                <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" VerticalAlignment="Center"/>
+                                             Margin="0,0,6,0"
+                                             Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" VerticalAlignment="Center" FontSize="13"/>
             </Grid>
         </HierarchicalDataTemplate>
     </UserControl.Resources>
