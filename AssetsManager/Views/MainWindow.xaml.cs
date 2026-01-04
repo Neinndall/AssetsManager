@@ -113,13 +113,15 @@ namespace AssetsManager.Views
             _taskCancellationManager = taskCancellationManager;
 
             // Initialize ProgressUIManager with controls from the new StatusBarView
-            _progressUIManager.Initialize(StatusBar.SummaryButton, StatusBar.StatusText, StatusBar.PercentageText, this);
+            _progressUIManager.Initialize(StatusBar.ViewModel, this);
             
             // Subscribe to Status Bar events
             StatusBar.NotificationClicked += StatusBar_NotificationClicked;
-
-            _logService.SetLogOutput(LogView.richTextBoxLogs);
+            StatusBar.ProgressSummaryClicked += (s, e) => _progressUIManager.ShowDetails();
+            
+            _logService.SetLogOutput(LogView.LogRichTextBox);
             LogView.ToggleLogSizeRequested += OnToggleLogSizeRequested;
+            LogView.ClearStatusBarRequested += (s, e) => ClearStatusBar();
             LogView.LogExpandedManually += (s, e) => _isLogMinimized = false;
 
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
