@@ -79,7 +79,9 @@
                         BorderBrush="{StaticResource BorderColor}"
                         BorderThickness="0,1,0,0"
                         Padding="0">
-                    <controls:LogView x:Name="LogView" NotificationCount="{Binding NotificationCount, ElementName=StatusBar}"/>
+                    <controls:LogView x:Name="LogView" 
+                                      NotificationCount="{Binding NotificationCount, ElementName=StatusBar}"
+                                      StatusText="{Binding ViewModel.StatusText, ElementName=StatusBar}"/>
                 </Border>
 
                 <!-- MODERN STATUS BAR -->
