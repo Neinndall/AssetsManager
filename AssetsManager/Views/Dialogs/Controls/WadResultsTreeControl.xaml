@@ -4,14 +4,10 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:AssetsManager.Views.Dialogs.Controls"
-             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
              
     <UserControl.Resources>
-        <converters:PathToIconConverter x:Key="IconConverter"/>
-        <converters:ChunkDiffTypeToBrushConverter x:Key="DiffTypeToBrushConverter"/>
-
         <ContextMenu x:Key="WadDiffContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="View Differences" x:Name="ViewDifferencesMenuItem" Click="ViewDifferences_Click">
                 <MenuItem.Icon>
@@ -26,7 +22,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}" 
                                              Width="18" Height="18"
                                              VerticalAlignment="Center" 
                                              Margin="0,0,6,0"
@@ -41,7 +37,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}"
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}"
                                             Width="18" Height="18"
                                             VerticalAlignment="Center" 
                                             Margin="0,0,6,0" 
@@ -67,7 +63,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}"
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}"
                                              Width="18" Height="18"
                                              VerticalAlignment="Center" 
                                              Margin="0,0,6,0"

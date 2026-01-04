@@ -15,16 +15,10 @@
             <DataTemplate>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock x:Name="Separator" Text=">" VerticalAlignment="Center" Margin="4,0" Foreground="{StaticResource TextMuted}" Opacity="0.6"/>
-                    <Button Content="{Binding BreadcrumbDisplayName}" Click="Button_Click">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
-                                        <Setter Property="IsEnabled" Value="False"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
+                    <Button Content="{Binding BreadcrumbDisplayName}" 
+                            Click="Button_Click"
+                            IsEnabled="{Binding IsEnabled}"
+                            Style="{StaticResource TransparentIconButton}">
                     </Button>
                 </StackPanel>
                 <DataTemplate.Triggers>

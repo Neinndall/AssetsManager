@@ -6,6 +6,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="800">
+             
     <StackPanel Margin="0,0,0,40">
         <!-- MODERN INTEGRATED HEADER (Compact) -->
         <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
@@ -164,17 +165,7 @@
                         </ToggleButton>
 
                         <!-- Content Area with Vertical Line -->
-                        <Grid Grid.Row="1" Margin="0,8,0,0">
-                            <Grid.Style>
-                                <Style TargetType="Grid">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsExpanded}" Value="False">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Grid.Style>
+                        <Grid Grid.Row="1" Margin="0,8,0,0" Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
                                 <ColumnDefinition Width="*"/>
@@ -185,20 +176,7 @@
 
                             <StackPanel Grid.Column="1" Margin="4,8,0,12">
                                 <!-- HERO SECTION (Inside notes) -->
-                                <StackPanel Margin="0,0,0,20">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding UpdateDescription}" Value="{x:Null}">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding UpdateDescription}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
-
+                                <StackPanel Margin="0,0,0,20" Visibility="{Binding UpdateDescription, Converter={StaticResource NullToVisibilityConverter}}">
                                     <TextBlock Text="{Binding UpdateType}" 
                                                FontSize="16" 
                                                FontWeight="Bold" 

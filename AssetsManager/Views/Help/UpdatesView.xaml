@@ -6,6 +6,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="800">
+             
     <StackPanel>
         <!-- MODERN INTEGRATED HEADER (Compact) -->
         <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
@@ -45,18 +46,7 @@
             <Grid>
                 <StackPanel>
                     <!-- Up to Date State -->
-                    <StackPanel>
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Visible"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-                        
+                    <StackPanel Visibility="{Binding IsUpdateAvailable, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <materialIcons:MaterialIcon Kind="CheckCircleOutline" Foreground="{StaticResource AccentGreen}" Width="40" Height="40" HorizontalAlignment="Center"/>
                         <TextBlock Text="You are up to date!" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
                         <TextBlock HorizontalAlignment="Center" Margin="0,4,0,0" Foreground="{StaticResource TextSecondary}">
@@ -67,18 +57,7 @@
                     </StackPanel>
 
                     <!-- Update Available State -->
-                    <StackPanel>
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-
+                    <StackPanel Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}">
                         <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Foreground="White" Width="40" Height="40" HorizontalAlignment="Center"/>
                         <TextBlock Text="New Version Available!" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0,12,0,0"/>
                         <TextBlock HorizontalAlignment="Center" Margin="0,4,0,24" Foreground="White" Opacity="0.8">

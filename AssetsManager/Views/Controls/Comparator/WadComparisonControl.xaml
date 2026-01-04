@@ -7,10 +7,6 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
 
-    <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
-    </UserControl.Resources>
-
     <StackPanel HorizontalAlignment="Stretch">
         <!-- Main Premium Comparison Card -->
         <Border Background="{StaticResource CardBackground}" 

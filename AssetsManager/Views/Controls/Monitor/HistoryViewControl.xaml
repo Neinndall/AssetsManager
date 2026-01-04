@@ -52,18 +52,10 @@
                 </StackPanel>
 
                 <!-- Pagination Controls -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Visible"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Paginator.TotalPages}" Value="0">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
-
+                <StackPanel Grid.Column="2" 
+                            Orientation="Horizontal" 
+                            HorizontalAlignment="Right"
+                            Visibility="{Binding Paginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}">
                     <Button Style="{StaticResource TransparentIconButton}" Click="PrevPage_Click" IsEnabled="{Binding Paginator.CanGoToPreviousPage}" Width="28" Height="28">
                         <materialIcons:MaterialIcon Kind="ChevronLeft" Width="20" Foreground="{StaticResource TextSecondary}"/>
                     </Button>

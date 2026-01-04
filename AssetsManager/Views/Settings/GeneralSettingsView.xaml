@@ -161,26 +161,17 @@
                     <Border Grid.Column="0" Width="2" Background="{StaticResource AccentGreen}" Opacity="0.2" CornerRadius="1" Margin="0,4,20,4"/>
 
                     <StackPanel Grid.Column="1">
-                        <CheckBox IsChecked="{Binding Settings.EnableExtraction, Mode=TwoWay}" x:Name="EnableExtractionCheckBox" Content="Auto-extract new files">
-                            <CheckBox.Style>
-                                <Style TargetType="CheckBox" BasedOn="{StaticResource ModernCheckBox}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ElementName=ReportGenerationCheckBox, Path=IsChecked}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </CheckBox.Style>
-                        </CheckBox>
+                        <CheckBox IsChecked="{Binding Settings.EnableExtraction, Mode=TwoWay}" 
+                                  x:Name="EnableExtractionCheckBox" 
+                                  Content="Auto-extract new files"
+                                  Style="{StaticResource ModernCheckBox}"
+                                  IsEnabled="{Binding IsChecked, ElementName=ReportGenerationCheckBox, Converter={StaticResource InverseBooleanConverter}}"/>
                         <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
-                        <CheckBox IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}" Content="Organize extracted files into folders">
-                            <CheckBox.Style>
-                                <Style TargetType="CheckBox" BasedOn="{StaticResource ModernCheckBox}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ElementName=EnableExtractionCheckBox, Path=IsChecked}" Value="False"><Setter Property="IsEnabled" Value="False"/><Setter Property="IsChecked" Value="False"/></DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </CheckBox.Style>
-                        </CheckBox>
+                        <CheckBox IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}" 
+                                  Content="Organize extracted files into folders"
+                                  Style="{StaticResource ModernCheckBox}"
+                                  IsEnabled="{Binding IsChecked, ElementName=EnableExtractionCheckBox}"/>
                         <TextBlock Text="If enabled, extracted assets will be organized into folders" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Grid>
@@ -291,15 +282,11 @@
                     <Border Grid.Column="0" Width="2" Background="{StaticResource AccentOrange}" Opacity="0.2" CornerRadius="1" Margin="0,4,20,4"/>
 
                     <StackPanel Grid.Column="1">
-                        <CheckBox x:Name="ReportGenerationCheckBox" IsChecked="{Binding Settings.ReportGeneration.Enabled, Mode=TwoWay}" Content="Generate asset report">
-                            <CheckBox.Style>
-                                <Style TargetType="CheckBox" BasedOn="{StaticResource ModernCheckBox}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ElementName=EnableExtractionCheckBox, Path=IsChecked}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </CheckBox.Style>
-                        </CheckBox>
+                        <CheckBox x:Name="ReportGenerationCheckBox" 
+                                  IsChecked="{Binding Settings.ReportGeneration.Enabled, Mode=TwoWay}" 
+                                  Content="Generate asset report"
+                                  Style="{StaticResource ModernCheckBox}"
+                                  IsEnabled="{Binding IsChecked, ElementName=EnableExtractionCheckBox, Converter={StaticResource InverseBooleanConverter}}"/>
                         <TextBlock Text="An assets.log file will be created instead of extracting the assets" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
                         <!-- Filter Options -->

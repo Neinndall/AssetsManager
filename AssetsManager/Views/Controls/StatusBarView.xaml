@@ -77,7 +77,7 @@
                 <!-- 3. Notifications -->
                 <Button x:Name="NotificationButton"
                         Style="{StaticResource TransparentIconButton}"
-                        Visibility="Collapsed"
+                        Visibility="{Binding NotificationCount, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource CountToVisibilityConverter}}"
                         Cursor="Hand"
                         Margin="0"
                         Padding="0"

@@ -168,17 +168,12 @@
                             <!-- Actions -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <!-- Compare Action -->
-                                <Button Click="ViewChanges_Click" ToolTip="View Differences" Width="28" Height="28" Margin="0,0,8,0">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasChanges}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
+                                <Button Click="ViewChanges_Click" 
+                                        ToolTip="View Differences" 
+                                        Width="28" Height="28" 
+                                        Margin="0,0,8,0"
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <materialIcons:MaterialIcon Kind="FileCompare" Width="16" Foreground="{StaticResource AccentBlue}"/>
                                 </Button>                                    
                                 <!-- Remove Action -->

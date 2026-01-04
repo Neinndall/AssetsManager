@@ -8,8 +8,6 @@
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="900">
     
-
-
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Header -->
@@ -88,33 +86,13 @@
                     </Border>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock Text="AUTHENTICATION" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
-                        <StackPanel Orientation="Horizontal">
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Status.IsAuthenticated}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </StackPanel.Style>
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding Status.IsAuthenticated, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TextBlock Text="{Binding Status.SummonerIdText}" FontSize="12" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold"/>
                             <TextBlock Text=" • " Foreground="{StaticResource TextMuted}"/>
                             <TextBlock Text="{Binding Status.RegionText}" FontSize="12" Foreground="{StaticResource TextMuted}"/>
                         </StackPanel>
-                        <TextBlock Text="Not Authenticated" FontSize="11" Foreground="{StaticResource AccentRed}">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Status.IsAuthenticated}" Value="True">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                        <TextBlock Text="Not Authenticated" FontSize="11" Foreground="{StaticResource AccentRed}"
+                                   Visibility="{Binding Status.IsAuthenticated, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -139,17 +117,7 @@
                 <!-- Actions -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <!-- Sales Specific Actions -->
-                    <StackPanel Orientation="Horizontal">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsChecked, ElementName=TabSales}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabSales, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Button Click="RequestsSales_Click" IsEnabled="{Binding Status.IsConnected}" Style="{StaticResource ModernButton}" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
                             <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="Refresh" Width="16" Margin="0,0,8,0"/><TextBlock Text="Fetch Sales" FontWeight="SemiBold"/></StackPanel>
                         </Button>
@@ -159,17 +127,7 @@
                     </StackPanel>
 
                     <!-- Mythic Specific Actions -->
-                    <StackPanel Orientation="Horizontal">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsChecked, ElementName=TabMythic}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabMythic, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Button Click="RequestsMythicShop_Click" IsEnabled="{Binding Status.IsConnected}" Style="{StaticResource ModernButton}" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
                             <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="AutoFix" Width="16" Margin="0,0,8,0"/><TextBlock Text="Fetch Shop" FontWeight="SemiBold"/></StackPanel>
                         </Button>
@@ -194,14 +152,13 @@
                     </ItemsControl>
                     
                     <!-- Paginator -->
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0"
+                                Visibility="{Binding Status.Paginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}">
                         <StackPanel.Style>
                             <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Status.Paginator.TotalPages}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
                                     <DataTrigger Binding="{Binding Status.Paginator.TotalPages}" Value="1"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
-                                    <DataTrigger Binding="{Binding IsChecked, ElementName=TabSales}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=TabSales}" Value="False"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>

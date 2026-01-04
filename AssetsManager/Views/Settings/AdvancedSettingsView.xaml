@@ -65,16 +65,8 @@
                         <TextBlock Text="Automatically check for and discover new assets on Riot's CDN" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
                         <!-- Interval Settings Container -->
-                        <Border Margin="28,0,0,0" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked, ElementName=EnableAssetTrackerCheckBox}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-
+                        <Border Margin="28,0,0,0" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                Visibility="{Binding IsChecked, ElementName=EnableAssetTrackerCheckBox, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
@@ -114,16 +106,8 @@
                         <TextBlock Text="Stay updated on PBE maintenance and server status changes" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
                         <!-- Interval Settings Container -->
-                        <Border Margin="28,0,0,0" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked, ElementName=EnablePbeStatusCheckBox}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-
+                        <Border Margin="28,0,0,0" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                Visibility="{Binding IsChecked, ElementName=EnablePbeStatusCheckBox, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">

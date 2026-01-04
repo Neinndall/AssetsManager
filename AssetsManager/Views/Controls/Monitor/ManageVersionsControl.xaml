@@ -117,12 +117,13 @@
                         <Style TargetType="StackPanel">
                             <Setter Property="Visibility" Value="Collapsed"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabClient}" Value="True">
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsChecked, ElementName=TabClient}" Value="True"/>
+                                        <Condition Binding="{Binding LeagueClientPaginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}" Value="Visible"/>
+                                    </MultiDataTrigger.Conditions>
                                     <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding LeagueClientPaginator.TotalPages}" Value="0">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
+                                </MultiDataTrigger>
                             </Style.Triggers>
                         </Style>
                     </StackPanel.Style>
@@ -139,12 +140,13 @@
                         <Style TargetType="StackPanel">
                             <Setter Property="Visibility" Value="Collapsed"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabGame}" Value="True">
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsChecked, ElementName=TabGame}" Value="True"/>
+                                        <Condition Binding="{Binding LoLGameClientPaginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}" Value="Visible"/>
+                                    </MultiDataTrigger.Conditions>
                                     <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding LoLGameClientPaginator.TotalPages}" Value="0">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
+                                </MultiDataTrigger>
                             </Style.Triggers>
                         </Style>
                     </StackPanel.Style>
@@ -188,7 +190,8 @@
                                         <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
                                         
                                         <!-- 2. Accent Indicator (Pixel-Perfect Layer) -->
-                                        <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentBrush}" CornerRadius="8"/>
+                                        <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentBrush}" CornerRadius="8"
+                                                Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                                         <!-- 3. Content -->
                                         <Grid Margin="12,8,12,8">
@@ -203,7 +206,8 @@
                                                     <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
-                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Visibility="Collapsed"/>
+                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" 
+                                                                        Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         </Grid>
                                     </Grid>
                                     <ControlTemplate.Triggers>
@@ -211,8 +215,6 @@
                                             <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                                             <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
                                             <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                            <Setter TargetName="AccentIndicator" Property="Visibility" Value="Visible"/>
-                                            <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                                         </Trigger>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
@@ -254,7 +256,8 @@
                                         <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
                                         
                                         <!-- 2. Accent Indicator (Pixel-Perfect Layer) -->
-                                        <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentGreen}" CornerRadius="8"/>
+                                        <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentGreen}" CornerRadius="8"
+                                                Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                                         <!-- 3. Content -->
                                         <Grid Margin="12,8,12,8">
@@ -273,7 +276,8 @@
                                                     <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
-                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" Visibility="Collapsed"/>
+                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" 
+                                                                        Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         </Grid>
                                     </Grid>
                                     <ControlTemplate.Triggers>
@@ -281,8 +285,6 @@
                                             <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
                                             <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
                                             <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                            <Setter TargetName="AccentIndicator" Property="Visibility" Value="Visible"/>
-                                            <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                                         </Trigger>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
