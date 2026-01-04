@@ -45,13 +45,7 @@ namespace AssetsManager.Views.Controls.Models
         public event EventHandler SceneClearRequested;
         public event EventHandler MapGeometryLoadRequested;
 
-        // Studio Events
-        public event Action<double> FieldOfViewChanged;
-        public event Action<double, double> LightDirectionChanged;
-        public event Action<double> AmbientIntensityChanged;
-        public event Action<bool> BackgroundTransparencyChanged;
-        public event Action SnapshotRequested;
-        public event Action StudioResetRequested;
+        public ModelViewportControl Viewport { get; set; }
 
         public event Action<SceneModel> ModelReadyForViewport;
         public event Action<SceneModel> ActiveModelChanged;
@@ -80,6 +74,7 @@ namespace AssetsManager.Views.Controls.Models
         public void Cleanup()
         {
             ResetScene();
+            Viewport = null;
         }
 
         public void ResetScene()
@@ -588,32 +583,53 @@ namespace AssetsManager.Views.Controls.Models
         }
 
         // STUDIO HANDLERS
-
-        private void TransparentBgCheck_Changed(object sender, RoutedEventArgs e)
+        private void EnvironmentCheck_Changed(object sender, RoutedEventArgs e)
         {
-            if (sender is CheckBox checkBox)
+            // Mutual exclusivity logic
+            if (sender == TransparentBgCheck && TransparentBgCheck.IsChecked == true)
             {
-                BackgroundTransparencyChanged?.Invoke(checkBox.IsChecked ?? false);
+                ShowSkyboxCheck.IsChecked = false;
             }
+            else if (sender == ShowSkyboxCheck && ShowSkyboxCheck.IsChecked == true)
+            {
+                TransparentBgCheck.IsChecked = false;
+            }
+
+            UpdateEnvironment();
+        }
+
+        private void UpdateEnvironment()
+        {
+            if (Viewport == null) return;
+
+            bool isTransparent = TransparentBgCheck.IsChecked ?? false;
+            bool showSkybox = ShowSkyboxCheck.IsChecked ?? true;
+
+            // TransparentBgCheck controls ground visibility
+            Viewport.SetGroundVisibility(!isTransparent); 
+
+            // ShowSkyboxCheck directly controls skybox (mutual exclusivity logic ensures correctness)
+            Viewport.SetSkyboxVisibility(showSkybox);
         }
 
         private void FovSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            FieldOfViewChanged?.Invoke(e.NewValue);
+            Viewport?.SetFieldOfView(e.NewValue);
         }
 
         private void LightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (LightRotationSlider != null && LightHeightSlider != null && AmbientIntensitySlider != null)
             {
-                LightDirectionChanged?.Invoke(LightRotationSlider.Value, LightHeightSlider.Value);
-                AmbientIntensityChanged?.Invoke(AmbientIntensitySlider.Value);
+                Viewport?.SetLightDirection(LightRotationSlider.Value, LightHeightSlider.Value);
+                Viewport?.SetAmbientIntensity(AmbientIntensitySlider.Value);
             }
         }
 
         private void SnapshotButton_Click(object sender, RoutedEventArgs e)
         {
-            SnapshotRequested?.Invoke();
+            // Request 4K Snapshot (Scale 4.0)
+            Viewport?.InitiateSnapshot(4.0);
         }
 
         private void ResetStudio_Click(object sender, RoutedEventArgs e)
@@ -623,10 +639,14 @@ namespace AssetsManager.Views.Controls.Models
             LightRotationSlider.Value = 0;
             LightHeightSlider.Value = 0;
             AmbientIntensitySlider.Value = 100; // Return to 100% (Normal mode)
-            TransparentBgCheck.IsChecked = false;
 
-            // Trigger Reset Event
-            StudioResetRequested?.Invoke();
+            // Reset Environment Toggles
+            TransparentBgCheck.IsChecked = false;
+            ShowSkyboxCheck.IsChecked = true;
+
+            // Trigger Reset on Viewport and update visuals
+            Viewport?.ResetStudioLighting();
+            UpdateEnvironment();
         }
     }
 }

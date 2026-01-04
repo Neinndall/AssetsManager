@@ -29,7 +29,6 @@ namespace AssetsManager.Views.Controls.Models
         public event Action<AnimationModel, bool> PlaybackStateChanged;
         public event EventHandler<double> AnimationProgressChanged;
         public event EventHandler<bool> MaximizeClicked;
-        public event EventHandler<bool> SkyboxVisibilityChanged;
         public event EventHandler<double> AutoRotationStopped;
 
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
@@ -43,6 +42,10 @@ namespace AssetsManager.Views.Controls.Models
         private SceneModel _activeSceneModel;
         private AnimationModel _activeAnimationModel;
         private readonly List<SceneModel> _loadedModels = new();
+
+        // Environment references
+        private ModelVisual3D _skyVisual;
+        private ModelVisual3D _groundVisual;
 
         public ModelViewportControl()
         {
@@ -61,6 +64,13 @@ namespace AssetsManager.Views.Controls.Models
             CompositionTarget.Rendering += CompositionTarget_Rendering;
             _lastFrameTime = DateTime.Now;
         }
+
+        public void RegisterEnvironment(ModelVisual3D sky, ModelVisual3D ground)
+        {
+            _skyVisual = sky;
+            _groundVisual = ground;
+        }
+
 
         public void Cleanup()
         {
@@ -85,6 +95,8 @@ namespace AssetsManager.Views.Controls.Models
 
             // 6. Limpiar referencias
             _animationPlayer = null;
+            _skyVisual = null;
+            _groundVisual = null;
         }
 
         public void SetAnimation(AnimationModel animationModel)
@@ -149,6 +161,10 @@ namespace AssetsManager.Views.Controls.Models
             }
             _loadedModels.Clear();
             _activeSceneModel = null;
+            
+            // Clear environment refs as they are wiped from children
+            _skyVisual = null;
+            _groundVisual = null;
 
             if (AutoRotateToggleButton != null)
             {
@@ -348,19 +364,31 @@ namespace AssetsManager.Views.Controls.Models
             if (Viewport.Camera is PerspectiveCamera camera) camera.FieldOfView = 45;
         }
 
-        public void ToggleTransparentBackground(bool isTransparent)
+        public void SetSkyboxVisibility(bool isVisible)
         {
-            if (isTransparent)
+            if (_skyVisual == null) return;
+
+            if (isVisible && !Viewport.Children.Contains(_skyVisual))
             {
-                // Hide Skybox/Ground if managed externally, but here we ensure Viewport background is transparent
-                // and maybe trigger an event to hide external visuals
-                Viewport3D.Background = Brushes.Transparent;
+                Viewport.Children.Add(_skyVisual);
             }
-            else
+            else if (!isVisible && Viewport.Children.Contains(_skyVisual))
             {
-                // Restore default background if needed, though usually it is transparent and skybox covers it.
-                // If the user wants a solid color, we could set it here.
-                Viewport3D.Background = Brushes.Transparent; 
+                Viewport.Children.Remove(_skyVisual);
+            }
+        }
+
+        public void SetGroundVisibility(bool isVisible)
+        {
+            if (_groundVisual == null) return;
+
+            if (isVisible && !Viewport.Children.Contains(_groundVisual))
+            {
+                Viewport.Children.Add(_groundVisual);
+            }
+            else if (!isVisible && Viewport.Children.Contains(_groundVisual))
+            {
+                Viewport.Children.Remove(_groundVisual);
             }
         }
 
@@ -427,6 +455,31 @@ namespace AssetsManager.Views.Controls.Models
             }
         }
 
+        public void InitiateSnapshot(double scaleFactor = 1.0)
+        {
+            if (_activeSceneModel == null || string.IsNullOrEmpty(_activeSceneModel.Name))
+            {
+                LogService.LogWarning("No model loaded to name the screenshot automatically. Using default name.");
+            }
+
+            string modelName = _activeSceneModel?.Name ?? "Model";
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string defaultFileName = $"{modelName}_{timestamp}.png";
+
+            var saveFileDialog = new CommonSaveFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
+                Title = scaleFactor > 1.5 ? "Save 4K Snapshot" : "Save Screenshot",
+                DefaultExtension = ".png",
+                DefaultFileName = defaultFileName
+            };
+
+            if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                TakeScreenshot(saveFileDialog.FileName, scaleFactor);
+            }
+        }
+
         private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             ResetCamera();
@@ -434,28 +487,7 @@ namespace AssetsManager.Views.Controls.Models
 
         private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_activeSceneModel == null || string.IsNullOrEmpty(_activeSceneModel.Name))
-            {
-                LogService.LogWarning("No model loaded to name the screenshot automatically. Please load a model first.");
-                return;
-            }
-
-            string modelName = _activeSceneModel.Name;
-            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            string defaultFileName = $"{modelName}_{timestamp}.png";
-
-            var saveFileDialog = new CommonSaveFileDialog
-            {
-                Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
-                Title = "Save screenshot file",
-                DefaultExtension = ".png",
-                DefaultFileName = defaultFileName // Pre-populate with the generated name
-            };
-
-            if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                TakeScreenshot(saveFileDialog.FileName);
-            }
+            InitiateSnapshot(1.0);
         }
 
         private void FpsToggleButton_Click(object sender, RoutedEventArgs e)
@@ -489,14 +521,6 @@ namespace AssetsManager.Views.Controls.Models
                         ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                     }
                 }
-            }
-        }
-
-        private void SkyboxToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
-            {
-                SkyboxVisibilityChanged?.Invoke(this, !(toggleButton.IsChecked ?? false));
             }
         }
 
