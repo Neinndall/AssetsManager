@@ -410,7 +410,11 @@
                     </ListBox>                
                     
                     <!-- Animation Controls -->
-                    <Border Grid.Row="1" x:Name="AnimationControlsPanel" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="12,10" Margin="0,8,0,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Visibility="Collapsed">
+                    <Border Grid.Row="1" x:Name="AnimationControlsPanel" 
+                            Background="{StaticResource CardBackground}" 
+                            CornerRadius="12" Padding="12,10" Margin="0,8,0,8" 
+                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
+                            Visibility="{Binding SelectedItem, ElementName=AnimationsListBox, Converter={StaticResource NullToVisibilityConverter}}">
                         <StackPanel>
                             <Grid Margin="0,0,0,8">
                                 <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="140" HorizontalAlignment="Left"/>
