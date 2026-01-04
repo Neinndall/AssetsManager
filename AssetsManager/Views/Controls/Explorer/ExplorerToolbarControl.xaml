@@ -46,8 +46,9 @@
                         ToolTip="Switch Mode (WAD / Directory)" 
                         Margin="0,0,2,0" 
                         Click="SwitchModeButton_Click">
-                    <materialIcons:MaterialIcon Kind="Sync" Width="18" Height="18"/>
+                    <materialIcons:MaterialIcon x:Name="ModeIcon" Kind="ArchiveOutline" Width="18" Height="18"/>
                 </Button>
+
                 <ToggleButton x:Name="GridViewToggleButton" 
                               Style="{StaticResource TransparentIconToggleButton}"
                               ToolTip="Toggle Grid View"

@@ -33,6 +33,20 @@ namespace AssetsManager.Views.Controls.Explorer
             GridViewToggleButton.IsChecked = isGridMode;
         }
 
+        public void SetWadMode(bool isWadMode)
+        {
+            if (isWadMode)
+            {
+                ModeIcon.Kind = Material.Icons.MaterialIconKind.ArchiveOutline;
+                SwitchModeButton.ToolTip = "LoL WAD Mode (Switch Mode to Directory)";
+            }
+            else
+            {
+                ModeIcon.Kind = Material.Icons.MaterialIconKind.FolderMultipleOutline;
+                SwitchModeButton.ToolTip = "Local Directory Mode (Switch Mode to WAD)";
+            }
+        }
+
         private void GridViewToggle_Click(object sender, RoutedEventArgs e)
         {
             ViewModeChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(GridViewToggleButton.IsChecked ?? false), GridViewToggleButton.IsChecked ?? false));
