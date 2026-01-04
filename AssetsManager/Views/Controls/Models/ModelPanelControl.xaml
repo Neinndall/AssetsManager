@@ -158,7 +158,8 @@
                                 </DataTemplate>
                             </GroupBox.HeaderTemplate>
                             <StackPanel Margin="0,4">
-                                <CheckBox x:Name="TransparentBgCheck" Content="Transparent Background" Style="{StaticResource ModernCheckBox}" Checked="TransparentBgCheck_Changed" Unchecked="TransparentBgCheck_Changed" Margin="0,0,0,0"/>
+                                <CheckBox x:Name="TransparentBgCheck" Content="Transparent Background" Style="{StaticResource ModernCheckBox}" Checked="EnvironmentCheck_Changed" Unchecked="EnvironmentCheck_Changed" Margin="0,0,0,4"/>
+                                <CheckBox x:Name="ShowSkyboxCheck" Content="Show Skybox" Style="{StaticResource ModernCheckBox}" IsChecked="True" Checked="EnvironmentCheck_Changed" Unchecked="EnvironmentCheck_Changed" Margin="0,0,0,0"/>
                             </StackPanel>
                         </GroupBox>
 
