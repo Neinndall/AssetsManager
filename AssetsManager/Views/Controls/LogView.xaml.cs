@@ -2,19 +2,23 @@ using System.Windows.Controls;
 using System.Windows;
 using Material.Icons;
 using System;
+using AssetsManager.Views.Models.Controls;
 
 namespace AssetsManager.Views.Controls
 {
     public partial class LogView : UserControl
     {
+        public LogViewModel ViewModel { get; } = new LogViewModel();
+
         public RichTextBox LogRichTextBox => richTextBoxLogs;
 
         public event EventHandler ToggleLogSizeRequested;
         public event EventHandler LogExpandedManually;
+        public event EventHandler ClearStatusBarRequested;
 
         // Dependency Property for Notification Count
         public static readonly DependencyProperty NotificationCountProperty =
-            DependencyProperty.Register("NotificationCount", typeof(int), typeof(LogView), new PropertyMetadata(0));
+            DependencyProperty.Register("NotificationCount", typeof(int), typeof(LogView), new PropertyMetadata(0, OnNotificationCountChanged));
 
         public int NotificationCount
         {
@@ -22,9 +26,37 @@ namespace AssetsManager.Views.Controls
             set { SetValue(NotificationCountProperty, value); }
         }
 
+        // Dependency Property for StatusText (to sync Clear Button state)
+        public static readonly DependencyProperty StatusTextProperty =
+            DependencyProperty.Register("StatusText", typeof(string), typeof(LogView), new PropertyMetadata(null, OnStatusTextChanged));
+
+        public string StatusText
+        {
+            get { return (string)GetValue(StatusTextProperty); }
+            set { SetValue(StatusTextProperty, value); }
+        }
+
+        private static void OnNotificationCountChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is LogView logView)
+            {
+                logView.ViewModel.NotificationCount = (int)e.NewValue;
+            }
+        }
+
+        private static void OnStatusTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is LogView logView)
+            {
+                // Logic: If there is text, status is active.
+                logView.ViewModel.HasActiveStatus = !string.IsNullOrEmpty((string)e.NewValue);
+            }
+        }
+
         public LogView()
         {
             InitializeComponent();
+            DataContext = ViewModel;
             this.SizeChanged += LogView_SizeChanged;
         }
 
@@ -33,18 +65,13 @@ namespace AssetsManager.Views.Controls
             // Update icon and visibility based on manual resize (GridSplitter)
             if (e.NewSize.Height <= 45)
             {
-                if (ToggleIcon.Kind != MaterialIconKind.ChevronUp)
-                {
-                    ToggleIcon.Kind = MaterialIconKind.ChevronUp;
-                    richTextBoxLogs.Visibility = Visibility.Collapsed;
-                }
+                ViewModel.SetLogVisibility(false);
             }
             else
             {
-                if (ToggleIcon.Kind != MaterialIconKind.ChevronDown)
+                if (!ViewModel.IsLogVisible)
                 {
-                    ToggleIcon.Kind = MaterialIconKind.ChevronDown;
-                    richTextBoxLogs.Visibility = Visibility.Visible;
+                    ViewModel.SetLogVisibility(true);
                     LogExpandedManually?.Invoke(this, EventArgs.Empty);
                 }
             }
@@ -57,25 +84,12 @@ namespace AssetsManager.Views.Controls
 
         private void ClearStatusBar_Click(object sender, RoutedEventArgs e)
         {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-            {
-                mainWindow.ClearStatusBar();
-            }
+            ClearStatusBarRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void ToggleLogSize_Click(object sender, RoutedEventArgs e)
         {
-            if (richTextBoxLogs.Visibility == Visibility.Visible)
-            {
-                richTextBoxLogs.Visibility = Visibility.Collapsed;
-                ToggleIcon.Kind = MaterialIconKind.ChevronUp;
-            }
-            else
-            {
-                richTextBoxLogs.Visibility = Visibility.Visible;
-                ToggleIcon.Kind = MaterialIconKind.ChevronDown;
-            }
-
+            ViewModel.ToggleLog();
             ToggleLogSizeRequested?.Invoke(this, EventArgs.Empty);
         }
     }
