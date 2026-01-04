@@ -9,12 +9,12 @@
     <!-- ToggleButton Style for TreeView Expander -->
     <Style x:Key="TreeViewToggleButton" TargetType="ToggleButton">
         <Setter Property="Focusable" Value="False"/>
-        <Setter Property="Width" Value="18"/>
-        <Setter Property="Height" Value="18"/>
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border Background="Transparent" Width="18" Height="18">
+                    <Border Background="Transparent" Width="16" Height="16">
                         <materialIcons:MaterialIcon x:Name="ExpanderIcon"
                                                     Kind="ChevronRight"
                                                     Width="14" Height="14"
@@ -86,7 +86,7 @@
                                 SnapsToDevicePixels="true">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" MinWidth="18"/>
+                                    <ColumnDefinition Width="Auto" MinWidth="16"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <ToggleButton x:Name="Expander"
@@ -108,7 +108,7 @@
                         <ItemsPresenter x:Name="ItemsHost"
                                         Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
                                         Visibility="Collapsed"
-                                        Margin="18,0,0,0"/>
+                                        Margin="16,0,0,0"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsExpanded" Value="true">
