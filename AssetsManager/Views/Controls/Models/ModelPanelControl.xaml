@@ -152,15 +152,39 @@
                                     <Grid>
                                         <StackPanel>
                                             <TextBlock Text="Environment" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="Visibility and background settings." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                            <TextBlock Text="Visual style and background." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
                                         </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </GroupBox.HeaderTemplate>
-                            <StackPanel Margin="0,4">
-                                <CheckBox x:Name="TransparentBgCheck" Content="Remove Background" Style="{StaticResource ModernCheckBox}" Checked="EnvironmentCheck_Changed" Unchecked="EnvironmentCheck_Changed" Margin="0,0,0,4"/>
-                                <CheckBox x:Name="ShowSkyboxCheck" Content="Show/Hide SkyBox" Style="{StaticResource ModernCheckBox}" IsChecked="True" Checked="EnvironmentCheck_Changed" Unchecked="EnvironmentCheck_Changed" Margin="0,0,0,0"/>
-                            </StackPanel>
+                            <UniformGrid Columns="2" Margin="0,4">
+                                <!-- Skybox Toggle -->
+                                <ToggleButton x:Name="ShowSkyboxCheck" 
+                                              Style="{StaticResource ModernTileToggleButton}" 
+                                              IsChecked="True" 
+                                              Checked="EnvironmentCheck_Changed" 
+                                              Unchecked="EnvironmentCheck_Changed"
+                                              Margin="0,0,4,0"
+                                              ToolTip="Show the 3D Skybox environment">
+                                    <StackPanel>
+                                        <materialIcons:MaterialIcon Kind="Earth" Width="24" Height="24" Margin="0,0,0,4" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Skybox" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+
+                                <!-- Transparent Toggle -->
+                                <ToggleButton x:Name="TransparentBgCheck" 
+                                              Style="{StaticResource ModernTileToggleButton}" 
+                                              Checked="EnvironmentCheck_Changed" 
+                                              Unchecked="EnvironmentCheck_Changed"
+                                              Margin="4,0,0,0"
+                                              ToolTip="Remove background for transparency">
+                                    <StackPanel>
+                                        <materialIcons:MaterialIcon Kind="ImageOff" Width="24" Height="24" Margin="0,0,0,4" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="No Background" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                            </UniformGrid>
                         </GroupBox>
 
                         <!-- CAMERA -->

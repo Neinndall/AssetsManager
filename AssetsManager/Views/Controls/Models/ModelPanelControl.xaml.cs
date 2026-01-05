@@ -585,6 +585,9 @@ namespace AssetsManager.Views.Controls.Models
         // STUDIO HANDLERS
         private void EnvironmentCheck_Changed(object sender, RoutedEventArgs e)
         {
+            // Safety check: Controls might be null during InitializeComponent
+            if (TransparentBgCheck == null || ShowSkyboxCheck == null) return;
+
             // Mutual exclusivity logic
             if (sender == TransparentBgCheck && TransparentBgCheck.IsChecked == true)
             {
@@ -600,7 +603,7 @@ namespace AssetsManager.Views.Controls.Models
 
         private void UpdateEnvironment()
         {
-            if (Viewport == null) return;
+            if (Viewport == null || TransparentBgCheck == null || ShowSkyboxCheck == null) return;
 
             bool isTransparent = TransparentBgCheck.IsChecked ?? false;
             bool showSkybox = ShowSkyboxCheck.IsChecked ?? true;
