@@ -149,7 +149,7 @@
                         <GroupBox Header="Environment" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
                             <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Grid Width="230">
+                                    <Grid>
                                         <StackPanel>
                                             <TextBlock Text="Environment" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
                                             <TextBlock Text="Visibility and background settings." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
@@ -158,8 +158,8 @@
                                 </DataTemplate>
                             </GroupBox.HeaderTemplate>
                             <StackPanel Margin="0,4">
-                                <CheckBox x:Name="TransparentBgCheck" Content="Transparent Background" Style="{StaticResource ModernCheckBox}" Checked="EnvironmentCheck_Changed" Unchecked="EnvironmentCheck_Changed" Margin="0,0,0,4"/>
-                                <CheckBox x:Name="ShowSkyboxCheck" Content="Show Skybox" Style="{StaticResource ModernCheckBox}" IsChecked="True" Checked="EnvironmentCheck_Changed" Unchecked="EnvironmentCheck_Changed" Margin="0,0,0,0"/>
+                                <CheckBox x:Name="TransparentBgCheck" Content="Remove Background" Style="{StaticResource ModernCheckBox}" Checked="EnvironmentCheck_Changed" Unchecked="EnvironmentCheck_Changed" Margin="0,0,0,4"/>
+                                <CheckBox x:Name="ShowSkyboxCheck" Content="Show/Hide SkyBox" Style="{StaticResource ModernCheckBox}" IsChecked="True" Checked="EnvironmentCheck_Changed" Unchecked="EnvironmentCheck_Changed" Margin="0,0,0,0"/>
                             </StackPanel>
                         </GroupBox>
 
@@ -167,7 +167,7 @@
                         <GroupBox Header="Camera Lens" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
                             <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Grid Width="230">
+                                    <Grid>
                                         <StackPanel>
                                             <TextBlock Text="Camera Lens" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
                                             <TextBlock Text="FOV and perspective controls." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
@@ -193,7 +193,7 @@
                         <GroupBox Header="Studio Lighting" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
                             <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Grid Width="230">
+                                    <Grid>
                                         <StackPanel>
                                             <TextBlock Text="Studio Lighting" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
                                             <TextBlock Text="Sun rotation and altitude." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
@@ -328,7 +328,7 @@
                         <GroupBox Header="Position" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
                             <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Grid Width="230">
+                                    <Grid>
                                         <TextBlock Text="Position" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
                                         <Button HorizontalAlignment="Right" Click="ResetPosition_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Position">
                                             <materialIcons:MaterialIcon Kind="Refresh" Width="16"/>
@@ -386,7 +386,7 @@
                         <GroupBox Header="Rotation" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
                             <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Grid Width="230">
+                                    <Grid>
                                         <TextBlock Text="Rotation" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
                                         <Button HorizontalAlignment="Right" Click="ResetRotation_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Rotation">
                                             <materialIcons:MaterialIcon Kind="Refresh" Width="16"/>
@@ -444,7 +444,7 @@
                         <GroupBox Header="Scale" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
                             <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Grid Width="230">
+                                    <Grid>
                                         <TextBlock Text="Scale" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
                                         <Button HorizontalAlignment="Right" Click="ResetScale_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Scale">
                                             <materialIcons:MaterialIcon Kind="Refresh" Width="16"/>
