@@ -69,7 +69,7 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="RootGrid" Storyboard.TargetProperty="(RenderTransform).(TranslateTransform.Y)" To="-4" Duration="0:0:0.2">
+                                            <DoubleAnimation Storyboard.TargetName="RootGrid" Storyboard.TargetProperty="(RenderTransform).(TranslateTransform.Y)" To="-3" Duration="0:0:0.2">
                                                 <DoubleAnimation.EasingFunction><PowerEase EasingMode="EaseOut" Power="3"/></DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
