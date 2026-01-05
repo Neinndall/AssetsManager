@@ -57,7 +57,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="DOWNLOAD CONFIGURATION" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Download Configuration" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
                             <TextBlock Text="Select available game languages to download." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,1,0,0"/>
                         </StackPanel>
                         
