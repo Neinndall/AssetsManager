@@ -154,12 +154,14 @@ namespace AssetsManager.Views
                 MainGridSplitter.Visibility = Visibility.Collapsed;
                 PanelControl.Visibility = Visibility.Collapsed;
                 Grid.SetColumnSpan(ViewportControl, 3);
+                ViewportControl.Margin = new Thickness(0, 0, 4, 0);
             }
             else
             {
                 MainGridSplitter.Visibility = Visibility.Visible;
                 PanelControl.Visibility = Visibility.Visible;
                 Grid.SetColumnSpan(ViewportControl, 1);
+                ViewportControl.Margin = new Thickness(0);
             }
         }
 
