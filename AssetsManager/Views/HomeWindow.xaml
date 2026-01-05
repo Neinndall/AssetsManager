@@ -20,13 +20,27 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid x:Name="RootGrid">
-                            <!-- 1. Background Layer -->
+                        <Grid x:Name="RootGrid" RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <TranslateTransform X="0" Y="0"/>
+                            </Grid.RenderTransform>
+                            
+                            <!-- 1. Glow Layer (Fixed: Using a dedicated border for the effect) -->
+                            <Border x:Name="GlowBorder" CornerRadius="12" Opacity="0" IsHitTestVisible="False">
+                                <Border.Background>
+                                    <SolidColorBrush Color="{Binding Tag.Color, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </Border.Background>
+                                <Border.Effect>
+                                    <BlurEffect Radius="15"/>
+                                </Border.Effect>
+                            </Border>
+
+                            <!-- 2. Background Layer -->
                             <Border x:Name="BackgroundBorder" 
                                     Background="{TemplateBinding Background}" 
                                     CornerRadius="12"/>
 
-                            <!-- 2. Accent Strip Layer (Uses BorderThickness for perfect rounding) -->
+                            <!-- 3. Accent Strip Layer -->
                             <Border x:Name="AccentStrip" 
                                     BorderThickness="3,0,0,0" 
                                     BorderBrush="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
@@ -34,10 +48,10 @@
                                     Opacity="0.8"
                                     Margin="0"/>
 
-                            <!-- 3. Content Layer -->
+                            <!-- 4. Content Layer -->
                             <ContentPresenter Margin="1"/>
 
-                            <!-- 4. Border Overlay (Changes thickness without pushing content) -->
+                            <!-- 5. Border Overlay -->
                             <Border x:Name="CardBorder"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
@@ -51,6 +65,23 @@
                                 <Setter TargetName="CardBorder" Property="BorderBrush" Value="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
                                 <Setter TargetName="CardBorder" Property="BorderThickness" Value="1.5"/>
                                 <Setter TargetName="AccentStrip" Property="Opacity" Value="1"/>
+                                <Setter TargetName="GlowBorder" Property="Opacity" Value="0.25"/> <!-- Subtle but vibrant glow -->
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="RootGrid" Storyboard.TargetProperty="(RenderTransform).(TranslateTransform.Y)" To="-4" Duration="0:0:0.2">
+                                                <DoubleAnimation.EasingFunction><PowerEase EasingMode="EaseOut" Power="3"/></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="RootGrid" Storyboard.TargetProperty="(RenderTransform).(TranslateTransform.Y)" To="0" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -93,17 +124,18 @@
                             <TextBlock Text="Welcome back, Summoner" 
                                        FontSize="32" 
                                        FontWeight="Bold" 
-                                       Foreground="{StaticResource TextPrimary}"/>
+                                       Foreground="{StaticResource TextPrimary}"
+                                       Margin="-2,0,0,0"/>
                             <TextBlock Text="What would you like to do today?" 
                                        FontSize="16" 
                                        Foreground="{StaticResource TextSecondary}" 
-                                       Margin="0,4,0,0"/>
+                                       Margin="-2,4,0,0"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>
 
                 <!-- MAIN TOOLS GRID (2x2) -->
-                <TextBlock Text="PRIMARY TOOLS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="10,0,0,10"/>
+                <TextBlock Text="PRIMARY TOOLS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="10,0,0,10" Opacity="0.8"/>
                 <UniformGrid Columns="2" Margin="0,0,0,20">
                     
                     <!-- Comparator -->
@@ -111,13 +143,18 @@
                         <Button.CommandParameter>Comparator</Button.CommandParameter>
                         <Grid Margin="24,20">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="12" Background="#1A5577CC" Margin="0,0,20,0">
-                                <materialIcons:MaterialIcon Kind="Compare" Width="28" Height="28" Foreground="{StaticResource AccentBrush}"/>
+                            
+                            <Border Width="44" Height="44" CornerRadius="10" Background="#1A5577CC" Margin="0,0,20,0">
+                                <materialIcons:MaterialIcon Kind="Compare" Width="24" Height="24" Foreground="{StaticResource AccentBrush}"/>
                             </Border>
+
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="WAD Comparator" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Compare version manifests and track incremental changes in game files." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="WAD Comparator" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                                <TextBlock Text="Compare version manifests and track incremental changes in game files." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="-2,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
+
+                            <!-- Watermark Icon -->
+                            <materialIcons:MaterialIcon Kind="Compare" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-12,0" Grid.Column="1"/>
                         </Grid>
                     </Button>
 
@@ -126,13 +163,18 @@
                         <Button.CommandParameter>Explorer</Button.CommandParameter>
                         <Grid Margin="24,20">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="12" Background="#1A4FC1FF" Margin="0,0,20,0">
-                                <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="28" Height="28" Foreground="{StaticResource AccentBlue}"/>
+                            
+                            <Border Width="44" Height="44" CornerRadius="10" Background="#1A4FC1FF" Margin="0,0,20,0">
+                                <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBlue}"/>
                             </Border>
+
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="File Explorer" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Browse virtual file systems, extract assets, and preview contents." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="File Explorer" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                                <TextBlock Text="Browse virtual file systems, extract assets, and preview contents." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="-2,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
+
+                            <!-- Watermark Icon -->
+                            <materialIcons:MaterialIcon Kind="FolderMultipleOutline" Width="64" Height="64" Foreground="{StaticResource AccentBlue}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-12,0" Grid.Column="1"/>
                         </Grid>
                     </Button>
 
@@ -141,13 +183,18 @@
                         <Button.CommandParameter>Models</Button.CommandParameter>
                         <Grid Margin="24,20">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="12" Background="#1AC77DFF" Margin="0,0,20,0">
-                                <materialIcons:MaterialIcon Kind="CubeOutline" Width="28" Height="28" Foreground="{StaticResource AccentPurple}"/>
+                            
+                            <Border Width="44" Height="44" CornerRadius="10" Background="#1AC77DFF" Margin="0,0,20,0">
+                                <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}"/>
                             </Border>
+
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="3D Models" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Render champion skins, skeletons, and animations in high definition." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="3D Models" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                                <TextBlock Text="Render champion skins, skeletons, and animations in high definition." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="-2,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
+
+                            <!-- Watermark Icon -->
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="64" Height="64" Foreground="{StaticResource AccentPurple}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-12,0" Grid.Column="1"/>
                         </Grid>
                     </Button>
 
@@ -156,19 +203,24 @@
                         <Button.CommandParameter>Monitor</Button.CommandParameter>
                         <Grid Margin="24,20">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="12" Background="#1A57CC99" Margin="0,0,20,0">
-                                <materialIcons:MaterialIcon Kind="Radar" Width="28" Height="28" Foreground="{StaticResource AccentGreen}"/>
+                            
+                            <Border Width="44" Height="44" CornerRadius="10" Background="#1A57CC99" Margin="0,0,20,0">
+                                <materialIcons:MaterialIcon Kind="Radar" Width="24" Height="24" Foreground="{StaticResource AccentGreen}"/>
                             </Border>
+
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="Live Monitor" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Monitor PBE status, remote JSON changes, and CDN asset discovery." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="Live Monitor" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                                <TextBlock Text="Monitor PBE status, remote JSON changes, and CDN asset discovery." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="-2,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
+
+                            <!-- Watermark Icon -->
+                            <materialIcons:MaterialIcon Kind="MonitorDashboard" Width="64" Height="64" Foreground="{StaticResource AccentGreen}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-12,0" Grid.Column="1"/>
                         </Grid>
                     </Button>
                 </UniformGrid>
 
                 <!-- SYSTEM SECTION -->
-                <TextBlock Text="APPLICATION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="10,0,0,10"/>
+                <TextBlock Text="APPLICATION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="10,0,0,10" Opacity="0.8"/>
                 <UniformGrid Columns="2">
                     <!-- Settings -->
                     <Button Style="{StaticResource SecondaryTileStyle}" Click="Button_Click" Tag="{StaticResource TextSecondary}">
@@ -177,9 +229,12 @@
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <materialIcons:MaterialIcon Kind="CogOutline" Width="22" Height="22" Foreground="{StaticResource TextSecondary}" Margin="0,0,16,0"/>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="Settings" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Configure app behavior and game paths." FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="Settings" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                                <TextBlock Text="Configure app behavior and game paths." FontSize="12" Foreground="{StaticResource TextMuted}" Margin="-2,0,0,0"/>
                             </StackPanel>
+
+                            <!-- Watermark Icon -->
+                            <materialIcons:MaterialIcon Kind="CogOutline" Width="48" Height="48" Foreground="{StaticResource TextSecondary}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0" Grid.Column="1"/>
                         </Grid>
                     </Button>
 
@@ -190,9 +245,12 @@
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <materialIcons:MaterialIcon Kind="HelpCircleOutline" Width="22" Height="22" Foreground="{StaticResource TextSecondary}" Margin="0,0,16,0"/>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="Help &amp; Documentation" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="User guides and application information." FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="Help &amp; Documentation" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                                <TextBlock Text="User guides and application information." FontSize="12" Foreground="{StaticResource TextMuted}" Margin="-2,0,0,0"/>
                             </StackPanel>
+
+                            <!-- Watermark Icon -->
+                            <materialIcons:MaterialIcon Kind="HelpCircleOutline" Width="48" Height="48" Foreground="{StaticResource TextSecondary}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0" Grid.Column="1"/>
                         </Grid>
                     </Button>
                 </UniformGrid>
