@@ -29,8 +29,8 @@
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="API Center" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Interact with LCU and Riot API endpoints directly" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                    <TextBlock Text="API Center" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                    <TextBlock Text="Interact with LCU and Riot API endpoints directly" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,0,0,0"/>
                 </StackPanel>
 
                 <materialIcons:MaterialIcon Grid.Column="1" Kind="Web" Width="64" Height="64" Foreground="{StaticResource AccentPurple}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
@@ -46,7 +46,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- LEFT: LCU Info Card (NO BUTTONS INSIDE) -->
-            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0" Height="90">
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0" Height="90">
                 <Grid VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/> <!-- Icon -->
@@ -68,19 +68,28 @@
                         </materialIcons:MaterialIcon>
                     </Border>
 
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,32,0">
-                        <TextBlock Text="LCU connection" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="{Binding Status.StatusText}" FontSize="10" Foreground="{Binding Status.StatusColor}" Margin="0,2,0,0"/>
-                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="LCU SERVICE" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                        
+                        <!-- Status text ALWAYS visible - Fixed optical alignment with -2 margin -->
+                        <TextBlock Text="{Binding Status.StatusText}" FontSize="11" Foreground="{Binding Status.StatusColor}" Margin="-2,0,0,0"/>
 
-                    <!-- USER PROFILE INFO (Summoner ID and Region clearly visible) -->
-                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Visibility="{Binding Status.IsAuthenticated, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource AccentGreen}" BorderThickness="1.5" Margin="0,0,12,0">
-                            <materialIcons:MaterialIcon Kind="Account" Width="20" Height="20" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Status.SummonerIdText}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="{Binding Status.RegionText}" FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                        <!-- Connected Info (Summoner + Region) - Visible ONLY when Authenticated (after a fetch) -->
+                        <StackPanel Orientation="Horizontal" Margin="-2,0,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Status.IsAuthenticated}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            
+                            <TextBlock Text="{Binding Status.SummonerIdText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text=" • " FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="4,0"/>
+                            <TextBlock Text="{Binding Status.RegionText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>

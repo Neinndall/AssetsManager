@@ -30,8 +30,8 @@
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Manage Versions" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Retrieve and manage client versions" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                    <TextBlock Text="Manage Versions" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                    <TextBlock Text="Retrieve and manage client versions" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,0,0,0"/>
                 </StackPanel>
 
                 <materialIcons:MaterialIcon Grid.Column="1" Kind="FormatListBulleted" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
@@ -57,8 +57,8 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="Download configuration" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Select available game languages to download." FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                            <TextBlock Text="DOWNLOAD CONFIGURATION" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Select available game languages to download." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,1,0,0"/>
                         </StackPanel>
                         
                         <ItemsControl Grid.Column="1" ItemsSource="{Binding AvailableLocales}" HorizontalAlignment="Right" VerticalAlignment="Center">

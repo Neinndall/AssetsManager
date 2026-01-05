@@ -27,8 +27,8 @@
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Operations Dashboard" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Real-time monitoring of game services and assets" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                    <TextBlock Text="Operations Dashboard" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                    <TextBlock Text="Real-time monitoring of game services and assets" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                 </StackPanel>
 
                 <!-- Global Status Indicator (Integrated into Header) -->
@@ -59,12 +59,12 @@
                     <!-- Header -->
                     <Grid Grid.Row="0" Margin="0,0,0,20">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
+                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
                             <materialIcons:MaterialIcon Kind="ServerNetwork" Width="24" Height="24" Foreground="{Binding PbeStatusColor}"/>
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="PBE SERVER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
-                            <TextBlock Text="Riot Games Environment" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="PBE SERVER" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextSecondary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Riot Games Environment" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="-2,2,0,0"/>
                         </StackPanel>
                     </Grid>
                     
@@ -103,12 +103,12 @@
                     <!-- Header -->
                     <Grid Grid.Row="0" Margin="0,0,0,20">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
+                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
                             <materialIcons:MaterialIcon Kind="EyeSettingsOutline" Width="24" Height="24" Foreground="{StaticResource AccentBlue}"/>
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="FILE WATCHER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
-                            <TextBlock Text="Remote Manifest Monitoring" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="FILE WATCHER" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextSecondary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Remote Manifest Monitoring" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="-2,2,0,0"/>
                         </StackPanel>
                     </Grid>
 
@@ -164,12 +164,12 @@
                     <!-- Header -->
                     <Grid Grid.Row="0" Margin="0,0,0,20">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
+                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
                             <materialIcons:MaterialIcon Kind="ImageSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}"/>
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="ASSET TRACKER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
-                            <TextBlock Text="Discovery &amp; Archival" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="ASSET TRACKER" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextSecondary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Discovery &amp; Archival" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="-2,2,0,0"/>
                         </StackPanel>
                     </Grid>
 
@@ -220,12 +220,12 @@
                     <!-- Header -->
                     <Grid Grid.Row="0" Margin="0,0,0,16">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
+                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
                             <materialIcons:MaterialIcon Kind="Pulse" Width="24" Height="24" Foreground="{StaticResource AccentOrange}"/>
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="SYSTEM HEALTH" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
-                            <TextBlock Text="Component Integrity" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="SYSTEM HEALTH" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextSecondary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Component Integrity" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="-2,2,0,0"/>
                         </StackPanel>
                     </Grid>
 
