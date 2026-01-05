@@ -562,4 +562,44 @@
         </Setter>
     </Style>
 
+    <Style x:Key="ModernTileToggleButton" TargetType="ToggleButton">
+        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="Height" Value="64"/>
+        <Setter Property="Margin" Value="2"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid>
+                        <Border x:Name="BackgroundBorder" 
+                                Background="{TemplateBinding Background}" 
+                                CornerRadius="8"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"/>
+
+                        <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="BackgroundBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="BackgroundBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="BackgroundBorder" Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
