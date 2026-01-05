@@ -107,7 +107,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
                     if (salesCatalog != null)
                     {
-                        var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null);
+                        var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR");
                         Status.SetFullSalesCatalog(salesItems);
                     }
                 }
@@ -209,7 +209,7 @@ namespace AssetsManager.Views.Controls.Monitor
             if (salesCatalog != null)
             {
                 UpdateAuthenticationStatus();
-                var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null);
+                var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR");
 
                 if (salesItems.Any())
                 {

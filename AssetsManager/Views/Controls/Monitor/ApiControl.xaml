@@ -68,14 +68,14 @@
                         </materialIcons:MaterialIcon>
                     </Border>
 
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,2,16,0">
                         <TextBlock Text="LCU SERVICE" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
                         
                         <!-- Status text ALWAYS visible - Fixed optical alignment with -2 margin -->
-                        <TextBlock Text="{Binding Status.StatusText}" FontSize="11" Foreground="{Binding Status.StatusColor}" Margin="-2,0,0,0"/>
+                        <TextBlock Text="{Binding Status.StatusText}" FontSize="11" Foreground="{Binding Status.StatusColor}" Margin="-2,1,0,0"/>
 
                         <!-- Connected Info (Summoner + Region) - Visible ONLY when Authenticated (after a fetch) -->
-                        <StackPanel Orientation="Horizontal" Margin="-2,0,0,0">
+                        <StackPanel Orientation="Horizontal" Margin="-2,1,0,0">
                             <StackPanel.Style>
                                 <Style TargetType="StackPanel">
                                     <Setter Property="Visibility" Value="Collapsed"/>

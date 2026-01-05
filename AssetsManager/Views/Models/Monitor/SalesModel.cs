@@ -16,6 +16,9 @@ namespace AssetsManager.Views.Models.Monitor
         [JsonPropertyName("inventoryType")]
         public string InventoryType { get; set; }
 
+        [JsonPropertyName("subInventoryType")]
+        public string SubInventoryType { get; set; }
+
         [JsonPropertyName("rp")]
         public int? Rp { get; set; } // This is the original price RP
 
