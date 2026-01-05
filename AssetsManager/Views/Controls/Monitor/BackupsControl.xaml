@@ -6,17 +6,17 @@
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="800" d:DesignWidth="800">
+             d:DesignHeight="800" d:DesignWidth="1000">
 
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Header -->
-            <RowDefinition Height="Auto"/> <!-- Toolbar -->
-            <RowDefinition Height="*"/>    <!-- Backups List -->
+            <RowDefinition Height="Auto"/> <!-- 1. Header -->
+            <RowDefinition Height="Auto"/> <!-- 2. Action Buttons -->
+            <RowDefinition Height="*"/>    <!-- 3. Backups List -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER: Standardized Settings Style -->
-        <Border Grid.Row="0" Margin="0,0,0,24" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+        <!-- 1. HEADER -->
+        <Border Grid.Row="0" Margin="0,0,0,16" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -28,41 +28,37 @@
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Local Backups" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Create and manage full backups of your game installation" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                    <TextBlock Text="Local Backups" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Create and manage full backups of your game installation" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
 
-                <!-- Background Icon (Watermark) -->
                 <materialIcons:MaterialIcon Grid.Column="1" Kind="FolderZip" Width="64" Height="64" Foreground="{StaticResource AccentBlue}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
             </Grid>
         </Border>
 
-        <!-- 2. TOOLBAR -->
-        <Border Grid.Row="1" Margin="0,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+        <!-- 2. ACTION BUTTONS (Simplified to 2 Columns) -->
+        <UniformGrid Grid.Row="1" Columns="2" Margin="0,0,0,24">
+            <!-- Create Backup -->
+            <Button Click="createLolBackupButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Height="90" Padding="0">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Plus" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Create Backup" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Generate a new game snapshot" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Button>
 
-                <Button Grid.Column="0" Click="createLolBackupButton_Click" Style="{StaticResource ModernButton}" Padding="12,0,16,0" HorizontalContentAlignment="Left">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Plus" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="Create Backup" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <!-- Delete Selected -->
+            <Button Click="DeleteSelectedBackups_Click" Style="{StaticResource DestructiveSelectionCardButtonStyle}" Margin="8,0,0,0" Height="90" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                <Grid>
+                    <Border Background="{StaticResource AccentRed}" Opacity="0.05" CornerRadius="12"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="24" Height="24" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock Text="Delete Selected" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource AccentRed}"/>
+                        <TextBlock Text="Remove from storage" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                     </StackPanel>
-                </Button>
-
-                <Button Grid.Column="2" 
-                        Click="DeleteSelectedBackups_Click" 
-                        Style="{StaticResource TransparentIconButton}" 
-                        Width="32" Height="32" 
-                        ToolTip="Delete Selected Snapshots"
-                        Visibility="{Binding AllBackups.Count, Converter={StaticResource CountToVisibilityConverter}}">
-                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
-                </Button>
-            </Grid>
-        </Border>
+                </Grid>
+            </Button>
+        </UniformGrid>
 
         <!-- 3. BACKUPS LIST -->
         <ListView Grid.Row="2" x:Name="BackupsListView" ItemsSource="{Binding AllBackups}" Style="{StaticResource ModernListView}" Background="Transparent" BorderThickness="0">
@@ -80,11 +76,11 @@
                                     <!-- 1. Background Layer -->
                                     <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
                                     
-                                    <!-- 2. Accent Indicator (Pixel-Perfect Layer) -->
-                                    <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentPurple}" CornerRadius="12"/>
+                                    <!-- 2. Accent Indicator -->
+                                    <Border x:Name="AccentIndicator" BorderThickness="3,0,0,0" BorderBrush="{StaticResource AccentPurple}" CornerRadius="12"/>
 
                                     <!-- 3. Content -->
-                                    <Grid Margin="16,16,16,16">
+                                    <Grid Margin="16,12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/> <!-- Icon -->
                                             <ColumnDefinition Width="*"/>    <!-- Info -->
@@ -92,8 +88,8 @@
                                         </Grid.ColumnDefinitions>
 
                                         <!-- Folder Icon Box -->
-                                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="4,0,20,0">
-                                            <materialIcons:MaterialIcon Kind="FolderZipOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="0,0,16,0">
+                                            <materialIcons:MaterialIcon Kind="FolderZipOutline" Width="20" Height="20" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
 
                                         <!-- Info -->
@@ -104,7 +100,7 @@
                                                 <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 
                                                 <!-- NEW Badge -->
-                                                <Border x:Name="NewBadge" Background="{StaticResource AccentPurple}" CornerRadius="4" Padding="6,1" Margin="12,0,0,0" 
+                                                <Border x:Name="NewBadge" Background="{StaticResource AccentPurple}" CornerRadius="4" Padding="8,2" Margin="12,0,0,0" 
                                                         Visibility="{Binding IsCurrentSessionBackup, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                     <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                 </Border>
@@ -113,13 +109,14 @@
 
                                         <!-- Selection Check -->
                                         <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentPurple}" Width="24" Height="24" 
-                                                                    Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                                                    Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </Grid>
                                 </Grid>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsSelected" Value="True">
                                         <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentPurple}"/>
                                         <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
+                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                                     </Trigger>
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>

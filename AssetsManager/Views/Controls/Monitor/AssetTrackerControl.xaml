@@ -10,10 +10,10 @@
 
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Header -->
-            <RowDefinition Height="Auto"/> <!-- Action Buttons -->
-            <RowDefinition Height="Auto"/> <!-- Category Configuration -->
-            <RowDefinition Height="*"/>    <!-- Grid -->
+            <RowDefinition Height="Auto"/> <!-- 1. Header -->
+            <RowDefinition Height="Auto"/> <!-- 2. Category Configuration -->
+            <RowDefinition Height="Auto"/> <!-- 3. Action Buttons -->
+            <RowDefinition Height="*"/>    <!-- 4. Grid Area -->
         </Grid.RowDefinitions>
 
         <!-- 1. HEADER -->
@@ -33,55 +33,19 @@
                     <TextBlock Text="Discover and catalog remote assets" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
 
-                <!-- Background Icon (Watermark) -->
                 <materialIcons:MaterialIcon Grid.Column="1" Kind="ImageMultiple" Width="64" Height="64" Foreground="{StaticResource AccentGreen}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
             </Grid>
         </Border>
 
-        <!-- 2. ACTION BUTTONS -->
-        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,16">
-            <Button Name="CheckButton" Click="CheckButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,6,0" Height="86" Padding="0">
-                <StackPanel VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="Radar" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Scan CDN" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Check for new assets" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                </StackPanel>
-            </Button>
-            <Button Name="LoadMoreButton" Click="LoadMoreButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
-                <StackPanel VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="PlusBoxMultipleOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Load More" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Fetch next batch" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                </StackPanel>
-            </Button>
-            <Button Name="DownloadButton" Click="DownloadButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
-                <StackPanel VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="DownloadOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Download All" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Save visible assets" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                </StackPanel>
-            </Button>
-            <Button Name="RemoveFoundButton" Click="RemoveFoundButton_Click" Style="{StaticResource DestructiveSelectionCardButtonStyle}" Margin="6,0,0,0" Height="86" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
-                <Grid>
-                    <Border Background="{StaticResource AccentRed}" Opacity="0.05" CornerRadius="12"/>
-                    <StackPanel VerticalAlignment="Center">
-                        <materialIcons:MaterialIcon Kind="Broom" Width="24" Height="24" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                        <TextBlock Text="Clean Found" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource AccentRed}"/>
-                        <TextBlock Text="Reset found list" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Grid>
-            </Button>
-        </UniformGrid>
-        
-        <!-- 3. CATEGORY CONFIGURATION (Mirroring Main Header alignment) -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+        <!-- 2. CATEGORY CONFIGURATION (Now above Buttons) -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Box and Icon: Identical to Header -->
+                <!-- Box and Icon -->
                 <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
                     <materialIcons:MaterialIcon Kind="ShapeOutline" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
@@ -123,6 +87,41 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- 3. ACTION BUTTONS (Now below Configuration) -->
+        <UniformGrid Grid.Row="2" Columns="4" Margin="0,0,0,24">
+            <Button Name="CheckButton" Click="CheckButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,6,0" Height="86" Padding="0">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Radar" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Scan CDN" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Check for new assets" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Button>
+            <Button Name="LoadMoreButton" Click="LoadMoreButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="PlusBoxMultipleOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Load More" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Fetch next batch" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Button>
+            <Button Name="DownloadButton" Click="DownloadButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="DownloadOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Download All" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Save visible assets" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Button>
+            <Button Name="RemoveFoundButton" Click="RemoveFoundButton_Click" Style="{StaticResource DestructiveSelectionCardButtonStyle}" Margin="6,0,0,0" Height="86" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                <Grid>
+                    <Border Background="{StaticResource AccentRed}" Opacity="0.05" CornerRadius="12"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Broom" Width="24" Height="24" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock Text="Clean Found" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource AccentRed}"/>
+                        <TextBlock Text="Reset found list" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Button>
+        </UniformGrid>
 
         <!-- 4. ASSET GRID -->
         <ItemsControl Grid.Row="3" Name="AssetsItemsControl">

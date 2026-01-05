@@ -11,12 +11,11 @@
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 1. Header -->
-            <RowDefinition Height="Auto"/> <!-- 2. Action Buttons -->
-            <RowDefinition Height="Auto"/> <!-- 3. Search Configuration -->
-            <RowDefinition Height="*"/>    <!-- 4. Content List -->
+            <RowDefinition Height="Auto"/> <!-- 2. Actions & Search Row -->
+            <RowDefinition Height="*"/>    <!-- 3. Content List -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER (Consistent with other screens) -->
+        <!-- 1. HEADER -->
         <Border Grid.Row="0" Margin="0,0,0,16" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -37,91 +36,84 @@
             </Grid>
         </Border>
 
-        <!-- 2. ACTION BUTTONS (4 Columns Grid) -->
-        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,16">
-            <!-- Add File -->
-            <Button Click="AddUrl_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,6,0" Height="86" Padding="0">
+        <!-- 2. ACTIONS & SEARCH ROW (Balanced Proportions) -->
+        <Grid Grid.Row="1" Margin="0,0,0,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>    <!-- Search Card (Flexible) -->
+                <ColumnDefinition Width="160"/>  <!-- Add Button (Slimmer) -->
+                <ColumnDefinition Width="160"/>  <!-- Clear Button (Slimmer) -->
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT: Search Card -->
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0" Height="90">
+                <Grid Margin="20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Icon Box -->
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="Magnify" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Text -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Search monitors" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Filter by alias or URL." FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- Input (Fixed Clipping) -->
+                    <TextBox x:Name="txtSearch" 
+                             Grid.Column="2"
+                             Style="{StaticResource StandardSearchBoxStyle}" 
+                             Width="180" 
+                             MinHeight="34"
+                             VerticalAlignment="Center"
+                             VerticalContentAlignment="Center"
+                             TextChanged="TxtSearch_TextChanged" 
+                             Tag="Filter..."/>
+                </Grid>
+            </Border>
+
+            <!-- MIDDLE: Add Monitor -->
+            <Button Grid.Column="1" 
+                    Click="AddUrl_Click" 
+                    Style="{StaticResource SelectionCardButtonStyle}" 
+                    Margin="0,0,12,0" 
+                    Height="90" 
+                    Padding="0">
                 <StackPanel VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="Plus" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Add Monitor" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Track new URL" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <materialIcons:MaterialIcon Kind="Plus" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="Add Monitor" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Track URL" FontSize="9" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Button>
 
-            <!-- Refresh Status (Placeholder for now, logic can be added) -->
-            <Button Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
-                <StackPanel VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="Sync" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Refresh All" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Check updates now" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                </StackPanel>
-            </Button>
-
-            <!-- View History folder -->
-            <Button Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
-                <StackPanel VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="History" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="View History" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Open local records" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                </StackPanel>
-            </Button>
-
-            <!-- Remove All (Destructive) -->
-            <Button Style="{StaticResource DestructiveSelectionCardButtonStyle}" Margin="6,0,0,0" Height="86" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+            <!-- RIGHT: Clear All -->
+            <Button Grid.Column="2" 
+                    Click="ClearAll_Click" 
+                    Style="{StaticResource DestructiveSelectionCardButtonStyle}" 
+                    Margin="0" 
+                    Height="90" 
+                    Padding="0" 
+                    HorizontalContentAlignment="Stretch" 
+                    VerticalContentAlignment="Stretch">
                 <Grid>
                     <Border Background="{StaticResource AccentRed}" Opacity="0.05" CornerRadius="12"/>
                     <StackPanel VerticalAlignment="Center">
-                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="24" Height="24" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                        <TextBlock Text="Clear All" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource AccentRed}"/>
-                        <TextBlock Text="Reset monitor list" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="22" Height="22" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                        <TextBlock Text="Clear All" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource AccentRed}"/>
+                        <TextBlock Text="Reset list" FontSize="9" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Grid>
             </Button>
-        </UniformGrid>
+        </Grid>
 
-        <!-- 3. SEARCH CONFIGURATION (Mirroring Versions alignment) -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Box and Icon -->
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="Magnify" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-
-                <!-- Text and Search -->
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="Search monitors" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Filter your monitored files by alias or URL." FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
-                        </StackPanel>
-
-                        <!-- Search Box aligned to the right -->
-                        <TextBox x:Name="txtSearch" 
-                                 Grid.Column="1"
-                                 Style="{StaticResource StandardSearchBoxStyle}" 
-                                 Width="250" 
-                                 Height="36" 
-                                 HorizontalAlignment="Right" 
-                                 VerticalAlignment="Center"
-                                 TextChanged="TxtSearch_TextChanged" 
-                                 Tag="Filter monitors..."/>
-                    </Grid>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- 4. MONITORS LIST -->
+        <!-- 3. MONITORS LIST -->
         <ListView x:Name="MonitoredItemsListView" 
-                  Grid.Row="3" 
+                  Grid.Row="2" 
                   Style="{StaticResource ModernListView}"
                   Background="Transparent" BorderThickness="0">
             <ListView.ItemContainerStyle>
@@ -197,17 +189,10 @@
 
                             <!-- Contextual Actions -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Click="ViewChanges_Click" 
-                                        ToolTip="Show Differences" 
-                                        Style="{StaticResource TransparentIconButton}"
-                                        Width="32" Height="32" Margin="0,0,8,0"
-                                        Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Button Click="ViewChanges_Click" ToolTip="Show Differences" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" Margin="0,0,8,0" Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Foreground="{StaticResource AccentBlue}"/>
                                 </Button>                                    
-                                <Button Click="Remove_Click" 
-                                        Style="{StaticResource TransparentIconButton}" 
-                                        Width="32" Height="32" 
-                                        ToolTip="Remove Monitor">
+                                <Button Click="Remove_Click" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Remove Monitor">
                                     <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
                                 </Button>
                             </StackPanel>
