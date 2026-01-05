@@ -28,34 +28,47 @@
             </Grid>
         </Border>
 
-        <!-- HERO ACTION SECTION -->
-        <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,20" Padding="32">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+        <!-- HERO ACTION SECTION (Split) -->
+        <Grid Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Width="64" Height="64">
-                    <materialIcons:MaterialIcon Kind="Github" Foreground="{StaticResource TextPrimary}" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+            <!-- Left: Found an Issue Card -->
+            <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Margin="0,0,10,0" Padding="20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="24,0,24,0">
-                    <TextBlock Text="Found an Issue?" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Your feedback is essential. Help us by reporting bugs on our official GitHub repository." 
-                               FontSize="13" Foreground="{StaticResource TextSecondary}" Opacity="0.8" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Width="48" Height="48" VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Github" Foreground="{StaticResource TextPrimary}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="Found an Issue?" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Your feedback is essential. Help us by reporting bugs on our official GitHub repository." 
+                                   FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Right: Report Button -->
+            <Button Grid.Column="1"
+                    x:Name="buttonReportBug" 
+                    Click="buttonReportBug_Click"
+                    Style="{StaticResource SelectionCardButtonStyle}"
+                    Margin="0" Width="160" Padding="0"
+                    VerticalAlignment="Stretch">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Github" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="Report on GitHub" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Open repository" FontSize="11" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
-
-                <Button Grid.Column="2"
-                        x:Name="buttonReportBug" 
-                        Content="Report on GitHub"
-                        Click="buttonReportBug_Click"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource ModernButton}"
-                        FontWeight="Bold"/>
-            </Grid>
-        </Border>
+            </Button>
+        </Grid>
 
         <!-- REPORTING GUIDE SECTION -->
         <TextBlock Text="QUALITY CHECKLIST" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,16"/>
