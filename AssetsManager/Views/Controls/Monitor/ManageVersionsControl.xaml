@@ -16,7 +16,7 @@
             <RowDefinition Height="*"/>    <!-- Content Area -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER: Standardized Settings Style -->
+        <!-- 1. HEADER -->
         <Border Grid.Row="0" Margin="0,0,0,24" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -33,85 +33,114 @@
                     <TextBlock Text="Retrieve and manage League of Legends manifests and client versions" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
                 </StackPanel>
 
-                <!-- Background Icon (Watermark) -->
                 <materialIcons:MaterialIcon Grid.Column="1" Kind="FormatListBulleted" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
             </Grid>
         </Border>
 
-        <!-- 2. MAIN ACTIONS & LOCALES -->
-        <Border Grid.Row="1" Margin="0,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <StackPanel>
-                <!-- Quick Actions Row -->
-                <Grid Margin="0,0,0,16">
+        <!-- 2. MAIN ACTIONS & CONFIGURATION -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,24">
+            
+            <!-- Action Cards Grid (Now 4 Columns) -->
+            <UniformGrid Columns="4" Margin="0,0,0,16">
+                <!-- Fetch All -->
+                <Button Click="FetchVersions_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,6,0" Height="100" Padding="0">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Refresh" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <TextBlock Text="Fetch All" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Refresh manifests" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Get Client -->
+                <Button Click="GetLeagueClient_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="100" Padding="0">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="DesktopClassic" Width="26" Height="26" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <TextBlock Text="Get Client" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Download specific ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Get Game -->
+                <Button Click="GetLoLGameClient_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="100" Padding="0">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="26" Height="26" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <TextBlock Text="Get Game" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Download game ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Delete Selected (Moved Here) -->
+                <Button Click="DeleteSelectedVersions_Click" 
+                        Style="{StaticResource DestructiveSelectionCardButtonStyle}" 
+                        Margin="6,0,0,0" 
+                        Height="100" 
+                        Padding="0"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch">
+                    <Grid>
+                        <!-- Subtle Red Tint (Now stretching to fill) -->
+                        <Border Background="{StaticResource AccentRed}" Opacity="0.05" CornerRadius="12"/>
+                        
+                        <StackPanel VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="26" Height="26" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                            <TextBlock Text="Delete Selected" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource AccentRed}"/>
+                            <TextBlock Text="Remove from disk" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Button>
+            </UniformGrid>
+
+            <!-- Configuration Section (Full Width) -->
+            <Border Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    
-                    <StackPanel Orientation="Horizontal">
-                        <Button Click="FetchVersions_Click" Style="{StaticResource ModernButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal">
-                                <materialIcons:MaterialIcon Kind="Refresh" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Fetch All" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Click="GetLeagueClient_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left" Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal">
-                                <materialIcons:MaterialIcon Kind="DesktopClassic" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Get Client" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Click="GetLoLGameClient_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0,16,0" HorizontalContentAlignment="Left">
-                            <StackPanel Orientation="Horizontal">
-                                <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Get Game" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
 
-                    <!-- Delete Selected Action -->
-                    <Button Grid.Column="2" Click="DeleteSelectedVersions_Click" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Delete Selected Entries">
-                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
-                    </Button>
-                </Grid>
+                    <!-- Icon Box -->
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" VerticalAlignment="Top">
+                        <materialIcons:MaterialIcon Kind="Translate" Foreground="{StaticResource AccentOrange}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
 
-                <!-- Locales Selector -->
-                <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="12,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Translate" Foreground="{StaticResource AccentOrange}" Width="14" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="DOWNLOAD LOCALES:" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                    <!-- Content (Title + Chips) -->
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                        <TextBlock Text="DOWNLOAD CONFIGURATION" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0"/>
+                        <TextBlock Text="Select the locales (languages) to include when downloading." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,12"/>
+                        
+                        <!-- Chips Panel (Aligned with Text) -->
                         <ItemsControl ItemsSource="{Binding AvailableLocales}">
-                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,0" FontSize="11"/>
+                                    <CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}" Style="{StaticResource ModernChipToggleButton}"/>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
-                </Border>
-            </StackPanel>
-        </Border>
+                </Grid>
+            </Border>
+        </StackPanel>
 
-        <!-- 3. TABS & PAGINATION UNIFIED -->
+        <!-- 3. TABS & PAGINATION -->
         <Grid Grid.Row="2" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Segmented Switch -->
             <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal">
-                    <RadioButton x:Name="TabClient" Content="League Client" IsChecked="True" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Width="120"/>
-                    <RadioButton x:Name="TabGame" Content="Game Client" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Width="120"/>
+                    <RadioButton x:Name="TabClient" Content="League Client" IsChecked="True" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Width="140"/>
+                    <RadioButton x:Name="TabGame" Content="Game Client" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Width="140"/>
                 </StackPanel>
             </Border>
 
-            <!-- Contextual Pagination -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- Client Pagination -->
                 <StackPanel Orientation="Horizontal">
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
@@ -134,7 +163,6 @@
                     <Button Style="{StaticResource TransparentIconButton}" Click="NextLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}" Width="28" Height="28"><materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{StaticResource TextSecondary}"/></Button>
                 </StackPanel>
 
-                <!-- Game Pagination -->
                 <StackPanel Orientation="Horizontal">
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
@@ -161,7 +189,6 @@
 
         <!-- 4. CONTENT AREA: Lists -->
         <Grid Grid.Row="3">
-            <!-- CLIENT LIST -->
             <ListView x:Name="LeagueClientVersionsListView" 
                       ItemsSource="{Binding LeagueClientPaginator.PagedItems}" 
                       Background="Transparent" BorderThickness="0">
@@ -186,13 +213,8 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="ListViewItem">
                                     <Grid>
-                                        <!-- 1. Background -->
                                         <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
-                                        
-                                        <!-- 2. Accent Indicator (Pixel-Perfect Layer) -->
                                         <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentBrush}" CornerRadius="8"/>
-
-                                        <!-- 3. Content -->
                                         <Grid Margin="12,8,12,8">
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                             <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
@@ -225,7 +247,6 @@
                 </ListView.ItemContainerStyle>
             </ListView>
 
-            <!-- GAME LIST -->
             <ListView x:Name="LoLGameClientVersionsListView" 
                       ItemsSource="{Binding LoLGameClientPaginator.PagedItems}" 
                       Background="Transparent" BorderThickness="0">
@@ -250,13 +271,8 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="ListViewItem">
                                     <Grid>
-                                        <!-- 1. Background -->
                                         <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
-                                        
-                                        <!-- 2. Accent Indicator (Pixel-Perfect Layer) -->
                                         <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentGreen}" CornerRadius="8"/>
-
-                                        <!-- 3. Content -->
                                         <Grid Margin="12,8,12,8">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
