@@ -10,11 +10,11 @@
 
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Header -->
-            <RowDefinition Height="Auto"/> <!-- Action Buttons -->
-            <RowDefinition Height="Auto"/> <!-- Download Configuration -->
-            <RowDefinition Height="Auto"/> <!-- Tabs & Pagination -->
-            <RowDefinition Height="*"/>    <!-- Content Area -->
+            <RowDefinition Height="Auto"/> <!-- 1. Header -->
+            <RowDefinition Height="Auto"/> <!-- 2. Download Configuration -->
+            <RowDefinition Height="Auto"/> <!-- 3. Action Buttons -->
+            <RowDefinition Height="Auto"/> <!-- 4. Tabs & Pagination -->
+            <RowDefinition Height="*"/>    <!-- 5. Content Area -->
         </Grid.RowDefinitions>
 
         <!-- 1. HEADER -->
@@ -37,9 +37,49 @@
                 <materialIcons:MaterialIcon Grid.Column="1" Kind="FormatListBulleted" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
             </Grid>
         </Border>
+
+        <!-- 2. DOWNLOAD CONFIGURATION (Now above Buttons) -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <materialIcons:MaterialIcon Kind="Translate" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Download configuration" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Select available game languages to download." FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        
+                        <ItemsControl Grid.Column="1" ItemsSource="{Binding AvailableLocales}" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" MaxWidth="500"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}" Style="{StaticResource ModernChipToggleButton}" Margin="4,0,0,4"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
         
-        <!-- 2. ACTION BUTTONS -->
-        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,16">
+        <!-- 3. ACTION BUTTONS (Now below Configuration) -->
+        <UniformGrid Grid.Row="2" Columns="4" Margin="0,0,0,24">
             <Button Click="FetchVersions_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,6,0" Height="86" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="Refresh" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
@@ -72,49 +112,6 @@
                 </Grid>
             </Button>
         </UniformGrid>
-
-        <!-- 3. DOWNLOAD CONFIGURATION (Mirroring Main Header alignment) -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Box and Icon: Identical to Header -->
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="Translate" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-
-                <!-- Text Block: Identical alignment to Header -->
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Download configuration" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Select available game languages to download." FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
-                        </StackPanel>
-                        
-                        <!-- Chips aligned to the right inside the same row -->
-                        <ItemsControl Grid.Column="1" ItemsSource="{Binding AvailableLocales}" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" MaxWidth="500"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}" Style="{StaticResource ModernChipToggleButton}" Margin="4,0,0,4"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
-                </StackPanel>
-            </Grid>
-        </Border>
 
         <!-- 4. TABS & PAGINATION -->
         <Grid Grid.Row="3" Margin="0,0,0,12">
