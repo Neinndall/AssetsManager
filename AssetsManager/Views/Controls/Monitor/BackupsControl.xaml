@@ -74,10 +74,10 @@
                             <ControlTemplate TargetType="ListViewItem">
                                 <Grid>
                                     <!-- 1. Background Layer -->
-                                    <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                                    <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
                                     
                                     <!-- 2. Accent Indicator -->
-                                    <Border x:Name="AccentIndicator" BorderThickness="3,0,0,0" BorderBrush="{StaticResource AccentPurple}" CornerRadius="12"/>
+                                    <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentPurple}" CornerRadius="8"/>
 
                                     <!-- 3. Content -->
                                     <Grid Margin="16,12">
