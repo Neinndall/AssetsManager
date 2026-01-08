@@ -483,22 +483,42 @@ namespace AssetsManager.Services.Audio
             // Live Mode
             else
             {
-                string wadDirectory;
-                if (strategy.Type == BinType.Champion)
+                string targetWadFullPath = null;
+                string sourceWadRelativePath = clickedNode.ChunkDiff.SourceWadFile;
+                string sourceWadFileName = Path.GetFileName(sourceWadRelativePath);
+
+                // Case 1: The BIN is in the same WAD as the audio file (Most common case: Champions, Maps)
+                if (string.Equals(sourceWadFileName, strategy.TargetWadName, StringComparison.OrdinalIgnoreCase))
                 {
-                    wadDirectory = basePath;
+                    targetWadFullPath = Path.Combine(basePath, sourceWadRelativePath);
                 }
-                else if (strategy.Type == BinType.Map)
-                {
-                    wadDirectory = basePath;
-                }
+                // Case 2: The BIN is in a different WAD. Try to find it in the same directory as the source WAD first.
                 else
                 {
-                    wadDirectory = Path.GetDirectoryName(Path.Combine(basePath, clickedNode.ChunkDiff.SourceWadFile));
+                    string sourceWadDirectory = Path.GetDirectoryName(sourceWadRelativePath);
+                    string potentialPath = Path.Combine(basePath, sourceWadDirectory, strategy.TargetWadName);
+
+                    if (File.Exists(potentialPath))
+                    {
+                        targetWadFullPath = potentialPath;
+                    }
+                    else
+                    {
+                        // Fallback: Use the original logic as a last resort
+                        string wadDirectory;
+                        if (strategy.Type == BinType.Champion || strategy.Type == BinType.Map)
+                        {
+                            wadDirectory = basePath;
+                        }
+                        else
+                        {
+                            wadDirectory = Path.GetDirectoryName(Path.Combine(basePath, sourceWadRelativePath));
+                        }
+                        targetWadFullPath = Path.Combine(wadDirectory, strategy.TargetWadName);
+                    }
                 }
 
-                string targetWadFullPath = Path.Combine(wadDirectory, strategy.TargetWadName);
-                _logService.LogDebug($"[FindAssociatedBinFileFromWadsAsync] Live Mode: Target WAD for BIN search: '{targetWadFullPath}'");
+                _logService.LogDebug($"[FindAssociatedBinFileFromWadsAsync] Live Mode: Resolved Target WAD path: '{targetWadFullPath}'");
 
                 if (File.Exists(targetWadFullPath))
                 {
