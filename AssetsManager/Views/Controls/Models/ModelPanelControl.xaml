@@ -572,7 +572,22 @@
                                         <materialIcons:MaterialIcon Kind="Play" Width="16" Foreground="{StaticResource AccentGreen}"/>
                                     </Button>
                                     <ToggleButton Click="StopButton_Click" IsChecked="{Binding IsPlaying, Mode=OneWay}" Style="{StaticResource IconToggleButton}" Width="28" Height="28" Margin="4,0,0,0">
-                                        <materialIcons:MaterialIcon Kind="Pause" Width="16" Foreground="{StaticResource AccentRed}"/>
+                                        <materialIcons:MaterialIcon Width="16">
+                                            <materialIcons:MaterialIcon.Style>
+                                                <Style TargetType="materialIcons:MaterialIcon">
+                                                    <!-- Por defecto (Cuando está pausado -> Mostrar el Cuadrado para Resume) -->
+                                                    <Setter Property="Kind" Value="Stop" />
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
+                                                    <Style.Triggers>
+                                                        <!-- Cuando está reproduciendo -> Mostrar Pausa -->
+                                                        <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                                            <Setter Property="Kind" Value="Pause" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialIcons:MaterialIcon.Style>
+                                        </materialIcons:MaterialIcon>
                                     </ToggleButton>
                                 </StackPanel>
                             </Grid>
