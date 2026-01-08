@@ -85,7 +85,7 @@ namespace AssetsManager.Services.Core
 
         private async Task HandleAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath, LoadingDiffWindow loadingWindow)
         {
-            _logService.Log("[HandleAudioBankDiffAsync] Starting audio bank diff process.");
+            _logService.LogDebug("[HandleAudioBankDiffAsync] Starting audio bank diff process.");
             string oldJson = "{}";
             string newJson = "{}";
 
@@ -102,7 +102,7 @@ namespace AssetsManager.Services.Core
 
             if (diff.Type is ChunkDiffType.Modified or ChunkDiffType.Renamed or ChunkDiffType.Removed)
             {
-                _logService.Log("[HandleAudioBankDiffAsync] Linking OLD version of the audio bank.");
+                _logService.LogDebug("[HandleAudioBankDiffAsync] Linking OLD version of the audio bank.");
                 string backupChunkPathOld = null;
                 if (backupRootDir != null)
                 {
@@ -112,7 +112,7 @@ namespace AssetsManager.Services.Core
                 var linkedBankOld = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeOld, oldPbePath, true, backupRootDir);
                 if (linkedBankOld != null)
                 {
-                    _logService.Log("[HandleAudioBankDiffAsync] OLD version linked successfully. Converting to string.");
+                    _logService.LogDebug("[HandleAudioBankDiffAsync] OLD version linked successfully. Converting to string.");
                     oldJson = await AudioBankToStringAsync(linkedBankOld);
                 }
                 else
@@ -123,7 +123,7 @@ namespace AssetsManager.Services.Core
 
             if (diff.Type is ChunkDiffType.Modified or ChunkDiffType.Renamed or ChunkDiffType.New)
             {
-                _logService.Log("[HandleAudioBankDiffAsync] Linking NEW version of the audio bank.");
+                _logService.LogDebug("[HandleAudioBankDiffAsync] Linking NEW version of the audio bank.");
                 string backupChunkPathNew = null;
                 if (backupRootDir != null)
                 {
@@ -133,7 +133,7 @@ namespace AssetsManager.Services.Core
                 var linkedBankNew = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeNew, newPbePath, false, backupRootDir);
                 if (linkedBankNew != null)
                 {
-                    _logService.Log("[HandleAudioBankDiffAsync] NEW version linked successfully. Converting to string.");
+                    _logService.LogDebug("[HandleAudioBankDiffAsync] NEW version linked successfully. Converting to string.");
                     newJson = await AudioBankToStringAsync(linkedBankNew);
                 }
                 else
@@ -142,8 +142,8 @@ namespace AssetsManager.Services.Core
                 }
             }
 
-            _logService.Log($"[HandleAudioBankDiffAsync] JSON for old version (first 100 chars): {(oldJson.Length > 100 ? oldJson.Substring(0, 100) : oldJson)}");
-            _logService.Log($"[HandleAudioBankDiffAsync] JSON for new version (first 100 chars): {(newJson.Length > 100 ? newJson.Substring(0, 100) : newJson)}");
+            _logService.LogDebug($"[HandleAudioBankDiffAsync] JSON for old version (first 100 chars): {(oldJson.Length > 100 ? oldJson.Substring(0, 100) : oldJson)}");
+            _logService.LogDebug($"[HandleAudioBankDiffAsync] JSON for new version (first 100 chars): {(newJson.Length > 100 ? newJson.Substring(0, 100) : newJson)}");
 
             if (oldJson == newJson)
             {
@@ -156,7 +156,7 @@ namespace AssetsManager.Services.Core
                 {
                     _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
                 }
-                _logService.Log("[HandleAudioBankDiffAsync] Parsed content is identical. Aborting diff view.");
+                _logService.LogDebug("[HandleAudioBankDiffAsync] Parsed content is identical. Aborting diff view.");
                 return;
             }
 
@@ -164,7 +164,7 @@ namespace AssetsManager.Services.Core
             diffWindow.Owner = owner;
             await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, diff.OldPath, diff.NewPath);
 
-            _logService.Log("[HandleAudioBankDiffAsync] Displaying diff window.");
+            _logService.LogDebug("[HandleAudioBankDiffAsync] Displaying diff window.");
             diffWindow.ContentRendered += (s, e) => loadingWindow.Close();
             diffWindow.ShowDialog();
         }
