@@ -342,7 +342,8 @@ namespace AssetsManager.Services.Monitor
                     if (fileName != null)
                     {
                         fileCounter++;
-                        VersionDownloadProgressChanged?.Invoke(this, (taskName, fileCounter, totalFiles, fileName));
+                        string displayName = Path.GetFileName(fileName);
+                        VersionDownloadProgressChanged?.Invoke(this, (taskName, fileCounter, totalFiles, displayName));
                     }
                 }
             }, cancellationToken);
