@@ -318,24 +318,9 @@ namespace AssetsManager.Services.Explorer
                 var bitmapSource = TextureUtils.LoadTexture(memoryStream, Path.GetExtension(node.Name));
                 if (bitmapSource != null)
                 {
-                    SaveBitmapAsPng(bitmapSource, node.Name, destinationPath, onFileSavedCallback);
+                    TextureUtils.SaveBitmapSourceAsImage(bitmapSource, node.Name, destinationPath, _appSettings.ImageExportFormat, onFileSavedCallback);
                 }
             }
-        }
-
-        private void SaveBitmapAsPng(BitmapSource bitmapSource, string originalFileName, string destinationPath, Action<string> onFileSavedCallback)
-        {
-            BitmapEncoder encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
-
-            string fileName = Path.ChangeExtension(originalFileName, ".png");
-            string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
-
-            using (var fileStream = new FileStream(filePath, FileMode.Create))
-            {
-                encoder.Save(fileStream);
-            }
-            onFileSavedCallback?.Invoke(filePath);
         }
 
         private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
@@ -386,7 +371,7 @@ namespace AssetsManager.Services.Explorer
                             var bitmapSource = TextureUtils.LoadTexture(memoryStream, "." + guessedExtension);
                             if (bitmapSource != null)
                             {
-                                SaveBitmapAsPng(bitmapSource, node.Name, destinationPath, onFileSavedCallback);
+                                TextureUtils.SaveBitmapSourceAsImage(bitmapSource, node.Name, destinationPath, _appSettings.ImageExportFormat, onFileSavedCallback);
                                 return; // Done, we converted and saved it
                             }
                         }

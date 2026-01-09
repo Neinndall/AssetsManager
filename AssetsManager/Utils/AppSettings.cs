@@ -37,6 +37,7 @@ namespace AssetsManager.Utils
         public string CustomFloorTexturePath { get; set; } = string.Empty;
         public Dictionary<string, long> HashesSizes { get; set; }
         public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
+        public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Png;
 
         // Dictionary for File Watcher
         public Dictionary<string, DateTime> JsonDataModificationDates { get; set; }
@@ -172,6 +173,7 @@ namespace AssetsManager.Utils
                 DefaultExtractedSelectDirectory = null,
                 CustomFloorTexturePath = null,
                 AudioExportFormat = AudioExportFormat.Ogg,
+                ImageExportFormat = ImageExportFormat.Png,
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
                 HashesSizes = new Dictionary<string, long>(),
@@ -214,6 +216,7 @@ namespace AssetsManager.Utils
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;
             CustomFloorTexturePath = defaultSettings.CustomFloorTexturePath;
             AudioExportFormat = defaultSettings.AudioExportFormat;
+            ImageExportFormat = defaultSettings.ImageExportFormat;
             SaveDiffHistory = defaultSettings.SaveDiffHistory;
             BackgroundUpdates = defaultSettings.BackgroundUpdates;
             CheckPbeStatus = defaultSettings.CheckPbeStatus;
