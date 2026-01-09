@@ -54,6 +54,7 @@ namespace AssetsManager.Views.Converters
                 DiffTypeGroupViewModel diffType => GetDiffTypeIcon(diffType.Type),
                 SerializableChunkDiff chunk => GetIcon(Path.GetExtension(chunk.Path), chunk.Path),
                 FileSystemNodeModel node => GetNodeIcon(node),
+                string path => GetIcon(Path.GetExtension(path), path),
                 _ => MaterialIconKind.FileQuestionOutline, // Outline
             };
         }
@@ -133,7 +134,13 @@ namespace AssetsManager.Views.Converters
                 return MaterialIconKind.LanguageCss3;
             }
 
-            // 3. Default icon if no match is found
+            // 3. Heuristic: If no extension, assume it's a Directory
+            if (string.IsNullOrEmpty(extension))
+            {
+                return MaterialIconKind.FolderOutline;
+            }
+
+            // 4. Default icon for unknown files
             return MaterialIconKind.FileOutline; // Outline
         }
 
