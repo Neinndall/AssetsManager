@@ -137,18 +137,7 @@
                         <Border x:Name="CardBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
                         
                         <!-- Side Status Accent -->
-                        <Border x:Name="StatusIndicator" BorderThickness="2,0,0,0" CornerRadius="8">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="BorderBrush" Value="{StaticResource TextMuted}"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding StatusText}" Value="Updated"><Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/></DataTrigger>
-                                        <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date"><Setter Property="BorderBrush" Value="{StaticResource AccentGreen}"/></DataTrigger>
-                                        <DataTrigger Binding="{Binding StatusText}" Value="Error"><Setter Property="BorderBrush" Value="{StaticResource AccentRed}"/></DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                        </Border>
+                        <Border x:Name="StatusIndicator" BorderThickness="2,0,0,0" CornerRadius="8" BorderBrush="{Binding StatusColor}"/>
 
                         <!-- Content -->
                         <Grid Margin="16,12">
@@ -160,15 +149,14 @@
 
                             <!-- Status Box -->
                             <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="0,0,16,0">
-                                <materialIcons:MaterialIcon Width="20" Height="20">
+                                <materialIcons:MaterialIcon Width="20" Height="20" Foreground="{Binding StatusColor}">
                                     <materialIcons:MaterialIcon.Style>
                                         <Style TargetType="materialIcons:MaterialIcon">
-                                            <Setter Property="Kind" Value="HelpCircleOutline" /><Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+                                            <Setter Property="Kind" Value="HelpCircleOutline" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date"><Setter Property="Kind" Value="CheckCircleOutline" /><Setter Property="Foreground" Value="{StaticResource AccentGreen}" /></DataTrigger>
-                                                <DataTrigger Binding="{Binding StatusText}" Value="Updated"><Setter Property="Kind" Value="BellRingOutline" /><Setter Property="Foreground" Value="{StaticResource AccentBlue}" /></DataTrigger>
-                                                <DataTrigger Binding="{Binding StatusText}" Value="Checking..."><Setter Property="Kind" Value="Sync" /><Setter Property="Foreground" Value="{StaticResource AccentBrush}" /></DataTrigger>
-                                                <DataTrigger Binding="{Binding StatusText}" Value="Error"><Setter Property="Kind" Value="AlertCircleOutline" /><Setter Property="Foreground" Value="{StaticResource AccentRed}" /></DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date"><Setter Property="Kind" Value="CheckCircleOutline" /></DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Updated"><Setter Property="Kind" Value="BellRingOutline" /></DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Error"><Setter Property="Kind" Value="AlertCircleOutline" /></DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </materialIcons:MaterialIcon.Style>
@@ -177,13 +165,15 @@
 
                             <!-- Information -->
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Alias}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="{Binding Alias}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="8,2" Margin="0,0,12,0">
-                                        <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="8,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="Bold" Foreground="{Binding StatusColor}" VerticalAlignment="Center"/>
                                     </Border>
-                                    <materialIcons:MaterialIcon Kind="ClockOutline" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding LastChecked}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="ClockOutline" Width="12" Height="12" Foreground="{StaticResource TextMuted}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding LastChecked}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,1,0,0"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </StackPanel>
 

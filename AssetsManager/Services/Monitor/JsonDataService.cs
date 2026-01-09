@@ -24,6 +24,8 @@ namespace AssetsManager.Services.Monitor
     public class JsonDataService
     {
         public event Action<FileUpdateInfo> FileUpdated;
+        public event Action<string> FileCheckFailed;
+        public event Action<string> FileCheckUpToDate;
 
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
@@ -253,7 +255,12 @@ namespace AssetsManager.Services.Monitor
                     {
                         _logService.LogError(ex, $"General error during file operation for {fullUrl}. Path: {newFilePath}");
                         wasUpdated = false;
+                        FileCheckFailed?.Invoke(fullUrl);
                     }
+                }
+                else
+                {
+                    FileCheckUpToDate?.Invoke(fullUrl);
                 }
             }
 
