@@ -318,19 +318,24 @@ namespace AssetsManager.Services.Explorer
                 var bitmapSource = TextureUtils.LoadTexture(memoryStream, Path.GetExtension(node.Name));
                 if (bitmapSource != null)
                 {
-                    BitmapEncoder encoder = new PngBitmapEncoder();
-                    encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
-
-                    string fileName = Path.ChangeExtension(node.Name, ".png");
-                    string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
-
-                    using (var fileStream = new FileStream(filePath, FileMode.Create))
-                    {
-                        encoder.Save(fileStream);
-                    }
-                    onFileSavedCallback?.Invoke(filePath);
+                    SaveBitmapAsPng(bitmapSource, node.Name, destinationPath, onFileSavedCallback);
                 }
             }
+        }
+
+        private void SaveBitmapAsPng(BitmapSource bitmapSource, string originalFileName, string destinationPath, Action<string> onFileSavedCallback)
+        {
+            BitmapEncoder encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
+
+            string fileName = Path.ChangeExtension(originalFileName, ".png");
+            string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                encoder.Save(fileStream);
+            }
+            onFileSavedCallback?.Invoke(filePath);
         }
 
         private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
@@ -371,6 +376,23 @@ namespace AssetsManager.Services.Explorer
                 string guessedExtension = FileTypeDetector.GuessExtension(fileBytes);
                 if (!string.IsNullOrEmpty(guessedExtension))
                 {
+                    // Fix: If we guessed it's a texture, we should convert it to PNG just like in the main switch
+                    if (guessedExtension.Equals("tex", StringComparison.OrdinalIgnoreCase) || 
+                        guessedExtension.Equals("dds", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using (var memoryStream = new MemoryStream(fileBytes))
+                        {
+                            // Try to load it as a texture
+                            var bitmapSource = TextureUtils.LoadTexture(memoryStream, "." + guessedExtension);
+                            if (bitmapSource != null)
+                            {
+                                SaveBitmapAsPng(bitmapSource, node.Name, destinationPath, onFileSavedCallback);
+                                return; // Done, we converted and saved it
+                            }
+                        }
+                    }
+
+                    // For other types, just append the extension
                     fileName = $"{fileName}.{guessedExtension}";
                 }
             }
