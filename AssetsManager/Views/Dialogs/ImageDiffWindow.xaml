@@ -9,6 +9,39 @@
         Background="{StaticResource SidebarBackground}"
         WindowStartupLocation="CenterScreen">
 
+    <Window.Resources>
+        <!-- Checkerboard Pattern for transparency visualization -->
+        <DrawingBrush x:Key="CheckerboardBrush" TileMode="Tile" Viewport="0,0,20,20" ViewportUnits="Absolute">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#FF2D2D30">
+                        <GeometryDrawing.Geometry>
+                            <RectangleGeometry Rect="0,0,20,20" />
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                    <GeometryDrawing Brush="#FF3E3E42">
+                        <GeometryDrawing.Geometry>
+                            <GeometryGroup>
+                                <RectangleGeometry Rect="0,0,10,10" />
+                                <RectangleGeometry Rect="10,10,10,10" />
+                            </GeometryGroup>
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+
+        <!-- Tool Section Label Style -->
+        <Style x:Key="ToolSectionLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="10,0,6,0"/>
+            <Setter Property="Opacity" Value="0.8"/>
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -20,7 +53,7 @@
                 Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1"
-                Padding="24,15">
+                Padding="24,18">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -29,58 +62,79 @@
 
                 <!-- Title & Icon -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{DynamicResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
-                         <icons:MaterialIcon Kind="ImageMultipleOutline" Width="22" Height="22" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                         <icons:MaterialIcon Kind="ImageMultipleOutline" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Image Comparison" 
                                    FontSize="18" 
                                    FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Visual analysis of modified assets" 
+                        <TextBlock Text="Advanced visual analysis suite" 
                                    FontSize="12" 
                                    Foreground="{StaticResource TextSecondary}"
                                    Margin="0,1,0,0"/>
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Tools Section -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    
-                    <!-- Overlay Slider (Visible only in Slider/Opacity modes) -->
-                    <StackPanel x:Name="ToolsContainer" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,24,0">
-                        <TextBlock Text="Adjust Effect" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <Slider x:Name="OverlaySlider" Width="120" Minimum="0" Maximum="100" Value="50" 
-                                VerticalAlignment="Center" Margin="0,0,10,0"
-                                ValueChanged="OverlaySlider_ValueChanged"/>
-                        <TextBlock Text="{Binding Value, ElementName=OverlaySlider, StringFormat={}{0:0}%}" 
-                                   Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" VerticalAlignment="Center" FontSize="11" Width="30"/>
-                    </StackPanel>
+                <!-- UNIFIED TOOLBAR AREA -->
+                <Border Grid.Column="1" 
+                        Background="{StaticResource SidebarBackground}"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="4,2"
+                        VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        
+                        <!-- MODES SECTION -->
+                        <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}"/>
+                        <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}" 
+                                     IsChecked="True" Checked="Mode_Checked" ToolTip="Side by Side View">
+                            <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
+                        </RadioButton>
+                        <RadioButton x:Name="SliderBtn" Style="{StaticResource ModernIconRadioButton}" 
+                                     Checked="Mode_Checked" ToolTip="Slider Overlay Mode">
+                            <icons:MaterialIcon Kind="Compare" Width="18" Height="18"/>
+                        </RadioButton>
+                        <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource ModernIconRadioButton}" 
+                                     Checked="Mode_Checked" ToolTip="Onion Skin (Opacity) Mode">
+                            <icons:MaterialIcon Kind="Opacity" Width="18" Height="18"/>
+                        </RadioButton>
+                        <RadioButton x:Name="DiffBtn" Style="{StaticResource ModernIconRadioButton}" 
+                                     Checked="Mode_Checked" ToolTip="Mathematical Difference Map">
+                            <icons:MaterialIcon Kind="Contrast" Width="18" Height="18"/>
+                        </RadioButton>
 
-                    <!-- Graphic Mode Selector -->
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton x:Name="SideBySideBtn" Style="{StaticResource GraphicToolRadioButton}" 
-                                         IsChecked="True" Checked="Mode_Checked"
-                                         ToolTip="Side by Side View">
-                                <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
-                            </RadioButton>
-                            
-                            <RadioButton x:Name="SliderBtn" Style="{StaticResource GraphicToolRadioButton}" 
-                                         Checked="Mode_Checked"
-                                         ToolTip="Slider Overlay Mode">
-                                <icons:MaterialIcon Kind="Compare" Width="18" Height="18"/>
-                            </RadioButton>
-                            
-                            <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource GraphicToolRadioButton}" 
-                                         Checked="Mode_Checked"
-                                         ToolTip="Onion Skin (Opacity) Mode">
-                                <icons:MaterialIcon Kind="Opacity" Width="18" Height="18"/>
-                            </RadioButton>
+                        <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,6" CornerRadius="1"/>
+
+                        <!-- VIEW SECTION -->
+                        <TextBlock Text="VIEW" Style="{StaticResource ToolSectionLabel}"/>
+                        <RadioButton x:Name="BgDarkBtn" Style="{StaticResource ModernIconRadioButton}" 
+                                     IsChecked="True" Checked="Background_Checked" ToolTip="Dark Background">
+                            <icons:MaterialIcon Kind="Brightness2" Width="18" Height="18"/>
+                        </RadioButton>
+                        <RadioButton x:Name="BgGridBtn" Style="{StaticResource ModernIconRadioButton}" 
+                                     Checked="Background_Checked" ToolTip="Checkerboard (Transparency)">
+                            <icons:MaterialIcon Kind="Grid" Width="18" Height="18"/>
+                        </RadioButton>
+                        <RadioButton x:Name="BgLightBtn" Style="{StaticResource ModernIconRadioButton}" 
+                                     Checked="Background_Checked" ToolTip="Light Background">
+                            <icons:MaterialIcon Kind="Brightness5" Width="18" Height="18"/>
+                        </RadioButton>
+
+                        <!-- ADJUST SECTION (Dynamic) -->
+                        <StackPanel x:Name="ToolsContainer" Orientation="Horizontal" Visibility="Collapsed">
+                            <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,4" CornerRadius="1"/>
+                            <TextBlock Text="ADJUST" Style="{StaticResource ToolSectionLabel}"/>
+                            <Slider x:Name="OverlaySlider" Width="100" Minimum="0" Maximum="100" Value="50" 
+                                    VerticalAlignment="Center" Margin="4,0,8,0"
+                                    ValueChanged="OverlaySlider_ValueChanged"/>
+                            <TextBlock Text="{Binding Value, ElementName=OverlaySlider, StringFormat={}{0:0}%}" 
+                                       Foreground="{StaticResource AccentBrush}" FontWeight="Bold" VerticalAlignment="Center" FontSize="11" Width="30" Margin="0,0,8,0"/>
                         </StackPanel>
-                    </Border>
-
-                </StackPanel>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 
@@ -102,17 +156,24 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
                             <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{DynamicResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                                    <TextBlock x:Name="OldFileNameLabel" FontSize="11" Foreground="{DynamicResource TextSecondary}" MaxWidth="350" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock x:Name="OldFileNameLabel" FontSize="11" Foreground="{StaticResource TextSecondary}" MaxWidth="350" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16">
-                            <Image x:Name="OldImage" Stretch="Uniform"/>
+                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16" x:Name="OldImageBorder" ClipToBounds="True">
+                            <Image x:Name="OldImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                <Image.RenderTransform>
+                                    <TransformGroup>
+                                        <ScaleTransform x:Name="OldScale"/>
+                                        <TranslateTransform x:Name="OldTranslate"/>
+                                    </TransformGroup>
+                                </Image.RenderTransform>
+                            </Image>
                         </Border>
                     </Grid>
                 </Border>
@@ -126,23 +187,30 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
                             <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{DynamicResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                                    <TextBlock x:Name="NewFileNameLabel" FontSize="11" Foreground="{DynamicResource TextSecondary}" MaxWidth="350" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock x:Name="NewFileNameLabel" FontSize="11" Foreground="{StaticResource TextSecondary}" MaxWidth="350" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16">
-                            <Image x:Name="NewImage" Stretch="Uniform"/>
+                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16" x:Name="NewImageBorder" ClipToBounds="True">
+                            <Image x:Name="NewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                <Image.RenderTransform>
+                                    <TransformGroup>
+                                        <ScaleTransform x:Name="NewScale"/>
+                                        <TranslateTransform x:Name="NewTranslate"/>
+                                    </TransformGroup>
+                                </Image.RenderTransform>
+                            </Image>
                         </Border>
                     </Grid>
                 </Border>
             </Grid>
 
-            <!-- MODE 2: Overlay (Slider / Onion Skin) -->
+            <!-- MODE 2: Overlay (Slider / Onion Skin / Diff) -->
             <Grid x:Name="OverlayPanel" Visibility="Collapsed">
                 <Border Style="{StaticResource SettingsCard}" Padding="0">
                     <Grid>
@@ -152,14 +220,14 @@
                         </Grid.RowDefinitions>
 
                         <!-- Info Header -->
-                        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                    <icons:MaterialIcon Kind="LayersOutline" Width="14" Height="14" Foreground="{DynamicResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                    <icons:MaterialIcon Kind="LayersOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                     <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Mode" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock Grid.Column="1" Text="NEW vs OLD" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
@@ -167,16 +235,39 @@
                         </Border>
 
                         <!-- Interactive Image Container -->
-                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16" x:Name="ImageContainer">
+                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16" x:Name="ImageContainer" ClipToBounds="True">
                             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <!-- Base Image (OLD) -->
-                                <Image x:Name="OldImageOverlay" Stretch="Uniform" Opacity="1"/>
+                                <Image x:Name="OldImageOverlay" Stretch="Uniform" Opacity="1" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                    <Image.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform x:Name="OldOverlayScale"/>
+                                            <TranslateTransform x:Name="OldOverlayTranslate"/>
+                                        </TransformGroup>
+                                    </Image.RenderTransform>
+                                </Image>
                                 
                                 <!-- Top Image (NEW) -->
-                                <Image x:Name="NewImageOverlay" Stretch="Uniform" Opacity="1">
+                                <Image x:Name="NewImageOverlay" Stretch="Uniform" Opacity="1" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                    <Image.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform x:Name="NewOverlayScale"/>
+                                            <TranslateTransform x:Name="NewOverlayTranslate"/>
+                                        </TransformGroup>
+                                    </Image.RenderTransform>
                                     <Image.Clip>
                                         <RectangleGeometry x:Name="SliderClip" Rect="0,0,9999,9999"/>
                                     </Image.Clip>
+                                </Image>
+
+                                <!-- Difference Map Image (Heatmap) -->
+                                <Image x:Name="DiffImageOverlay" Stretch="Uniform" Visibility="Collapsed" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                    <Image.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform x:Name="DiffOverlayScale"/>
+                                            <TranslateTransform x:Name="DiffOverlayTranslate"/>
+                                        </TransformGroup>
+                                    </Image.RenderTransform>
                                 </Image>
                             </Grid>
                         </Border>

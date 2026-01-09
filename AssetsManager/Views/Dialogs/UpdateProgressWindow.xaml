@@ -60,7 +60,7 @@
                         <Grid Margin="0,0,0,12">
                              <TextBlock x:Name="MessageTextBlock" 
                                        Text="Initializing download..." 
-                                       Foreground="{DynamicResource TextSecondary}"
+                                       Foreground="{StaticResource TextSecondary}"
                                        FontSize="16"
                                        VerticalAlignment="Bottom"/>
                         </Grid>
@@ -69,7 +69,7 @@
                                      Height="8" 
                                      Minimum="0" Maximum="100" 
                                      HorizontalAlignment="Stretch" 
-                                     Style="{DynamicResource ModernProgressBar}" 
+                                     Style="{StaticResource ModernProgressBar}" 
                                      BorderThickness="0"/>
                     </StackPanel>
                 </Grid>

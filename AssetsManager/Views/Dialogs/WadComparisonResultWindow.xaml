@@ -30,8 +30,8 @@
                 </Grid.ColumnDefinitions>
                 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{DynamicResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                        <materialIcons:MaterialIcon Kind="Compare" Width="24" Height="24" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="Compare" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Comparison Results" 

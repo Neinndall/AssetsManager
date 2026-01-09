@@ -14,8 +14,8 @@
 
         <!-- MINIMALIST TOOLBAR HEADER -->
         <Border Grid.Row="0" 
-                Background="{DynamicResource CardBackground}" 
-                BorderBrush="{DynamicResource BorderColor}" 
+                Background="{StaticResource CardBackground}" 
+                BorderBrush="{StaticResource BorderColor}" 
                 BorderThickness="0,0,0,1" 
                 Padding="12,2">
             <Grid>
@@ -66,7 +66,7 @@
                             </materialIcons:MaterialIcon>
 
                             <!-- Notification Badge -->
-                            <Border Background="{DynamicResource AccentRed}" 
+                            <Border Background="{StaticResource AccentRed}" 
                                     CornerRadius="5" 
                                     MinWidth="10" Height="10"
                                     HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -89,7 +89,7 @@
                             Click="ClearLogs_Click"
                             ToolTip="Clear All Logs"
                             Width="28" Height="28">
-                        <materialIcons:MaterialIcon Kind="Broom" Width="14" Height="14" Foreground="{DynamicResource AccentRed}"/>
+                        <materialIcons:MaterialIcon Kind="Broom" Width="14" Height="14" Foreground="{StaticResource AccentRed}"/>
                     </Button>
                 </StackPanel>
             </Grid>

@@ -31,7 +31,7 @@
                                              Height="48"
                                              Width="48"
                                              VerticalAlignment="Center"
-                                             Foreground="{DynamicResource AccentBrush}"
+                                             Foreground="{StaticResource AccentBrush}"
                                              Grid.Column="0">
                     <materialIcons:MaterialIcon.Effect>
                         <DropShadowEffect Color="{Binding Foreground.Color, ElementName=MainIcon}" 
@@ -59,15 +59,15 @@
                 </Grid.RowDefinitions>
 
                 <!-- 1. NAVIGATION SELECTOR (Segmented) -->
-                <Border Grid.Row="0" Margin="0,18,0,8" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                <Border Grid.Row="0" Margin="0,18,0,8" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                     <UniformGrid Columns="7">
-                        <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                        <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                        <RadioButton x:Name="TabHistory" Content="History" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                        <RadioButton x:Name="TabAssetTracker" Content="Tracker" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                        <RadioButton x:Name="TabVersions" Content="Versions" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                        <RadioButton x:Name="TabBackups" Content="Backups" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
-                        <RadioButton x:Name="TabApi" Content="API Center" GroupName="MonitorTabs" Style="{DynamicResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabHistory" Content="History" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabAssetTracker" Content="Tracker" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabVersions" Content="Versions" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabBackups" Content="Backups" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="TabApi" Content="API Center" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
                     </UniformGrid>
                 </Border>
 

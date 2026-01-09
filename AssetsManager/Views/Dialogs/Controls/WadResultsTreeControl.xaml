@@ -81,28 +81,28 @@
             </Grid.RowDefinitions>
             
             <!-- Header -->
-            <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="16" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+            <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
                 <StackPanel Orientation="Horizontal">
-                    <Border Background="{DynamicResource HoverColor}" CornerRadius="6" Width="32" Height="32" Margin="0,0,12,0">
-                        <materialIcons:MaterialIcon Kind="FormatListGroup" Width="18" Height="18" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="32" Height="32" Margin="0,0,12,0">
+                        <materialIcons:MaterialIcon Kind="FormatListGroup" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Border>
                     <TextBlock Text="Differences Explorer" 
                                FontSize="14" 
                                FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimary}"
+                               Foreground="{StaticResource TextPrimary}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
             <!-- Search Box Area -->
-            <Border Grid.Row="1" Padding="16,12" Background="{DynamicResource CardBackground}">
+            <Border Grid.Row="1" Padding="16,12" Background="{StaticResource CardBackground}">
                  <TextBox x:Name="searchTextBox"
                      Style="{StaticResource StandardSearchBoxStyle}"
                      TextChanged="SearchTextBox_TextChanged"/>
             </Border>
 
             <!-- Tree Content -->
-            <Border Grid.Row="2" Padding="0" Background="{DynamicResource CardBackground}" CornerRadius="0,0,8,8">
+            <Border Grid.Row="2" Padding="0" Background="{StaticResource CardBackground}" CornerRadius="0,0,8,8">
                 <TreeView x:Name="resultsTreeView" 
                           Style="{StaticResource ModernTreeView}"
                           Background="Transparent"

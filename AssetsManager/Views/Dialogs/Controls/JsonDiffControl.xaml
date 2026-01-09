@@ -27,8 +27,8 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{DynamicResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                        <icons:MaterialIcon Kind="FileDocumentEditOutline" Width="24" Height="24" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
+                        <icons:MaterialIcon Kind="FileDocumentEditOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Text Comparison" 
@@ -44,8 +44,8 @@
 
                 <!-- TOOLBAR AREA -->
                 <Border Grid.Column="1" 
-                        Background="{DynamicResource SidebarBackground}"
-                        BorderBrush="{DynamicResource BorderColor}"
+                        Background="{StaticResource SidebarBackground}"
+                        BorderBrush="{StaticResource BorderColor}"
                         BorderThickness="1"
                         CornerRadius="8"
                         Padding="6"
@@ -119,17 +119,17 @@
                         </Grid.RowDefinitions>
 
                         <!-- Sub-Header -->
-                        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
                             <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{DynamicResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                                    <TextBlock x:Name="OldFileNameLabel" FontSize="10" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock x:Name="OldFileNameLabel" FontSize="10" Foreground="{StaticResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Padding="0" Background="{DynamicResource DarkBackground}" CornerRadius="0,0,8,8">
+                        <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8">
                             <avalonEdit:TextEditor x:Name="OldJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
                         </Border>
                     </Grid>
@@ -146,17 +146,17 @@
                         </Grid.RowDefinitions>
 
                         <!-- Sub-Header -->
-                        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
                             <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{DynamicResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                                    <TextBlock x:Name="NewFileNameLabel" FontSize="10" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock x:Name="NewFileNameLabel" FontSize="10" Foreground="{StaticResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Padding="0" Background="{DynamicResource DarkBackground}" CornerRadius="0,0,8,8">
+                        <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8">
                             <avalonEdit:TextEditor x:Name="NewJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
                         </Border>
                     </Grid>
@@ -171,8 +171,8 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="8" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
-                            <icons:MaterialIcon Kind="MapOutline" Width="16" Height="16" Foreground="{DynamicResource TextMuted}"/>
+                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="8" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
+                            <icons:MaterialIcon Kind="MapOutline" Width="16" Height="16" Foreground="{StaticResource TextMuted}"/>
                         </Border>
                         <jsonDiff:DiffNavigationPanel Grid.Row="1" x:Name="DiffNavigationPanel" Margin="0,4"/>
                     </Grid>
