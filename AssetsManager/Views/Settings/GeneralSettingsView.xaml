@@ -178,7 +178,7 @@
             </StackPanel>
         </Border>
 
-        <!-- SECTION 4: Audio Export -->
+        <!-- SECTION 4: Export Settings -->
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
                 <!-- Header -->
@@ -189,12 +189,12 @@
                     </Grid.ColumnDefinitions>
 
                     <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="40" Height="40" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <materialIcons:MaterialIcon Kind="MusicNoteOutline" Foreground="{StaticResource AccentBlue}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="FileExportOutline" Foreground="{StaticResource AccentBlue}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
-                        <TextBlock Text="Audio Export" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Configure default format for audio extraction" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                        <TextBlock Text="Export Settings" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Configure default formats for asset extraction" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Grid>
 
@@ -208,7 +208,8 @@
                     <Border Grid.Column="0" Width="2" Background="{StaticResource AccentBlue}" Opacity="0.2" CornerRadius="1" Margin="0,4,20,4"/>
 
                     <StackPanel Grid.Column="1">
-                        <Grid>
+                        <!-- Audio Format -->
+                        <Grid Margin="0,0,0,24">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -231,7 +232,7 @@
                         </Grid>
 
                         <!-- Info for MP3 -->
-                        <Border Margin="0,12,0,0" 
+                        <Border Margin="0,-16,0,24" 
                                 Padding="12" 
                                 Background="{StaticResource SidebarBackground}" 
                                 CornerRadius="8">
@@ -251,6 +252,29 @@
                                            FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,0,0"/>
                              </StackPanel>
                         </Border>
+
+                        <!-- Image Format -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Preferred Image Format" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
+                                <TextBlock Text="Select the format to use when exporting .tex/.dds files" FontSize="12" Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <ComboBox Grid.Column="1"
+                                      Width="140"
+                                      Height="32"
+                                      ItemsSource="{Binding ImageFormatOptions}"
+                                      DisplayMemberPath="Name"
+                                      SelectedValuePath="Value"
+                                      SelectedValue="{Binding ImageExportFormat, Mode=TwoWay}"
+                                      Style="{StaticResource ModernComboBox}"
+                                      VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
                 </Grid>
             </StackPanel>

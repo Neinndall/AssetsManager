@@ -42,6 +42,24 @@ namespace AssetsManager.Views.Models.Shared
             new AudioFormatOption { Name = "MP3 Audio", Value = AudioExportFormat.Mp3 }
         };
 
+        public ImageExportFormat ImageExportFormat
+        {
+            get => _settings.ImageExportFormat;
+            set
+            {
+                if (_settings.ImageExportFormat != value)
+                {
+                    _settings.ImageExportFormat = value;
+                    OnPropertyChanged(nameof(ImageExportFormat));
+                }
+            }
+        }
+
+        public List<ImageFormatOption> ImageFormatOptions { get; } = new List<ImageFormatOption>
+        {
+            new ImageFormatOption { Name = "PNG (Default)", Value = ImageExportFormat.Png }
+        };
+
         protected void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
