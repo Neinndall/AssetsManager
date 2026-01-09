@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Title="Image Comparison" Height="800" Width="1200"
+        Title="Image Comparison" Height="850" Width="1200"
         Background="{StaticResource SidebarBackground}"
         WindowStartupLocation="CenterScreen">
 
@@ -20,98 +20,156 @@
                 Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1"
-                Padding="24,20">
+                Padding="24,15">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
+                <!-- Title & Icon -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{DynamicResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                         <icons:MaterialIcon Kind="ImageMultipleOutline" Width="24" Height="24" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Border Background="{DynamicResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                         <icons:MaterialIcon Kind="ImageMultipleOutline" Width="22" Height="22" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Image Comparison" 
-                                   FontSize="20" 
+                                   FontSize="18" 
                                    FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="Visual analysis of modified assets" 
-                                   FontSize="13" 
+                                   FontSize="12" 
                                    Foreground="{StaticResource TextSecondary}"
-                                   Margin="0,2,0,0"/>
+                                   Margin="0,1,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Tools Section -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Mode Selector -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="2" Margin="0,0,20,0">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="SideBySideBtn" Style="{StaticResource SegmentedRadioButtonStyle}" 
+                                         Content="Side by Side" IsChecked="True" Checked="Mode_Checked" />
+                            <RadioButton x:Name="SliderBtn" Style="{StaticResource SegmentedRadioButtonStyle}" 
+                                         Content="Slider" Checked="Mode_Checked" />
+                            <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource SegmentedRadioButtonStyle}" 
+                                         Content="Onion Skin" Checked="Mode_Checked" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Overlay Slider (Visible only in Slider/Opacity modes) -->
+                    <StackPanel x:Name="ToolsContainer" Orientation="Horizontal" Visibility="Collapsed">
+                        <icons:MaterialIcon Kind="Compare" Width="16" Height="16" Foreground="{StaticResource TextSecondary}" Margin="0,0,10,0"/>
+                        <Slider x:Name="OverlaySlider" Width="150" Minimum="0" Maximum="100" Value="50" 
+                                VerticalAlignment="Center" Margin="0,0,10,0"
+                                ValueChanged="OverlaySlider_ValueChanged"/>
+                        <TextBlock Text="{Binding Value, ElementName=OverlaySlider, StringFormat={}{0:0}%}" 
+                                   Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" FontSize="11" Width="30"/>
                     </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Main Content -->
+        <!-- Main Content Area -->
         <Grid Grid.Row="1" Margin="24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+            
+            <!-- MODE 1: Side by Side (Default) -->
+            <Grid x:Name="SideBySidePanel" Visibility="Visible">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-            <!-- Old Image Card -->
-            <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Sub-Header -->
-                    <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{DynamicResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                                <TextBlock x:Name="OldFileNameLabel" FontSize="12" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
+                <!-- Old Image Card -->
+                <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{DynamicResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
+                                    <TextBlock x:Name="OldFileNameLabel" FontSize="11" Foreground="{DynamicResource TextSecondary}" MaxWidth="350" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
-                    </Border>
+                        </Border>
+                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16">
+                            <Image x:Name="OldImage" Stretch="Uniform"/>
+                        </Border>
+                    </Grid>
+                </Border>
 
-                    <!-- Content -->
-                    <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16">
-                        <Image x:Name="OldImage" Stretch="Uniform"/>
-                    </Border>
-                </Grid>
-            </Border>
+                <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext"/>
 
-            <!-- Grid Splitter -->
-            <GridSplitter Grid.Column="1"
-                          Width="12"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Stretch"
-                          Background="Transparent"
-                          ResizeBehavior="PreviousAndNext"/>
-
-            <!-- New Image Card -->
-            <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Sub-Header -->
-                    <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{DynamicResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
-                                <TextBlock x:Name="NewFileNameLabel" FontSize="12" Foreground="{DynamicResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
+                <!-- New Image Card -->
+                <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{DynamicResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}"/>
+                                    <TextBlock x:Name="NewFileNameLabel" FontSize="11" Foreground="{DynamicResource TextSecondary}" MaxWidth="350" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
-                    </Border>
+                        </Border>
+                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16">
+                            <Image x:Name="NewImage" Stretch="Uniform"/>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
 
-                    <!-- Content -->
-                    <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16">
-                        <Image x:Name="NewImage" Stretch="Uniform"/>
-                    </Border>
-                </Grid>
-            </Border>
+            <!-- MODE 2: Overlay (Slider / Onion Skin) -->
+            <Grid x:Name="OverlayPanel" Visibility="Collapsed">
+                <Border Style="{StaticResource SettingsCard}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Info Header -->
+                        <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <icons:MaterialIcon Kind="LayersOutline" Width="14" Height="14" Foreground="{DynamicResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Mode" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="NEW vs OLD" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Interactive Image Container -->
+                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16" x:Name="ImageContainer">
+                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <!-- Base Image (OLD) -->
+                                <Image x:Name="OldImageOverlay" Stretch="Uniform" Opacity="1"/>
+                                
+                                <!-- Top Image (NEW) -->
+                                <Image x:Name="NewImageOverlay" Stretch="Uniform" Opacity="1">
+                                    <Image.Clip>
+                                        <RectangleGeometry x:Name="SliderClip" Rect="0,0,9999,9999"/>
+                                    </Image.Clip>
+                                </Image>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Window>
