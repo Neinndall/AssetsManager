@@ -691,36 +691,26 @@
         </Setter>
     </Style>
 
-    <!-- Estilo para botones de herramientas gráficas (ImageDiffWindow) -->
-    <Style x:Key="GraphicToolRadioButton" TargetType="RadioButton">
+    <!-- Estilo para botones de iconos limpios (Utilizado en Toolbars de Comparación) -->
+    <Style x:Key="ModernIconRadioButton" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Width" Value="40"/>
-        <Setter Property="Height" Value="32"/>
-        <Setter Property="Margin" Value="2"/>
+        <Setter Property="Width" Value="34"/>
+        <Setter Property="Height" Value="34"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Container" 
-                            Background="{TemplateBinding Background}" 
-                            CornerRadius="6">
+                    <Border x:Name="border" Background="Transparent" CornerRadius="4" Padding="4">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Container" Property="Background" Value="{StaticResource AccentBrush}"/>
-                            <Setter Property="Foreground" Value="White"/>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                         </Trigger>
-                        <MultiTrigger>
-                            <MultiTrigger.Conditions>
-                                <Condition Property="IsMouseOver" Value="True"/>
-                                <Condition Property="IsChecked" Value="False"/>
-                            </MultiTrigger.Conditions>
-                            <Setter TargetName="Container" Property="Background" Value="{StaticResource HoverColor}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                        </MultiTrigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
