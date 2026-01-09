@@ -156,6 +156,7 @@
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding StatusText}" Value="Up-to-date"><Setter Property="Kind" Value="CheckCircleOutline" /></DataTrigger>
                                                 <DataTrigger Binding="{Binding StatusText}" Value="Updated"><Setter Property="Kind" Value="BellRingOutline" /></DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusText}" Value="Checking"><Setter Property="Kind" Value="Sync" /></DataTrigger>
                                                 <DataTrigger Binding="{Binding StatusText}" Value="Error"><Setter Property="Kind" Value="AlertCircleOutline" /></DataTrigger>
                                             </Style.Triggers>
                                         </Style>

@@ -24,6 +24,7 @@ namespace AssetsManager.Services.Monitor
     public class JsonDataService
     {
         public event Action<FileUpdateInfo> FileUpdated;
+        public event Action<string> FileCheckStarted;
         public event Action<string> FileCheckFailed;
         public event Action<string> FileCheckUpToDate;
 
@@ -168,6 +169,9 @@ namespace AssetsManager.Services.Monitor
 
                 // Find the corresponding entry in AppSettings
                 _appSettings.JsonDataModificationDates.TryGetValue(fullUrl, out DateTime lastUpdated);
+
+                // Notify that we are checking this file
+                FileCheckStarted?.Invoke(fullUrl);
 
                 if (lastUpdated != serverDate)
                 {

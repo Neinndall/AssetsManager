@@ -37,6 +37,7 @@ namespace AssetsManager.Services.Monitor
             LoadMonitoredUrls();
 
             _jsonDataService.FileUpdated += OnFileUpdated;
+            _jsonDataService.FileCheckStarted += OnFileCheckStarted;
             _jsonDataService.FileCheckFailed += OnFileCheckFailed;
             _jsonDataService.FileCheckUpToDate += OnFileCheckUpToDate;
         }
@@ -44,6 +45,7 @@ namespace AssetsManager.Services.Monitor
         public void Dispose()
         {
             _jsonDataService.FileUpdated -= OnFileUpdated;
+            _jsonDataService.FileCheckStarted -= OnFileCheckStarted;
             _jsonDataService.FileCheckFailed -= OnFileCheckFailed;
             _jsonDataService.FileCheckUpToDate -= OnFileCheckUpToDate;
         }
@@ -94,6 +96,19 @@ namespace AssetsManager.Services.Monitor
                 });
                 _appSettings.JsonDataModificationDates[fileUpdateInfo.FullUrl] = fileUpdateInfo.Timestamp;
                 AppSettings.SaveSettings(_appSettings);
+            }
+        }
+
+        private void OnFileCheckStarted(string url)
+        {
+            var item = MonitoredItems.FirstOrDefault(x => x.Url == url);
+            if (item != null)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    item.StatusText = "Checking";
+                    item.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBrush");
+                });
             }
         }
 
