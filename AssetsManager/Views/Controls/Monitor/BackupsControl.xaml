@@ -88,22 +88,39 @@
                                         </Grid.ColumnDefinitions>
 
                                         <!-- Folder Icon Box -->
-                                        <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="0,0,16,0">
-                                            <materialIcons:MaterialIcon Kind="FolderZipOutline" Width="20" Height="20" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="0,0,16,0">
+                                            <materialIcons:MaterialIcon Kind="FolderZipOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
 
                                         <!-- Info -->
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Path}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                            <!-- Title Row -->
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                                 
+                                                <!-- Path Info Icon as Superscript -->
+                                                <materialIcons:MaterialIcon Kind="InformationOutline" Width="11" Height="11" Foreground="{StaticResource TextSecondary}" Margin="2,0,0,8" VerticalAlignment="Top" ToolTip="{Binding Path}" Background="Transparent"/>
+
                                                 <!-- NEW Badge -->
-                                                <Border x:Name="NewBadge" Background="{StaticResource AccentPurple}" CornerRadius="4" Padding="8,2" Margin="12,0,0,0" 
+                                                <Border Background="{StaticResource AccentPurple}" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center"
                                                         Visibility="{Binding IsCurrentSessionBackup, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                                    <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                                 </Border>
+                                            </StackPanel>
+
+                                            <!-- Metadata Row -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                <!-- Date -->
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                                                    <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy, HH:mm}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+
+                                                <!-- Size -->
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialIcons:MaterialIcon Kind="DatabaseOutline" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Size}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
 
