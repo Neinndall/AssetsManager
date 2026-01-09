@@ -10,6 +10,7 @@ using AssetsManager.Services.Updater;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Help;
 using AssetsManager.Views.Settings;
 using AssetsManager.Views.Controls;
@@ -108,6 +109,7 @@ namespace AssetsManager
       services.AddSingleton<WadSearchBoxService>();
       services.AddTransient<TreeBuilderService>();
       services.AddTransient<TreeUIManager>();
+      services.AddSingleton<FavoritesManager>();
     
       // Downloads Services
       services.AddSingleton<AssetDownloader>();

@@ -10,6 +10,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public event RoutedEventHandler LoadComparisonClicked;
         public event RoutedEventHandler SwitchModeClicked;
         public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
+        public event RoutedPropertyChangedEventHandler<bool> FavoritesVisibilityChanged;
         public event RoutedPropertyChangedEventHandler<bool> SortStateChanged;
         public event RoutedPropertyChangedEventHandler<bool> ViewModeChanged; // True for Grid, False for Preview
 
@@ -79,6 +80,14 @@ namespace AssetsManager.Views.Controls.Explorer
             if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
             {
                 BreadcrumbVisibilityChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
+            }
+        }
+
+        private void FavoritesToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                FavoritesVisibilityChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
             }
         }
 

@@ -49,6 +49,26 @@
                     <materialIcons:MaterialIcon x:Name="ModeIcon" Kind="ArchiveOutline" Width="18" Height="18"/>
                 </Button>
 
+                <ToggleButton x:Name="FavoritesToggleButton"
+                              Style="{StaticResource TransparentIconToggleButton}"
+                              Click="FavoritesToggleButton_Click"
+                              ToolTip="Toggle Favorites"
+                              Margin="0,0,2,0"
+                              IsChecked="True">
+                    <materialIcons:MaterialIcon Width="18" Height="18">
+                        <materialIcons:MaterialIcon.Style>
+                            <Style TargetType="materialIcons:MaterialIcon">
+                                <Setter Property="Kind" Value="StarOutline"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=FavoritesToggleButton}" Value="True">
+                                        <Setter Property="Kind" Value="Star"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialIcons:MaterialIcon.Style>
+                    </materialIcons:MaterialIcon>
+                </ToggleButton>
+
                 <ToggleButton x:Name="GridViewToggleButton" 
                               Style="{StaticResource TransparentIconToggleButton}"
                               ToolTip="Toggle Grid View"

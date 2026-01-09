@@ -50,6 +50,7 @@ namespace AssetsManager.Utils
         public Dictionary<string, Dictionary<long, string>> AssetTrackerUrlOverrides { get; set; }
 
         public Dictionary<string, List<long>> AssetTrackerUserRemovedIds { get; set; }
+        public List<string> FavoritePaths { get; set; }
 
         public ApiSettings ApiSettings { get; set; }
 
@@ -118,6 +119,7 @@ namespace AssetsManager.Utils
             settings.AssetTrackerFoundIds ??= new Dictionary<string, List<long>>();
             settings.AssetTrackerUrlOverrides ??= new Dictionary<string, Dictionary<long, string>>();
             settings.AssetTrackerUserRemovedIds ??= new Dictionary<string, List<long>>();
+            settings.FavoritePaths ??= new List<string>();
 
             // Robustly initialize and heal ApiSettings
             if (settings.ApiSettings == null)
@@ -181,6 +183,7 @@ namespace AssetsManager.Utils
                 AssetTrackerFoundIds = new Dictionary<string, List<long>>(),
                 AssetTrackerUrlOverrides = new Dictionary<string, Dictionary<long, string>>(),
                 AssetTrackerUserRemovedIds = new Dictionary<string, List<long>>(),
+                FavoritePaths = new List<string>(),
                 ApiSettings = new ApiSettings
                 {
                     Connection = new ConnectionInfo(),

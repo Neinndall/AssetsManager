@@ -31,6 +31,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public FilePreviewerControl FilePreviewer { get; set; }
 
         public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "PinMenuItem");
+        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "AddToFavoritesMenuItem");
         public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewChangesMenuItem");
         public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ExtractMenuItem");
         public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "SaveMenuItem");
@@ -46,6 +47,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public AppSettings AppSettings { get; set; }
         public TreeBuilderService TreeBuilderService { get; set; }
         public TreeUIManager TreeUIManager { get; set; }
+        public FavoritesManager FavoritesManager { get; set; }
         public AudioBankService AudioBankService { get; set; }
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
         public HashResolverService HashResolverService { get; set; }
@@ -93,6 +95,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.LoadComparisonClicked -= Toolbar_LoadComparisonClicked;
                 Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
                 Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
+                Toolbar.FavoritesVisibilityChanged -= Toolbar_FavoritesVisibilityChanged;
                 Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
                 Toolbar.ViewModeChanged -= Toolbar_ViewModeChanged;
             }
@@ -147,12 +150,19 @@ namespace AssetsManager.Views.Controls.Explorer
             // Now, perform the async hash loading.
             await HashResolverService.LoadAllHashesAsync();
 
+            // Bind Favorites
+            if (FavoritesManager != null)
+            {
+                FavoritesListView.ItemsSource = FavoritesManager.Favorites;
+            }
+
             // Setup toolbar events (can be done regardless of loading)
             Toolbar.SearchTextChanged += Toolbar_SearchTextChanged;
             Toolbar.CollapseToContainerClicked += Toolbar_CollapseToContainerClicked;
             Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;
             Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
+            Toolbar.FavoritesVisibilityChanged += Toolbar_FavoritesVisibilityChanged;
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
             Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
 
@@ -198,6 +208,14 @@ namespace AssetsManager.Views.Controls.Explorer
         private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
             BreadcrumbVisibilityChanged?.Invoke(this, e);
+        }
+
+        private void Toolbar_FavoritesVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        {
+            if (FavoritesContainer != null)
+            {
+                FavoritesContainer.Visibility = e.NewValue ? Visibility.Visible : Visibility.Collapsed;
+            }
         }
 
         private async void Toolbar_SortStateChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
@@ -614,6 +632,53 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private void AddToFavorites_Click(object sender, RoutedEventArgs e)
+        {
+            if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode)
+            {
+                var path = TreeUIManager.FindNodePath(RootNodes, selectedNode);
+                if (path != null)
+                {
+                    // Filter out any "Loading..." nodes that might be in the path
+                    // And join by '/'
+                    var validNodes = path.Where(n => n.Name != "Loading...");
+                    string fullPath = string.Join("/", validNodes.Select(n => n.Name));
+                    
+                    FavoritesManager.AddFavorite(fullPath);
+                }
+            }
+        }
+
+        private void RemoveFavorite_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is FavoriteItemModel item)
+            {
+                FavoritesManager.RemoveFavorite(item);
+                e.Handled = true; // Stop bubbling
+            }
+        }
+
+        private async void FavoritesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (FavoritesListView.SelectedItem is FavoriteItemModel item)
+            {
+                // Deselect immediately so it can be clicked again
+                FavoritesListView.SelectedItem = null;
+
+                var node = await WadSearchBoxService.PerformSearchAsync(item.FullPath, RootNodes, LoadAllChildrenForSearch);
+
+                if (node != null)
+                {
+                    TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, node, true);
+                }
+                else
+                {
+                    LogService.LogWarning($"Favorite node not found: {item.FullPath}");
+                    CustomMessageBoxService.ShowInfo("Not Found", $"Could not find '{item.DisplayName}' in the current tree.", Window.GetWindow(this));
+                }
+            }
+        }
+
         private void ContextMenu_Opened(object sender, RoutedEventArgs e)
         {
             if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode) return;
@@ -631,6 +696,12 @@ namespace AssetsManager.Views.Controls.Explorer
             if (PinMenuItem is not null)
             {
                 PinMenuItem.IsEnabled = selectedNode.Type != NodeType.RealDirectory && selectedNode.Type != NodeType.VirtualDirectory && selectedNode.Type != NodeType.WadFile;
+            }
+
+            if (AddToFavoritesMenuItem is not null)
+            {
+                // Can verify here if it's already a favorite to toggle text, but for now simple 'Add' is enough
+                 AddToFavoritesMenuItem.IsEnabled = true; 
             }
 
             if (ViewChangesMenuItem is not null)

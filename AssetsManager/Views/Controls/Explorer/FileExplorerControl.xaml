@@ -30,6 +30,11 @@
                     <materialIcons:MaterialIcon Kind="Pin"/>
                 </MenuItem.Icon>
             </MenuItem>
+            <MenuItem Header="Add to Favorites" x:Name="AddToFavoritesMenuItem" Click="AddToFavorites_Click">
+                <MenuItem.Icon>
+                    <materialIcons:MaterialIcon Kind="StarOutline"/>
+                </MenuItem.Icon>
+            </MenuItem>
         </ContextMenu>
     </UserControl.Resources>
     
@@ -44,8 +49,17 @@
                                       Grid.Row="0" 
                                       Margin="10,10,10,5" 
                                       Visibility="Collapsed"/>
+        
+        <!-- Content Area -->
         <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>    <!-- Tree -->
+                <RowDefinition Height="Auto"/> <!-- Favorites -->
+            </Grid.RowDefinitions>
+
+            <!-- Tree View -->
             <TreeView x:Name="FileTreeView" 
+                      Grid.Row="0"
                       Margin="6,0,0,0" 
                       ItemsSource="{Binding RootNodes}"
                       SelectedItemChanged="FileTreeView_SelectedItemChanged"
@@ -201,85 +215,180 @@
                 </TreeView.ItemContainerStyle>
             </TreeView>
 
-            <!-- Empty State -->
-            <StackPanel x:Name="NoDirectoryMessage"
-                        Orientation="Vertical"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Margin="10"
-                        Visibility="Collapsed">
-                <materialIcons:MaterialIcon Kind="FolderSearchOutline"
-                                            Width="64" Height="64"
+            <!-- Favorites Container (Quick Access + Separator) -->
+            <StackPanel x:Name="FavoritesContainer" Grid.Row="1">
+
+                <!-- Separator (Top) -->
+                <Separator Background="{StaticResource BorderColor}" 
+                           Margin="16,8,16,2" 
+                           Opacity="0.4"
+                           Visibility="{Binding FavoritesManager.Favorites.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
+                
+                <!-- Favorites Content -->
+                <StackPanel Margin="6,5,10,0" 
+                            Visibility="{Binding FavoritesManager.Favorites.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                    
+                    <!-- Header with Icon -->
+                    <StackPanel Orientation="Horizontal" Margin="16,0,0,5" Opacity="0.9">
+                        <materialIcons:MaterialIcon Kind="Star" Width="12" Height="12" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,-1,6,0"/>
+                        <TextBlock Text="FAVORITES" 
+                                   FontSize="11" 
+                                   FontWeight="Bold" 
+                                   Foreground="{StaticResource TextSecondary}" 
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <ListView x:Name="FavoritesListView" 
+                              BorderThickness="0" 
+                              Background="Transparent"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              Margin="0,0,0,5"
+                              SelectionChanged="FavoritesListView_SelectionChanged">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,0"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListViewItem">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="4" SnapsToDevicePixels="true">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Background="Transparent" ToolTip="{Binding FullPath}" Margin="20,2,8,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <!-- Visual Content -->
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                        <materialIcons:MaterialIcon Kind="{Binding FullPath, Converter={StaticResource PathToIconConverter}}" 
+                                                                    Width="14" Height="14" 
+                                                                    Margin="0,0,8,0" 
+                                                                    Foreground="{StaticResource TextSecondary}"
+                                                                    VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding DisplayName}" 
+                                                   VerticalAlignment="Center" 
+                                                   FontSize="12" 
+                                                   Foreground="{StaticResource TextPrimary}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+
+                                    <!-- Remove Button -->
+                                    <Button Grid.Column="1" 
+                                            Click="RemoveFavorite_Click" 
+                                            Tag="{Binding}"
+                                            Style="{StaticResource TransparentIconButton}"
+                                            Width="16" Height="16"
+                                            Margin="0,0,0,0"
+                                            ToolTip="Unpin from Favorites">
+                                        <materialIcons:MaterialIcon Kind="Close" Width="10" Height="10" Foreground="{StaticResource TextMuted}"/>
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <!-- Empty State (Overlay) -->
+        <StackPanel x:Name="NoDirectoryMessage"
+                    Grid.Row="1"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Margin="10"
+                    Visibility="Collapsed">
+            <materialIcons:MaterialIcon Kind="FolderSearchOutline"
+                                        Width="64" Height="64"
+                                        HorizontalAlignment="Center"
+                                        Foreground="{StaticResource TextMuted}"
+                                        Opacity="0.5"/>
+            <TextBlock x:Name="PlaceholderTitle"
+                       Text="No Directory Selected"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimary}"
+                       HorizontalAlignment="Center"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       Margin="0,16,0,0"/>
+            <TextBlock x:Name="PlaceholderDescription"
+                       Text="Please select your League of Legends installation folder to start exploring."
+                       TextWrapping="Wrap"
+                       FontSize="14"
+                       Foreground="{StaticResource TextSecondary}"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       Margin="20,8,20,0"/>
+            <Button x:Name="SelectLolDirButton"
+                    Content="Open Folder"
+                    Style="{StaticResource SecondaryButton}"
+                    Click="SelectLolDirButton_Click"
+                    Padding="24,8"
+                    HorizontalAlignment="Center"
+                    Margin="0,24,0,0"/>
+        </StackPanel>
+        
+        <!-- Loading Indicator (Overlay) -->
+        <Grid x:Name="LoadingIndicator" 
+              Grid.Row="1"
+              Visibility="Collapsed" 
+              Background="{StaticResource SidebarBackground}">
+             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <!-- Modern Spinner Animation -->
+                <materialIcons:MaterialIcon Kind="Loading" 
+                                            Width="38" 
+                                            Height="38" 
+                                            Foreground="{StaticResource AccentBrush}"
                                             HorizontalAlignment="Center"
-                                            Foreground="{StaticResource TextMuted}"
-                                            Opacity="0.5"/>
-                <TextBlock x:Name="PlaceholderTitle"
-                           Text="No Directory Selected"
-                           FontSize="20"
+                                            RenderTransformOrigin="0.5, 0.5">
+                    <materialIcons:MaterialIcon.RenderTransform>
+                        <RotateTransform Angle="0"/>
+                    </materialIcons:MaterialIcon.RenderTransform>
+                    <materialIcons:MaterialIcon.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" 
+                                                     From="0" To="360" Duration="0:0:1" 
+                                                     RepeatBehavior="Forever"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </materialIcons:MaterialIcon.Triggers>
+                </materialIcons:MaterialIcon>
+                
+                <TextBlock Text="Loading assets..."
+                           FontSize="16"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource TextPrimary}"
-                           HorizontalAlignment="Center"
-                           TextWrapping="Wrap"
-                           TextAlignment="Center"
-                           Margin="0,16,0,0"/>
-                <TextBlock x:Name="PlaceholderDescription"
-                           Text="Please select your League of Legends installation folder to start exploring."
-                           TextWrapping="Wrap"
-                           FontSize="14"
+                           HorizontalAlignment="Center" 
+                           Margin="0,12,0,0"/>
+                <TextBlock Text="Preparing the file explorer"
+                           FontSize="13"
                            Foreground="{StaticResource TextSecondary}"
-                           HorizontalAlignment="Center"
-                           TextAlignment="Center"
-                           Margin="20,8,20,0"/>
-                <Button x:Name="SelectLolDirButton"
-                        Content="Open Folder"
-                        Style="{StaticResource SecondaryButton}"
-                        Click="SelectLolDirButton_Click"
-                        Padding="24,8"
-                        HorizontalAlignment="Center"
-                        Margin="0,24,0,0"/>
-            </StackPanel>
-            
-            <!-- Loading Indicator -->
-            <Grid x:Name="LoadingIndicator" 
-                  Visibility="Collapsed" 
-                  Background="{StaticResource SidebarBackground}">
-                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <!-- Modern Spinner Animation -->
-                    <materialIcons:MaterialIcon Kind="Loading" 
-                                                Width="38" 
-                                                Height="38" 
-                                                Foreground="{StaticResource AccentBrush}"
-                                                HorizontalAlignment="Center"
-                                                RenderTransformOrigin="0.5, 0.5">
-                        <materialIcons:MaterialIcon.RenderTransform>
-                            <RotateTransform Angle="0"/>
-                        </materialIcons:MaterialIcon.RenderTransform>
-                        <materialIcons:MaterialIcon.Triggers>
-                            <EventTrigger RoutedEvent="Loaded">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" 
-                                                         From="0" To="360" Duration="0:0:1" 
-                                                         RepeatBehavior="Forever"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </materialIcons:MaterialIcon.Triggers>
-                    </materialIcons:MaterialIcon>
-                    
-                    <TextBlock Text="Loading assets..."
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"
-                               HorizontalAlignment="Center" 
-                               Margin="0,12,0,0"/>
-                    <TextBlock Text="Preparing the file explorer"
-                               FontSize="13"
-                               Foreground="{StaticResource TextSecondary}"
-                               HorizontalAlignment="Center" 
-                               Margin="0,6,0,0"/>
-                 </StackPanel>
-            </Grid>
+                           HorizontalAlignment="Center" 
+                           Margin="0,6,0,0"/>
+             </StackPanel>
         </Grid>
     </Grid>
 </UserControl>
