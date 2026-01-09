@@ -231,6 +231,7 @@ namespace AssetsManager.Utils
             AssetTrackerProgress = defaultSettings.AssetTrackerProgress;
             AssetTrackerUrlOverrides = defaultSettings.AssetTrackerUrlOverrides;
             AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
+            FavoritePaths = defaultSettings.FavoritePaths;
             ApiSettings = defaultSettings.ApiSettings;
             // SyncHashesWithCDTB and HashesSizes are intentionally not reset.
         }
