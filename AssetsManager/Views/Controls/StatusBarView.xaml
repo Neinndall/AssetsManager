@@ -110,6 +110,11 @@
                         Padding="4,0"
                         VerticalAlignment="Center"
                         Click="ProgressSummaryButton_Click">
+                    <Button.ToolTip>
+                        <ToolTip Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}">
+                            <TextBlock Text="Click to see more details" Foreground="{StaticResource TextPrimary}" FontSize="12"/>
+                        </ToolTip>
+                    </Button.ToolTip>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock x:Name="ProgressPercentageTextBlock" 
                                    Text="{Binding ProgressPercentage}" 
