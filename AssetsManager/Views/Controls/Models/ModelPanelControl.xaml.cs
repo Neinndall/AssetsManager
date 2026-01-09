@@ -93,7 +93,7 @@ namespace AssetsManager.Views.Controls.Models
             _currentlyPlayingAnimation = null;
 
             // 4. Limpiar UI
-            MeshesItemsControl.ItemsSource = null;
+            MeshesListBox.ItemsSource = null;
             _animationModels.Clear();
             ModelsListBox.SelectedItem = null;
             AnimationControlsPanel.Visibility = Visibility.Collapsed;
@@ -240,7 +240,7 @@ namespace AssetsManager.Views.Controls.Models
                 UpdateTransform(newModel, transformData);
 
                 ModelReadyForViewport?.Invoke(newModel);
-                MeshesItemsControl.ItemsSource = newModel.Parts;
+                MeshesListBox.ItemsSource = newModel.Parts;
 
                 _loadedModels.Add(newModel);
                 ModelsListBox.SelectedItem = newModel;
@@ -352,7 +352,7 @@ namespace AssetsManager.Views.Controls.Models
                 MainContentVisibilityChanged?.Invoke(Visibility.Visible);
 
                 ModelReadyForViewport?.Invoke(newModel);
-                MeshesItemsControl.ItemsSource = newModel.Parts;
+                MeshesListBox.ItemsSource = newModel.Parts;
 
                 foreach (var model in _loadedModels)
                 {
@@ -381,7 +381,7 @@ namespace AssetsManager.Views.Controls.Models
             {
                 _selectedModel = selectedModel;
                 ActiveModelChanged?.Invoke(selectedModel);
-                MeshesItemsControl.ItemsSource = selectedModel.Parts;
+                MeshesListBox.ItemsSource = selectedModel.Parts;
 
                 _animationModels.Clear();
                 if (selectedModel.Animations != null)

@@ -271,49 +271,69 @@
                 <!-- MESHES -->
                 <Grid x:Name="MeshesPanel"
                       Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="MeshesItemsControl">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,6" Padding="10,8">
-                                        <StackPanel>
-                                            <!-- Row 1: Visibility & Name -->
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                            </Grid>
+                    <ListBox x:Name="MeshesListBox" 
+                             Background="Transparent" 
+                             BorderThickness="0"
+                             VirtualizingStackPanel.IsVirtualizing="True"
+                             VirtualizingStackPanel.VirtualizationMode="Recycling"
+                             VirtualizingStackPanel.CacheLengthUnit="Item"
+                             VirtualizingStackPanel.CacheLength="10,10"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,6" Padding="10,8">
+                                    <StackPanel>
+                                        <!-- Row 1: Visibility & Name -->
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                        </Grid>
 
-                                            <!-- Row 2: Texture Selector (Compact & Visual) -->
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                
-                                                <!-- Icon Indicator -->
-                                                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="4" Width="28" Height="28" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="Active Texture">
-                                                     <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
+                                        <!-- Row 2: Texture Selector (Compact & Visual) -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- Icon Indicator -->
+                                            <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="4" Width="28" Height="28" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="Active Texture">
+                                                 <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
 
-                                                <!-- Combo -->
-                                                <ComboBox Grid.Column="1" 
-                                                          Style="{StaticResource ModernComboBox}" 
-                                                          Height="28" 
-                                                          FontSize="11" 
-                                                          ItemsSource="{Binding AvailableTextureNames}" 
-                                                          SelectedItem="{Binding SelectedTextureName}"
-                                                          VerticalAlignment="Center"/>
-                                            </Grid>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                                            <!-- Combo -->
+                                            <ComboBox Grid.Column="1" 
+                                                      Style="{StaticResource ModernComboBox}" 
+                                                      Height="28" 
+                                                      FontSize="11" 
+                                                      ItemsSource="{Binding AvailableTextureNames}" 
+                                                      SelectedItem="{Binding SelectedTextureName}"
+                                                      VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Grid>
 
                 <!-- TRANSFORM -->
