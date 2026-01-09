@@ -183,68 +183,30 @@ namespace AssetsManager.Views.Dialogs
 
         private void Background_Checked(object sender, RoutedEventArgs e)
         {
-            if (!_isInitialized) return;
-            UpdateBackground();
-        }
-
-        private void UpdateBackground()
-        {
-            Brush bgBrush;
-            if (BgGridBtn.IsChecked == true) bgBrush = (Brush)FindResource("CheckerboardBrush");
-            else if (BgLightBtn.IsChecked == true) bgBrush = new SolidColorBrush(Color.FromRgb(220, 220, 220)); 
-            else bgBrush = (Brush)FindResource("DarkBackground");
-
-            if (OldImageBorder != null) OldImageBorder.Background = bgBrush;
-            if (NewImageBorder != null) NewImageBorder.Background = bgBrush;
-            if (ImageContainer != null) ImageContainer.Background = bgBrush;
+            // Handled by XAML DataTriggers
         }
 
         private void UpdateUIMode()
         {
-            if (SideBySidePanel == null || OverlayPanel == null) return;
+            if (OverlayInfoLabel == null) return;
 
-            if (SideBySideBtn.IsChecked == true)
+            if (DiffBtn.IsChecked == true)
             {
-                SideBySidePanel.Visibility = Visibility.Visible;
-                OverlayPanel.Visibility = Visibility.Collapsed;
-                ToolsContainer.Visibility = Visibility.Collapsed;
+                OverlayInfoLabel.Text = "Difference Map";
+                GenerateDifferenceMap();
             }
             else
             {
-                SideBySidePanel.Visibility = Visibility.Collapsed;
-                OverlayPanel.Visibility = Visibility.Visible;
-
-                if (DiffBtn.IsChecked == true)
+                if (SliderBtn.IsChecked == true)
                 {
-                    OverlayInfoLabel.Text = "Difference Map";
-                    if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = Visibility.Collapsed;
-                    ToolsContainer.Visibility = Visibility.Collapsed;
-                    NewImageOverlay.Visibility = Visibility.Collapsed;
-                    DiffImageOverlay.Visibility = Visibility.Visible;
-                    GenerateDifferenceMap();
+                    OverlayInfoLabel.Text = "Slider Mode";
+                    // Force layout update and then update the effect
+                    this.Dispatcher.BeginInvoke(new Action(() => UpdateSliderEffect()), System.Windows.Threading.DispatcherPriority.Loaded);
                 }
-                else
+                else if (OnionSkinBtn.IsChecked == true)
                 {
-                    NewImageOverlay.Visibility = Visibility.Visible;
-                    DiffImageOverlay.Visibility = Visibility.Collapsed;
-                    ToolsContainer.Visibility = Visibility.Visible;
-
-                    if (SliderBtn.IsChecked == true)
-                    {
-                        OverlayInfoLabel.Text = "Slider Mode";
-                        NewImageOverlay.Opacity = 1;
-                        if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = Visibility.Visible;
-
-                        // Force layout update and then update the effect
-                        this.Dispatcher.BeginInvoke(new Action(() => UpdateSliderEffect()), System.Windows.Threading.DispatcherPriority.Loaded);
-                    }
-                    else if (OnionSkinBtn.IsChecked == true)
-                    {
-                        OverlayInfoLabel.Text = "Onion Skin";
-                        if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = Visibility.Collapsed;
-                        SliderClip.Rect = new Rect(0, 0, 99999, 99999);
-                        UpdateOpacityEffect();
-                    }
+                    OverlayInfoLabel.Text = "Onion Skin";
+                    UpdateOpacityEffect();
                 }
             }
         }

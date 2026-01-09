@@ -40,6 +40,19 @@
             <Setter Property="Margin" Value="10,0,6,0"/>
             <Setter Property="Opacity" Value="0.8"/>
         </Style>
+
+        <!-- Dynamic Background Style for Image Containers -->
+        <Style x:Key="ImageContainerStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource DarkBackground}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsChecked, ElementName=BgGridBtn}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource CheckerboardBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsChecked, ElementName=BgLightBtn}" Value="True">
+                    <Setter Property="Background" Value="#FFDCDCDC"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -124,7 +137,20 @@
                         </RadioButton>
 
                         <!-- ADJUST SECTION (Dynamic) -->
-                        <StackPanel x:Name="ToolsContainer" Orientation="Horizontal" Visibility="Collapsed">
+                        <StackPanel x:Name="ToolsContainer" Orientation="Horizontal">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
                             <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,4" CornerRadius="1"/>
                             <TextBlock Text="ADJUST" Style="{StaticResource ToolSectionLabel}"/>
                             <Slider x:Name="OverlaySlider" Width="100" Minimum="0" Maximum="100" Value="50" 
@@ -141,8 +167,9 @@
         <!-- Main Content Area -->
         <Grid Grid.Row="1" Margin="24">
             
-            <!-- MODE 1: Side by Side (Default) -->
-            <Grid x:Name="SideBySidePanel" Visibility="Visible">
+            <!-- MODE 1: Side by Side -->
+            <Grid x:Name="SideBySidePanel" 
+                  Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -165,7 +192,7 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16" x:Name="OldImageBorder" ClipToBounds="True">
+                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,8,8" Padding="16" x:Name="OldImageBorder" ClipToBounds="True">
                             <Image x:Name="OldImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
                                 <Image.RenderTransform>
                                     <TransformGroup>
@@ -196,7 +223,7 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16" x:Name="NewImageBorder" ClipToBounds="True">
+                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,8,8" Padding="16" x:Name="NewImageBorder" ClipToBounds="True">
                             <Image x:Name="NewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
                                 <Image.RenderTransform>
                                     <TransformGroup>
@@ -211,7 +238,8 @@
             </Grid>
 
             <!-- MODE 2: Overlay (Slider / Onion Skin / Diff) -->
-            <Grid x:Name="OverlayPanel" Visibility="Collapsed">
+            <Grid x:Name="OverlayPanel" 
+                  Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                 <Border Style="{StaticResource SettingsCard}" Padding="0">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -235,7 +263,7 @@
                         </Border>
 
                         <!-- Interactive Image Container -->
-                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8" Padding="16" x:Name="ImageContainer" ClipToBounds="True">
+                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,8,8" Padding="16" x:Name="ImageContainer" ClipToBounds="True">
                             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <!-- Base Image (OLD) -->
                                 <Image x:Name="OldImageOverlay" Stretch="Uniform" Opacity="1" RenderOptions.BitmapScalingMode="NearestNeighbor">
@@ -248,7 +276,8 @@
                                 </Image>
                                 
                                 <!-- Top Image (NEW) -->
-                                <Image x:Name="NewImageOverlay" Stretch="Uniform" Opacity="1" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                <Image x:Name="NewImageOverlay" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                       Visibility="{Binding IsChecked, ElementName=DiffBtn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                                     <Image.RenderTransform>
                                         <TransformGroup>
                                             <ScaleTransform x:Name="NewOverlayScale"/>
@@ -261,7 +290,8 @@
                                 </Image>
 
                                 <!-- Difference Map Image (Heatmap) -->
-                                <Image x:Name="DiffImageOverlay" Stretch="Uniform" Visibility="Collapsed" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                <Image x:Name="DiffImageOverlay" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                       Visibility="{Binding IsChecked, ElementName=DiffBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Image.RenderTransform>
                                         <TransformGroup>
                                             <ScaleTransform x:Name="DiffOverlayScale"/>
@@ -276,9 +306,9 @@
                                         Background="{StaticResource AccentBrush}" 
                                         HorizontalAlignment="Left" 
                                         VerticalAlignment="Stretch"
-                                        Visibility="Collapsed"
                                         IsHitTestVisible="False"
-                                        Opacity="0.9">
+                                        Opacity="0.9"
+                                        Visibility="{Binding IsChecked, ElementName=SliderBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Border.Effect>
                                         <DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="Black" Opacity="0.8"/>
                                     </Border.Effect>
