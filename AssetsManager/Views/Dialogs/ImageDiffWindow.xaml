@@ -89,19 +89,19 @@
                         
                         <!-- MODES SECTION -->
                         <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}"/>
-                        <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}" 
+                        <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
                                      IsChecked="True" Checked="Mode_Checked" ToolTip="Side by Side View">
                             <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
                         </RadioButton>
-                        <RadioButton x:Name="SliderBtn" Style="{StaticResource ModernIconRadioButton}" 
+                        <RadioButton x:Name="SliderBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
                                      Checked="Mode_Checked" ToolTip="Slider Overlay Mode">
                             <icons:MaterialIcon Kind="Compare" Width="18" Height="18"/>
                         </RadioButton>
-                        <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource ModernIconRadioButton}" 
-                                     Checked="Mode_Checked" ToolTip="Onion Skin (Opacity) Mode">
+                        <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                     Checked="Mode_Checked" ToolTip="Onion Skin Mode">
                             <icons:MaterialIcon Kind="Opacity" Width="18" Height="18"/>
                         </RadioButton>
-                        <RadioButton x:Name="DiffBtn" Style="{StaticResource ModernIconRadioButton}" 
+                        <RadioButton x:Name="DiffBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
                                      Checked="Mode_Checked" ToolTip="Mathematical Difference Map">
                             <icons:MaterialIcon Kind="Contrast" Width="18" Height="18"/>
                         </RadioButton>
@@ -110,15 +110,15 @@
 
                         <!-- VIEW SECTION -->
                         <TextBlock Text="VIEW" Style="{StaticResource ToolSectionLabel}"/>
-                        <RadioButton x:Name="BgDarkBtn" Style="{StaticResource ModernIconRadioButton}" 
+                        <RadioButton x:Name="BgDarkBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
                                      IsChecked="True" Checked="Background_Checked" ToolTip="Dark Background">
                             <icons:MaterialIcon Kind="Brightness2" Width="18" Height="18"/>
                         </RadioButton>
-                        <RadioButton x:Name="BgGridBtn" Style="{StaticResource ModernIconRadioButton}" 
-                                     Checked="Background_Checked" ToolTip="Checkerboard (Transparency)">
+                        <RadioButton x:Name="BgGridBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
+                                     Checked="Background_Checked" ToolTip="Transparency">
                             <icons:MaterialIcon Kind="Grid" Width="18" Height="18"/>
                         </RadioButton>
-                        <RadioButton x:Name="BgLightBtn" Style="{StaticResource ModernIconRadioButton}" 
+                        <RadioButton x:Name="BgLightBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
                                      Checked="Background_Checked" ToolTip="Light Background">
                             <icons:MaterialIcon Kind="Brightness5" Width="18" Height="18"/>
                         </RadioButton>
@@ -228,7 +228,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                                     <icons:MaterialIcon Kind="LayersOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Mode" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Mode" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock Grid.Column="1" Text="NEW vs OLD" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                             </Grid>
@@ -269,6 +269,27 @@
                                         </TransformGroup>
                                     </Image.RenderTransform>
                                 </Image>
+
+                                <!-- Slider Visual Separator Line -->
+                                <Border x:Name="SliderSeparatorLine" 
+                                        Width="2" 
+                                        Background="{StaticResource AccentBrush}" 
+                                        HorizontalAlignment="Left" 
+                                        VerticalAlignment="Stretch"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False"
+                                        Opacity="0.9">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="Black" Opacity="0.8"/>
+                                    </Border.Effect>
+                                    <Border.RenderTransform>
+                                        <TransformGroup>
+                                            <TranslateTransform x:Name="SliderOffsetTranslate"/>
+                                            <ScaleTransform x:Name="SliderSeparatorScale"/>
+                                            <TranslateTransform x:Name="SliderSeparatorTranslate"/>
+                                        </TransformGroup>
+                                    </Border.RenderTransform>
+                                </Border>
                             </Grid>
                         </Border>
                     </Grid>

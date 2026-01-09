@@ -38,7 +38,13 @@ namespace AssetsManager.Views.Dialogs
             this.MouseMove += ImageDiffWindow_MouseMove;
             this.MouseUp += ImageDiffWindow_MouseUp;
             
+            // Sync Slider value
+            OverlaySlider.Value = 50;
+
             _isInitialized = true;
+
+            // Force Side-by-Side as default
+            SideBySideBtn.IsChecked = true;
             UpdateUIMode();
             UpdateBackground();
         }
@@ -106,11 +112,8 @@ namespace AssetsManager.Views.Dialogs
 
             if (newZoom < 0.1 || newZoom > 20) return;
 
-            // Get mouse position relative to the Window (stable reference)
             Point mousePos = e.GetPosition(this);
 
-            // For each transform group, we need to adjust translation to center zoom on mouse
-            // We use OldTranslate as reference since all are synchronized
             double dx = (mousePos.X - OldTranslate.X) * (1 - zoomFactor);
             double dy = (mousePos.Y - OldTranslate.Y) * (1 - zoomFactor);
 
@@ -159,6 +162,7 @@ namespace AssetsManager.Views.Dialogs
             UpdateTransformGroup(OldOverlayScale, OldOverlayTranslate, scale, deltaX, deltaY);
             UpdateTransformGroup(NewOverlayScale, NewOverlayTranslate, scale, deltaX, deltaY);
             UpdateTransformGroup(DiffOverlayScale, DiffOverlayTranslate, scale, deltaX, deltaY);
+            UpdateTransformGroup(SliderSeparatorScale, SliderSeparatorTranslate, scale, deltaX, deltaY);
             UpdateSliderEffect();
         }
 
@@ -212,8 +216,9 @@ namespace AssetsManager.Views.Dialogs
 
                 if (DiffBtn.IsChecked == true)
                 {
+                    OverlayInfoLabel.Text = "Difference Map";
+                    if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = Visibility.Collapsed;
                     ToolsContainer.Visibility = Visibility.Collapsed;
-                    OverlayInfoLabel.Text = "Mathematical Difference Map (Heatmap)";
                     NewImageOverlay.Visibility = Visibility.Collapsed;
                     DiffImageOverlay.Visibility = Visibility.Visible;
                     GenerateDifferenceMap();
@@ -226,13 +231,17 @@ namespace AssetsManager.Views.Dialogs
 
                     if (SliderBtn.IsChecked == true)
                     {
-                        OverlayInfoLabel.Text = "Slider Mode (Swipe)";
+                        OverlayInfoLabel.Text = "Slider Mode";
                         NewImageOverlay.Opacity = 1;
-                        UpdateSliderEffect();
+                        if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = Visibility.Visible;
+
+                        // Force layout update and then update the effect
+                        this.Dispatcher.BeginInvoke(new Action(() => UpdateSliderEffect()), System.Windows.Threading.DispatcherPriority.Loaded);
                     }
                     else if (OnionSkinBtn.IsChecked == true)
                     {
-                        OverlayInfoLabel.Text = "Onion Skin Mode (Opacity)";
+                        OverlayInfoLabel.Text = "Onion Skin";
+                        if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = Visibility.Collapsed;
                         SliderClip.Rect = new Rect(0, 0, 99999, 99999);
                         UpdateOpacityEffect();
                     }
@@ -249,14 +258,24 @@ namespace AssetsManager.Views.Dialogs
 
         private void UpdateSliderEffect()
         {
-            if (SliderBtn.IsChecked != true || NewImageOverlay == null) return;
+            if (SliderBtn.IsChecked != true || NewImageOverlay == null || SliderSeparatorLine == null) return;
+            
             double percentage = OverlaySlider.Value / 100.0;
             double width = NewImageOverlay.ActualWidth;
             double height = NewImageOverlay.ActualHeight;
-            if (width > 0)
+
+            // If layout is not ready, we can't position correctly yet
+            if (width <= 0) return;
+
+            double clipX = width * percentage;
+            SliderClip.Rect = new Rect(clipX, 0, width - clipX, height);
+
+            // Position the visual line relative to image pixels using TranslateTransform
+            // This ensures it follows the zoom and pan perfectly
+            if (SliderOffsetTranslate != null)
             {
-                double clipX = width * percentage;
-                SliderClip.Rect = new Rect(clipX, 0, width - clipX, height);
+                SliderOffsetTranslate.X = clipX;
+                SliderSeparatorLine.Margin = new Thickness(0); // Reset margin to ensure only transform counts
             }
         }
 
