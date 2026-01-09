@@ -20,7 +20,9 @@ namespace AssetsManager.Views.Models.Monitor
         }
 
         public string Name { get; set; }
+        public string DisplayName { get; set; }
         public string Path { get; set; }
+        public string Size { get; set; }
         public DateTime CreationDate { get; set; }
         public bool IsCurrentSessionBackup { get; set; }
 
