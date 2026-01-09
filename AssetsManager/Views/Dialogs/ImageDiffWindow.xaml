@@ -256,7 +256,23 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                                     <icons:MaterialIcon Kind="LayersOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Mode" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Mode" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
+                                                        <Setter Property="Text" Value="Slider Mode"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
+                                                        <Setter Property="Text" Value="Onion Skin"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=DiffBtn}" Value="True">
+                                                        <Setter Property="Text" Value="Difference Map"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
                                 <TextBlock Grid.Column="1" Text="NEW vs OLD" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                             </Grid>
@@ -278,6 +294,16 @@
                                 <!-- Top Image (NEW) -->
                                 <Image x:Name="NewImageOverlay" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
                                        Visibility="{Binding IsChecked, ElementName=DiffBtn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                    <Image.Style>
+                                        <Style TargetType="Image">
+                                            <Setter Property="Opacity" Value="1.0"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
+                                                    <Setter Property="Opacity" Value="{Binding Value, ElementName=OverlaySlider, Converter={StaticResource ValueMultiplierConverter}, ConverterParameter=0.01}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Image.Style>
                                     <Image.RenderTransform>
                                         <TransformGroup>
                                             <ScaleTransform x:Name="NewOverlayScale"/>

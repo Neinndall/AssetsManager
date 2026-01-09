@@ -46,7 +46,6 @@ namespace AssetsManager.Views.Dialogs
             // Force Side-by-Side as default
             SideBySideBtn.IsChecked = true;
             UpdateUIMode();
-            UpdateBackground();
         }
 
         #region Difference Map Logic
@@ -188,26 +187,16 @@ namespace AssetsManager.Views.Dialogs
 
         private void UpdateUIMode()
         {
-            if (OverlayInfoLabel == null) return;
+            if (!_isInitialized) return;
 
             if (DiffBtn.IsChecked == true)
             {
-                OverlayInfoLabel.Text = "Difference Map";
                 GenerateDifferenceMap();
             }
-            else
+            else if (SliderBtn.IsChecked == true)
             {
-                if (SliderBtn.IsChecked == true)
-                {
-                    OverlayInfoLabel.Text = "Slider Mode";
-                    // Force layout update and then update the effect
-                    this.Dispatcher.BeginInvoke(new Action(() => UpdateSliderEffect()), System.Windows.Threading.DispatcherPriority.Loaded);
-                }
-                else if (OnionSkinBtn.IsChecked == true)
-                {
-                    OverlayInfoLabel.Text = "Onion Skin";
-                    UpdateOpacityEffect();
-                }
+                // Force layout update and then update the effect
+                this.Dispatcher.BeginInvoke(new Action(() => UpdateSliderEffect()), System.Windows.Threading.DispatcherPriority.Loaded);
             }
         }
 
@@ -215,7 +204,6 @@ namespace AssetsManager.Views.Dialogs
         {
             if (!_isInitialized) return;
             if (SliderBtn.IsChecked == true) UpdateSliderEffect();
-            else if (OnionSkinBtn.IsChecked == true) UpdateOpacityEffect();
         }
 
         private void UpdateSliderEffect()
@@ -233,18 +221,11 @@ namespace AssetsManager.Views.Dialogs
             SliderClip.Rect = new Rect(clipX, 0, width - clipX, height);
 
             // Position the visual line relative to image pixels using TranslateTransform
-            // This ensures it follows the zoom and pan perfectly
             if (SliderOffsetTranslate != null)
             {
                 SliderOffsetTranslate.X = clipX;
-                SliderSeparatorLine.Margin = new Thickness(0); // Reset margin to ensure only transform counts
+                SliderSeparatorLine.Margin = new Thickness(0); 
             }
-        }
-
-        private void UpdateOpacityEffect()
-        {
-            if (OnionSkinBtn.IsChecked != true) return;
-            NewImageOverlay.Opacity = OverlaySlider.Value / 100.0;
         }
 
         private void OnWindowClosed(object sender, EventArgs e)

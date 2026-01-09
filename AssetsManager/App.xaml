@@ -37,6 +37,7 @@
             <converters:PathToIconConverter x:Key="PathToIconConverter"/>
             <converters:ChunkDiffTypeToBrushConverter x:Key="DiffTypeToBrushConverter"/>
             <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
+            <converters:ValueMultiplierConverter x:Key="ValueMultiplierConverter"/>
             
         </ResourceDictionary>
     </Application.Resources>

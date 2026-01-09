@@ -106,15 +106,11 @@ namespace AssetsManager.Views.Controls.Models
             {
                 LoadModelIcon.Kind = MaterialIconKind.Map;
                 LoadModelButton.ToolTip = "Load MapGeometry";
-                LoadAnimationButton.Visibility = Visibility.Collapsed;
-                LoadChromaModelButton.Visibility = Visibility.Collapsed;
             }
             else
             {
                 LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
                 LoadModelButton.ToolTip = "Load Model";
-                LoadAnimationButton.Visibility = Visibility.Visible;
-                LoadChromaModelButton.Visibility = Visibility.Visible;
                 LoadAnimationButton.IsEnabled = true;
             }
         }
@@ -368,8 +364,6 @@ namespace AssetsManager.Views.Controls.Models
                 CameraResetRequested?.Invoke();
 
                 LoadModelButton.IsEnabled = false;
-                LoadAnimationButton.Visibility = Visibility.Collapsed;
-                LoadChromaModelButton.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -381,26 +375,8 @@ namespace AssetsManager.Views.Controls.Models
             }
         }
 
-        private void AnimationsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (AnimationsListBox.SelectedItem is AnimationModel selectedAnimation)
-            {
-                AnimationControlsPanel.DataContext = selectedAnimation;
-                AnimationControlsPanel.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                AnimationControlsPanel.DataContext = null;
-                AnimationControlsPanel.Visibility = Visibility.Collapsed;
-            }
-        }
-
         private void ModelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Hide animation controls when model selection changes
-            AnimationControlsPanel.Visibility = Visibility.Collapsed;
-            AnimationControlsPanel.DataContext = null;
-
             if (e.AddedItems.Count > 0 && e.AddedItems[0] is SceneModel selectedModel)
             {
                 _selectedModel = selectedModel;
@@ -418,15 +394,7 @@ namespace AssetsManager.Views.Controls.Models
 
                 if (_transformData.TryGetValue(selectedModel, out var transformData))
                 {
-                    // Unsubscribe from events to prevent feedback loop
-                    PositionXSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    PositionYSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    PositionZSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    RotationXSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    RotationYSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    RotationZSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    ScaleSlider.ValueChanged -= TransformSlider_ValueChanged;
-
+                    // Update Sliders safely
                     PositionXSlider.Value = transformData.Position.X;
                     PositionYSlider.Value = transformData.Position.Y;
                     PositionZSlider.Value = transformData.Position.Z;
@@ -434,15 +402,6 @@ namespace AssetsManager.Views.Controls.Models
                     RotationYSlider.Value = transformData.Rotation.Y;
                     RotationZSlider.Value = transformData.Rotation.Z;
                     ScaleSlider.Value = transformData.Scale;
-
-                    // Re-subscribe to events
-                    PositionXSlider.ValueChanged += TransformSlider_ValueChanged;
-                    PositionYSlider.ValueChanged += TransformSlider_ValueChanged;
-                    PositionZSlider.ValueChanged += TransformSlider_ValueChanged;
-                    RotationXSlider.ValueChanged += TransformSlider_ValueChanged;
-                    RotationYSlider.ValueChanged += TransformSlider_ValueChanged;
-                    RotationZSlider.ValueChanged += TransformSlider_ValueChanged;
-                    ScaleSlider.ValueChanged += TransformSlider_ValueChanged;
                 }
 
                 // Reset locks
