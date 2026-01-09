@@ -46,27 +46,40 @@
 
                 <!-- Tools Section -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Mode Selector -->
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="2" Margin="0,0,20,0">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton x:Name="SideBySideBtn" Style="{StaticResource SegmentedRadioButtonStyle}" 
-                                         Content="Side by Side" IsChecked="True" Checked="Mode_Checked" />
-                            <RadioButton x:Name="SliderBtn" Style="{StaticResource SegmentedRadioButtonStyle}" 
-                                         Content="Slider" Checked="Mode_Checked" />
-                            <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource SegmentedRadioButtonStyle}" 
-                                         Content="Onion Skin" Checked="Mode_Checked" />
-                        </StackPanel>
-                    </Border>
-
+                    
                     <!-- Overlay Slider (Visible only in Slider/Opacity modes) -->
-                    <StackPanel x:Name="ToolsContainer" Orientation="Horizontal" Visibility="Collapsed">
-                        <icons:MaterialIcon Kind="Compare" Width="16" Height="16" Foreground="{StaticResource TextSecondary}" Margin="0,0,10,0"/>
-                        <Slider x:Name="OverlaySlider" Width="150" Minimum="0" Maximum="100" Value="50" 
+                    <StackPanel x:Name="ToolsContainer" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,24,0">
+                        <TextBlock Text="Adjust Effect" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Slider x:Name="OverlaySlider" Width="120" Minimum="0" Maximum="100" Value="50" 
                                 VerticalAlignment="Center" Margin="0,0,10,0"
                                 ValueChanged="OverlaySlider_ValueChanged"/>
                         <TextBlock Text="{Binding Value, ElementName=OverlaySlider, StringFormat={}{0:0}%}" 
-                                   Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" FontSize="11" Width="30"/>
+                                   Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" VerticalAlignment="Center" FontSize="11" Width="30"/>
                     </StackPanel>
+
+                    <!-- Graphic Mode Selector -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="SideBySideBtn" Style="{StaticResource GraphicToolRadioButton}" 
+                                         IsChecked="True" Checked="Mode_Checked"
+                                         ToolTip="Side by Side View">
+                                <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
+                            </RadioButton>
+                            
+                            <RadioButton x:Name="SliderBtn" Style="{StaticResource GraphicToolRadioButton}" 
+                                         Checked="Mode_Checked"
+                                         ToolTip="Slider Overlay Mode">
+                                <icons:MaterialIcon Kind="Compare" Width="18" Height="18"/>
+                            </RadioButton>
+                            
+                            <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource GraphicToolRadioButton}" 
+                                         Checked="Mode_Checked"
+                                         ToolTip="Onion Skin (Opacity) Mode">
+                                <icons:MaterialIcon Kind="Opacity" Width="18" Height="18"/>
+                            </RadioButton>
+                        </StackPanel>
+                    </Border>
+
                 </StackPanel>
             </Grid>
         </Border>
