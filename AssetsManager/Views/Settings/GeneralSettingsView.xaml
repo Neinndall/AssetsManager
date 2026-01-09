@@ -217,7 +217,7 @@
                             
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                 <TextBlock Text="Preferred Audio Format" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
-                                <TextBlock Text="Select the format to use when exporting .wem files" FontSize="12" Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" />
+                                <TextBlock Text="Format to use when exporting .wem files" FontSize="12" Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <ComboBox Grid.Column="1"
@@ -262,7 +262,7 @@
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                 <TextBlock Text="Preferred Image Format" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
-                                <TextBlock Text="Select the format to use when exporting .tex/.dds files" FontSize="12" Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" />
+                                <TextBlock Text="Format to use when exporting .tex/.dds files" FontSize="12" Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <ComboBox Grid.Column="1"
