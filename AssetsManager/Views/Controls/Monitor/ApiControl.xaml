@@ -184,18 +184,16 @@
                 </ItemsControl>
             </TabItem>
             <TabItem>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="MythicShopCategoriesItemsControl" ItemsSource="{Binding Status.MythicShopCategories}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Margin="0,0,0,24">
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Left" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"><TextBlock Text="{Binding CategoryName}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/></Border>
-                                    <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource MythicItemTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                <ItemsControl x:Name="MythicShopCategoriesItemsControl" ItemsSource="{Binding Status.MythicShopCategories}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,24">
+                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Left" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"><TextBlock Text="{Binding CategoryName}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/></Border>
+                                <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource MythicItemTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </TabItem>
         </TabControl>
     </Grid>
