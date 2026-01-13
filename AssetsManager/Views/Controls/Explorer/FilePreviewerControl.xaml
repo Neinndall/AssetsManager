@@ -149,7 +149,7 @@
         </Grid>
 
         <!-- Main Content Area -->
-        <Grid Margin="5">
+        <Grid Margin="0">
             <local:FileGridView x:Name="FileGridView" Visibility="Collapsed"/>
             
             <Grid x:Name="PreviewContainer" Visibility="Visible">
@@ -159,7 +159,7 @@
                 <StackPanel x:Name="PreviewPlaceholder"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            Margin="20"
+                            Margin="10"
                             Visibility="Visible">
                     <!-- Default State -->
                     <StackPanel x:Name="SelectFileMessagePanel"
@@ -184,7 +184,7 @@
                                    FontSize="14"
                                    Foreground="{StaticResource TextSecondary}"
                                    HorizontalAlignment="Center"
-                                   Margin="20,8,20,0"
+                                   Margin="10,8,10,0"
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"/>
                     </StackPanel>
@@ -212,7 +212,7 @@
                                    FontSize="14"
                                    Foreground="{StaticResource TextSecondary}"
                                    HorizontalAlignment="Center"
-                                   Margin="20,8,20,0"
+                                   Margin="10,8,10,0"
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"/>
                     </StackPanel>

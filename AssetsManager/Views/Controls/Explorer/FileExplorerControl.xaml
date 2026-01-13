@@ -338,7 +338,7 @@
                        Foreground="{StaticResource TextSecondary}"
                        HorizontalAlignment="Center"
                        TextAlignment="Center"
-                       Margin="20,8,20,0"/>
+                       Margin="10,8,10,0"/>
             <Button x:Name="SelectLolDirButton"
                     Content="Open Folder"
                     Style="{StaticResource SecondaryButton}"
