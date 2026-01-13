@@ -156,13 +156,13 @@
                 <local:DetailsTabView x:Name="DetailsPreview" Visibility="Collapsed"/>
                 
                 <!-- Placeholders -->
-                <StackPanel x:Name="PreviewPlaceholder"
+                <StackPanel x:Name="PreviewStatusPanel"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Margin="10"
                             Visibility="Visible">
                     <!-- Default State -->
-                    <StackPanel x:Name="SelectFileMessagePanel"
+                    <StackPanel x:Name="SelectFileStatusPanel"
                                 Orientation="Vertical"
                                 HorizontalAlignment="Center">
                         <materialIcons:MaterialIcon Kind="FileSearchOutline"
@@ -190,7 +190,7 @@
                     </StackPanel>
 
                     <!-- Unsupported State -->
-                    <StackPanel x:Name="UnsupportedFileMessagePanel"
+                    <StackPanel x:Name="UnsupportedStatusPanel"
                                 Orientation="Vertical"
                                 HorizontalAlignment="Center"
                                 Visibility="Collapsed">

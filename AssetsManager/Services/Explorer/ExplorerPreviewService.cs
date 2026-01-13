@@ -32,14 +32,14 @@ namespace AssetsManager.Services.Explorer
 {
     public class ExplorerPreviewService
     {
-        private enum Previewer { None, Image, WebView, AvalonEdit, Placeholder }
+        private enum Previewer { None, Image, WebView, AvalonEdit, StatusPanel }
         private Previewer _activePreviewer = Previewer.None;
         private FileSystemNodeModel _currentlyDisplayedNode;
 
         private Image _imagePreview;
         private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
-        private Panel _previewPlaceholder;
+        private Panel _previewStatusPanel;
         private Panel _selectFileMessagePanel;
         private Panel _unsupportedFileMessagePanel;
 
@@ -65,12 +65,12 @@ namespace AssetsManager.Services.Explorer
             _wadExtractionService = wadExtractionService;
         }
 
-        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, Panel placeholder, Panel selectFileMessage, Panel unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
+        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, Panel statusPanel, Panel selectFileMessage, Panel unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
         {
             _imagePreview = imagePreview;
             _webViewContainer = webViewContainer;
             _textEditorPreview = textEditor;
-            _previewPlaceholder = placeholder;
+            _previewStatusPanel = statusPanel;
             _selectFileMessagePanel = selectFileMessage;
             _unsupportedFileMessagePanel = unsupportedFileMessage;
             _unsupportedFileTextBlock = unsupportedFileTextBlock;
@@ -125,7 +125,7 @@ namespace AssetsManager.Services.Explorer
         public async Task ResetPreviewAsync()
         {
             _currentlyDisplayedNode = null;
-            await SetPreviewerAsync(Previewer.Placeholder);
+            await SetPreviewerAsync(Previewer.StatusPanel);
         }
 
         private async Task PreviewRealFile(FileSystemNodeModel node)
@@ -227,7 +227,7 @@ namespace AssetsManager.Services.Explorer
             // Part 1: Hide all static panels and clear their content.
             _imagePreview.Visibility = Visibility.Collapsed;
             _textEditorPreview.Visibility = Visibility.Collapsed;
-            _previewPlaceholder.Visibility = Visibility.Collapsed;
+            _previewStatusPanel.Visibility = Visibility.Collapsed;
             _detailsPreview.Visibility = Visibility.Collapsed;
             _imagePreview.Source = null;
             _textEditorPreview.Clear();
@@ -275,8 +275,8 @@ namespace AssetsManager.Services.Explorer
                     }
                     break;
 
-                case Previewer.Placeholder:
-                    _previewPlaceholder.Visibility = Visibility.Visible;
+                case Previewer.StatusPanel:
+                    _previewStatusPanel.Visibility = Visibility.Visible;
                     if (content is string extension)
                     {
                         // This is for unsupported files
@@ -526,7 +526,7 @@ namespace AssetsManager.Services.Explorer
 
         private async Task ShowUnsupportedPreviewAsync(string extension)
         {
-            await SetPreviewerAsync(Previewer.Placeholder, extension);
+            await SetPreviewerAsync(Previewer.StatusPanel, extension);
         }
 
         public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node)

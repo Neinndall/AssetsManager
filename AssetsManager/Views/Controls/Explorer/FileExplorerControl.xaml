@@ -322,7 +322,7 @@
                                         HorizontalAlignment="Center"
                                         Foreground="{StaticResource TextMuted}"
                                         Opacity="0.5"/>
-            <TextBlock x:Name="PlaceholderTitle"
+            <TextBlock x:Name="StatusTitle"
                        Text="No Directory Selected"
                        FontSize="20"
                        FontWeight="SemiBold"
@@ -331,7 +331,7 @@
                        TextWrapping="Wrap"
                        TextAlignment="Center"
                        Margin="0,16,0,0"/>
-            <TextBlock x:Name="PlaceholderDescription"
+            <TextBlock x:Name="StatusDescription"
                        Text="Please select your League of Legends installation folder to start exploring."
                        TextWrapping="Wrap"
                        FontSize="14"

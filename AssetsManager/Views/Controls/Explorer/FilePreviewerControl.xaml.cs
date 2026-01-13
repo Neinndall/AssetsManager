@@ -171,7 +171,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     await ExplorerPreviewService.ResetPreviewAsync();
                     DetailsPreview.DataContext = selectedPin.Node;
                     DetailsPreview.Visibility = Visibility.Visible;
-                    PreviewPlaceholder.Visibility = Visibility.Collapsed; // Hide the placeholder
+                    PreviewStatusPanel.Visibility = Visibility.Collapsed; // Hide the placeholder
                 }
                 else
                 {
@@ -211,9 +211,9 @@ namespace AssetsManager.Views.Controls.Explorer
                     ImagePreview,
                     WebViewContainer, // Pass the container grid
                     TextEditorPreview,
-                    PreviewPlaceholder,
-                    SelectFileMessagePanel,
-                    UnsupportedFileMessagePanel,
+                    PreviewStatusPanel,
+                    SelectFileStatusPanel,
+                    UnsupportedStatusPanel,
                     UnsupportedFileMessage,
                     DetailsPreview
                 );
@@ -364,7 +364,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private void SwitchToFilePreview()
         {
             FileGridView.Visibility = Visibility.Collapsed;
-            PreviewPlaceholder.Visibility = Visibility.Collapsed; // Hide placeholder to prevent flicker
+            PreviewStatusPanel.Visibility = Visibility.Collapsed; // Hide placeholder to prevent flicker
             PreviewContainer.Visibility = Visibility.Visible;
         }
 

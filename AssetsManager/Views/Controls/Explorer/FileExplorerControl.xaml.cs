@@ -144,7 +144,7 @@ namespace AssetsManager.Views.Controls.Explorer
             else
             {
                 // If we are not going to load, show the correct placeholder immediately.
-                ShowPlaceholder(_isWadMode);
+                ShowStatusMessage(_isWadMode);
             }
 
             // Now, perform the async hash loading.
@@ -237,7 +237,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    ShowPlaceholder(true);
+                    ShowStatusMessage(true);
                 }
             }
             else
@@ -248,20 +248,20 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    ShowPlaceholder(false);
+                    ShowStatusMessage(false);
                 }
             }
         }
 
-        private void ShowPlaceholder(bool isWadMode)
+        private void ShowStatusMessage(bool isWadMode)
         {
             if (isWadMode) {
-                PlaceholderTitle.Text = "Select a LoL Directory";
-                PlaceholderDescription.Text = "Choose the root folder where you installed League of Legends to browse its WAD files.";
+                StatusTitle.Text = "Select a LoL Directory";
+                StatusDescription.Text = "Choose the root folder where you installed League of Legends to browse its WAD files.";
                 SelectLolDirButton.Visibility = Visibility.Visible;
             } else {
-                PlaceholderTitle.Text = "Assets Directory Not Found";
-                PlaceholderDescription.Text = "The application could not find the directory for downloaded assets.";
+                StatusTitle.Text = "Assets Directory Not Found";
+                StatusDescription.Text = "The application could not find the directory for downloaded assets.";
                 SelectLolDirButton.Visibility = Visibility.Collapsed;
             }
             RootNodes.Clear();
