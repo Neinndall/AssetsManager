@@ -25,14 +25,14 @@
                     <materialIcons:MaterialIcon Kind="CompareHorizontal"/>
                 </MenuItem.Icon>
             </MenuItem>
-            <MenuItem Header="Pin" x:Name="PinMenuItem" Click="PinSelected_Click">
-                <MenuItem.Icon>
-                    <materialIcons:MaterialIcon Kind="Pin"/>
-                </MenuItem.Icon>
-            </MenuItem>
             <MenuItem Header="Add to Favorites" x:Name="AddToFavoritesMenuItem" Click="AddToFavorites_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="StarOutline"/>
+                </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Pin" x:Name="PinMenuItem" Click="PinSelected_Click">
+                <MenuItem.Icon>
+                    <materialIcons:MaterialIcon Kind="Pin"/>
                 </MenuItem.Icon>
             </MenuItem>
         </ContextMenu>
