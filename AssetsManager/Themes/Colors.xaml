@@ -24,9 +24,10 @@
     <SolidColorBrush x:Key="TextSecondary" Color="#FF9499B3"/> <!-- Muted blue-grey -->
     <SolidColorBrush x:Key="TextMuted" Color="#FF5C617A"/>
     
-    <!-- BORDERS & INTERACTION -->
+    <!-- INTERACTION & HOVER -->
     <SolidColorBrush x:Key="BorderColor" Color="#FF2D314D"/>
     <SolidColorBrush x:Key="HoverColor" Color="#FF292E42"/>
+    <SolidColorBrush x:Key="MenuHighlightBrush" Color="#8C5C85FF"/>
     
     <!-- Dialog Colors -->
     <SolidColorBrush x:Key="OptionCardBrush" Color="#FF24293E"/> 
