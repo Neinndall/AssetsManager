@@ -10,8 +10,8 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Configuration Card -->
-            <RowDefinition Height="Auto"/> <!-- Inputs (The Arena - Unified) -->
-            <RowDefinition Height="Auto"/> <!-- Footer Action (Ready for Compare) -->
+            <RowDefinition Height="Auto"/> <!-- Versions Card -->
+            <RowDefinition Height="Auto"/> <!-- Footer Action Card -->
         </Grid.RowDefinitions>
 
         <!-- 1. CONFIGURATION CARD -->
@@ -20,7 +20,7 @@
                 BorderBrush="{StaticResource BorderColor}" 
                 BorderThickness="1" 
                 CornerRadius="12" 
-                Padding="20"
+                Padding="24"
                 Margin="0,0,0,20">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -39,7 +39,7 @@
 
                 <!-- Titles -->
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Configuration Select" FontWeight="Bold" FontSize="16" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Configuration" FontWeight="Bold" FontSize="16" Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Choose the analysis mode and paths below" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
 
@@ -53,12 +53,12 @@
                         BorderThickness="1">
                     <StackPanel Orientation="Horizontal">
                         <RadioButton x:Name="ModeDirectory" 
-                                     Content="Directory Mode" 
+                                     Content="Directory" 
                                      GroupName="ComparisonMode"
                                      IsChecked="True" 
                                      Style="{StaticResource SegmentedRadioButtonStyle}"/>
                         <RadioButton x:Name="ModeFile" 
-                                     Content="Single File" 
+                                     Content="Wad File" 
                                      GroupName="ComparisonMode"
                                      Style="{StaticResource SegmentedRadioButtonStyle}"/>
                     </StackPanel>
@@ -66,7 +66,7 @@
             </Grid>
         </Border>
 
-        <!-- 2. INPUT ARENA (Unified Card) -->
+        <!-- 2. VERSIONS CARD -->
         <Border Grid.Row="1" 
                 Background="{StaticResource CardBackground}" 
                 BorderBrush="{StaticResource BorderColor}" 
@@ -76,8 +76,8 @@
                 Margin="0,0,0,20">
             <StackPanel>
                 
-                <!-- === A. NEW VERSION (TARGET) === -->
-                <StackPanel Margin="0,0,0,12">
+                <!-- === SECTION: TARGET VERSION (NEW) === -->
+                <StackPanel Margin="0,0,0,18">
                     <!-- Label Header -->
                     <StackPanel Orientation="Horizontal" Margin="4,0,0,12">
                         <Border Background="#1A00E676" CornerRadius="6" Width="32" Height="32" Margin="0,0,12,0">
@@ -85,13 +85,23 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="TARGET VERSION" FontWeight="Bold" FontSize="11" Foreground="{StaticResource AccentGreen}" Opacity="0.9"/>
-                            <TextBlock Text="New / Updated" FontSize="13" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                            <TextBlock FontSize="13" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="New Directory"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsChecked, ElementName=ModeFile}" Value="True">
+                                                <Setter Property="Text" Value="New Wad File"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                     </StackPanel>
 
                     <!-- Inputs: Directory Mode -->
                     <StackPanel Visibility="{Binding IsChecked, ElementName=ModeDirectory, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Select the updated League of Legends directory to detect new assets." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,8"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -119,7 +129,6 @@
 
                     <!-- Inputs: File Mode -->
                     <StackPanel Visibility="{Binding IsChecked, ElementName=ModeFile, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Select the updated .wad file you want to inspect for changes." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,8"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -146,10 +155,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Separator Line -->
-                <Border Height="1" Background="{StaticResource BorderColor}" Margin="0,0,0,12" Opacity="0.5"/>
-
-                <!-- === B. BASE VERSION (OLD) === -->
+                <!-- === SECTION: BASE VERSION (OLD) === -->
                 <StackPanel>
                     <!-- Label Header -->
                     <StackPanel Orientation="Horizontal" Margin="4,0,0,12">
@@ -158,13 +164,23 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="BASE VERSION" FontWeight="Bold" FontSize="11" Foreground="{StaticResource AccentOrange}" Opacity="0.9"/>
-                            <TextBlock Text="Old / Original" FontSize="13" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                            <TextBlock FontSize="13" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="Old Directory"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsChecked, ElementName=ModeFile}" Value="True">
+                                                <Setter Property="Text" Value="Old Wad File"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                     </StackPanel>
 
                     <!-- Inputs: Directory Mode -->
                     <StackPanel Visibility="{Binding IsChecked, ElementName=ModeDirectory, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Select the base/original League of Legends directory to use as reference." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,8"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -192,7 +208,6 @@
 
                     <!-- Inputs: File Mode -->
                     <StackPanel Visibility="{Binding IsChecked, ElementName=ModeFile, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock Text="Select the base/original .wad file to compare against." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,8"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -252,13 +267,12 @@
                 <Button Grid.Column="2" 
                         x:Name="compareWadButton" 
                         Click="compareWadButton_Click"
-                        Style="{StaticResource SecondaryButton}"
-                        Background="{StaticResource SidebarBackground}"
-                        MinWidth="140"
-                        Margin="16,0,0,0">
+                        Style="{StaticResource PrimaryButton}"
+                        HorizontalContentAlignment="Left"
+                        Padding="10,0,14,0">
                     <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Flash" Margin="0,0,8,0" Width="16" Height="16" VerticalAlignment="Center"/>
-                        <TextBlock Text="Start Comparison" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="Flash" Margin="0,0,8,0" Width="14" Height="14" VerticalAlignment="Center"/>
+                        <TextBlock Text="START COMPARISON" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
             </Grid>

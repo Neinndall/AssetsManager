@@ -135,15 +135,16 @@
         </Setter>
     </Style>
 
-    <!-- 1. PRIMARY ACTION BUTTON (The "Call to Action") -->
+    <!-- 1. PRIMARY BUTTON (Elastic Action) -->
     <Style x:Key="PrimaryButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="24,0"/>
-        <Setter Property="Height" Value="42"/>
-        <Setter Property="FontSize" Value="13"/>
-        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Padding" Value="14,9"/>
+        <Setter Property="MinWidth" Value="60"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FontSize" Value="12"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -153,10 +154,9 @@
                         <Border x:Name="Shadow" 
                                 Background="{TemplateBinding Background}" 
                                 CornerRadius="8" 
-                                Opacity="0.4"
-                                Margin="0,4,0,0">
+                                Opacity="0.3">
                             <Border.Effect>
-                                <BlurEffect Radius="8"/>
+                                <DropShadowEffect BlurRadius="8" ShadowDepth="2" Direction="270" Opacity="0.4" Color="Black"/>
                             </Border.Effect>
                         </Border>
 
@@ -165,8 +165,8 @@
                                 Background="{TemplateBinding Background}" 
                                 CornerRadius="8"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" 
-                                            VerticalAlignment="Center"
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                             RecognizesAccessKey="True"/>
                         </Border>
                     </Grid>
@@ -178,7 +178,7 @@
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Body" Property="Background" Value="{StaticResource ModernButtonPressedBrush}"/>
                             <Setter TargetName="Shadow" Property="Opacity" Value="0"/>
-                            <Setter TargetName="Body" Property="Margin" Value="0,2,0,0"/>
+                            <Setter TargetName="Body" Property="Margin" Value="0,1,0,0"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.5"/>
@@ -190,30 +190,32 @@
         </Setter>
     </Style>
 
-    <!-- Secondary Button Style -->
+    <!-- 2. SECONDARY BUTTON (Elastic Style) -->
     <Style x:Key="SecondaryButton" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="MinWidth" Value="0"/>
-        <Setter Property="Padding" Value="14,7"/>
+        <Setter Property="MinWidth" Value="60"/>
+        <Setter Property="Padding" Value="14,9"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Grid x:Name="RootGrid">
+                    <Grid>
                         <!-- 1. Background Layer -->
                         <Border x:Name="BackgroundBorder" 
                                 Background="{TemplateBinding Background}" 
                                 CornerRadius="6"/>
 
-                        <!-- 2. Content Layer (Fixed) -->
+                        <!-- 2. Content Layer -->
                         <Border Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
                                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
 
-                        <!-- 3. Border Overlay (Changes thickness without moving content) -->
+                        <!-- 3. Border Overlay -->
                         <Border x:Name="ButtonBorder"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
@@ -236,41 +238,52 @@
         </Setter>
     </Style>
 
-    <!-- 2. BROWSE / SECONDARY BUTTON (Subtle, matches Inputs) -->
+    <!-- 3. BROWSE / INPUT SECONDARY BUTTON -->
     <Style x:Key="BrowseButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="16,0"/>
-        <Setter Property="Height" Value="38"/> <!-- Matches TextBox height roughly -->
+        <Setter Property="Padding" Value="14,0"/>
+        <Setter Property="Height" Value="38"/>
         <Setter Property="FontSize" Value="12"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="border"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="8"
-                            Padding="{TemplateBinding Padding}">
-                        <Grid>
-                            <ContentPresenter HorizontalAlignment="Center" 
-                                            VerticalAlignment="Center"
+                    <Grid x:Name="RootGrid">
+                        <!-- 1. Background Layer -->
+                        <Border x:Name="BackgroundBorder" 
+                                Background="{TemplateBinding Background}" 
+                                CornerRadius="8"/>
+
+                        <!-- 2. Content Layer (Fixed Padding ensures no jumps) -->
+                        <Border Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                             RecognizesAccessKey="True"/>
-                        </Grid>
-                    </Border>
+                        </Border>
+
+                        <!-- 3. Border Overlay (Changes thickness without moving content) -->
+                        <Border x:Name="ButtonBorder"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                IsHitTestVisible="False"/>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="ButtonBorder" Property="BorderThickness" Value="1.5"/>
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource CardBackground}"/>
-                            <Setter TargetName="border" Property="Opacity" Value="0.8"/>
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource CardBackground}"/>
+                            <Setter TargetName="BackgroundBorder" Property="Opacity" Value="0.8"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -282,7 +295,7 @@
     <Style x:Key="DestructiveButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource AccentRed}"/>
         <Setter Property="Foreground" Value="White"/>
-        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="Padding" Value="14,7"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -729,7 +742,7 @@
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="HoverBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>  
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>

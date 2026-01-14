@@ -81,7 +81,7 @@
             </Grid.RowDefinitions>
             
             <!-- Header -->
-            <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
+            <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
                 <StackPanel Orientation="Horizontal">
                     <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="32" Height="32" Margin="0,0,12,0">
                         <materialIcons:MaterialIcon Kind="FormatListGroup" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -102,7 +102,7 @@
             </Border>
 
             <!-- Tree Content -->
-            <Border Grid.Row="2" Padding="0" Background="{StaticResource CardBackground}" CornerRadius="0,0,8,8">
+            <Border Grid.Row="2" Padding="0" Background="{StaticResource CardBackground}" CornerRadius="0,0,12,12">
                 <TreeView x:Name="resultsTreeView" 
                           Style="{StaticResource ModernTreeView}"
                           Background="Transparent"

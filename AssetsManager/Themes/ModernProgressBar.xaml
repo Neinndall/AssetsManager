@@ -4,12 +4,41 @@
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
-    <!-- Modern ProgressBar Style (Basic) -->
+    <!-- Modern Rounded ProgressBar Style -->
     <Style x:Key="ModernProgressBar" TargetType="ProgressBar">
         <Setter Property="Background" Value="{StaticResource DarkBackground}"/>
         <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Height" Value="10"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid x:Name="TemplateRoot" SnapsToDevicePixels="true">
+                        <!-- Fondo de la barra (El carril) -->
+                        <Border x:Name="Track" 
+                                CornerRadius="5" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}"/>
+
+                        <!-- El indicador de progreso (Lo que se llena) -->
+                        <!-- Usamos un Decorator para que WPF gestione el tamaño de PART_Indicator -->
+                        <Grid x:Name="PART_Track" Margin="1">
+                            <Border x:Name="PART_Indicator" 
+                                    CornerRadius="4" 
+                                    Background="{TemplateBinding Foreground}" 
+                                    HorizontalAlignment="Left"/>
+                        </Grid>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsIndeterminate" Value="true">
+                            <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>
