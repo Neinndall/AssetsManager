@@ -29,12 +29,11 @@
             <!-- Main Content Area, Logger and Status Bar -->
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*" MinHeight="200"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition x:Name="LogRowDefinition" Height="185" MinHeight="38"/> <!-- LogView Height -->
-                    <RowDefinition Height="Auto"/> <!-- Status Bar Height -->
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/> <!-- GridSplitter -->
+                    <RowDefinition x:Name="LogRowDefinition" Height="175" MinHeight="38"/> <!-- LogView Height -->
+                    <RowDefinition Height="Auto"/> <!-- StatusBar -->
                 </Grid.RowDefinitions>
-
                 <Border Grid.Row="0"
                         Background="Transparent"
                         BorderBrush="{StaticResource BorderColor}"

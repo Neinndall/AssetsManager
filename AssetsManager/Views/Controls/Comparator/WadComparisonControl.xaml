@@ -269,7 +269,8 @@
                         Click="compareWadButton_Click"
                         Style="{StaticResource PrimaryButton}"
                         HorizontalContentAlignment="Left"
-                        Padding="10,0,14,0">
+                        Padding="10,0,14,0"
+                        Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
                         <materialIcons:MaterialIcon Kind="Flash" Margin="0,0,8,0" Width="14" Height="14" VerticalAlignment="Center"/>
                         <TextBlock Text="START COMPARISON" FontWeight="Bold" VerticalAlignment="Center"/>
