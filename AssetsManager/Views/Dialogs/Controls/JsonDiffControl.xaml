@@ -111,7 +111,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Old JSON Card -->
-                <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0">
+                <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -119,7 +119,7 @@
                         </Grid.RowDefinitions>
 
                         <!-- Sub-Header -->
-                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
                             <StackPanel Orientation="Horizontal">
                                 <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                 <StackPanel VerticalAlignment="Center">
@@ -129,7 +129,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8">
+                        <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
                             <avalonEdit:TextEditor x:Name="OldJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
                         </Border>
                     </Grid>
@@ -138,7 +138,7 @@
                 <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
 
                 <!-- New JSON Card -->
-                <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0">
+                <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -146,7 +146,7 @@
                         </Grid.RowDefinitions>
 
                         <!-- Sub-Header -->
-                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
                             <StackPanel Orientation="Horizontal">
                                 <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                 <StackPanel VerticalAlignment="Center">
@@ -156,7 +156,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,8,8">
+                        <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
                             <avalonEdit:TextEditor x:Name="NewJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
                         </Border>
                     </Grid>
@@ -165,16 +165,19 @@
                 <GridSplitter Grid.Column="3" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
 
                 <!-- Navigation Panel Card -->
-                <Border Grid.Column="4" Style="{StaticResource SettingsCard}" Padding="0">
+                <Border Grid.Column="4" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="8" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
+                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="8" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
                             <icons:MaterialIcon Kind="MapOutline" Width="16" Height="16" Foreground="{StaticResource TextMuted}"/>
                         </Border>
-                        <jsonDiff:DiffNavigationPanel Grid.Row="1" x:Name="DiffNavigationPanel" Margin="0,4"/>
+                        
+                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
+                            <jsonDiff:DiffNavigationPanel x:Name="DiffNavigationPanel" Margin="0,4"/>
+                        </Border>
                     </Grid>
                 </Border>
             </Grid>
