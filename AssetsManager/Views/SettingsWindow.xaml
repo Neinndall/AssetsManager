@@ -143,7 +143,7 @@
                                 Content="Save Changes"
                                 Margin="12,0,0,0"
                                 Click="btnSave_Click"
-                                Style="{StaticResource ModernButton}"
+                                Style="{StaticResource PrimaryButton}"
                                 Height="32"
                                 Padding="12,0"/>
                     </StackPanel>

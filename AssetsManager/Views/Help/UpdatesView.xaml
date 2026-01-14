@@ -69,11 +69,7 @@
                         <Button x:Name="buttonInstallUpdate" 
                                 Content="Download &amp; Install" 
                                 Click="buttonInstallUpdate_Click"
-                                Style="{StaticResource ModernButton}" 
-                                Background="White"
-                                Foreground="{StaticResource AccentBrush}"
-                                FontWeight="Bold"
-                                Padding="24,12"
+                                Style="{StaticResource PrimaryButton}" 
                                 HorizontalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>

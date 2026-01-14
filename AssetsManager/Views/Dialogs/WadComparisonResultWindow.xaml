@@ -50,14 +50,18 @@
                     <Button x:Name="reloadHashesButton"
                             Content="Reload Hashes" 
                             Style="{StaticResource SecondaryButton}"
-                            HorizontalContentAlignment="Left"
+                            Height="36"
+                            Padding="16,0"
+                            HorizontalContentAlignment="Center"
                             Margin="0,0,8,0"
                             Click="ReloadHashesButton_Click"
                             ToolTip="Reloads hashes from the default application path"/>
                     <Button x:Name="saveButton"
                             Content="Save Report"
-                            Style="{StaticResource ModernButton}"
-                            HorizontalContentAlignment="Left"
+                            Style="{StaticResource PrimaryButton}"
+                            Height="36"
+                            Padding="16,0"
+                            HorizontalContentAlignment="Center"
                             Click="SaveButton_Click"
                             ToolTip="Save the full list of differences to a JSON file"/>
                 </StackPanel>

@@ -251,7 +251,7 @@
 
                         <!-- RENDER ACTIONS -->
                         <StackPanel Margin="0,4,0,0">
-                            <Button x:Name="SnapshotButton" Click="SnapshotButton_Click" Style="{StaticResource ModernButton}" Height="36">
+                            <Button x:Name="SnapshotButton" Click="SnapshotButton_Click" Style="{StaticResource PrimaryButton}" Height="36">
                                 <StackPanel Orientation="Horizontal">
                                     <materialIcons:MaterialIcon Kind="Camera" Width="16" Height="16" Margin="0,0,8,0"/>
                                     <TextBlock Text="Take 4K Snapshot" VerticalAlignment="Center"/>

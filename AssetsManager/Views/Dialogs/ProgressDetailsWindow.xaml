@@ -103,7 +103,7 @@
                     <!-- Footer -->
                     <Grid Grid.Row="1" Margin="24,0,24,24">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource ModernButton}" Click="CancelButton_Click" Width="90"/>
+                            <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource PrimaryButton}" Click="CancelButton_Click" Width="90" Height="36" Padding="12,0"/>
                         </StackPanel>
                     </Grid>
                 </Grid>

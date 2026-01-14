@@ -170,7 +170,7 @@
                                 <StackPanel>
                                     <TextBlock Text="{Binding DisplayName}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,0,12"/>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <Button Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource ModernButton}" Width="32" Height="32" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip="Save to Disk"><materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="16" Height="16" Foreground="White"/></Button>
+                                        <Button Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource PrimaryButton}" Width="32" Height="32" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip="Save to Disk"><materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="16" Height="16" Foreground="White"/></Button>
                                         <Button Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Opacity="0.8" Width="32" Height="32" MinWidth="0" Padding="0" Margin="6,0,0,0" ToolTip="Ignore Asset"><materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="White"/></Button>
                                     </StackPanel>
                                 </StackPanel>
