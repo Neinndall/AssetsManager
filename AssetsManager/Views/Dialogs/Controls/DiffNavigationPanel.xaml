@@ -13,13 +13,13 @@
 
         <!-- Old Version Panel -->
         <Grid Grid.Column="0">
-            <Rectangle Fill="{StaticResource SidebarBackground}"/>
+            <Rectangle Fill="Transparent"/>
             <helpers:VisualHost x:Name="OldDiffMapHost"/>
         </Grid>
 
         <!-- New Version Panel -->
         <Grid Grid.Column="1">
-            <Rectangle Fill="{StaticResource SidebarBackground}"/>
+            <Rectangle Fill="Transparent"/>
             <helpers:VisualHost x:Name="NewDiffMapHost"/>
         </Grid>
     </Grid>

@@ -118,15 +118,25 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Sub-Header -->
-                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
-                            <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock x:Name="OldFileNameLabel" FontSize="10" Foreground="{StaticResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </StackPanel>
+                        <!-- Sub-Header: OLD VERSION -->
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="12,12,12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <Border Background="#1AFF9100" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                        <icons:MaterialIcon Kind="History" Width="18" Height="18" Foreground="{StaticResource AccentOrange}"/>
+                                    </Border>
+                                    
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="OLD VERSION" FontSize="9" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>
+                                        <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </Border>
 
                         <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
@@ -145,15 +155,25 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Sub-Header -->
-                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
-                            <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock x:Name="NewFileNameLabel" FontSize="10" Foreground="{StaticResource TextSecondary}" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </StackPanel>
+                        <!-- Sub-Header: NEW VERSION -->
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="12,12,12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <Border Background="#1A00E676" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                        <icons:MaterialIcon Kind="FlashOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
+                                    </Border>
+                                    
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="NEW VERSION" FontSize="9" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>
+                                        <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </Border>
 
                         <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
@@ -171,8 +191,12 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="8" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
-                            <icons:MaterialIcon Kind="MapOutline" Width="16" Height="16" Foreground="{StaticResource TextMuted}"/>
+                        
+                        <!-- Sub-Header: MAP -->
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="8,10">
+                                <icons:MaterialIcon Kind="MapOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}"/>
+                            </Border>
                         </Border>
                         
                         <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
