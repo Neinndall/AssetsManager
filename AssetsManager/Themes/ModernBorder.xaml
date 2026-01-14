@@ -17,9 +17,20 @@
         <Setter Property="Background" Value="{StaticResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="CornerRadius" Value="12"/>
         <Setter Property="Padding" Value="24"/>
         <Setter Property="Margin" Value="0,0,0,16"/>
+        <!-- Subtle Inner Highlight via Border (simulated with shadow for now, as Border styles are limited without ControlTemplate) 
+             Actually, let's keep the soft shadow but make it cleaner. -->
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect BlurRadius="12" 
+                                  ShadowDepth="4" 
+                                  Opacity="0.2" 
+                                  Direction="270"
+                                  Color="Black"/>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Settings GroupBox Style -->

@@ -20,21 +20,28 @@
                         <!-- Capa 1: Fondo (Color Hover/Selected) -->
                         <Border x:Name="BackgroundBorder"
                                 Background="{TemplateBinding Background}"
-                                CornerRadius="10"
+                                CornerRadius="12"
                                 Margin="8,2"
                                 BorderThickness="0"/>
 
-                        <!-- Capa 2: Indicador de Selección (Integrado en el borde derecho) -->
+                        <!-- Capa 2: Indicador de Selección (Cápsula flotante a la izquierda) -->
                         <Border x:Name="SelectionIndicator"
-                                BorderBrush="{StaticResource AccentBrush}"
-                                BorderThickness="0,0,2,0"
-                                CornerRadius="10"
-                                Margin="8,2"
-                                Visibility="Collapsed"/>
+                                Background="{StaticResource AccentBrush}"
+                                Width="4"
+                                Height="20"
+                                CornerRadius="2"
+                                HorizontalAlignment="Left"
+                                Margin="4,0,0,0"
+                                Visibility="Collapsed">
+                             <Border.Effect>
+                                <BlurEffect Radius="2"/>
+                            </Border.Effect>
+                        </Border>
 
                         <!-- Contenido -->
                         <ContentPresenter VerticalAlignment="Center"
-                                          HorizontalAlignment="Left"/>
+                                          HorizontalAlignment="Left"
+                                          Margin="24,0,0,0"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <!-- Estado: Hover -->
@@ -52,6 +59,7 @@
                             <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                             <Setter TargetName="SelectionIndicator" Property="Visibility" Value="Visible"/>
                             <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
                         
                          <!-- Estado: Presionado -->
@@ -76,20 +84,12 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Grid>
-                        <!-- Capa 1: Fondo (Color Hover/Selected) - Simétrico y sin bordes -->
+                        <!-- Capa 1: Fondo -->
                         <Border x:Name="BackgroundBorder"
                                 Background="{TemplateBinding Background}"
-                                CornerRadius="6"
+                                CornerRadius="8"
                                 Margin="12,2"
                                 BorderThickness="0"/>
-
-                        <!-- Capa 2: Borde de Selección (Solo Borde Derecho) - Superpuesto para seguir la curva -->
-                        <Border x:Name="SelectionBorder"
-                                Background="Transparent"
-                                CornerRadius="6"
-                                Margin="12,2"
-                                BorderThickness="0,0,2,0"
-                                BorderBrush="Transparent"/>
 
                         <Grid VerticalAlignment="Center" Margin="20,0,12,0">
                             <Grid.ColumnDefinitions>
@@ -126,15 +126,9 @@
 
                         <!-- Selected -->
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource CardBackground}"/>
                             <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                        </Trigger>
-                        
-                         <!-- Pressed -->
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource ModernButtonPressedBrush}"/>
-                            <Setter TargetName="BackgroundBorder" Property="Opacity" Value="0.4"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -155,29 +149,51 @@
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border Background="{TemplateBinding Background}"
-                            CornerRadius="6"
+                            CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
                                         VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{StaticResource ModernButtonHoverBrush}"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter Property="Background" Value="{StaticResource ModernButtonPressedBrush}"/>
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.5"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <ScaleTransform ScaleX="1" ScaleY="1"/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource ModernButtonHoverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{StaticResource ModernButtonPressedBrush}"/>
+                <Trigger.EnterActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="0.95" Duration="0:0:0.1"/>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="0.95" Duration="0:0:0.1"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.1"/>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.1"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.ExitActions>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.5"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- Secondary Button Style -->
