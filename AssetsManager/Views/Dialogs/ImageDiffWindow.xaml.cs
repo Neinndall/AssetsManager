@@ -189,6 +189,12 @@ namespace AssetsManager.Views.Dialogs
         {
             if (!_isInitialized) return;
 
+            // Reset Slider Clip if not in Slider mode
+            if (SliderBtn.IsChecked != true && SliderClip != null)
+            {
+                SliderClip.Rect = new Rect(0, 0, 99999, 99999);
+            }
+
             if (DiffBtn.IsChecked == true)
             {
                 GenerateDifferenceMap();
@@ -217,13 +223,16 @@ namespace AssetsManager.Views.Dialogs
             // If layout is not ready, we can't position correctly yet
             if (width <= 0) return;
 
-            double clipX = width * percentage;
-            SliderClip.Rect = new Rect(clipX, 0, width - clipX, height);
+            // The slider acts as a curtain from LEFT to RIGHT
+            // At 0%: Clip width is 0 (New image hidden)
+            // At 100%: Clip width is full width (New image fully visible)
+            double visibleWidth = width * percentage;
+            SliderClip.Rect = new Rect(0, 0, visibleWidth, height);
 
             // Position the visual line relative to image pixels using TranslateTransform
             if (SliderOffsetTranslate != null)
             {
-                SliderOffsetTranslate.X = clipX;
+                SliderOffsetTranslate.X = visibleWidth;
                 SliderSeparatorLine.Margin = new Thickness(0); 
             }
         }

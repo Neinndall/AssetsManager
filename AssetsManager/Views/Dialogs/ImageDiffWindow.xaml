@@ -64,8 +64,8 @@
         <!-- Header Section -->
         <Border Grid.Row="0"
                 Background="{StaticResource CardBackground}"
-                BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1"
+                BorderBrush="{StaticResource BorderColor}"
                 Padding="24,18">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -177,22 +177,35 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Old Image Card -->
-                <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0">
+                <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
-                            <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="History" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Old Version" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock x:Name="OldFileNameLabel" FontSize="11" Foreground="{StaticResource TextSecondary}" MaxWidth="350" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </StackPanel>
+
+                        <!-- Sub-Header: OLD VERSION -->
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="12,12,12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Background="#1AFF9100" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                        <icons:MaterialIcon Kind="History" Width="18" Height="18" Foreground="{StaticResource AccentOrange}"/>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="OLD VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>
+                                        <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </Border>
-                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,8,8" Padding="16" x:Name="OldImageBorder" ClipToBounds="True">
+
+                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,12,12" Padding="16" x:Name="OldImageBorder" ClipToBounds="True">
                             <Image x:Name="OldImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
                                 <Image.RenderTransform>
                                     <TransformGroup>
@@ -208,22 +221,35 @@
                 <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext"/>
 
                 <!-- New Image Card -->
-                <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0">
+                <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
-                            <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="FlashOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="New Version" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock x:Name="NewFileNameLabel" FontSize="11" Foreground="{StaticResource TextSecondary}" MaxWidth="350" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </StackPanel>
+
+                        <!-- Sub-Header: NEW VERSION -->
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="12,12,12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Background="#1A00E676" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                        <icons:MaterialIcon Kind="FlashOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="NEW VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>
+                                        <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </Border>
-                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,8,8" Padding="16" x:Name="NewImageBorder" ClipToBounds="True">
+
+                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,12,12" Padding="16" x:Name="NewImageBorder" ClipToBounds="True">
                             <Image x:Name="NewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
                                 <Image.RenderTransform>
                                     <TransformGroup>
@@ -240,46 +266,55 @@
             <!-- MODE 2: Overlay (Slider / Onion Skin / Diff) -->
             <Grid x:Name="OverlayPanel" 
                   Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                <Border Style="{StaticResource SettingsCard}" Padding="0">
+                <Border Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Info Header -->
-                        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,10" Background="{StaticResource SidebarBackground}" CornerRadius="8,8,0,0">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                    <icons:MaterialIcon Kind="LayersOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Mode" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
-                                                        <Setter Property="Text" Value="Slider Mode"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
-                                                        <Setter Property="Text" Value="Onion Skin"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=DiffBtn}" Value="True">
-                                                        <Setter Property="Text" Value="Difference Map"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </StackPanel>
-                                <TextBlock Grid.Column="1" Text="NEW vs OLD" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            </Grid>
+                        <!-- Sub-Header: OVERLAY MODE -->
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="12,12,12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Background="#1A5C85FF" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                        <icons:MaterialIcon Kind="LayersOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="OVERLAY MODE" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentBrush}" Opacity="0.8"/>
+                                        <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Analysis" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
+                                                            <Setter Property="Text" Value="Slider Overlay View"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
+                                                            <Setter Property="Text" Value="Onion Skin Transparency"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsChecked, ElementName=DiffBtn}" Value="True">
+                                                            <Setter Property="Text" Value="Mathematical Difference Map"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Column="2" Text="NEW vs OLD" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.6"/>
+                                </Grid>
+                            </Border>
                         </Border>
 
                         <!-- Interactive Image Container -->
-                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,8,8" Padding="16" x:Name="ImageContainer" ClipToBounds="True">
+                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,12,12" Padding="16" x:Name="ImageContainer" ClipToBounds="True">
                             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <!-- Base Image (OLD) -->
                                 <Image x:Name="OldImageOverlay" Stretch="Uniform" Opacity="1" RenderOptions.BitmapScalingMode="NearestNeighbor">
