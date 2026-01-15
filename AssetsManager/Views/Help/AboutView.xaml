@@ -29,7 +29,7 @@
             </Grid>
         </Border>
 
-        <!-- HERO SECTION: Branding (Integrated and Refined) -->
+        <!-- HERO SECTION: Branding -->
         <StackPanel HorizontalAlignment="Center" Margin="0,0,0,40">
             <materialIcons:MaterialIcon Kind="DatabaseSearch" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,16"/>
             
@@ -71,90 +71,91 @@
         <!-- FEATURES GRID -->
         <TextBlock Text="CORE CAPABILITIES" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,16"/>
         <UniformGrid Columns="2">
-            <!-- Feature 1: Download -->
+            <!-- Feature 1 -->
             <Border Style="{StaticResource SettingsCard}" Margin="0,0,8,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
                             <materialIcons:MaterialIcon Kind="CloudDownload" Foreground="{StaticResource AccentBlue}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Auto Downloads" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="Auto Downloads" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Seamlessly detects and downloads new PBE assets in the background." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    <TextBlock Text="Seamlessly detects and downloads new PBE assets in the background." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 2: Comparator -->
+            <!-- Feature 2 -->
             <Border Style="{StaticResource SettingsCard}" Margin="8,0,0,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
                             <materialIcons:MaterialIcon Kind="FileCompare" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="WAD Comparator" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="WAD Comparator" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Advanced differential analysis to pinpoint modified content." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    <TextBlock Text="Advanced differential analysis to pinpoint modified content." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 3: Explorer -->
+            <!-- Feature 3 -->
             <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
                             <materialIcons:MaterialIcon Kind="FolderSearch" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="File Explorer" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="File Explorer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Browse internal archives with integrated instant previews." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    <TextBlock Text="Browse internal archives with integrated instant previews." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 4: 3D Viewer -->
+            <!-- Feature 4 -->
             <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
                             <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="3D Viewer" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="3D Viewer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="High-performance rendering of models, skeletons, and animations." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    <TextBlock Text="High-performance rendering of models, skeletons, and animations." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 5: Monitor -->
+            <!-- Feature 5 -->
             <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,0" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
                             <materialIcons:MaterialIcon Kind="Radar" Foreground="{StaticResource AccentRed}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Live Monitoring" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="Live Monitoring" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Real-time surveillance of remote configs and server health." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    <TextBlock Text="Real-time surveillance of remote configs and server health." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 6: Audio -->
+            <!-- Feature 6 -->
             <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,0" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
                             <materialIcons:MaterialIcon Kind="MusicNote" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Audio Banks" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="Audio Banks" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Decrypt, inspect, and playback encrypted audio bank events." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    <TextBlock Text="Decrypt, inspect, and playback encrypted audio bank events." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
 
         <!-- FOOTER -->
-        <TextBlock Text="© 2026 AssetsManager. All rights reserved." 
-                   FontSize="11" 
-                   Foreground="{StaticResource TextMuted}" 
-                   HorizontalAlignment="Center" 
-                   Margin="0,40,0,0"/>
+        <StackPanel HorizontalAlignment="Center" Margin="0,30,0,0">
+            <TextBlock Text="© 2026 AssetsManager. All rights reserved." 
+                       FontSize="11" 
+                       Foreground="{StaticResource TextMuted}" 
+                       TextAlignment="Center"/>
+        </StackPanel>
     </StackPanel>
 </UserControl>
