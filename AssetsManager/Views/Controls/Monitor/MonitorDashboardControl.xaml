@@ -13,15 +13,11 @@
             <RowDefinition Height="Auto"/> <!-- Service Grid -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER: Main Status + HUD -->
-        <Grid Grid.Row="0" Margin="0,0,0,24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
+        <!-- 1. HEADER: Main Status + HUD (Centered) -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,24">
+            
             <!-- Left: Title -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,32,0">
                 <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="32" Height="32" Margin="0,0,12,0">
                     <materialIcons:MaterialIcon Kind="StarFourPoints" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
@@ -29,7 +25,7 @@
             </StackPanel>
 
             <!-- Right: Status Indicators -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <!-- PBE Status -->
                 <Border Background="{StaticResource SidebarBackground}" Padding="12,6" CornerRadius="8" Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
@@ -66,7 +62,7 @@
                     </StackPanel>
                 </Border>
             </StackPanel>
-        </Grid>
+        </StackPanel>
 
         <!-- 2. SERVICE GRID: Reorganized Layout (Single Row HUD) -->
         <UniformGrid Grid.Row="1" Columns="4">
@@ -82,8 +78,8 @@
 
                     <!-- Header -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
-                        <materialIcons:MaterialIcon Kind="ServerNetwork" Width="18" Height="18" Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="PBE SERVER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="ServerNetwork" Width="20" Height="20" Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="PBE SERVER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                     </StackPanel>
                     
                     <!-- Main Content -->
@@ -115,8 +111,8 @@
 
                     <!-- Header -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
-                        <materialIcons:MaterialIcon Kind="Pulse" Width="18" Height="18" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="SYSTEM HEALTH" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="Pulse" Width="20" Height="20" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="SYSTEM HEALTH" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Main Content -->
@@ -131,20 +127,20 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- Core Version -->
-                        <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,12">
-                            <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="16" Foreground="{Binding AppVersionColor}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="6" Width="32" Height="32" Margin="0,0,10,12">
+                            <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="18" Foreground="{Binding AppVersionColor}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,0,12">
-                            <TextBlock Text="Core Version" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="{Binding AppVersionText}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Core Version" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="{Binding AppVersionText}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                         </StackPanel>
 
                         <!-- Hash Database -->
-                        <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,4">
-                            <materialIcons:MaterialIcon Kind="DatabaseCheckOutline" Width="16" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="6" Width="32" Height="32" Margin="0,0,10,4">
+                            <materialIcons:MaterialIcon Kind="DatabaseCheckOutline" Width="18" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,0,4">
-                            <TextBlock Text="Hash Database" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,2"/>
+                            <TextBlock Text="Hash Database" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,2"/>
                             <TextBlock Text="{Binding HashesStatus}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                         </StackPanel>
                     </Grid>
@@ -173,8 +169,8 @@
 
                     <!-- Header -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
-                        <materialIcons:MaterialIcon Kind="EyeSettingsOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="FILE WATCHER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="EyeSettingsOutline" Width="20" Height="20" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="FILE WATCHER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Metrics HUD -->
@@ -221,8 +217,8 @@
 
                     <!-- Header -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
-                        <materialIcons:MaterialIcon Kind="ImageSearchOutline" Width="18" Height="18" Foreground="{StaticResource AccentOrange}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="ASSET TRACKER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="ImageSearchOutline" Width="20" Height="20" Foreground="{StaticResource AccentOrange}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="ASSET TRACKER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Metrics HUD -->
