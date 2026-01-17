@@ -45,13 +45,18 @@ AssetsManager includes a professional suite of tools to automatically track chan
 
 ### Prerequisites
 
-*   [.NET 8.0 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.8-windows-x64-installer) (or higher) installed on your system.
+*   [.NET 10.0 Runtime](https://dotnet.microsoft.com/es-es/download/dotnet/thank-you/runtime-desktop-10.0.2-windows-x64-installer) installed on your system for running the app.
 
-### Installation
+### How do I download the app from GitHub?
 
-1.  **Download the latest release:** Visit the [Releases page](https://github.com/Neinndall/AssetsManager/releases) and download the `AssetsManager.zip` file.
+1.  **Download the latest release:** Visit the [Releases page](https://github.com/Neinndall/AssetsManager/releases) and search `AssetsManager_vX.X.X.X.zip` and download.
 2.  **Extract the contents:** Unzip the file to your desired location.
 3.  **Run the application:** Launch `AssetsManager.exe` to start exploring.
+
+### How to update the app?
+
+1. It's very simple. You'll be notified in the `app's status bar` or you can update to the latest version in Help Updates section.
+2. Follow the steps and update easily.
 
 ## ⚙️ Configuration
 
