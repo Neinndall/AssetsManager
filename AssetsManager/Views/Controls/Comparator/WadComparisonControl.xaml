@@ -41,7 +41,7 @@
                 <!-- Right: Mode Switcher -->
                 <Border Grid.Column="1" 
                         Background="{StaticResource SidebarBackground}" 
-                        CornerRadius="12" 
+                        CornerRadius="8" 
                         Padding="4" 
                         BorderBrush="{StaticResource BorderColor}" 
                         BorderThickness="1"

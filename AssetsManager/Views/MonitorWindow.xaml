@@ -86,7 +86,7 @@
         <Border Grid.Row="1" 
                 Margin="32,0,32,16" 
                 Background="{StaticResource CardBackground}" 
-                CornerRadius="12" 
+                CornerRadius="8" 
                 BorderBrush="{StaticResource BorderColor}" 
                 BorderThickness="1"
                 Padding="4">

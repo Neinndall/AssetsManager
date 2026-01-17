@@ -98,7 +98,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="TabClient" Content="League Client" IsChecked="True" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="140"/>
                     <RadioButton x:Name="TabGame" Content="Game Client" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="140"/>

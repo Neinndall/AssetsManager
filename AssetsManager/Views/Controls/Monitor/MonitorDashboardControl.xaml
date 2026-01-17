@@ -13,19 +13,19 @@
             <RowDefinition Height="Auto"/> <!-- Service Grid -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER: Main Status + HUD (Centered) -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,24">
+        <!-- 1. HEADER: Main Status + HUD (Vertical Centered) -->
+        <StackPanel Grid.Row="0" Orientation="Vertical" HorizontalAlignment="Center" Margin="0,0,0,32">
             
-            <!-- Left: Title -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,32,0">
+            <!-- Top: Title -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,16">
                 <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="32" Height="32" Margin="0,0,12,0">
                     <materialIcons:MaterialIcon Kind="StarFourPoints" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <TextBlock Text="MAIN STATUS" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
             </StackPanel>
 
-            <!-- Right: Status Indicators -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- Bottom: Status Indicators -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <!-- PBE Status -->
                 <Border Background="{StaticResource SidebarBackground}" Padding="12,6" CornerRadius="8" Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
