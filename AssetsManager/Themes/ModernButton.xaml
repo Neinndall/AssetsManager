@@ -556,13 +556,14 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Grid x:Name="RootGrid" Background="Transparent" ClipToBounds="False">
+                    <Grid x:Name="RootGrid" Background="Transparent" ClipToBounds="False" SnapsToDevicePixels="True">
                         <!-- Layer 1: Background -->
                         <Border x:Name="MainBorder" 
                                 Background="{TemplateBinding Background}" 
                                 CornerRadius="6" 
                                 BorderThickness="0"
                                 Padding="{TemplateBinding Padding}"
+                                Margin="1"
                                 ClipToBounds="False">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <!-- Status LED -->
@@ -604,7 +605,7 @@
                             <Setter TargetName="StatusLed" Property="Fill" Value="{StaticResource AccentBrush}"/>
                             <Setter TargetName="StatusLed" Property="Effect">
                                 <Setter.Value>
-                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="{StaticResource AccentBrushColor}" Opacity="0.8"/>
+                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#FF5C85FF" Opacity="0.8"/>
                                 </Setter.Value>
                             </Setter>
                             <Setter Property="Foreground" Value="White"/>

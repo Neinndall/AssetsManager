@@ -14,29 +14,38 @@
             <RowDefinition Height="Auto"/> <!-- Footer Action Card -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER: Configuration & Mode Selector -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+        <!-- 1. HEADER: Configuration Card -->
+        <Border Grid.Row="0" Margin="0,0,0,20"
+                Background="{StaticResource CardBackground}" 
+                BorderBrush="{StaticResource BorderColor}" 
+                BorderThickness="1" 
+                CornerRadius="8" 
+                Padding="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <!-- Left: Configuration Label -->
-            <StackPanel Grid.Column="0" VerticalAlignment="Bottom" Margin="0,0,0,10">
-                <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,0,2">
-                    <TextBlock Text="PREPARE YOUR" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Opacity="0.8"/>
-                </Border>
-                <TextBlock Text="Configuration" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,0"/>
-            </StackPanel>
+                <!-- Left: Icon & Text -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="38" Height="38" Margin="0,0,12,0">
+                        <materialIcons:MaterialIcon Kind="Wrench" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Configuration" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Select a comparison mode to proceed." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                    </StackPanel>
+                </StackPanel>
 
-            <!-- Right: Mode Switcher (Aligned Bottom) -->
-            <StackPanel Grid.Column="1" VerticalAlignment="Bottom" Margin="0,0,0,10">
-                <TextBlock Text="ANALYSIS MODE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" Margin="0,0,2,4"/>
-                <Border Background="{StaticResource CardBackground}" 
+                <!-- Right: Mode Switcher -->
+                <Border Grid.Column="1" 
+                        Background="{StaticResource SidebarBackground}" 
                         CornerRadius="8" 
                         Padding="3" 
                         BorderBrush="{StaticResource BorderColor}" 
-                        BorderThickness="1">
+                        BorderThickness="1"
+                        VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <RadioButton x:Name="ModeDirectory" 
                                      Content="Directory" 
@@ -49,11 +58,8 @@
                                      Style="{StaticResource SegmentedRadioButtonStyle}"/>
                     </StackPanel>
                 </Border>
-            </StackPanel>
-
-            <!-- Technical Separator -->
-            <Rectangle Grid.ColumnSpan="2" Height="1" Fill="{StaticResource BorderColor}" VerticalAlignment="Bottom" Opacity="0.3"/>
-        </Grid>
+            </Grid>
+        </Border>
 
         <!-- 2. VERSIONS CARD -->
         <Border Grid.Row="1" 
@@ -232,7 +238,7 @@
                 BorderBrush="{StaticResource BorderColor}" 
                 BorderThickness="1" 
                 CornerRadius="12" 
-                Padding="16"
+                Padding="12"
                 Margin="0,0,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -242,7 +248,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Icon/Decoration -->
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="40" Height="40" Margin="0,0,12,0">
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="38" Height="38" Margin="0,0,12,0">
                     <materialIcons:MaterialIcon Kind="CheckAll" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 

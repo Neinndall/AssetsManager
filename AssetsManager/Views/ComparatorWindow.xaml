@@ -34,11 +34,10 @@
                         <ColumnDefinition Width="Auto"/> <!-- Status Badge -->
                     </Grid.ColumnDefinitions>
 
-                    <!-- Large Tech Icon with Glow -->
                     <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="12" Width="56" Height="56" Margin="0,0,0,0">
                         <materialIcons:MaterialIcon Kind="Compare" Width="30" Height="30" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <materialIcons:MaterialIcon.Effect>
-                                <DropShadowEffect Color="{StaticResource AccentBrushColor}" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/>
+                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/>
                             </materialIcons:MaterialIcon.Effect>
                         </materialIcons:MaterialIcon>
                     </Border>
@@ -48,8 +47,8 @@
 
                     <!-- Titles -->
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                        <TextBlock Text="WAD COMPARATOR" FontWeight="SemiBold" FontSize="18" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Compare game distributions, identify file differences and extract assets" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" Opacity="0.8"/>
+                        <TextBlock Text="WAD COMPARATOR" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                        <TextBlock Text="Compare game distributions, identify file differences and extract assets" FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8"/>
                     </StackPanel>
                 </Grid>
             </Border>

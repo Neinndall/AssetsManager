@@ -55,18 +55,30 @@
 
                         <!-- Main Titles -->
                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                            <TextBlock Text="MONITOR CENTER" FontWeight="SemiBold" FontSize="18" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                            <TextBlock x:Name="DynamicSubtitle" FontSize="13" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
+                            <TextBlock Text="MONITOR CENTER" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                            <TextBlock x:Name="DynamicSubtitle" FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value="Operations dashboard and system integrity overview"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True"><Setter Property="Text" Value="Remote manifests monitoring and real-time change detection"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True"><Setter Property="Text" Value="Audit log of historical changes and version differences"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True"><Setter Property="Text" Value="Advanced discovery and archival of remote game assets"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True"><Setter Property="Text" Value="Retrieve and manage League of Legends client distributions"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True"><Setter Property="Text" Value="Management of local game installation snapshots and backups"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True"><Setter Property="Text" Value="Direct connectivity with LCU and Riot API service endpoints"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True">
+                                                <Setter Property="Text" Value="Remote manifests monitoring and real-time change detection"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True">
+                                                <Setter Property="Text" Value="Audit log of historical changes and version differences"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True">
+                                                <Setter Property="Text" Value="Advanced discovery and archival of remote game assets"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True">
+                                                <Setter Property="Text" Value="Retrieve and manage League of Legends client distributions"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True">
+                                                <Setter Property="Text" Value="Management of local game installation snapshots and backups"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True">
+                                                <Setter Property="Text" Value="Direct connectivity with LCU and Riot API service endpoints"/>
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </TextBlock.Style>
@@ -100,7 +112,11 @@
                     <monitorControls:MonitorDashboardControl.Style>
                         <Style TargetType="UserControl">
                             <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabDashboard}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabDashboard}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </monitorControls:MonitorDashboardControl.Style>
                 </monitorControls:MonitorDashboardControl>
@@ -109,7 +125,11 @@
                     <monitorControls:FileWatcherControl.Style>
                         <Style TargetType="UserControl">
                             <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </monitorControls:FileWatcherControl.Style>
                 </monitorControls:FileWatcherControl>
@@ -118,7 +138,11 @@
                     <monitorControls:HistoryViewControl.Style>
                         <Style TargetType="UserControl">
                             <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </monitorControls:HistoryViewControl.Style>
                 </monitorControls:HistoryViewControl>
@@ -127,7 +151,11 @@
                     <monitorControls:AssetTrackerControl.Style>
                         <Style TargetType="UserControl">
                             <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </monitorControls:AssetTrackerControl.Style>
                 </monitorControls:AssetTrackerControl>
@@ -136,7 +164,11 @@
                     <monitorControls:ManageVersionsControl.Style>
                         <Style TargetType="UserControl">
                             <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </monitorControls:ManageVersionsControl.Style>
                 </monitorControls:ManageVersionsControl>
@@ -145,7 +177,11 @@
                     <monitorControls:BackupsControl.Style>
                         <Style TargetType="UserControl">
                             <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </monitorControls:BackupsControl.Style>
                 </monitorControls:BackupsControl>
@@ -154,7 +190,11 @@
                     <monitorControls:ApiControl.Style>
                         <Style TargetType="UserControl">
                             <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </monitorControls:ApiControl.Style>
                 </monitorControls:ApiControl>

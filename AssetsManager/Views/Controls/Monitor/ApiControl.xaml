@@ -10,25 +10,13 @@
     
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- 1. Header -->
-            <RowDefinition Height="Auto"/> <!-- 2. Control Row (Card + Buttons) -->
-            <RowDefinition Height="Auto"/> <!-- 3. Tab Selector -->
-            <RowDefinition Height="*"/>    <!-- 4. Content Area -->
+            <RowDefinition Height="Auto"/> <!-- 1. Control Row (Card + Buttons) -->
+            <RowDefinition Height="Auto"/> <!-- 2. Tab Selector -->
+            <RowDefinition Height="*"/>    <!-- 3. Content Area -->
         </Grid.RowDefinitions>
-
-        <!-- 1. MODULE IDENTIFIER: Minimalist Tech Label -->
+        
+        <!-- 1. CONTROL ROW -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,0,8">
-                <TextBlock Text="[ MODULE: 07 ]" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentPurple}" Opacity="0.8" Margin="0,0,12,0"/>
-                <TextBlock Text="CONNECTIVITY" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Opacity="0.5"/>
-            </StackPanel>
-            
-            <!-- Technical Separator -->
-            <Rectangle Height="1" Fill="{StaticResource BorderColor}" VerticalAlignment="Bottom" Opacity="0.3"/>
-        </Grid>
-
-        <!-- 2. CONTROL ROW -->
-        <Grid Grid.Row="1" Margin="0,0,0,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>    <!-- Info Card -->
                 <ColumnDefinition Width="Auto"/> <!-- Connect Button -->
@@ -48,10 +36,17 @@
                         <materialIcons:MaterialIcon Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <materialIcons:MaterialIcon.Style>
                                 <Style TargetType="materialIcons:MaterialIcon">
-                                    <Setter Property="Kind" Value="LinkVariantOff" /><Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+                                    <Setter Property="Kind" Value="LinkVariantOff" />
+                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Status.IsConnected}" Value="True"><Setter Property="Kind" Value="LinkVariant" /><Setter Property="Foreground" Value="{StaticResource AccentGreen}" /></DataTrigger>
-                                        <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: Connecting..."><Setter Property="Kind" Value="Sync" /><Setter Property="Foreground" Value="{StaticResource AccentBrush}" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding Status.IsConnected}" Value="True">
+                                            <Setter Property="Kind" Value="LinkVariant" />
+                                            <Setter Property="Foreground" Value="{StaticResource AccentGreen}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: Connecting...">
+                                            <Setter Property="Kind" Value="Sync" />
+                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                        </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </materialIcons:MaterialIcon.Style>
@@ -134,9 +129,12 @@
             </StackPanel>
         </Grid>
 
-        <!-- 3. TABS & PAGINATION -->
-        <Grid Grid.Row="2" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <!-- 2. TABS & PAGINATION -->
+        <Grid Grid.Row="1" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
             <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="TabSales" Content="Sales" Click="TabSales_Click" IsChecked="True" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
@@ -155,22 +153,38 @@
                                 </MultiDataTrigger.Conditions>
                                 <Setter Property="Visibility" Value="Visible"/>
                             </MultiDataTrigger>
-                            <DataTrigger Binding="{Binding Status.Paginator.TotalPages}" Value="1"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                            <DataTrigger Binding="{Binding Status.Paginator.TotalPages}" Value="1">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </StackPanel.Style>
-                <Button Style="{StaticResource TransparentIconButton}" Click="PreviousPage_Click" IsEnabled="{Binding Status.Paginator.CanGoToPreviousPage}"><materialIcons:MaterialIcon Kind="ChevronLeft"/></Button>
-                <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="12,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"><TextBlock Text="{Binding Status.Paginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/></Border>
-                <Button Style="{StaticResource TransparentIconButton}" Click="NextPage_Click" IsEnabled="{Binding Status.Paginator.CanGoToNextPage}"><materialIcons:MaterialIcon Kind="ChevronRight"/></Button>
+                <Button Style="{StaticResource TransparentIconButton}" Click="PreviousPage_Click" IsEnabled="{Binding Status.Paginator.CanGoToPreviousPage}">
+                    <materialIcons:MaterialIcon Kind="ChevronLeft"/>
+                </Button>
+                <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="12,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <TextBlock Text="{Binding Status.Paginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </Border>
+                <Button Style="{StaticResource TransparentIconButton}" Click="NextPage_Click" IsEnabled="{Binding Status.Paginator.CanGoToNextPage}">
+                    <materialIcons:MaterialIcon Kind="ChevronRight"/>
+                </Button>
             </StackPanel>
         </Grid>
 
-        <!-- 4. CONTENT AREA -->
-        <TabControl x:Name="MainTabControl" Grid.Row="3" Background="Transparent" BorderThickness="0" Padding="0">
-            <TabControl.ItemContainerStyle><Style TargetType="TabItem"><Setter Property="Visibility" Value="Collapsed"/></Style></TabControl.ItemContainerStyle>
+        <!-- 3. CONTENT AREA -->
+        <TabControl x:Name="MainTabControl" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="0">
+            <TabControl.ItemContainerStyle>
+                <Style TargetType="TabItem">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </Style>
+            </TabControl.ItemContainerStyle>
             <TabItem>
                 <ItemsControl x:Name="SalesItemsControl" ItemsSource="{Binding Status.SalesCatalog}" ItemTemplate="{StaticResource StoreItemTemplate}">
-                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="4"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </TabItem>
             <TabItem>
@@ -178,8 +192,16 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,0,0,24">
-                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Left" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"><TextBlock Text="{Binding CategoryName}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/></Border>
-                                <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource MythicItemTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl>
+                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Left" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <TextBlock Text="{Binding CategoryName}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource MythicItemTemplate}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="4"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

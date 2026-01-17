@@ -10,26 +10,14 @@
 
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- 1. Header -->
-            <RowDefinition Height="Auto"/> <!-- 2. Download Configuration -->
-            <RowDefinition Height="Auto"/> <!-- 3. Action Buttons -->
-            <RowDefinition Height="Auto"/> <!-- 4. Tabs & Pagination -->
-            <RowDefinition Height="*"/>    <!-- 5. Content Area -->
+            <RowDefinition Height="Auto"/> <!-- 1. Download Configuration -->
+            <RowDefinition Height="Auto"/> <!-- 2. Action Buttons -->
+            <RowDefinition Height="Auto"/> <!-- 3. Tabs & Pagination -->
+            <RowDefinition Height="*"/>    <!-- 4. Content Area -->
         </Grid.RowDefinitions>
-
-        <!-- 1. MODULE IDENTIFIER: Minimalist Tech Label -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,0,8">
-                <TextBlock Text="[ MODULE: 05 ]" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Opacity="0.8" Margin="0,0,12,0"/>
-                <TextBlock Text="DISTRIBUTION" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Opacity="0.5"/>
-            </StackPanel>
-            
-            <!-- Technical Separator -->
-            <Rectangle Height="1" Fill="{StaticResource BorderColor}" VerticalAlignment="Bottom" Opacity="0.3"/>
-        </Grid>
-
-        <!-- 2. DOWNLOAD CONFIGURATION (Now above Buttons) -->
-        <Border Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+        
+        <!-- 1. DOWNLOAD CONFIGURATION -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -68,8 +56,8 @@
             </Grid>
         </Border>
         
-        <!-- 3. ACTION BUTTONS (Now below Configuration) -->
-        <UniformGrid Grid.Row="2" Columns="4" Margin="0,0,0,24">
+        <!-- 2. ACTION BUTTONS (Now below Configuration) -->
+        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,24">
             <Button Click="FetchVersions_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,6,0" Height="86" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="Refresh" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
@@ -103,8 +91,8 @@
             </Button>
         </UniformGrid>
 
-        <!-- 4. TABS & PAGINATION -->
-        <Grid Grid.Row="3" Margin="0,0,0,12">
+        <!-- 3. TABS & PAGINATION -->
+        <Grid Grid.Row="2" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -133,11 +121,15 @@
                             </Style.Triggers>
                         </Style>
                     </StackPanel.Style>
-                    <Button Style="{StaticResource TransparentIconButton}" Click="PrevLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToPreviousPage}" Width="28" Height="28"><materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/></Button>
+                    <Button Style="{StaticResource TransparentIconButton}" Click="PrevLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToPreviousPage}" Width="28" Height="28">
+                        <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/>
+                    </Button>
                     <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <TextBlock Text="{Binding LeagueClientPaginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </Border>
-                    <Button Style="{StaticResource TransparentIconButton}" Click="NextLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}" Width="28" Height="28"><materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{StaticResource TextSecondary}"/></Button>
+                    <Button Style="{StaticResource TransparentIconButton}" Click="NextLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}" Width="28" Height="28">
+                        <materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{StaticResource TextSecondary}"/>
+                    </Button>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal">
@@ -155,17 +147,21 @@
                             </Style.Triggers>
                         </Style>
                     </StackPanel.Style>
-                    <Button Style="{StaticResource TransparentIconButton}" Click="PrevLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToPreviousPage}" Width="28" Height="28"><materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/></Button>
+                    <Button Style="{StaticResource TransparentIconButton}" Click="PrevLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToPreviousPage}" Width="28" Height="28">
+                        <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/>
+                    </Button>
                     <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <TextBlock Text="{Binding LoLGameClientPaginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </Border>
-                    <Button Style="{StaticResource TransparentIconButton}" Click="NextLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToNextPage}" Width="28" Height="28"><materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{StaticResource TextSecondary}"/></Button>
+                    <Button Style="{StaticResource TransparentIconButton}" Click="NextLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToNextPage}" Width="28" Height="28">
+                        <materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{StaticResource TextSecondary}"/>
+                    </Button>
                 </StackPanel>
             </StackPanel>
         </Grid>
 
-        <!-- 5. CONTENT AREA -->
-        <Grid Grid.Row="4">
+        <!-- 4. CONTENT AREA -->
+        <Grid Grid.Row="3">
             <ListView x:Name="LeagueClientVersionsListView" 
                       ItemsSource="{Binding LeagueClientPaginator.PagedItems}" 
                       Background="Transparent" BorderThickness="0">
@@ -193,7 +189,11 @@
                                         <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
                                         <Border x:Name="AccentIndicator" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentBrush}" CornerRadius="8"/>
                                         <Grid Margin="12,8,12,8">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
                                             <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
                                                 <materialIcons:MaterialIcon Kind="DesktopClassic" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
