@@ -72,24 +72,6 @@
                                 </TextBlock.Style>
                             </TextBlock>
                         </StackPanel>
-
-                        <!-- Status Pulse Badge (Dynamic) -->
-                        <Border Grid.Column="3" VerticalAlignment="Top" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="20" Padding="12,6">
-                            <StackPanel Orientation="Horizontal">
-                                <Ellipse Width="8" Height="8" Fill="{Binding DataContext.GlobalStatusColor, ElementName=MonitorDashboardControl}" Margin="0,0,8,0" VerticalAlignment="Center">
-                                    <Ellipse.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.2" Duration="0:0:1.5" AutoReverse="True" RepeatBehavior="Forever"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Ellipse.Triggers>
-                                </Ellipse>
-                                <TextBlock Text="{Binding DataContext.GlobalStatusText, ElementName=MonitorDashboardControl}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
                     </Grid>
                 </Border>
 

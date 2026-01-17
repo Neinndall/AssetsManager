@@ -139,6 +139,14 @@ namespace AssetsManager.Views.Models.Monitor
             set { _globalStatusIconKind = value; OnPropertyChanged(); }
         }
 
+        // --- Data Status Color (Independent for Telemetry) ---
+        private Brush _dataStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Default Green
+        public Brush DataStatusColor
+        {
+            get => _dataStatusColor;
+            set { _dataStatusColor = value; OnPropertyChanged(); }
+        }
+
         // --- System Health Footer Status ---
         private string _systemHealthFooterText = "Self-Check Passed";
         public string SystemHealthFooterText
@@ -310,6 +318,19 @@ namespace AssetsManager.Views.Models.Monitor
             GlobalStatusIconKind = Material.Icons.MaterialIconKind.ShieldCheckOutline;
         }
 
+        private void UpdateDataStatus()
+        {
+            // Check if there are changed files or new assets
+            if (MonitoredFilesChangedCount > 0)
+            {
+                DataStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
+            }
+            else
+            {
+                DataStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
+            }
+        }
+
         private void UpdateSystemHealthFooter()
         {
             // Case 1: Hashes Updating
@@ -399,6 +420,7 @@ namespace AssetsManager.Views.Models.Monitor
                 : "Never";
 
             UpdateGlobalStatus();
+            UpdateDataStatus();
         }
 
         public void RefreshAssetTrackerData()
@@ -413,6 +435,7 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 AssetTrackerStatus = "Idle";
             }
+            UpdateDataStatus();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
