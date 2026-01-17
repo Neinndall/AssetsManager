@@ -355,7 +355,7 @@ namespace AssetsManager.Services.Comparator
                     {
                         fs.Seek(chunk.DataOffset, SeekOrigin.Begin);
                         byte[] rawChunkData = new byte[chunk.CompressedSize];
-                        await fs.ReadAsync(rawChunkData, 0, rawChunkData.Length);
+                        await fs.ReadExactlyAsync(rawChunkData, 0, rawChunkData.Length);
 
                         string chunkFileName = $"{chunk.PathHash:X16}.chunk";
                         string destChunkPath = Path.Combine(targetChunkPath, chunkFileName);
