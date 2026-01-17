@@ -2,7 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     
     <!-- BRAND ACCENTS (More vibrant & professional) -->
-    <SolidColorBrush x:Key="AccentBrush" Color="#FF5C85FF"/> <!-- Blue-ish Indigo -->
+    <Color x:Key="AccentBrushColor">#FF5C85FF</Color>
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentBrushColor}"/> <!-- Blue-ish Indigo -->
     <SolidColorBrush x:Key="ModernButtonHoverBrush" Color="#FF7094FF"/>
     <SolidColorBrush x:Key="ModernButtonPressedBrush" Color="#FF4A6EDF"/>
 

@@ -14,41 +14,27 @@
             <RowDefinition Height="Auto"/> <!-- Footer Action Card -->
         </Grid.RowDefinitions>
 
-        <!-- 1. CONFIGURATION CARD -->
-        <Border Grid.Row="0" 
-                Background="{StaticResource CardBackground}" 
-                BorderBrush="{StaticResource BorderColor}" 
-                BorderThickness="1" 
-                CornerRadius="12" 
-                Padding="24"
-                Margin="0,0,0,20">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                    <ColumnDefinition Width="*"/>    <!-- Texts -->
-                    <ColumnDefinition Width="Auto"/> <!-- Mode Selector -->
-                </Grid.ColumnDefinitions>
+        <!-- 1. HEADER: Configuration & Mode Selector -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-                <!-- Icon Box -->
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="SettingsOutline" 
-                                               Foreground="{StaticResource AccentBrush}"
-                                               Width="22" Height="22"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- Left: Configuration Label -->
+            <StackPanel Grid.Column="0" VerticalAlignment="Bottom" Margin="0,0,0,10">
+                <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,0,2">
+                    <TextBlock Text="PREPARE YOUR" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Opacity="0.8"/>
                 </Border>
+                <TextBlock Text="Configuration" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,0"/>
+            </StackPanel>
 
-                <!-- Titles -->
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Configuration" FontWeight="Bold" FontSize="16" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Choose the analysis mode and paths below" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
-                </StackPanel>
-
-                <!-- Mode Switcher -->
-                <Border Grid.Column="2" 
-                        Background="{StaticResource SidebarBackground}" 
+            <!-- Right: Mode Switcher (Aligned Bottom) -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Bottom" Margin="0,0,0,10">
+                <TextBlock Text="ANALYSIS MODE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" Margin="0,0,2,4"/>
+                <Border Background="{StaticResource CardBackground}" 
                         CornerRadius="8" 
                         Padding="3" 
-                        VerticalAlignment="Center"
                         BorderBrush="{StaticResource BorderColor}" 
                         BorderThickness="1">
                     <StackPanel Orientation="Horizontal">
@@ -63,8 +49,11 @@
                                      Style="{StaticResource SegmentedRadioButtonStyle}"/>
                     </StackPanel>
                 </Border>
-            </Grid>
-        </Border>
+            </StackPanel>
+
+            <!-- Technical Separator -->
+            <Rectangle Grid.ColumnSpan="2" Height="1" Fill="{StaticResource BorderColor}" VerticalAlignment="Bottom" Opacity="0.3"/>
+        </Grid>
 
         <!-- 2. VERSIONS CARD -->
         <Border Grid.Row="1" 
@@ -85,7 +74,7 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="TARGET VERSION" FontWeight="Bold" FontSize="11" Foreground="{StaticResource AccentGreen}" Opacity="0.9"/>
-                            <TextBlock FontSize="13" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold">
+                            <TextBlock FontSize="13" Foreground="{StaticResource TextPrimary}">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value="New Directory"/>
@@ -164,7 +153,7 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="BASE VERSION" FontWeight="Bold" FontSize="11" Foreground="{StaticResource AccentOrange}" Opacity="0.9"/>
-                            <TextBlock FontSize="13" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold">
+                            <TextBlock FontSize="13" Foreground="{StaticResource TextPrimary}">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value="Old Directory"/>

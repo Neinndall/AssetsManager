@@ -15,19 +15,17 @@
                     
                     <!-- Default Content (Buttons) -->
                     <StackPanel x:Name="DefaultEmptyStateContent" Visibility="Visible">
-                        <!-- Welcome Text -->
-                        <TextBlock Text="Welcome to 3D Model Viewer"
-                                   FontSize="28"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource TextPrimary}"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,0,0,8"/>
-                        
-                        <TextBlock Text="Visualize models, animations and maps. Select an option to start visualizing models."
-                                   FontSize="14"
-                                   Foreground="{StaticResource TextSecondary}"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,0,0,40"/>
+                        <!-- HERO HEADER: Centered Model -->
+                        <StackPanel Margin="0,0,0,32" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
+                                <Border Background="#1A00E676" CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,10,0">
+                                    <TextBlock Text="3D WORKSPACE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
+                                </Border>
+                                <TextBlock Text="INTERACTIVE STUDIO" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Opacity="0.7"/>
+                            </StackPanel>
+                            <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Visualize characters, animations, and map geometry in real-time." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" Opacity="0.8"/>
+                        </StackPanel>
 
                         <!-- Action Cards -->
                         <UniformGrid Columns="3" HorizontalAlignment="Center">

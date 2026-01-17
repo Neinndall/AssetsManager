@@ -15,26 +15,16 @@
             <RowDefinition Height="*"/>    <!-- 3. Backups List -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER -->
-        <Border Grid.Row="0" Margin="0,0,0,16" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="BackupRestore" Width="22" Height="22" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Local Backups" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Create and manage full backups of your game installation" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
-                </StackPanel>
-
-                <materialIcons:MaterialIcon Grid.Column="1" Kind="FolderZip" Width="64" Height="64" Foreground="{StaticResource AccentBlue}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
-            </Grid>
-        </Border>
+        <!-- 1. MODULE IDENTIFIER: Minimalist Tech Label -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,0,8">
+                <TextBlock Text="[ MODULE: 06 ]" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" Opacity="0.8" Margin="0,0,12,0"/>
+                <TextBlock Text="SNAPSHOTS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Opacity="0.5"/>
+            </StackPanel>
+            
+            <!-- Technical Separator -->
+            <Rectangle Height="1" Fill="{StaticResource BorderColor}" VerticalAlignment="Bottom" Opacity="0.3"/>
+        </Grid>
 
         <!-- 2. ACTION BUTTONS (Simplified to 2 Columns) -->
         <UniformGrid Grid.Row="1" Columns="2" Margin="0,0,0,24">

@@ -7,65 +7,57 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:comparator="clr-namespace:AssetsManager.Views.Controls.Comparator"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
-    <Grid Background="{StaticResource SidebarBackground}">
+    
+    <Grid Background="{StaticResource DarkBackground}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/> <!-- Floating Hero Header -->
+            <RowDefinition Height="*"/>    <!-- Content Area -->
         </Grid.RowDefinitions>
 
-        <!-- CABECERA -->
+        <!-- 1. FLOATING COMMAND CENTER HEADER (Comparator Style) -->
         <Border Grid.Row="0" 
-                Background="{StaticResource CardBackground}"
-                BorderBrush="{StaticResource BorderColor}"
-                BorderThickness="0,0,0,1"
-                Padding="32,20">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                Margin="32,24,32,16" 
+                Background="{StaticResource CardBackground}" 
+                CornerRadius="16" 
+                BorderBrush="{StaticResource BorderColor}" 
+                BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="30" ShadowDepth="2" Opacity="0.2" Color="Black"/>
+            </Border.Effect>
+            
+            <Border Padding="24,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                        <ColumnDefinition Width="Auto"/> <!-- Separator -->
+                        <ColumnDefinition Width="*"/>    <!-- Titles -->
+                        <ColumnDefinition Width="Auto"/> <!-- Status Badge -->
+                    </Grid.ColumnDefinitions>
 
-                <!-- Icono con Brillo -->
-                <materialIcons:MaterialIcon x:Name="CompIcon"
-                                             Kind="Compare"
-                                             Height="48"
-                                             Width="48"
-                                             VerticalAlignment="Center"
-                                             Foreground="{StaticResource AccentBrush}"
-                                             Grid.Column="0">
-                    <materialIcons:MaterialIcon.Effect>
-                        <DropShadowEffect Color="{Binding Foreground.Color, ElementName=CompIcon}" 
-                                          BlurRadius="15" 
-                                          ShadowDepth="0" 
-                                          Opacity="0.4"/>
-                    </materialIcons:MaterialIcon.Effect>
-                </materialIcons:MaterialIcon>
+                    <!-- Large Tech Icon with Glow -->
+                    <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="12" Width="56" Height="56" Margin="0,0,0,0">
+                        <materialIcons:MaterialIcon Kind="Compare" Width="30" Height="30" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon.Effect>
+                                <DropShadowEffect Color="{StaticResource AccentBrushColor}" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/>
+                            </materialIcons:MaterialIcon.Effect>
+                        </materialIcons:MaterialIcon>
+                    </Border>
 
-                <!-- Separador Vertical -->
-                <Rectangle Grid.Column="1" 
-                           Width="1" 
-                           Fill="{StaticResource BorderColor}" 
-                           Margin="12,8" 
-                           VerticalAlignment="Stretch"/>
+                    <!-- Technical Vertical Separator -->
+                    <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="20,10" VerticalAlignment="Stretch" Opacity="0.6"/>
 
-                <!-- Textos -->
-                <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="WAD COMPARATOR" 
-                               FontSize="24" 
-                               FontWeight="Bold"
-                               Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Compare game files, identify changes and extract assets"
-                               FontSize="12" 
-                               Foreground="{StaticResource TextSecondary}"
-                               Margin="0,4,0,0"/>
-                </StackPanel>
-            </Grid>
+                    <!-- Titles -->
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="WAD COMPARATOR" FontWeight="SemiBold" FontSize="18" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Compare game distributions, identify file differences and extract assets" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" Opacity="0.8"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
         </Border>
 
-        <!-- CUERPO -->
+        <!-- 2. CONTENT AREA -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="40,40,40,40" MaxWidth="1100" HorizontalAlignment="Stretch">
+            <Grid Margin="32,0,32,32">
                 <comparator:WadComparisonControl x:Name="WadComparisonControl" HorizontalAlignment="Stretch"/>
             </Grid>
         </ScrollViewer>

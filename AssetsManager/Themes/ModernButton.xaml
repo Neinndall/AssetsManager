@@ -545,43 +545,79 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Global Segmented Radio Button Style for Tab-like behavior -->
+    <!-- Global Segmented Radio Button Style for Tab-like behavior (Reworked: Command Switcher) -->
     <Style x:Key="SegmentedRadioButtonStyle" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-        <Setter Property="Padding" Value="12,10"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Grid>
-                        <!-- Main background -->
-                        <Border x:Name="Border" 
+                    <Grid x:Name="RootGrid" Background="Transparent" ClipToBounds="False">
+                        <!-- Layer 1: Background -->
+                        <Border x:Name="MainBorder" 
                                 Background="{TemplateBinding Background}" 
                                 CornerRadius="6" 
-                                BorderThickness="0,0,0,2"
-                                BorderBrush="Transparent"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                BorderThickness="0"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="False">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <!-- Status LED -->
+                                <Ellipse x:Name="StatusLed" 
+                                         Width="6" Height="6" 
+                                         Fill="{StaticResource TextMuted}" 
+                                         Margin="2,0,8,0" 
+                                         VerticalAlignment="Center">
+                                    <Ellipse.Effect>
+                                        <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="Transparent" Opacity="0.8"/>
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                                
+                                <ContentPresenter x:Name="Content" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Border>
+
+                        <!-- Layer 2: Overlay Border (Fixed Position, prevents jumping) -->
+                        <Border x:Name="OverlayBorder"
+                                BorderThickness="1"
+                                BorderBrush="Transparent"
+                                CornerRadius="6"
+                                IsHitTestVisible="False"/>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Border" Property="Background" Value="{StaticResource CardBackground}"/>
-                            <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            <Setter Property="Foreground" Value="White"/>
-                            <Setter Property="FontWeight" Value="SemiBold"/>
-                        </Trigger>
+                        <!-- Hover State -->
                         <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="MainBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="OverlayBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="OverlayBorder" Property="BorderThickness" Value="1.5"/>
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                         </Trigger>
+                        
+                        <!-- Checked State -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="MainBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
+                            <Setter TargetName="OverlayBorder" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                            <Setter TargetName="OverlayBorder" Property="BorderThickness" Value="1.5"/>
+                            <Setter TargetName="StatusLed" Property="Fill" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="StatusLed" Property="Effect">
+                                <Setter.Value>
+                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="{StaticResource AccentBrushColor}" Opacity="0.8"/>
+                                </Setter.Value>
+                            </Setter>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                        </Trigger>
+
+                        <!-- Special behavior for IsChecked AND IsMouseOver -->
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
+                                <Condition Property="IsChecked" Value="True"/>
                                 <Condition Property="IsMouseOver" Value="True"/>
-                                <Condition Property="IsChecked" Value="False"/>
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="OverlayBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                         </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
