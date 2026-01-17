@@ -10,11 +10,12 @@
     
     <Grid Background="{StaticResource DarkBackground}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Floating Hero Header -->
-            <RowDefinition Height="*"/>    <!-- Content Area -->
+            <RowDefinition Height="Auto"/> <!-- 0. Hero Header -->
+            <RowDefinition Height="Auto"/> <!-- 1. Navigation Tab Bar -->
+            <RowDefinition Height="*"/>    <!-- 2. Content Area -->
         </Grid.RowDefinitions>
 
-        <!-- 1. FLOATING COMMAND CENTER HEADER -->
+        <!-- 0. FLOATING COMMAND CENTER HEADER -->
         <Border Grid.Row="0" 
                 Margin="32,24,32,16" 
                 Background="{StaticResource CardBackground}" 
@@ -25,88 +26,83 @@
                 <DropShadowEffect BlurRadius="30" ShadowDepth="2" Opacity="0.2" Color="Black"/>
             </Border.Effect>
             
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/> <!-- Top Info Section -->
-                    <RowDefinition Height="Auto"/> <!-- Tab Navigation Section -->
-                </Grid.RowDefinitions>
+            <Border Padding="24,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                        <ColumnDefinition Width="Auto"/> <!-- Separator -->
+                        <ColumnDefinition Width="*"/>    <!-- Titles -->
+                        <ColumnDefinition Width="Auto"/> <!-- Status Badge -->
+                    </Grid.ColumnDefinitions>
 
-                <!-- Top Section: Brand & Dynamic Info -->
-                <Border Grid.Row="0" Padding="24,20">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                            <ColumnDefinition Width="Auto"/> <!-- Separator -->
-                            <ColumnDefinition Width="*"/>    <!-- Titles -->
-                            <ColumnDefinition Width="Auto"/> <!-- Status Badge -->
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Large Tech Icon with Glow -->
-                        <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="12" Width="56" Height="56" Margin="0,0,0,0">
-                            <materialIcons:MaterialIcon Kind="Radar" Width="30" Height="30" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon.Effect>
-                                    <DropShadowEffect Color="#FF5C85FF" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/>
-                                </materialIcons:MaterialIcon.Effect>
-                            </materialIcons:MaterialIcon>
-                        </Border>
-
-                        <!-- Technical Vertical Separator -->
-                        <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="20,10" VerticalAlignment="Stretch" Opacity="0.6"/>
-
-                        <!-- Main Titles -->
-                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                            <TextBlock Text="MONITOR CENTER" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                            <TextBlock x:Name="DynamicSubtitle" FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="Operations dashboard and system integrity overview"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True">
-                                                <Setter Property="Text" Value="Remote manifests monitoring and real-time change detection"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True">
-                                                <Setter Property="Text" Value="Audit log of historical changes and version differences"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True">
-                                                <Setter Property="Text" Value="Advanced discovery and archival of remote game assets"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True">
-                                                <Setter Property="Text" Value="Retrieve and manage League of Legends client distributions"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True">
-                                                <Setter Property="Text" Value="Management of local game installation snapshots and backups"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True">
-                                                <Setter Property="Text" Value="Direct connectivity with LCU and Riot API service endpoints"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Navigation Section (Separator + Tabs) -->
-                <StackPanel Grid.Row="1">
-                    <Rectangle Height="1" Fill="{StaticResource BorderColor}" Opacity="0.5"/>
-                    <Border Padding="12,8">
-                        <UniformGrid Columns="7">
-                            <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                            <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                            <RadioButton x:Name="TabHistory" Content="History" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                            <RadioButton x:Name="TabAssetTracker" Content="Tracker" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                            <RadioButton x:Name="TabVersions" Content="Versions" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                            <RadioButton x:Name="TabBackups" Content="Backups" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                            <RadioButton x:Name="TabApi" Content="API Center" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                        </UniformGrid>
+                    <!-- Large Tech Icon with Glow -->
+                    <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="12" Width="56" Height="56" Margin="0,0,0,0">
+                        <materialIcons:MaterialIcon Kind="Radar" Width="30" Height="30" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon.Effect>
+                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/>
+                            </materialIcons:MaterialIcon.Effect>
+                        </materialIcons:MaterialIcon>
                     </Border>
-                </StackPanel>
-            </Grid>
+
+                    <!-- Technical Vertical Separator -->
+                    <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="20,10" VerticalAlignment="Stretch" Opacity="0.6"/>
+
+                    <!-- Main Titles -->
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="MONITOR CENTER" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                        <TextBlock x:Name="DynamicSubtitle" FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="Operations dashboard and system integrity overview"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True">
+                                            <Setter Property="Text" Value="Remote manifests monitoring and real-time change detection"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True">
+                                            <Setter Property="Text" Value="Audit log of historical changes and version differences"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True">
+                                            <Setter Property="Text" Value="Advanced discovery and archival of remote game assets"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True">
+                                            <Setter Property="Text" Value="Retrieve and manage League of Legends client distributions"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True">
+                                            <Setter Property="Text" Value="Management of local game installation snapshots and backups"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True">
+                                            <Setter Property="Text" Value="Direct connectivity with LCU and Riot API service endpoints"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Border>
+
+        <!-- 1. NAVIGATION TAB BAR (Separate & Balanced) -->
+        <Border Grid.Row="1" 
+                Margin="32,0,32,16" 
+                Background="{StaticResource CardBackground}" 
+                CornerRadius="12" 
+                BorderBrush="{StaticResource BorderColor}" 
+                BorderThickness="1"
+                Padding="4">
+            <UniformGrid Columns="7">
+                <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                <RadioButton x:Name="TabHistory" Content="History" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                <RadioButton x:Name="TabAssetTracker" Content="Tracker" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                <RadioButton x:Name="TabVersions" Content="Versions" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                <RadioButton x:Name="TabBackups" Content="Backups" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                <RadioButton x:Name="TabApi" Content="API Center" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+            </UniformGrid>
         </Border>
 
         <!-- 2. CONTENT AREA -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <Grid Margin="32,0,32,32">
                 <monitorControls:MonitorDashboardControl x:Name="MonitorDashboardControl">
                     <monitorControls:MonitorDashboardControl.Style>

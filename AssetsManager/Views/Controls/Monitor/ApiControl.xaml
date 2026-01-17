@@ -135,7 +135,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="TabSales" Content="Sales" Click="TabSales_Click" IsChecked="True" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
                     <RadioButton x:Name="TabMythic" Content="Mythic Shop" Click="TabMythic_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>

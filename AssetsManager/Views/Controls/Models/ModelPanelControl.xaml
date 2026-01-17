@@ -19,7 +19,7 @@
             </Grid.RowDefinitions>
 
             <!-- NAVIGATION (Segmented Control) -->
-            <Border Grid.Row="0" Margin="16,16,16,12" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Border Grid.Row="0" Margin="16,16,16,12" Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                 <UniformGrid Columns="5">
                     <RadioButton x:Name="TabModels" IsChecked="True" GroupName="MPT" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Models List">
                         <materialIcons:MaterialIcon Kind="CubeOutline" Width="18" Height="18"/>

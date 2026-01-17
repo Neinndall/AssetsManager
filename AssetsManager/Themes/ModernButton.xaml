@@ -545,80 +545,63 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Global Segmented Radio Button Style for Tab-like behavior (Reworked: Command Switcher) -->
+    <!-- Global Segmented Radio Button Style for Tab-like behavior (Reworked: Clean Pill Style) -->
     <Style x:Key="SegmentedRadioButtonStyle" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="Padding" Value="10,6"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Grid x:Name="RootGrid" Background="Transparent" ClipToBounds="False" SnapsToDevicePixels="True">
-                        <!-- Layer 1: Background -->
-                        <Border x:Name="MainBorder" 
-                                Background="{TemplateBinding Background}" 
-                                CornerRadius="6" 
-                                BorderThickness="0"
-                                Padding="{TemplateBinding Padding}"
-                                Margin="1"
-                                ClipToBounds="False">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <!-- Status LED -->
-                                <Ellipse x:Name="StatusLed" 
-                                         Width="6" Height="6" 
-                                         Fill="{StaticResource TextMuted}" 
-                                         Margin="2,0,8,0" 
-                                         VerticalAlignment="Center">
-                                    <Ellipse.Effect>
-                                        <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="Transparent" Opacity="0.8"/>
-                                    </Ellipse.Effect>
-                                </Ellipse>
-                                
-                                <ContentPresenter x:Name="Content" VerticalAlignment="Center"/>
-                            </StackPanel>
+                    <Grid x:Name="RootGrid" Background="Transparent" SnapsToDevicePixels="True" UseLayoutRounding="True">
+                        
+                        <!-- Layer 1: Selection Background (With Shadow) -->
+                        <!-- Placed BEHIND content to prevent text blur -->
+                        <Border x:Name="SelectionBorder"
+                                Background="{StaticResource AccentBrush}"
+                                CornerRadius="8"
+                                Margin="2"
+                                Opacity="0">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="4" ShadowDepth="1" Color="Black" Opacity="0.2" RenderingBias="Performance"/>
+                            </Border.Effect>
                         </Border>
 
-                        <!-- Layer 2: Overlay Border (Fixed Position, prevents jumping) -->
-                        <Border x:Name="OverlayBorder"
-                                BorderThickness="1"
-                                BorderBrush="Transparent"
-                                CornerRadius="6"
-                                IsHitTestVisible="False"/>
+                        <!-- Layer 2: Hover Background -->
+                        <Border x:Name="HoverBorder"
+                                Background="{StaticResource HoverColor}"
+                                CornerRadius="8"
+                                Margin="2"
+                                Opacity="0"/>
+
+                        <!-- Layer 3: Content -->
+                        <ContentPresenter x:Name="Content" 
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Margin="{TemplateBinding Padding}"
+                                          SnapsToDevicePixels="True"/>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <!-- Hover State -->
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="MainBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                            <Setter TargetName="OverlayBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="OverlayBorder" Property="BorderThickness" Value="1.5"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                        </Trigger>
-                        
                         <!-- Checked State -->
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="MainBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
-                            <Setter TargetName="OverlayBorder" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-                            <Setter TargetName="OverlayBorder" Property="BorderThickness" Value="1.5"/>
-                            <Setter TargetName="StatusLed" Property="Fill" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="StatusLed" Property="Effect">
-                                <Setter.Value>
-                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#FF5C85FF" Opacity="0.8"/>
-                                </Setter.Value>
-                            </Setter>
+                            <Setter TargetName="SelectionBorder" Property="Opacity" Value="1"/>
                             <Setter Property="Foreground" Value="White"/>
-                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
 
-                        <!-- Special behavior for IsChecked AND IsMouseOver -->
+                        <!-- Hover State (Only if not checked) -->
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
-                                <Condition Property="IsChecked" Value="True"/>
                                 <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsChecked" Value="False"/>
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="OverlayBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="HoverBorder" Property="Opacity" Value="1"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                         </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
