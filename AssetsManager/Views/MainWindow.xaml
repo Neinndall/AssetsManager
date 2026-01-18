@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:AssetsManager.Views"
         xmlns:controls="clr-namespace:AssetsManager.Views.Controls"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d"
         Title="AssetsManager"
         Width="1000" Height="850"
@@ -15,6 +16,29 @@
         FontFamily="{StaticResource AppFontFamily}">
 
     <Grid>
+        <!-- Taskbar Icon -->
+        <tb:TaskbarIcon x:Name="TrayIcon"
+                        Visibility="Collapsed"
+                        ToolTipText="AssetsManager"
+                        IconSource="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico"
+                        TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Show" Click="MenuItem_Show_Click">
+                        <MenuItem.Icon>
+                            <materialIcons:MaterialIcon Kind="Eye"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    
+                    <MenuItem Header="Exit" Click="MenuItem_Exit_Click">
+                        <MenuItem.Icon>
+                            <materialIcons:MaterialIcon Kind="Power"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+
         <!-- Main Layout Grid -->
         <Grid>
             <Grid.ColumnDefinitions>

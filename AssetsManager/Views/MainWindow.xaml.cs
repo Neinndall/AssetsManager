@@ -5,12 +5,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Forms;
+using System.Windows.Controls; // Added for ContextMenu/MenuItem if needed, though they are in System.Windows.Controls
 using System.Windows.Input;
-using Microsoft.Toolkit.Uwp.Notifications;
+using Hardcodet.Wpf.TaskbarNotification; // Hardcodet Namespace
 using Microsoft.Extensions.DependencyInjection;
-using Windows.Data.Xml.Dom;
-using Windows.UI.Notifications;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Comparator;
@@ -51,7 +49,6 @@ namespace AssetsManager.Views
         private readonly ReportGenerationService _reportGenerationService;
         private readonly TaskCancellationManager _taskCancellationManager;
 
-        private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
         
         // New fields to manage the state of the extraction after comparison
@@ -145,7 +142,6 @@ namespace AssetsManager.Views
             _updateCheckService.Start();
             InitializeApplicationAsync();
 
-            InitializeNotifyIcon();
             StateChanged += MainWindow_StateChanged;
             Closing += MainWindow_Closing;
         }
@@ -159,64 +155,60 @@ namespace AssetsManager.Views
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            SingleInstance.RegisterWindow(this, () =>
+
+            // Register window hook to handle single instance restoration message
+            var source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+            source?.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
             {
-                Show();
-                if (WindowState == WindowState.Minimized)
+                if (msg == SingleInstance.WM_SHOW_APP)
                 {
-                    WindowState = WindowState.Normal;
+                    ShowAppFromTray();
+                    handled = true;
                 }
-                Activate();
-                _notifyIcon.Visible = false;
+                return IntPtr.Zero;
             });
+            
+            // SingleInstance registration removed as it is no longer needed for basic notifications
+            // If advanced command line handling is needed for the tray icon, it can be re-added here.
         }
 
-        private void InitializeNotifyIcon()
+        // --- Taskbar / NotifyIcon Logic ---
+
+        private void TrayIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)
         {
-            _notifyIcon = new NotifyIcon();
-            var iconUri = new Uri("pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico", UriKind.RelativeOrAbsolute);
-            _notifyIcon.Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(iconUri).Stream);
-            _notifyIcon.Text = "AssetsManager";
-            _notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
-
-            var contextMenu = new ContextMenuStrip();
-            var exitMenuItem = new ToolStripMenuItem("Exit");
-            exitMenuItem.Click += ExitMenuItem_Click;
-            contextMenu.Items.Add(exitMenuItem);
-
-            _notifyIcon.ContextMenuStrip = contextMenu;
+            ShowAppFromTray();
         }
 
-        private void NotifyIcon_DoubleClick(object sender, EventArgs e)
+        private void MenuItem_Show_Click(object sender, RoutedEventArgs e)
+        {
+            ShowAppFromTray();
+        }
+
+        private void MenuItem_Exit_Click(object sender, RoutedEventArgs e)
+        {
+            System.Windows.Application.Current.Shutdown();
+        }
+
+        private void ShowAppFromTray()
         {
             Show();
             WindowState = WindowState.Normal;
-            _notifyIcon.Visible = false;
-        }
-
-        private void ExitMenuItem_Click(object sender, EventArgs e)
-        {
-            System.Windows.Application.Current.Shutdown();
+            Activate();
+            TrayIcon.Visibility = Visibility.Collapsed;
         }
 
         private void MainWindow_StateChanged(object sender, EventArgs e)
         {
             if (WindowState == WindowState.Minimized && _appSettings.MinimizeToTrayOnClose)
             {
+                TrayIcon.Visibility = Visibility.Visible;
                 Hide();
-                _notifyIcon.Visible = true;
-
-                // Use Dispatcher to avoid COMException when showing toast on state change
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    new ToastContentBuilder()
-                        .AddText("AssetsManager")
-                        .AddText("ℹ️ The application has been minimized to the tray.")
-                        .Show();
-                }));
+                // Show a balloon tip when minimized to tray
+                TrayIcon.ShowBalloonTip("AssetsManager", "The application has been minimized to the tray.", BalloonIcon.Info);
             }
         }
 
+        // --- End Taskbar Logic ---
         private void OnUpdatesFound(string message, string latestVersion)
         {
             if (!string.IsNullOrEmpty(latestVersion))
@@ -224,15 +216,13 @@ namespace AssetsManager.Views
                 _latestAppVersionAvailable = latestVersion;
             }
 
-            // Use the compat manager for robust notification support in WPF
+            // Show System Tray Balloon Notification if window is not visible
             if (Visibility != Visibility.Visible)
             {
-                new ToastContentBuilder()
-                    .AddText("AssetsManager")
-                    .AddText(message)
-                    .Show();
+                TrayIcon.ShowBalloonTip("AssetsManager", message, BalloonIcon.Info);
             }
 
+            // Always update internal notification system
             ShowNotification(true, message);
         }
         
@@ -441,13 +431,8 @@ namespace AssetsManager.Views
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
-            _notifyIcon.DoubleClick -= NotifyIcon_DoubleClick;
-            if (_notifyIcon.ContextMenuStrip != null && _notifyIcon.ContextMenuStrip.Items.Count > 0)
-            {
-                _notifyIcon.ContextMenuStrip.Items[0].Click -= ExitMenuItem_Click;
-            }
             StateChanged -= MainWindow_StateChanged;
-            _notifyIcon?.Dispose();
+            TrayIcon?.Dispose();
         }
     }
 }
