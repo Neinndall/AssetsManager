@@ -48,7 +48,7 @@
         <local:ExplorerToolbarControl x:Name="Toolbar" 
                                       Grid.Row="0" 
                                       Margin="10,10,10,5" 
-                                      Visibility="Collapsed"/>
+                                      Visibility="{Binding IsTreeReady, Converter={StaticResource BoolToVisibilityConverter}}"/>
         
         <!-- Content Area -->
         <Grid Grid.Row="1">
@@ -63,7 +63,8 @@
                       Margin="6,0,0,0" 
                       ItemsSource="{Binding RootNodes}"
                       SelectedItemChanged="FileTreeView_SelectedItemChanged"
-                      Style="{StaticResource ModernTreeView}">
+                      Style="{StaticResource ModernTreeView}"
+                      Visibility="{Binding IsTreeReady, Converter={StaticResource BoolToVisibilityConverter}}">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type models:FileSystemNodeModel}" ItemsSource="{Binding Children}">
                         <Grid Margin="0,0">
@@ -216,7 +217,7 @@
             </TreeView>
 
             <!-- Favorites Container (Quick Access + Separator) -->
-            <StackPanel x:Name="FavoritesContainer" Grid.Row="1">
+            <StackPanel x:Name="FavoritesContainer" Grid.Row="1" Visibility="{Binding AreFavoritesVisible, Converter={StaticResource BoolToVisibilityConverter}}">
 
                 <!-- Separator (Top) -->
                 <Separator Background="{StaticResource BorderColor}" 
@@ -316,7 +317,7 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Margin="10"
-                    Visibility="Collapsed">
+                    Visibility="{Binding IsEmptyState, Converter={StaticResource BoolToVisibilityConverter}}">
             <materialIcons:MaterialIcon Kind="FolderSearchOutline"
                                         Width="64" Height="64"
                                         HorizontalAlignment="Center"
@@ -351,7 +352,7 @@
         <!-- Loading Indicator (Overlay) -->
         <Grid x:Name="LoadingIndicator" 
               Grid.Row="1"
-              Visibility="Collapsed" 
+              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" 
               Background="{StaticResource SidebarBackground}">
              <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <!-- Modern Spinner Animation -->
