@@ -62,9 +62,6 @@ namespace AssetsManager.Views.Controls.Explorer
         
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
-        private bool _isWadMode = true;
-        private bool _isBackupMode = false;
-        private bool _isSortingEnabled = true;
         private string _backupJsonPath;
 
         public FileExplorerControl()
@@ -135,8 +132,8 @@ namespace AssetsManager.Views.Controls.Explorer
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
             // First, do the synchronous checks to decide the initial UI state.
-            bool shouldLoadWadTree = _isWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory);
-            bool shouldLoadDirTree = !_isWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
+            bool shouldLoadWadTree = _viewModel.IsWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory);
+            bool shouldLoadDirTree = !_viewModel.IsWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
 
             if (shouldLoadWadTree || shouldLoadDirTree)
             {
@@ -147,7 +144,7 @@ namespace AssetsManager.Views.Controls.Explorer
             else
             {
                 // If we are not going to load, show the correct placeholder immediately.
-                ShowStatusMessage(_isWadMode);
+                ShowStatusMessage(_viewModel.IsWadMode);
             }
 
             // Now, perform the async hash loading.
@@ -169,7 +166,7 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
             Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
 
-            Toolbar.SetWadMode(_isWadMode);
+            Toolbar.SetWadMode(_viewModel.IsWadMode);
             
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
@@ -197,8 +194,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
         {
-            _isWadMode = !_isWadMode;
-            Toolbar.SetWadMode(_isWadMode);
+            _viewModel.IsWadMode = !_viewModel.IsWadMode;
+            Toolbar.SetWadMode(_viewModel.IsWadMode);
             // Mode switched, we keep the current view mode (Grid/Preview) preference.
             
             if (FilePreviewer != null)
@@ -220,8 +217,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void Toolbar_SortStateChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
-            _isSortingEnabled = e.NewValue;
-            if (_isBackupMode)
+            _viewModel.IsSortingEnabled = e.NewValue;
+            if (_viewModel.IsBackupMode)
             {
                 await BuildTreeFromBackupAsync(_backupJsonPath);
             }
@@ -229,7 +226,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ReloadTreeAsync()
         {
-            if (_isWadMode)
+            if (_viewModel.IsWadMode)
             {
                 if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
                 {
@@ -288,7 +285,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildWadTreeAsync(string rootPath)
         {
-            _isBackupMode = false;
+            _viewModel.IsBackupMode = false;
             var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
@@ -344,7 +341,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
-            _isBackupMode = false;
+            _viewModel.IsBackupMode = false;
             var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
@@ -394,7 +391,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildTreeFromBackupAsync(string jsonPath)
         {
-            _isBackupMode = true;
+            _viewModel.IsBackupMode = true;
             _backupJsonPath = jsonPath;
             var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
@@ -406,7 +403,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             try
             {
-                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _isSortingEnabled, cancellationToken);
+                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _viewModel.IsSortingEnabled, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 _viewModel.RootNodes.Clear();
@@ -606,13 +603,13 @@ namespace AssetsManager.Views.Controls.Explorer
             string oldPbePath = this.OldLolPath;
             string newPbePath = this.NewLolPath;
 
-            if (_isBackupMode)
+            if (_viewModel.IsBackupMode)
             {
                 oldPbePath = null;
                 newPbePath = null;
             }
 
-            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _isBackupMode ? _backupJsonPath : null);
+            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _viewModel.IsBackupMode ? _backupJsonPath : null);
         }
 
         private void PinSelected_Click(object sender, RoutedEventArgs e)
@@ -687,12 +684,12 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (ExtractMenuItem is not null)
             {
-                ExtractMenuItem.IsEnabled = _isWadMode;
+                ExtractMenuItem.IsEnabled = _viewModel.IsWadMode;
             }
 
             if (SaveMenuItem is not null)
             {
-                SaveMenuItem.IsEnabled = _isWadMode;
+                SaveMenuItem.IsEnabled = _viewModel.IsWadMode;
             }
 
             if (PinMenuItem is not null)

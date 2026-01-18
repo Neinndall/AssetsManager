@@ -11,6 +11,9 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isBusy;
         private bool _isTreeReady;
         private bool _isEmptyState;
+        private bool _isWadMode = true; // Default WAD mode
+        private bool _isBackupMode = false;
+        private bool _isSortingEnabled = true;
         private bool _isFavoritesEnabled = true; // Default toggle state
         private ObservableCollection<FileSystemNodeModel> _rootNodes;
 
@@ -44,6 +47,7 @@ namespace AssetsManager.Views.Models.Explorer
                     _isTreeReady = value; 
                     OnPropertyChanged(); 
                     OnPropertyChanged(nameof(AreFavoritesVisible));
+                    OnPropertyChanged(nameof(IsToolbarVisible));
                 } 
             }
         }
@@ -51,7 +55,41 @@ namespace AssetsManager.Views.Models.Explorer
         public bool IsEmptyState
         {
             get => _isEmptyState;
-            set { if (_isEmptyState != value) { _isEmptyState = value; OnPropertyChanged(); } }
+            set 
+            { 
+                if (_isEmptyState != value) 
+                { 
+                    _isEmptyState = value; 
+                    OnPropertyChanged(); 
+                    OnPropertyChanged(nameof(IsToolbarVisible));
+                } 
+            }
+        }
+
+        public bool IsWadMode
+        {
+            get => _isWadMode;
+            set
+            {
+                if (_isWadMode != value)
+                {
+                    _isWadMode = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsToolbarVisible));
+                }
+            }
+        }
+
+        public bool IsBackupMode
+        {
+            get => _isBackupMode;
+            set { if (_isBackupMode != value) { _isBackupMode = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsSortingEnabled
+        {
+            get => _isSortingEnabled;
+            set { if (_isSortingEnabled != value) { _isSortingEnabled = value; OnPropertyChanged(); } }
         }
 
         public bool IsFavoritesEnabled
@@ -70,6 +108,9 @@ namespace AssetsManager.Views.Models.Explorer
 
         // Computed property for visibility
         public bool AreFavoritesVisible => IsTreeReady && IsFavoritesEnabled;
+        
+        // Toolbar is visible if Tree is ready OR if we are in Directory Mode (even if empty, to allow switching back)
+        public bool IsToolbarVisible => IsTreeReady || (IsEmptyState && !IsWadMode);
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
