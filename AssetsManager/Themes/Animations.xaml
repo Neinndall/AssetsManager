@@ -90,5 +90,21 @@
             </DoubleAnimation.EasingFunction>
         </DoubleAnimation>
     </Storyboard>
+
+    <!-- Pulsing LED Animation for Status Indicators -->
+    <Storyboard x:Key="PbeLedPulseAnimation" RepeatBehavior="Forever">
+        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.4" Duration="0:0:1.5" AutoReverse="True"/>
+    </Storyboard>
+
+    <!-- Global style for pulsing LED indicators -->
+    <Style x:Key="PulsingLedTestStyle" TargetType="Ellipse">
+        <Setter Property="Width" Value="8"/>
+        <Setter Property="Height" Value="8"/>
+        <Style.Triggers>
+            <EventTrigger RoutedEvent="Loaded">
+                <BeginStoryboard Storyboard="{StaticResource PbeLedPulseAnimation}"/>
+            </EventTrigger>
+        </Style.Triggers>
+    </Style>
         
 </ResourceDictionary>
