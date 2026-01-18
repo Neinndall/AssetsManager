@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace AssetsManager.Utils
@@ -9,14 +10,14 @@ namespace AssetsManager.Utils
         public const string AppId = "AssetsManager";
         public static readonly uint WM_SHOW_APP = RegisterWindowMessage("AssetsManager_ShowApp");
 
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         private static extern uint RegisterWindowMessage(string lpString);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-        [System.Runtime.InteropServices.DllImport("shell32.dll", SetLastError = true)]
-        public static extern void SetCurrentProcessExplicitAppUserModelID([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string AppID);
+        [DllImport("shell32.dll", SetLastError = true)]
+        public static extern void SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
         private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
 

@@ -266,6 +266,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             RootNodes.Clear();
             FileTreeView.Visibility = Visibility.Collapsed;
+            FavoritesContainer.Visibility = Visibility.Collapsed;
             NoDirectoryMessage.Visibility = Visibility.Visible;
             LoadingIndicator.Visibility = Visibility.Collapsed;
         }
@@ -335,7 +336,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
-
+                FavoritesContainer.Visibility = Visibility.Visible;
             }
         }
 
@@ -381,13 +382,10 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             finally
             {
-                // The indicatorTask will be implicitly cancelled by the main token,
-                // or its continuation will check t.IsCanceled.
-                // No need for explicit cts.Cancel() here as the token is already cancelled by _cancellationTokenSource?.Cancel()
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
-
+                FavoritesContainer.Visibility = Visibility.Visible;
             }
         }
 
@@ -435,7 +433,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 LoadingIndicator.Visibility = Visibility.Collapsed;
                 FileTreeView.Visibility = Visibility.Visible;
                 Toolbar.Visibility = Visibility.Visible;
-
+                FavoritesContainer.Visibility = Visibility.Visible;
             }
         }
 
