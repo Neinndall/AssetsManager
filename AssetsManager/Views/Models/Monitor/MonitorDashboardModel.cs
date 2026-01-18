@@ -186,7 +186,7 @@ namespace AssetsManager.Views.Models.Monitor
             // Check if an update was already found before this model was created
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
             {
-                AppVersionText = $"{_updateCheckService.AvailableVersion} available!";
+                AppVersionText = $"{_updateCheckService.AvailableVersion} ready!";
                 AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
                 AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
             }
@@ -199,7 +199,7 @@ namespace AssetsManager.Views.Models.Monitor
                 {
                     System.Windows.Application.Current.Dispatcher.Invoke(() =>
                     {
-                        AppVersionText = $"v{latestVersion} available!";
+                        AppVersionText = $"v{latestVersion} ready!";
                         AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
                         AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
                         UpdateGlobalStatus();
