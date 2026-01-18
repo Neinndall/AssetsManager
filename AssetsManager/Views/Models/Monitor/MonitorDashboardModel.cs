@@ -224,7 +224,7 @@ namespace AssetsManager.Views.Models.Monitor
                 PbeStatusText = "No issues detected";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
             }
-            PbeLastCheck = !string.IsNullOrEmpty(_appSettings.LastPbeCheckTime) ? _appSettings.LastPbeCheckTime : "N/A";
+            PbeLastCheck = FormatLastCheckTime(_appSettings.LastPbeCheckTime);
 
             // Initial Loads
             RefreshFileWatcherData();
@@ -436,6 +436,17 @@ namespace AssetsManager.Views.Models.Monitor
                 AssetTrackerStatus = "Idle";
             }
             UpdateDataStatus();
+        }
+
+        private string FormatLastCheckTime(string timeStr)
+        {
+            if (string.IsNullOrEmpty(timeStr) || timeStr == "N/A") return "N/A";
+
+            if (DateTime.TryParseExact(timeStr, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime dt))
+            {
+                return dt.Date == DateTime.Today ? dt.ToString("HH:mm") : dt.ToString("yyyy-MM-DD HH:mm");
+            }
+            return timeStr;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
