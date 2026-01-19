@@ -112,6 +112,20 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isWebVisible = value; OnPropertyChanged(); }
         }
 
+        private bool _isSelectFileMessageVisible;
+        public bool IsSelectFileMessageVisible
+        {
+            get => _isSelectFileMessageVisible;
+            set { _isSelectFileMessageVisible = value; OnPropertyChanged(); }
+        }
+
+        private bool _isUnsupportedFileMessageVisible;
+        public bool IsUnsupportedFileMessageVisible
+        {
+            get => _isUnsupportedFileMessageVisible;
+            set { _isUnsupportedFileMessageVisible = value; OnPropertyChanged(); }
+        }
+
         private bool _canScrollLeft;
         public bool CanScrollLeft
         {
