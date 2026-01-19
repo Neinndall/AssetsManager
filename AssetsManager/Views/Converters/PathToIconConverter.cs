@@ -92,7 +92,14 @@ namespace AssetsManager.Views.Converters
                 case NodeType.WemFile:
                     return MaterialIconKind.MusicNoteOutline; // Outline
                 default:
-                    return GetIcon(node.Extension, node.FullPath);
+                    var icon = GetIcon(node.Extension, node.FullPath);
+                    // Correction: If GetIcon returns Folder for a file node (because it has no extension), 
+                    // we must override it because we know 'node.Type' is a File type here.
+                    if (string.IsNullOrEmpty(node.Extension) && icon == MaterialIconKind.FolderOutline)
+                    {
+                        return MaterialIconKind.FileQuestionOutline;
+                    }
+                    return icon;
             }
         }
 
