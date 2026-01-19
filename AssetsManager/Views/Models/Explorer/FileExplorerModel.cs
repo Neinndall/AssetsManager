@@ -41,12 +41,21 @@ namespace AssetsManager.Views.Models.Explorer
 
         public void SetLoadingState(ExplorerLoadingState state)
         {
-            if (state != ExplorerLoadingState.None)
+            if (state == ExplorerLoadingState.None)
             {
-                IsBusy = true;
-                IsTreeReady = false;
-                IsEmptyState = false;
+                IsBusy = false;
+                // Only show tree if we actually have nodes
+                if (RootNodes.Count > 0)
+                {
+                    IsTreeReady = true;
+                    IsEmptyState = false;
+                }
+                return;
             }
+
+            IsBusy = true;
+            IsTreeReady = false;
+            IsEmptyState = false;
 
             switch (state)
             {
