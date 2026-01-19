@@ -26,7 +26,7 @@
                     Grid.Column="0" 
                     Style="{StaticResource TransparentIconButton}" 
                     Click="ScrollLeftButton_Click" 
-                    Visibility="Collapsed" 
+                    Visibility="{Binding CanScrollLeft, Converter={StaticResource BooleanToVisibilityConverter}}" 
                     VerticalAlignment="Center" 
                     Padding="4,2">
                 <materialIcons:MaterialIcon Kind="ChevronLeft" Width="16" Height="16" />
@@ -37,7 +37,7 @@
                           HorizontalScrollBarVisibility="Hidden" 
                           VerticalScrollBarVisibility="Disabled" 
                           ScrollChanged="TabsScrollViewer_ScrollChanged">
-                <ItemsControl ItemsSource="{Binding PinnedFiles}">
+                <ItemsControl ItemsSource="{Binding PinnedFilesManager.PinnedFiles}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"/>
@@ -115,7 +115,7 @@
                     Grid.Column="2" 
                     Style="{StaticResource TransparentIconButton}" 
                     Click="ScrollRightButton_Click" 
-                    Visibility="Collapsed" 
+                    Visibility="{Binding CanScrollRight, Converter={StaticResource BooleanToVisibilityConverter}}" 
                     VerticalAlignment="Center" 
                     Padding="4,2">
                 <materialIcons:MaterialIcon Kind="ChevronRight" Width="16" Height="16" />
@@ -127,7 +127,7 @@
                 Height="1" 
                 Background="{StaticResource BorderColor}" 
                 Margin="0,5,5,5" 
-                Visibility="{Binding PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
+                Visibility="{Binding PinnedFilesManager.PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
 
         <!-- Breadcrumbs Area -->
         <Grid DockPanel.Dock="Top">
@@ -139,25 +139,28 @@
                                      Grid.Row="0" 
                                      Margin="5,2,5,0" 
                                      VerticalAlignment="Center" 
-                                     Visibility="Collapsed"/>
+                                     Visibility="{Binding AreBreadcrumbsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             <Border x:Name="BreadcrumbSeparator" 
                     Grid.Row="1" 
                     Height="1" 
                     Background="{StaticResource BorderColor}" 
                     Margin="0,5,5,5" 
-                    Visibility="Collapsed"/>
+                    Visibility="{Binding AreBreadcrumbsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
 
         <!-- Main Content Area -->
         <Grid Margin="0">
-            <local:FileGridView x:Name="FileGridView" Visibility="Collapsed"/>
+            <local:FileGridView x:Name="FileGridView" 
+                                Visibility="{Binding IsGridMode, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             
-            <Grid x:Name="PreviewContainer" Visibility="Visible">
-                <local:DetailsTabView x:Name="DetailsPreview" Visibility="Collapsed"/>
+            <Grid x:Name="PreviewContainer" 
+                  Visibility="{Binding IsPreviewMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <local:DetailsTabView x:Name="DetailsPreview" 
+                                      Visibility="{Binding IsDetailsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 
                 <!-- Placeholders -->
                 <Grid x:Name="PreviewStatusPanel"
-                      Visibility="Visible">
+                      Visibility="{Binding IsPlaceholderVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                     
                     <!-- Default State Card -->
                     <Border x:Name="SelectFileStatusPanel"
@@ -226,19 +229,22 @@
                 </Grid>
 
                 <!-- Previews -->
-                <Image x:Name="ImagePreview" Visibility="Collapsed" Stretch="Uniform"/>
+                <Image x:Name="ImagePreview" 
+                       Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}" 
+                       Stretch="Uniform"/>
                 <avalonedit:TextEditor x:Name="TextEditorPreview"
                                        Style="{StaticResource BaseTextEditorStyle}"
-                                       Visibility="Collapsed"
+                                       Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                        Margin="-4,0,0,0"/>
-                <Grid x:Name="WebViewContainer"/>
+                <Grid x:Name="WebViewContainer"
+                      Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                 <!-- Search inside document -->
                 <shared:FindInDocumentControl x:Name="FindInDocumentControl"
                                               HorizontalAlignment="Right"
                                               VerticalAlignment="Top"
                                               Margin="0,0,15,0"
-                                              Visibility="Collapsed"
+                                              Visibility="{Binding IsFindVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                               TargetTextEditor="{Binding ElementName=TextEditorPreview}"
                                               Close="FindInDocumentControl_Close"/>
             </Grid>

@@ -46,6 +46,8 @@ namespace AssetsManager.Services.Explorer
         private TextBlock _unsupportedFileTextBlock;
         private UserControl _detailsPreview;
 
+        private FilePreviewerModel _viewModel; // New field
+
         private IHighlightingDefinition _jsonHighlightingDefinition;
 
         private readonly LogService _logService;
@@ -65,7 +67,7 @@ namespace AssetsManager.Services.Explorer
             _wadExtractionService = wadExtractionService;
         }
 
-        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FrameworkElement statusPanel, FrameworkElement selectFileMessage, FrameworkElement unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
+        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FrameworkElement statusPanel, FrameworkElement selectFileMessage, FrameworkElement unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview, FilePreviewerModel viewModel)
         {
             _imagePreview = imagePreview;
             _webViewContainer = webViewContainer;
@@ -75,6 +77,7 @@ namespace AssetsManager.Services.Explorer
             _unsupportedFileMessagePanel = unsupportedFileMessage;
             _unsupportedFileTextBlock = unsupportedFileTextBlock;
             _detailsPreview = detailsPreview;
+            _viewModel = viewModel;
         }
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
@@ -224,11 +227,13 @@ namespace AssetsManager.Services.Explorer
 
         private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false)
         {
-            // Part 1: Hide all static panels and clear their content.
-            _imagePreview.Visibility = Visibility.Collapsed;
-            _textEditorPreview.Visibility = Visibility.Collapsed;
-            _previewStatusPanel.Visibility = Visibility.Collapsed;
-            _detailsPreview.Visibility = Visibility.Collapsed;
+            // Part 1: Hide all via ViewModel
+            _viewModel.IsImageVisible = false;
+            _viewModel.IsTextVisible = false;
+            _viewModel.IsWebVisible = false;
+            _viewModel.IsPlaceholderVisible = false;
+            _viewModel.IsDetailsVisible = false;
+
             _imagePreview.Source = null;
             _textEditorPreview.Clear();
 
@@ -246,22 +251,22 @@ namespace AssetsManager.Services.Explorer
 
             _activePreviewer = newPreviewer;
 
-            // Part 3: Show the new content.
+            // Part 3: Show the new content via ViewModel.
             switch (newPreviewer)
             {
                 case Previewer.Image:
                     if (content is ImageSource imageSource)
                     {
                         _imagePreview.Source = imageSource;
-                        _imagePreview.Visibility = Visibility.Visible;
+                        _viewModel.IsImageVisible = true;
                     }
                     break;
 
                 case Previewer.WebView:
                     if (content is string htmlContent)
                     {
-                        // This is the new "nuclear" option. Create, initialize, and show a new WebView.
                         await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
+                        _viewModel.IsWebVisible = true;
                     }
                     break;
 
@@ -270,13 +275,13 @@ namespace AssetsManager.Services.Explorer
                     {
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
-                        _textEditorPreview.Visibility = Visibility.Visible;
+                        _viewModel.IsTextVisible = true;
                         _textEditorPreview.Focus();
                     }
                     break;
 
                 case Previewer.StatusPanel:
-                    _previewStatusPanel.Visibility = Visibility.Visible;
+                    _viewModel.IsPlaceholderVisible = true;
                     if (content is string extension)
                     {
                         // This is for unsupported files
