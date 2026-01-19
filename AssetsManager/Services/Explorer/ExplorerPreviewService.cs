@@ -39,14 +39,11 @@ namespace AssetsManager.Services.Explorer
         private Image _imagePreview;
         private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
-        private FrameworkElement _previewStatusPanel;
-        private FrameworkElement _selectFileMessagePanel;
-        private FrameworkElement _unsupportedFileMessagePanel;
 
         private TextBlock _unsupportedFileTextBlock;
         private UserControl _detailsPreview;
 
-        private FilePreviewerModel _viewModel; // New field
+        private FilePreviewerModel _viewModel;
 
         private IHighlightingDefinition _jsonHighlightingDefinition;
 
@@ -67,14 +64,11 @@ namespace AssetsManager.Services.Explorer
             _wadExtractionService = wadExtractionService;
         }
 
-        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FrameworkElement statusPanel, FrameworkElement selectFileMessage, FrameworkElement unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview, FilePreviewerModel viewModel)
+        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, TextBlock unsupportedFileTextBlock, UserControl detailsPreview, FilePreviewerModel viewModel)
         {
             _imagePreview = imagePreview;
             _webViewContainer = webViewContainer;
             _textEditorPreview = textEditor;
-            _previewStatusPanel = statusPanel;
-            _selectFileMessagePanel = selectFileMessage;
-            _unsupportedFileMessagePanel = unsupportedFileMessage;
             _unsupportedFileTextBlock = unsupportedFileTextBlock;
             _detailsPreview = detailsPreview;
             _viewModel = viewModel;
@@ -233,6 +227,8 @@ namespace AssetsManager.Services.Explorer
             _viewModel.IsWebVisible = false;
             _viewModel.IsPlaceholderVisible = false;
             _viewModel.IsDetailsVisible = false;
+            _viewModel.IsSelectFileMessageVisible = false;
+            _viewModel.IsUnsupportedFileMessageVisible = false;
 
             _imagePreview.Source = null;
             _textEditorPreview.Clear();
@@ -285,15 +281,15 @@ namespace AssetsManager.Services.Explorer
                     if (content is string extension)
                     {
                         // This is for unsupported files
-                        _selectFileMessagePanel.Visibility = Visibility.Collapsed;
-                        _unsupportedFileMessagePanel.Visibility = Visibility.Visible;
+                        _viewModel.IsSelectFileMessageVisible = false;
+                        _viewModel.IsUnsupportedFileMessageVisible = true;
                         _unsupportedFileTextBlock.Text = $"Preview not available for '{extension}' files.";
                     }
                     else
                     {
                         // This is for the default "Select a file" message
-                        _selectFileMessagePanel.Visibility = Visibility.Visible;
-                        _unsupportedFileMessagePanel.Visibility = Visibility.Collapsed;
+                        _viewModel.IsSelectFileMessageVisible = true;
+                        _viewModel.IsUnsupportedFileMessageVisible = false;
                     }
                     break;
             }

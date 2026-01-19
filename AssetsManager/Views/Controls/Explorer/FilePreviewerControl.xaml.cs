@@ -208,9 +208,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     ImagePreview,
                     WebViewContainer,
                     TextEditorPreview,
-                    PreviewStatusPanel,
-                    SelectFileStatusPanel,
-                    UnsupportedStatusPanel,
                     UnsupportedFileMessage,
                     DetailsPreview,
                     ViewModel

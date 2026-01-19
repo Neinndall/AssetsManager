@@ -166,6 +166,7 @@
                     <Border x:Name="SelectFileStatusPanel"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
+                            Visibility="{Binding IsSelectFileMessageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                             MaxWidth="400">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                              <!-- Icon -->
@@ -199,7 +200,7 @@
                     <Border x:Name="UnsupportedStatusPanel"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            Visibility="Collapsed"
+                            Visibility="{Binding IsUnsupportedFileMessageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                             MaxWidth="400">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="FileRemoveOutline" 
