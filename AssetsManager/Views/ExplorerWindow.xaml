@@ -18,8 +18,18 @@
 
             <!-- Panel Izquierdo: Explorador -->
             <Border Grid.Column="0" 
-                    BorderBrush="{StaticResource BorderColor}" 
-                    BorderThickness="0,0,1,0">
+                    BorderBrush="{StaticResource BorderColor}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ElementName=FileExplorer, Path=DataContext.IsTreeReady}" Value="False">
+                                <Setter Property="Grid.ColumnSpan" Value="3"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <explorer:FileExplorerControl x:Name="FileExplorer" 
                                               FileSelected="FileExplorer_FileSelected"/>
             </Border>
@@ -29,10 +39,12 @@
                           Width="5" 
                           HorizontalAlignment="Center" 
                           VerticalAlignment="Stretch" 
-                          Background="Transparent"/>
+                          Background="Transparent"
+                          Visibility="{Binding ElementName=FileExplorer, Path=DataContext.IsTreeReady, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
             <!-- Panel Derecho: Previsualizador -->
-            <Border Grid.Column="2">
+            <Border Grid.Column="2"
+                    Visibility="{Binding ElementName=FileExplorer, Path=DataContext.IsTreeReady, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <explorer:FilePreviewerControl x:Name="FilePreviewer"/>
             </Border>
         </Grid>

@@ -39,9 +39,9 @@ namespace AssetsManager.Services.Explorer
         private Image _imagePreview;
         private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
-        private Panel _previewStatusPanel;
-        private Panel _selectFileMessagePanel;
-        private Panel _unsupportedFileMessagePanel;
+        private FrameworkElement _previewStatusPanel;
+        private FrameworkElement _selectFileMessagePanel;
+        private FrameworkElement _unsupportedFileMessagePanel;
 
         private TextBlock _unsupportedFileTextBlock;
         private UserControl _detailsPreview;
@@ -65,7 +65,7 @@ namespace AssetsManager.Services.Explorer
             _wadExtractionService = wadExtractionService;
         }
 
-        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, Panel statusPanel, Panel selectFileMessage, Panel unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
+        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FrameworkElement statusPanel, FrameworkElement selectFileMessage, FrameworkElement unsupportedFileMessage, TextBlock unsupportedFileTextBlock, UserControl detailsPreview)
         {
             _imagePreview = imagePreview;
             _webViewContainer = webViewContainer;
