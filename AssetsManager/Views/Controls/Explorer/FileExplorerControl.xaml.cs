@@ -143,9 +143,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (shouldLoadWadTree || shouldLoadDirTree)
             {
-                _viewModel.IsBusy = true;
-                _viewModel.IsTreeReady = false;
-                _viewModel.IsEmptyState = false;
+                // Start with Hashes since it's the first async operation
+                _viewModel.SetLoadingState(ExplorerLoadingState.LoadingHashes);
             }
             else
             {
@@ -307,9 +306,7 @@ namespace AssetsManager.Views.Controls.Explorer
             NewLolPath = null;
             OldLolPath = null;
             
-            _viewModel.IsBusy = true;
-            _viewModel.IsTreeReady = false;
-            _viewModel.IsEmptyState = false;
+            _viewModel.SetLoadingState(ExplorerLoadingState.LoadingWads);
 
             Toolbar.IsSortButtonVisible = false;
 
@@ -363,9 +360,7 @@ namespace AssetsManager.Views.Controls.Explorer
             NewLolPath = null;
             OldLolPath = null;
             
-            _viewModel.IsBusy = true;
-            _viewModel.IsTreeReady = false;
-            _viewModel.IsEmptyState = false;
+            _viewModel.SetLoadingState(ExplorerLoadingState.ExploringDirectory);
 
             Toolbar.IsSortButtonVisible = false;
 
@@ -410,9 +405,7 @@ namespace AssetsManager.Views.Controls.Explorer
             _backupJsonPath = jsonPath;
             var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
-            _viewModel.IsBusy = true;
-            _viewModel.IsTreeReady = false;
-            _viewModel.IsEmptyState = false;
+            _viewModel.SetLoadingState(ExplorerLoadingState.LoadingBackup);
 
             Toolbar.IsSortButtonVisible = true;
 

@@ -96,6 +96,26 @@
         <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.4" Duration="0:0:1.5" AutoReverse="True"/>
     </Storyboard>
 
+    <!-- Technical Glow Animation for Backgrounds -->
+    <Storyboard x:Key="GlowPulseAnimation" RepeatBehavior="Forever">
+        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.04" To="0.14" Duration="0:0:1.5" AutoReverse="True"/>
+        <ThicknessAnimation Storyboard.TargetProperty="Margin" From="4" To="-4" Duration="0:0:1.5" AutoReverse="True"/>
+    </Storyboard>
+
+    <!-- Global style for technical pulsing glow -->
+    <Style x:Key="TechnicalGlowStyle" TargetType="FrameworkElement">
+        <Style.Triggers>
+            <Trigger Property="Visibility" Value="Visible">
+                <Trigger.EnterActions>
+                    <BeginStoryboard x:Name="GlowStoryboard" Storyboard="{StaticResource GlowPulseAnimation}"/>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <StopStoryboard BeginStoryboardName="GlowStoryboard"/>
+                </Trigger.ExitActions>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Global style for pulsing LED indicators -->
     <Style x:Key="PulsingLedTestStyle" TargetType="Ellipse">
         <Setter Property="Width" Value="8"/>

@@ -1,9 +1,19 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 
 namespace AssetsManager.Views.Models.Explorer
 {
+    public enum ExplorerLoadingState
+    {
+        None,
+        LoadingHashes,
+        LoadingWads,
+        ExploringDirectory,
+        LoadingBackup
+    }
+
     public class FileExplorerModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
@@ -16,6 +26,9 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isSortingEnabled = true;
         private bool _isFavoritesEnabled = true; // Default toggle state
         private bool _hasFavorites;
+        private string _loadingStatus = "Loading assets...";
+        private string _loadingOperation = "LOADING";
+        private string _loadingDetail = "Preparing the file explorer";
         private ObservableCollection<FileSystemNodeModel> _rootNodes;
 
         public FileExplorerModel()
@@ -24,6 +37,63 @@ namespace AssetsManager.Views.Models.Explorer
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true; // Start empty
+        }
+
+        public void SetLoadingState(ExplorerLoadingState state)
+        {
+            if (state != ExplorerLoadingState.None)
+            {
+                IsBusy = true;
+                IsTreeReady = false;
+                IsEmptyState = false;
+            }
+
+            switch (state)
+            {
+                case ExplorerLoadingState.LoadingHashes:
+                    LoadingStatus = "Synchronizing Hashes";
+                    LoadingOperation = "HASH ENGINE";
+                    LoadingDetail = "Loading dictionaries of hashes...";
+                    break;
+                case ExplorerLoadingState.LoadingWads:
+                    LoadingStatus = "Loading WAD Files";
+                    LoadingOperation = "WAD EXPLORER";
+                    LoadingDetail = "Scanning files from the directory...";
+                    break;
+                case ExplorerLoadingState.ExploringDirectory:
+                    LoadingStatus = "Exploring Directory";
+                    LoadingOperation = "DIRECTORY";
+                    LoadingDetail = "Scanning files from the directory...";
+                    break;
+                case ExplorerLoadingState.LoadingBackup:
+                    LoadingStatus = "Loading Backup";
+                    LoadingOperation = "BACKUP";
+                    LoadingDetail = "Reading Backup File...";
+                    break;
+                default:
+                    LoadingStatus = "Loading Explorer";
+                    LoadingOperation = "LOADING";
+                    LoadingDetail = "Initializing components...";
+                    break;
+            }
+        }
+
+        public string LoadingOperation
+        {
+            get => _loadingOperation;
+            set { if (_loadingOperation != value) { _loadingOperation = value; OnPropertyChanged(); } }
+        }
+
+        public string LoadingStatus
+        {
+            get => _loadingStatus;
+            set { if (_loadingStatus != value) { _loadingStatus = value; OnPropertyChanged(); } }
+        }
+
+        public string LoadingDetail
+        {
+            get => _loadingDetail;
+            set { if (_loadingDetail != value) { _loadingDetail = value; OnPropertyChanged(); } }
         }
 
         public ObservableCollection<FileSystemNodeModel> RootNodes

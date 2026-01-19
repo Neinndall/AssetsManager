@@ -351,42 +351,87 @@
         <Grid x:Name="LoadingIndicator" 
               Grid.Row="1"
               Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" 
-              Background="{StaticResource SidebarBackground}">
-             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <!-- Modern Spinner Animation -->
-                <materialIcons:MaterialIcon Kind="Loading" 
-                                            Width="38" 
-                                            Height="38" 
-                                            Foreground="{StaticResource AccentBrush}"
-                                            HorizontalAlignment="Center"
-                                            RenderTransformOrigin="0.5, 0.5">
-                    <materialIcons:MaterialIcon.RenderTransform>
-                        <RotateTransform Angle="0"/>
-                    </materialIcons:MaterialIcon.RenderTransform>
-                    <materialIcons:MaterialIcon.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard>
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" 
-                                                     From="0" To="360" Duration="0:0:1" 
-                                                     RepeatBehavior="Forever"/>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </materialIcons:MaterialIcon.Triggers>
-                </materialIcons:MaterialIcon>
+              IsHitTestVisible="True">
+            
+            <!-- Immersive Semi-transparent Background -->
+            <Border Background="{StaticResource DarkBackground}" Opacity="0.85"/>
+            
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 
-                <TextBlock Text="Loading assets..."
-                           FontSize="16"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TextPrimary}"
-                           HorizontalAlignment="Center" 
-                           Margin="0,12,0,0"/>
-                <TextBlock Text="Preparing the file explorer"
-                           FontSize="13"
-                           Foreground="{StaticResource TextSecondary}"
-                           HorizontalAlignment="Center" 
-                           Margin="0,6,0,0"/>
+                <!-- ADVANCED PROGRESS RING COMPOSITION -->
+                <Grid Width="100" Height="100" HorizontalAlignment="Center">
+                    <!-- 1. Outer Static Glow Ring -->
+                    <Ellipse Stroke="{StaticResource AccentBrush}" 
+                             StrokeThickness="1" 
+                             Opacity="0.1" 
+                             Margin="-10"/>
+                    
+                    <!-- 2. Technical Background Ring -->
+                    <Ellipse Stroke="{StaticResource BorderColor}" 
+                             StrokeThickness="4" 
+                             Opacity="0.3"/>
+                    
+                    <!-- 3. Pulsing Core Glow -->
+                    <Ellipse Fill="{StaticResource AccentBrush}" 
+                             Opacity="0.05"
+                             Style="{StaticResource TechnicalGlowStyle}"/>
+
+                    <!-- 4. Rotating "Scanner" Arc -->
+                    <materialIcons:MaterialIcon Kind="Loading" 
+                                                Width="60" 
+                                                Height="60" 
+                                                Foreground="{StaticResource AccentBrush}"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Style="{StaticResource SpinningIconStyle}">
+                    </materialIcons:MaterialIcon>
+                    
+                    <!-- 5. Central Static Identity Icon -->
+                    <materialIcons:MaterialIcon Kind="FolderSearch" 
+                                                Width="20" 
+                                                Height="20" 
+                                                Foreground="{StaticResource TextSecondary}"
+                                                Opacity="0.6"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"/>
+                </Grid>
+                
+                <!-- TECHNICAL TEXT COMPOSITION -->
+                <StackPanel Margin="0,30,0,0">
+                    <!-- Main Status (All-Caps Tech Style) -->
+                    <TextBlock Text="{Binding LoadingOperation}" 
+                               FontSize="11"
+                               FontWeight="Black"
+                               Foreground="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Center" 
+                               Opacity="0.9">
+                        <TextBlock.Effect>
+                            <DropShadowEffect BlurRadius="15" ShadowDepth="0" Color="{Binding Color, Source={StaticResource AccentBrush}}" Opacity="0.4"/>
+                        </TextBlock.Effect>
+                    </TextBlock>
+
+                    <!-- Dynamic Detail Message -->
+                    <TextBlock Text="{Binding LoadingStatus}"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               HorizontalAlignment="Center" 
+                               Margin="0,4,0,0"/>
+
+                    <!-- Separator Line -->
+                    <Rectangle Width="40" Height="2" 
+                               Fill="{StaticResource AccentBrush}" 
+                               HorizontalAlignment="Center" 
+                               Margin="0,12" 
+                               Opacity="0.5"/>
+
+                    <!-- Sub-Detail Detail Message -->
+                    <TextBlock Text="{Binding LoadingDetail}"
+                               FontSize="13"
+                               Foreground="{StaticResource TextSecondary}"
+                               HorizontalAlignment="Center" 
+                               Opacity="0.8"/>
+                </StackPanel>
              </StackPanel>
         </Grid>
     </Grid>
