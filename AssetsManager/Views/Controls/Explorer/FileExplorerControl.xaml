@@ -222,12 +222,10 @@
                 <!-- Separator (Top) -->
                 <Separator Background="{StaticResource BorderColor}" 
                            Margin="16,8,16,2" 
-                           Opacity="0.4"
-                           Visibility="{Binding FavoritesManager.Favorites.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
+                           Opacity="0.4"/>
                 
                 <!-- Favorites Content -->
-                <StackPanel Margin="6,5,10,0" 
-                            Visibility="{Binding FavoritesManager.Favorites.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                <StackPanel Margin="6,5,10,0">
                     
                     <!-- Header with Icon -->
                     <StackPanel Orientation="Horizontal" Margin="16,0,0,5" Opacity="0.9">

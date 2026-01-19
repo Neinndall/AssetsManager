@@ -122,7 +122,13 @@ namespace AssetsManager.Views.Controls.Explorer
                 _viewModel.RootNodes.Clear();
             }
 
-            // 6. Romper referencias cruzadas
+            // 6. Desuscribir de favoritos
+            if (FavoritesManager != null)
+            {
+                FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
+            }
+
+            // 7. Romper referencias cruzadas
             FilePreviewer = null; // Remove reference
 
             // 8. Limpiar paths
@@ -154,6 +160,10 @@ namespace AssetsManager.Views.Controls.Explorer
             if (FavoritesManager != null)
             {
                 FavoritesListView.ItemsSource = FavoritesManager.Favorites;
+                
+                // Track changes to update visibility
+                FavoritesManager.Favorites.CollectionChanged += Favorites_CollectionChanged;
+                _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
             }
 
             // Setup toolbar events (can be done regardless of loading)
@@ -177,6 +187,11 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 await BuildDirectoryTreeAsync(DirectoriesCreator.AssetsDownloadedPath);
             }
+        }
+
+        private void Favorites_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
         }
 
         private void Toolbar_ViewModeChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)

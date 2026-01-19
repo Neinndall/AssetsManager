@@ -15,6 +15,7 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isBackupMode = false;
         private bool _isSortingEnabled = true;
         private bool _isFavoritesEnabled = true; // Default toggle state
+        private bool _hasFavorites;
         private ObservableCollection<FileSystemNodeModel> _rootNodes;
 
         public FileExplorerModel()
@@ -29,6 +30,20 @@ namespace AssetsManager.Views.Models.Explorer
         {
             get => _rootNodes;
             set { _rootNodes = value; OnPropertyChanged(); }
+        }
+
+        public bool HasFavorites
+        {
+            get => _hasFavorites;
+            set
+            {
+                if (_hasFavorites != value)
+                {
+                    _hasFavorites = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(AreFavoritesVisible));
+                }
+            }
         }
 
         public bool IsBusy
@@ -118,7 +133,7 @@ namespace AssetsManager.Views.Models.Explorer
         }
 
         // Computed property for visibility
-        public bool AreFavoritesVisible => IsTreeReady && IsFavoritesEnabled && IsWadMode && !IsBackupMode;
+        public bool AreFavoritesVisible => IsTreeReady && IsFavoritesEnabled && IsWadMode && !IsBackupMode && HasFavorites;
 
         public bool IsFavoritesToggleVisible => IsWadMode && !IsBackupMode;
         
