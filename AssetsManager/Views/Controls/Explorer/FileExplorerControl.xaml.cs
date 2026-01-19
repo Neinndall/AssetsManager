@@ -699,8 +699,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (AddToFavoritesMenuItem is not null)
             {
-                // Can verify here if it's already a favorite to toggle text, but for now simple 'Add' is enough
-                 AddToFavoritesMenuItem.IsEnabled = true; 
+                // Favorites are only supported in pure WAD Mode (not Backup, not Directory)
+                 AddToFavoritesMenuItem.IsEnabled = _viewModel.IsWadMode && !_viewModel.IsBackupMode; 
             }
 
             if (ViewChangesMenuItem is not null)

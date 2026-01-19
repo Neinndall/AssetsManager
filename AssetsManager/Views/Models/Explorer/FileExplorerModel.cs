@@ -76,6 +76,8 @@ namespace AssetsManager.Views.Models.Explorer
                     _isWadMode = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsToolbarVisible));
+                    OnPropertyChanged(nameof(AreFavoritesVisible));
+                    OnPropertyChanged(nameof(IsFavoritesToggleVisible));
                 }
             }
         }
@@ -83,7 +85,16 @@ namespace AssetsManager.Views.Models.Explorer
         public bool IsBackupMode
         {
             get => _isBackupMode;
-            set { if (_isBackupMode != value) { _isBackupMode = value; OnPropertyChanged(); } }
+            set 
+            { 
+                if (_isBackupMode != value) 
+                { 
+                    _isBackupMode = value; 
+                    OnPropertyChanged(); 
+                    OnPropertyChanged(nameof(AreFavoritesVisible));
+                    OnPropertyChanged(nameof(IsFavoritesToggleVisible));
+                } 
+            }
         }
 
         public bool IsSortingEnabled
@@ -107,7 +118,9 @@ namespace AssetsManager.Views.Models.Explorer
         }
 
         // Computed property for visibility
-        public bool AreFavoritesVisible => IsTreeReady && IsFavoritesEnabled;
+        public bool AreFavoritesVisible => IsTreeReady && IsFavoritesEnabled && IsWadMode && !IsBackupMode;
+
+        public bool IsFavoritesToggleVisible => IsWadMode && !IsBackupMode;
         
         // Toolbar is visible if Tree is ready OR if we are in Directory Mode (even if empty, to allow switching back)
         public bool IsToolbarVisible => IsTreeReady || (IsEmptyState && !IsWadMode);
