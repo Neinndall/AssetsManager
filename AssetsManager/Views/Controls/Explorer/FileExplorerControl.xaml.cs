@@ -679,7 +679,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 // Deselect immediately so it can be clicked again
                 FavoritesListView.SelectedItem = null;
 
-                var node = await WadSearchBoxService.PerformSearchAsync(item.FullPath, _viewModel.RootNodes, LoadAllChildrenForSearch);
+                var node = await WadSearchBoxService.NavigateToPathAsync(item.FullPath, _viewModel.RootNodes, LoadAllChildrenForSearch);
 
                 if (node != null)
                 {

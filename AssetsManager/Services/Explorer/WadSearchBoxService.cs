@@ -35,6 +35,19 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        public async Task<FileSystemNodeModel> NavigateToPathAsync(
+            string path,
+            ObservableCollection<FileSystemNodeModel> rootNodes,
+            Func<FileSystemNodeModel, Task> loadChildrenFunc)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+
+            // Reset any previous search filtering before navigating
+            await FilterTreeAsync(rootNodes, string.Empty);
+
+            return await ExpandToPathAsync(path, rootNodes, loadChildrenFunc);
+        }
+
         public async Task FilterTreeAsync(ObservableCollection<FileSystemNodeModel> nodes, string searchText)
         {
             await Task.Run(() =>
