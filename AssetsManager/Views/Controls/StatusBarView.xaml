@@ -16,14 +16,11 @@
                 <Setter Property="Visibility" Value="Visible"/>
                 <Setter Property="BorderThickness" Value="0,1,0,0"/>
                 <Style.Triggers>
-                    <MultiDataTrigger>
-                        <MultiDataTrigger.Conditions>
-                            <Condition Binding="{Binding StatusText}" Value=""/>
-                            <Condition Binding="{Binding NotificationCount}" Value="0"/>
-                        </MultiDataTrigger.Conditions>
+                    <!-- Hide if no Status Text is present -->
+                    <DataTrigger Binding="{Binding StatusText}" Value="">
                         <Setter Property="Visibility" Value="Collapsed"/>
                         <Setter Property="BorderThickness" Value="0"/>
-                    </MultiDataTrigger>
+                    </DataTrigger>
                 </Style.Triggers>
             </Style>
         </Border.Style>
@@ -36,17 +33,42 @@
             <!-- Left Side: Ready, Status Text & Notifications -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
 
-                <!-- 1. Ready Icon (First) -->
+                <!-- 1. Status Icon (First) -->
                 <materialIcons:MaterialIcon x:Name="ReadyIcon" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center">
                     <materialIcons:MaterialIcon.Style>
                         <Style TargetType="materialIcons:MaterialIcon">
-                            <Setter Property="Kind" Value="CheckCircleOutline"/>
-                            <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                            <!-- Default: Info (Blue) -->
+                            <Setter Property="Kind" Value="InformationOutline"/>
+                            <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
                             <Setter Property="Visibility" Value="Visible"/>
+                            
                             <Style.Triggers>
+                                <!-- No Text -> Hide Icon -->
                                 <DataTrigger Binding="{Binding StatusText}" Value="">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
+
+                                <!-- Success States -->
+                                <DataTrigger Binding="{Binding StatusText}" Value="Ready">
+                                    <Setter Property="Kind" Value="CheckCircleOutline"/>
+                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding StatusText}" Value="Comparison Completed">
+                                    <Setter Property="Kind" Value="CheckCircleOutline"/>
+                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding StatusText}" Value="Success">
+                                    <Setter Property="Kind" Value="CheckCircleOutline"/>
+                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                </DataTrigger>
+
+                                <!-- Processing State (When Progress Spinner is Visible) -->
+                                <DataTrigger Binding="{Binding Visibility, ElementName=ProgressSummaryButton}" Value="Visible">
+                                    <Setter Property="Kind" Value="ConsoleLine"/>
+                                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                </DataTrigger>
+
+                                <!-- Warning/Cancelling States -->
                                 <DataTrigger Binding="{Binding StatusText}" Value="Cancelling Task...">
                                     <Setter Property="Kind" Value="AlertCircleOutline"/>
                                     <Setter Property="Foreground" Value="Orange"/>
@@ -80,26 +102,6 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-
-                <!-- 3. Notifications -->
-                <Button x:Name="NotificationButton"
-                        Style="{StaticResource TransparentIconButton}"
-                        Visibility="{Binding NotificationCount, Converter={StaticResource CountToVisibilityConverter}}"
-                        Cursor="Hand"
-                        Margin="0"
-                        Padding="0"
-                        VerticalAlignment="Center"
-                        Click="NotificationButton_Click">
-                    <Button.ToolTip>
-                        <ToolTip Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}">
-                            <TextBlock Text="{Binding AllNotificationsTooltip}" TextWrapping="Wrap" MaxWidth="400" Foreground="{StaticResource TextPrimary}" FontSize="12"/>
-                        </ToolTip>
-                    </Button.ToolTip>
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="BellRingOutline" Width="14" Height="14" Foreground="LightSkyBlue" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding CurrentNotificationMessage}" FontSize="11" Foreground="LightSkyBlue" FontWeight="Medium" VerticalAlignment="Center" MaxWidth="400" TextTrimming="CharacterEllipsis"/>
-                    </StackPanel>
-                </Button>
             </StackPanel>
 
             <!-- Right Side: Progress Indicator -->

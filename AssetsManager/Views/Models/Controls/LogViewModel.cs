@@ -1,19 +1,41 @@
 using System;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using Material.Icons;
+using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Views.Models.Controls
 {
     public class LogViewModel : INotifyPropertyChanged
     {
+        private readonly NotificationService _notificationService;
         private int _notificationCount;
         private bool _isLogVisible = true;
         private bool _hasActiveStatus;
         private MaterialIconKind _toggleIconKind = MaterialIconKind.ChevronDown;
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        public LogViewModel()
+        {
+            // Resolve service manually since this ViewModel is created by the View
+            _notificationService = App.ServiceProvider.GetService<NotificationService>();
+            
+            if (_notificationService != null)
+            {
+                _notificationService.CountsChanged += UpdateCounts;
+                UpdateCounts();
+            }
+        }
+
+        private void UpdateCounts()
+        {
+            if (_notificationService == null) return;
+            NotificationCount = _notificationService.GetNotifications().Count(n => !n.IsRead);
+        }
 
         public int NotificationCount
         {

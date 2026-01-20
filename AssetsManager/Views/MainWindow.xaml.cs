@@ -11,6 +11,7 @@ using Hardcodet.Wpf.TaskbarNotification; // Hardcodet Namespace
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Models.Notifications;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
@@ -19,6 +20,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
 using AssetsManager.Views.Controls;
+using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 
@@ -48,6 +50,7 @@ namespace AssetsManager.Views
         private readonly ExtractionService _extractionService;
         private readonly ReportGenerationService _reportGenerationService;
         private readonly TaskCancellationManager _taskCancellationManager;
+        private readonly NotificationService _notificationService;
 
         private string _latestAppVersionAvailable;
         
@@ -82,7 +85,8 @@ namespace AssetsManager.Views
             VersionService versionService,
             ExtractionService extractionService,
             ReportGenerationService reportGenerationService,
-            TaskCancellationManager taskCancellationManager)
+            TaskCancellationManager taskCancellationManager,
+            NotificationService notificationService)
         {
             InitializeComponent();
 
@@ -108,18 +112,23 @@ namespace AssetsManager.Views
             _extractionService = extractionService;
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
+            _notificationService = notificationService;
+
+            // Initialize NotificationHub
+            var notificationViewModel = new NotificationHubModel(_notificationService);
+            NotificationHub.DataContext = notificationViewModel;
 
             // Initialize ProgressUIManager with controls from the new StatusBarView
             _progressUIManager.Initialize(StatusBar.ViewModel, this);
             
             // Subscribe to Status Bar events
-            StatusBar.NotificationClicked += StatusBar_NotificationClicked;
             StatusBar.ProgressSummaryClicked += (s, e) => _progressUIManager.ShowDetails();
             
             _logService.SetLogOutput(LogView.LogRichTextBox);
             LogView.ToggleLogSizeRequested += OnToggleLogSizeRequested;
             LogView.ClearStatusBarRequested += (s, e) => ClearStatusBar();
             LogView.LogExpandedManually += (s, e) => _isLogMinimized = false;
+            LogView.NotificationClicked += OnNotificationHubRequested;
 
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
@@ -303,8 +312,10 @@ namespace AssetsManager.Views
 
         public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
         {
-            // Delegate to StatusBar
-            StatusBar.ShowNotification(show, message);
+            if (show)
+            {
+                _notificationService.AddNotification("System Notification", message, NotificationType.Info);
+            }
         }
 
         public void ClearStatusBar()
@@ -339,9 +350,13 @@ namespace AssetsManager.Views
             }
         }
 
-        private async void StatusBar_NotificationClicked(object sender, EventArgs e)
+        private async void OnNotificationHubRequested(object sender, EventArgs e)
         {
-            StatusBar.ShowNotification(false);
+            if (NotificationHub.DataContext is NotificationHubModel vm)
+            {
+                vm.TogglePanel();
+            }
+
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
             {
                 await _updateManager.CheckForUpdatesAsync(this, true);

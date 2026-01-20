@@ -62,6 +62,7 @@ namespace AssetsManager
 
       // Core Services
       services.AddSingleton<LogService>();
+      services.AddSingleton<NotificationService>();
       services.AddSingleton<TaskCancellationManager>(); // Added for managing task cancellations
       services.AddSingleton<DiffViewService>();
       services.AddSingleton<CustomMessageBoxService>();

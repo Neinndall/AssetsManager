@@ -16,28 +16,10 @@ namespace AssetsManager.Views.Controls
         public event EventHandler NotificationClicked;
         public event EventHandler ProgressSummaryClicked;
 
-        // Dependency Property for Notification Count
-        public static readonly DependencyProperty NotificationCountProperty =
-            DependencyProperty.Register("NotificationCount", typeof(int), typeof(StatusBarView), new PropertyMetadata(0));
-
-        public int NotificationCount
-        {
-            get { return (int)GetValue(NotificationCountProperty); }
-            set { SetValue(NotificationCountProperty, value); }
-        }
-
         public StatusBarView()
         {
             InitializeComponent();
             DataContext = ViewModel;
-
-            ViewModel.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(StatusBarViewModel.NotificationCount))
-                {
-                    NotificationCount = ViewModel.NotificationCount;
-                }
-            };
         }
 
         public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")

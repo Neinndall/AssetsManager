@@ -15,16 +15,7 @@ namespace AssetsManager.Views.Controls
         public event EventHandler ToggleLogSizeRequested;
         public event EventHandler LogExpandedManually;
         public event EventHandler ClearStatusBarRequested;
-
-        // Dependency Property for Notification Count
-        public static readonly DependencyProperty NotificationCountProperty =
-            DependencyProperty.Register("NotificationCount", typeof(int), typeof(LogView), new PropertyMetadata(0, OnNotificationCountChanged));
-
-        public int NotificationCount
-        {
-            get { return (int)GetValue(NotificationCountProperty); }
-            set { SetValue(NotificationCountProperty, value); }
-        }
+        public event EventHandler NotificationClicked;
 
         // Dependency Property for StatusText (to sync Clear Button state)
         public static readonly DependencyProperty StatusTextProperty =
@@ -34,14 +25,6 @@ namespace AssetsManager.Views.Controls
         {
             get { return (string)GetValue(StatusTextProperty); }
             set { SetValue(StatusTextProperty, value); }
-        }
-
-        private static void OnNotificationCountChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            if (d is LogView logView)
-            {
-                logView.ViewModel.NotificationCount = (int)e.NewValue;
-            }
         }
 
         private static void OnStatusTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -91,6 +74,11 @@ namespace AssetsManager.Views.Controls
         {
             ViewModel.ToggleLog();
             ToggleLogSizeRequested?.Invoke(this, EventArgs.Empty);
+        }
+        
+        private void NotificationButton_Click(object sender, RoutedEventArgs e)
+        {
+            NotificationClicked?.Invoke(this, EventArgs.Empty);
         }
     }
 }
