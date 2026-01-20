@@ -24,7 +24,7 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isWadMode = true; // Default WAD mode
         private bool _isBackupMode = false;
         private bool _isSortingEnabled = true;
-        private bool _isFavoritesEnabled = true; // Default toggle state
+        private bool _isFavoritesEnabled = false; // Default toggle state
         private bool _hasFavorites;
         private string _loadingStatus = "Loading assets...";
         private string _loadingOperation = "LOADING";
