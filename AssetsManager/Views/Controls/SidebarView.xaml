@@ -68,7 +68,7 @@
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderSearchOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         <TextBlock Grid.Column="1" Text="Explorer" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
