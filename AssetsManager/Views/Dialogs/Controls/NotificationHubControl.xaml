@@ -94,19 +94,10 @@
                     <Setter TargetName="NotificationBorder" Property="BorderThickness" Value="1.5"/>
                 </DataTrigger>
                 
-                <!-- Hover State (Combines with Unread if needed) -->
+                <!-- Hover State (Always change background) -->
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter TargetName="NotificationBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                 </Trigger>
-
-                <!-- Hover logic for Read items (changes border) -->
-                <MultiDataTrigger>
-                    <MultiDataTrigger.Conditions>
-                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
-                        <Condition Binding="{Binding IsRead}" Value="True"/>
-                    </MultiDataTrigger.Conditions>
-                    <Setter TargetName="NotificationBorder" Property="BorderBrush" Value="{StaticResource TextSecondary}"/>
-                </MultiDataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
     </UserControl.Resources>
@@ -129,9 +120,6 @@
             <Border.RenderTransform>
                 <TranslateTransform x:Name="PanelTranslateTransform"/>
             </Border.RenderTransform>
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="35" ShadowDepth="0" Opacity="0.45" Color="Black"/>
-            </Border.Effect>
             
             <Grid>
                 <Grid.RowDefinitions>
@@ -141,12 +129,12 @@
                     <RowDefinition Height="Auto"/> <!-- Footer -->
                 </Grid.RowDefinitions>
 
-                <!-- Row 0: Header (Sidebar style) -->
+                <!-- Row 0: Header -->
                 <Border Grid.Row="0" 
                         Padding="16,8,8,8" 
                         BorderBrush="{StaticResource BorderColor}" 
                         BorderThickness="0,0,0,1"
-                        Background="{StaticResource SidebarBackground}"
+                        Background="{StaticResource CardBackground}"
                         CornerRadius="12,12,0,0"
                         Cursor="SizeAll"
                         MouseLeftButtonDown="Header_MouseLeftButtonDown"
