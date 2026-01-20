@@ -71,7 +71,7 @@
                               Click="FavoritesToggleButton_Click"
                               ToolTip="Toggle Favorites"
                               Margin="0,0,2,0"
-                              IsChecked="True"
+                              IsChecked="False"
                               Visibility="{Binding IsFavoritesToggleVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                     <materialIcons:MaterialIcon Width="18" Height="18">
                         <materialIcons:MaterialIcon.Style>
