@@ -64,8 +64,8 @@
 
                                 <!-- Processing State (When Progress Spinner is Visible) -->
                                 <DataTrigger Binding="{Binding Visibility, ElementName=ProgressSummaryButton}" Value="Visible">
-                                    <Setter Property="Kind" Value="ConsoleLine"/>
-                                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                    <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
                                 </DataTrigger>
 
                                 <!-- Warning/Cancelling States -->
