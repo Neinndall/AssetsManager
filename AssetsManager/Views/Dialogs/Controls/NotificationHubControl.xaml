@@ -110,7 +110,7 @@
         <Border x:Name="MainPanel"
                 Width="420" 
                 MaxHeight="500" 
-                Background="{StaticResource SidebarBackground}"
+                Background="{StaticResource DarkBackground}"
                 CornerRadius="12" 
                 BorderBrush="{StaticResource BorderColor}" 
                 BorderThickness="1"
@@ -197,8 +197,8 @@
                 </ScrollViewer>
 
                 <!-- Footer (Sidebar style) -->
-                <Border Grid.Row="3" Padding="12,8" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,12,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0">
-                    <TextBlock Text="SYSTEM NOTIFICATIONS HUB" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.6"/>
+                <Border Grid.Row="3" Padding="12,8" Background="{StaticResource CardBackground}" CornerRadius="0,0,12,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0">
+                    <TextBlock Text="SYSTEM NOTIFICATIONS HUB" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </Border>
             </Grid>
         </Border>
