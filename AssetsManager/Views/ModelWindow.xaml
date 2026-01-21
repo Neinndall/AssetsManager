@@ -67,7 +67,7 @@
                                                FontSize="14" 
                                                Foreground="{StaticResource TextPrimary}" 
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Model + Textures" 
+                                    <TextBlock Text="Import skn with textures" 
                                                FontSize="12" 
                                                Foreground="{StaticResource TextMuted}" 
                                                HorizontalAlignment="Center" 
@@ -91,7 +91,7 @@
                                                FontSize="14" 
                                                Foreground="{StaticResource TextPrimary}" 
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import .mapgeo" 
+                                    <TextBlock Text="Import mapgeo" 
                                                FontSize="12" 
                                                Foreground="{StaticResource TextMuted}" 
                                                HorizontalAlignment="Center" 
