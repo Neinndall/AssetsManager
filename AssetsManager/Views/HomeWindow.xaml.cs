@@ -13,15 +13,11 @@ namespace AssetsManager.Views
         private readonly HomeViewModel _viewModel;
         public event Action<string> NavigationRequested;
 
-        public HomeWindow()
+        public HomeWindow(AppSettings appSettings)
         {
             InitializeComponent();
             
-            // Manual Dependency Resolution
-            var appSettings = App.ServiceProvider.GetRequiredService<AppSettings>();
-            var monitorService = App.ServiceProvider.GetRequiredService<MonitorService>();
-
-            _viewModel = new HomeViewModel(appSettings, monitorService);
+            _viewModel = new HomeViewModel(appSettings);
             DataContext = _viewModel;
             
             Unloaded += HomeWindow_Unloaded;

@@ -9,7 +9,6 @@ namespace AssetsManager.Views.Models
     public class HomeViewModel : INotifyPropertyChanged
     {
         private readonly AppSettings _appSettings;
-        private readonly MonitorService _monitorService;
 
         private string _greeting;
         private string _monitorSummary;
@@ -35,10 +34,9 @@ namespace AssetsManager.Views.Models
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public HomeViewModel(AppSettings appSettings, MonitorService monitorService)
+        public HomeViewModel(AppSettings appSettings)
         {
             _appSettings = appSettings;
-            _monitorService = monitorService;
 
             Initialize();
         }
