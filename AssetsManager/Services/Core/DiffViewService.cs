@@ -165,7 +165,7 @@ namespace AssetsManager.Services.Core
             await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, diff.OldPath, diff.NewPath);
 
             _logService.LogDebug("[HandleAudioBankDiffAsync] Displaying diff window.");
-            diffWindow.ContentRendered += (s, e) => loadingWindow.Close();
+            loadingWindow.Close();
             diffWindow.ShowDialog();
         }
 
@@ -207,7 +207,7 @@ namespace AssetsManager.Services.Core
             diffWindow.Owner = owner;
             await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath);
 
-            diffWindow.ContentRendered += (s, e) => loadingWindow.Close();
+            loadingWindow.Close();
             diffWindow.ShowDialog();
         }
 
@@ -257,7 +257,7 @@ namespace AssetsManager.Services.Core
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath));
 
-                diffWindow.ContentRendered += (s, e) => loadingWindow.Close();
+                loadingWindow.Close();
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)
