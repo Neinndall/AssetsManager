@@ -184,7 +184,7 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.Owner = _owner;
                 _progressDetailsWindow.OperationVerb = "Extracting";
                 _progressDetailsWindow.HeaderIconKind = "PackageDown";
-                _progressDetailsWindow.HeaderText = "Extracting New Assets";
+                _progressDetailsWindow.HeaderText = "Extracting Assets";
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, data.totalFiles, data.message, true, null);
             });
