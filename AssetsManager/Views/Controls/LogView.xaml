@@ -43,7 +43,7 @@
                             Width="28" Height="28"
                             Margin="0,0,8,0">
                         <Grid>
-                            <materialIcons:MaterialIcon Kind="BellOutline" Width="14" Height="14" Foreground="{StaticResource TextPrimary}"/>
+                            <materialIcons:MaterialIcon Kind="BellOutline" Width="14" Height="14"/>
                             <!-- Notification Badge -->
                             <Border Background="{StaticResource AccentRed}" 
                                     CornerRadius="5" 
@@ -71,7 +71,7 @@
                             ToolTip="Clear Status Bar"
                             Width="28" Height="28"
                             Margin="0,0,4,0">
-                        <materialIcons:MaterialIcon Kind="Eraser" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
+                        <materialIcons:MaterialIcon Kind="Eraser" Width="14" Height="14"/>
                     </Button>
 
                     <!-- Clear Log -->
