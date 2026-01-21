@@ -159,7 +159,6 @@ namespace AssetsManager
       services.AddTransient<InputDialog>();
       services.AddTransient<ConfirmationDialog>();
 
-
       // Secondary Views
       services.AddTransient<LogView>();
       services.AddTransient<GeneralSettingsView>();

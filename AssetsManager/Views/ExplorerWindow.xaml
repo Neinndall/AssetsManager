@@ -5,11 +5,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:explorer="clr-namespace:AssetsManager.Views.Controls.Explorer"
-             mc:Ignorable="d" 
-             FontFamily="{StaticResource AppFontFamily}">
-    <Grid Background="{StaticResource SidebarBackground}">
-        <!-- Cuerpo Principal -->
-        <Grid>
+                          mc:Ignorable="d" 
+                          FontFamily="{StaticResource AppFontFamily}">
+                 <Grid>
+                     <!-- Cuerpo Principal -->
+                     <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="405" MinWidth="250" MaxWidth="700"/>
                 <ColumnDefinition Width="Auto"/>
@@ -30,8 +30,7 @@
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <explorer:FileExplorerControl x:Name="FileExplorer" 
-                                              FileSelected="FileExplorer_FileSelected"/>
+                <explorer:FileExplorerControl x:Name="FileExplorer" FileSelected="FileExplorer_FileSelected"/>
             </Border>
 
             <!-- Splitter -->
