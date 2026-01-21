@@ -112,7 +112,7 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isWebVisible = value; OnPropertyChanged(); }
         }
 
-        private bool _isSelectFileMessageVisible;
+        private bool _isSelectFileMessageVisible = true;
         public bool IsSelectFileMessageVisible
         {
             get => _isSelectFileMessageVisible;
