@@ -18,6 +18,7 @@ namespace AssetsManager.Views
     public partial class ModelWindow : UserControl
     {
         private readonly SknModelLoadingService _sknModelLoadingService;
+        private readonly ScoModelLoadingService _scoModelLoadingService;
         private readonly MapGeometryLoadingService _mapGeometryLoadingService;
         private readonly LogService _logService;
         private readonly CustomMessageBoxService _customMessageBoxService;
@@ -28,10 +29,11 @@ namespace AssetsManager.Views
 
         private readonly AppSettings _appSettings;
 
-        public ModelWindow(SknModelLoadingService sknModelLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService, AppSettings appSettings)
+        public ModelWindow(SknModelLoadingService sknModelLoadingService, ScoModelLoadingService scoModelLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService, AppSettings appSettings)
         {
             InitializeComponent();
             _sknModelLoadingService = sknModelLoadingService;
+            _scoModelLoadingService = scoModelLoadingService;
             _mapGeometryLoadingService = mapGeometryLoadingService;
             _logService = logService;
             _customMessageBoxService = customMessageBoxService;
@@ -41,6 +43,7 @@ namespace AssetsManager.Views
             // Inject services into controls
             ViewportControl.LogService = _logService;
             PanelControl.SknModelLoadingService = _sknModelLoadingService;
+            PanelControl.ScoModelLoadingService = _scoModelLoadingService;
             PanelControl.MapGeometryLoadingService = _mapGeometryLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = _customMessageBoxService;
@@ -219,8 +222,11 @@ namespace AssetsManager.Views
             LoadingStateContent.Visibility = Visibility.Collapsed;
             var openFileDialog = new CommonOpenFileDialog
             {
-                Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl"), new CommonFileDialogFilter("All Files", "*.*") },
-                Title = "Select a skn file"
+                Filters = { 
+                    new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl;*.sco;*.scb"), 
+                    new CommonFileDialogFilter("All Files", "*.*") 
+                },
+                Title = "Select a model file"
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -230,7 +236,7 @@ namespace AssetsManager.Views
                 {
                     PanelControl.LoadSkeleton(openFileDialog.FileName);
                 }
-                else if (extension == ".skn")
+                else if (extension == ".skn" || extension == ".sco" || extension == ".scb")
                 {
                     PanelControl.LoadInitialModel(openFileDialog.FileName);
                 }

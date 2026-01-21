@@ -32,21 +32,23 @@
                             <!-- Load Model Card -->
                             <Button Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenFile_Click"
-                                    ToolTip="Load a standard .skn model"
+                                    ToolTip="Load a 3D model (.skn, .sco, .scb)"
                                     Width="180" Height="160">
                                 <StackPanel>
                                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
                                         <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="Load Character" 
+                                    <TextBlock Text="Load Model" 
                                                FontWeight="SemiBold" 
                                                FontSize="14" 
                                                Foreground="{StaticResource TextPrimary}" 
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import .skn files" 
+                                    <TextBlock Text="Import skn, sco and scb" 
                                                FontSize="12" 
                                                Foreground="{StaticResource TextMuted}" 
                                                HorizontalAlignment="Center" 
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
                                                Margin="0,4,0,0"/>
                                 </StackPanel>
                             </Button>
@@ -69,6 +71,8 @@
                                                FontSize="12" 
                                                Foreground="{StaticResource TextMuted}" 
                                                HorizontalAlignment="Center" 
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
                                                Margin="0,4,0,0"/>
                                 </StackPanel>
                             </Button>
@@ -91,6 +95,8 @@
                                                FontSize="12" 
                                                Foreground="{StaticResource TextMuted}" 
                                                HorizontalAlignment="Center" 
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
                                                Margin="0,4,0,0"/>
                                 </StackPanel>
                             </Button>

@@ -34,6 +34,7 @@ namespace AssetsManager.Views.Controls.Models
         private ModelType _currentMode;
 
         public SknModelLoadingService SknModelLoadingService { get; set; }
+        public ScoModelLoadingService ScoModelLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
@@ -144,8 +145,12 @@ namespace AssetsManager.Views.Controls.Models
             {
                 var openFileDialog = new CommonOpenFileDialog
                 {
-                    Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
-                    Title = "Select a skn file"
+                    Filters = { 
+                        new CommonFileDialogFilter("SKN files", "*.skn"), 
+                        new CommonFileDialogFilter("SCO/SCB files", "*.sco;*.scb"),
+                        new CommonFileDialogFilter("All files", "*.*") 
+                    },
+                    Title = "Select a model file"
                 };
 
                 if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -207,24 +212,37 @@ namespace AssetsManager.Views.Controls.Models
             LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
             LoadModelButton.ToolTip = "Load Model";
 
-            SceneModel newModel;
-            if (string.IsNullOrEmpty(texturePath))
+            SceneModel newModel = null;
+            string extension = Path.GetExtension(modelPath).ToLowerInvariant();
+
+            if (extension == ".sco" || extension == ".scb")
             {
-                newModel = SknModelLoadingService.LoadModel(modelPath);
+                newModel = ScoModelLoadingService.LoadModel(modelPath);
             }
             else
             {
-                newModel = SknModelLoadingService.LoadModel(modelPath, texturePath);
+                if (string.IsNullOrEmpty(texturePath))
+                {
+                    newModel = SknModelLoadingService.LoadModel(modelPath);
+                }
+                else
+                {
+                    newModel = SknModelLoadingService.LoadModel(modelPath, texturePath);
+                }
             }
 
             if (newModel != null)
             {
-                string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
-                if (File.Exists(sklFilePath))
+                // Only try to load .skl for .skn files
+                if (extension == ".skn")
                 {
-                    using (var stream = File.OpenRead(sklFilePath))
+                    string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
+                    if (File.Exists(sklFilePath))
                     {
-                        newModel.Skeleton = new RigResource(stream);
+                        using (var stream = File.OpenRead(sklFilePath))
+                        {
+                            newModel.Skeleton = new RigResource(stream);
+                        }
                     }
                 }
 

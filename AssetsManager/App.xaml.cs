@@ -136,6 +136,7 @@ namespace AssetsManager
 
       // Models Services
       services.AddSingleton<SknModelLoadingService>();
+      services.AddSingleton<ScoModelLoadingService>();
       services.AddSingleton<MapGeometryLoadingService>();
 
       // Audio Services
