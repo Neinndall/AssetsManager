@@ -1,12 +1,11 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 
-namespace AssetsManager.Views.Models
+namespace AssetsManager.Views.Models.Home
 {
-    public class HomeViewModel : INotifyPropertyChanged
+    public class HomeModel : INotifyPropertyChanged
     {
         private readonly AppSettings _appSettings;
 
@@ -34,7 +33,7 @@ namespace AssetsManager.Views.Models
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public HomeViewModel(AppSettings appSettings)
+        public HomeModel(AppSettings appSettings)
         {
             _appSettings = appSettings;
 
