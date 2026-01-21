@@ -14,6 +14,8 @@ using SixLabors.ImageSharp.Processing;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Models3D;
 
+using AssetsManager.Views.Models.Settings;
+
 namespace AssetsManager.Utils
 {
     public static class TextureUtils
@@ -245,6 +247,32 @@ namespace AssetsManager.Utils
         public static BitmapSource LoadTexture(Stream textureStream, string extension)
         {
             return LoadTexture(textureStream, extension, null, null);
+        }
+
+        public static void SaveBitmapSourceAsImage(BitmapSource bitmapSource, string originalFileName, string destinationPath, ImageExportFormat format, Action<string> onFileSavedCallback)
+        {
+            BitmapEncoder encoder;
+            string extension;
+
+            switch (format)
+            {
+                case ImageExportFormat.Png:
+                default:
+                    encoder = new PngBitmapEncoder();
+                    extension = ".png";
+                    break;
+            }
+
+            encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
+
+            string fileName = Path.ChangeExtension(originalFileName, extension);
+            string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                encoder.Save(fileStream);
+            }
+            onFileSavedCallback?.Invoke(filePath);
         }
     }
 }

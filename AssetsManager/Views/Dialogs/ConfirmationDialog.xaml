@@ -89,10 +89,10 @@
                     <Grid Grid.Row="1" Margin="24,0,24,24">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <StackPanel x:Name="YesNoButtons" Orientation="Horizontal">
-                                <Button x:Name="btnNo" Content="Cancel" Style="{StaticResource SecondaryButton}" Width="90" Click="btnNo_Click"/>
-                                <Button x:Name="btnYes" Content="Confirm" Style="{StaticResource ModernButton}" Width="90" Margin="12,0,0,0" Click="btnYes_Click"/>
+                                <Button x:Name="btnNo" Content="Cancel" Style="{StaticResource SecondaryButton}" Click="btnNo_Click"/>
+                                <Button x:Name="btnYes" Content="Confirm" Style="{StaticResource PrimaryButton}" Margin="12,0,0,0" Click="btnYes_Click"/>
                             </StackPanel>
-                            <Button x:Name="btnOk" Content="OK" Style="{StaticResource ModernButton}" Width="90" Click="btnOk_Click" Visibility="Collapsed"/>
+                            <Button x:Name="btnOk" Content="OK" Style="{StaticResource PrimaryButton}" Click="btnOk_Click" Visibility="Collapsed"/>
                         </StackPanel>
                     </Grid>
                 </Grid>

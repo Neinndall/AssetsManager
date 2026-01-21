@@ -18,6 +18,7 @@ namespace AssetsManager.Views
     public partial class ModelWindow : UserControl
     {
         private readonly SknModelLoadingService _sknModelLoadingService;
+        private readonly ScoModelLoadingService _scoModelLoadingService;
         private readonly MapGeometryLoadingService _mapGeometryLoadingService;
         private readonly LogService _logService;
         private readonly CustomMessageBoxService _customMessageBoxService;
@@ -28,10 +29,11 @@ namespace AssetsManager.Views
 
         private readonly AppSettings _appSettings;
 
-        public ModelWindow(SknModelLoadingService sknModelLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService, AppSettings appSettings)
+        public ModelWindow(SknModelLoadingService sknModelLoadingService, ScoModelLoadingService scoModelLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService, AppSettings appSettings)
         {
             InitializeComponent();
             _sknModelLoadingService = sknModelLoadingService;
+            _scoModelLoadingService = scoModelLoadingService;
             _mapGeometryLoadingService = mapGeometryLoadingService;
             _logService = logService;
             _customMessageBoxService = customMessageBoxService;
@@ -41,9 +43,13 @@ namespace AssetsManager.Views
             // Inject services into controls
             ViewportControl.LogService = _logService;
             PanelControl.SknModelLoadingService = _sknModelLoadingService;
+            PanelControl.ScoModelLoadingService = _scoModelLoadingService;
             PanelControl.MapGeometryLoadingService = _mapGeometryLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = _customMessageBoxService;
+            
+            // Link Panel to Viewport directly for Studio controls
+            PanelControl.Viewport = ViewportControl;
 
             // Scene events
             PanelControl.SceneClearRequested += OnSceneClearRequested;
@@ -65,8 +71,7 @@ namespace AssetsManager.Views
             ViewportControl.AnimationProgressChanged += OnAnimationProgressChanged;
             ViewportControl.PlaybackStateChanged += OnPlaybackStateChanged;
 
-            // Viewport events
-            ViewportControl.SkyboxVisibilityChanged += OnSkyboxVisibilityChanged;
+            // Auto-rotation from Viewport to Panel
             ViewportControl.AutoRotationStopped += OnAutoRotationStopped;
 
             Unloaded += (s, e) =>
@@ -88,27 +93,12 @@ namespace AssetsManager.Views
         private void OnAnimationSeekRequested(object s, (AnimationModel, TimeSpan) args) => ViewportControl.SeekAnimation(args.Item2);
         private void OnAnimationProgressChanged(object s, double time) => PanelControl.UpdateAnimationProgress(time);
         private void OnPlaybackStateChanged(AnimationModel model, bool isPlaying) => PanelControl.SetAnimationPlayingState(model, isPlaying);
-
         private void OnAutoRotationStopped(object sender, double angle) => PanelControl.ApplyAutoRotation(angle);
 
         private void OnSceneClearRequested(object sender, EventArgs e)
         {
             ViewportControl.ResetScene();
             ViewportControl.ResetCamera();
-        }
-
-        private void OnSkyboxVisibilityChanged(object sender, bool isVisible)
-        {
-            if (_skyVisual == null) return;
-
-            if (isVisible && !ViewportControl.Viewport.Children.Contains(_skyVisual))
-            {
-                ViewportControl.Viewport.Children.Add(_skyVisual);
-            }
-            else if (!isVisible && ViewportControl.Viewport.Children.Contains(_skyVisual))
-            {
-                ViewportControl.Viewport.Children.Remove(_skyVisual);
-            }
         }
 
         public void CleanupResources()
@@ -134,7 +124,6 @@ namespace AssetsManager.Views
             {
                 ViewportControl.AnimationProgressChanged -= OnAnimationProgressChanged;
                 ViewportControl.PlaybackStateChanged -= OnPlaybackStateChanged;
-                ViewportControl.SkyboxVisibilityChanged -= OnSkyboxVisibilityChanged;
                 ViewportControl.AutoRotationStopped -= OnAutoRotationStopped;
             }
 
@@ -168,12 +157,14 @@ namespace AssetsManager.Views
                 MainGridSplitter.Visibility = Visibility.Collapsed;
                 PanelControl.Visibility = Visibility.Collapsed;
                 Grid.SetColumnSpan(ViewportControl, 3);
+                ViewportControl.Margin = new Thickness(0, 0, 4, 0);
             }
             else
             {
                 MainGridSplitter.Visibility = Visibility.Visible;
                 PanelControl.Visibility = Visibility.Visible;
                 Grid.SetColumnSpan(ViewportControl, 1);
+                ViewportControl.Margin = new Thickness(0);
             }
         }
 
@@ -191,6 +182,8 @@ namespace AssetsManager.Views
 
             ViewportControl.Viewport.Children.Add(_groundVisual);
             ViewportControl.Viewport.Children.Add(_skyVisual);
+            
+            ViewportControl.RegisterEnvironment(_skyVisual, _groundVisual);
         }
 
         private BitmapSource LoadSceneTexture(string path)
@@ -229,8 +222,11 @@ namespace AssetsManager.Views
             LoadingStateContent.Visibility = Visibility.Collapsed;
             var openFileDialog = new CommonOpenFileDialog
             {
-                Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl"), new CommonFileDialogFilter("All Files", "*.*") },
-                Title = "Select a skn file"
+                Filters = { 
+                    new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl;*.sco;*.scb"), 
+                    new CommonFileDialogFilter("All Files", "*.*") 
+                },
+                Title = "Select a model file"
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -240,7 +236,7 @@ namespace AssetsManager.Views
                 {
                     PanelControl.LoadSkeleton(openFileDialog.FileName);
                 }
-                else if (extension == ".skn")
+                else if (extension == ".skn" || extension == ".sco" || extension == ".scb")
                 {
                     PanelControl.LoadInitialModel(openFileDialog.FileName);
                 }

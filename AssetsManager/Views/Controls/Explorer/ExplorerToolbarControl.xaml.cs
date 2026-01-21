@@ -10,6 +10,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public event RoutedEventHandler LoadComparisonClicked;
         public event RoutedEventHandler SwitchModeClicked;
         public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
+        public event RoutedPropertyChangedEventHandler<bool> FavoritesVisibilityChanged;
         public event RoutedPropertyChangedEventHandler<bool> SortStateChanged;
         public event RoutedPropertyChangedEventHandler<bool> ViewModeChanged; // True for Grid, False for Preview
 
@@ -31,6 +32,22 @@ namespace AssetsManager.Views.Controls.Explorer
         public void SetViewMode(bool isGridMode)
         {
             GridViewToggleButton.IsChecked = isGridMode;
+        }
+
+        public void SetWadMode(bool isWadMode)
+        {
+            if (isWadMode)
+            {
+                // Current: WAD -> Action: Go to Directory
+                ModeIcon.Kind = Material.Icons.MaterialIconKind.FolderMultipleOutline;
+                SwitchModeButton.ToolTip = "Switch to Local Directory Mode";
+            }
+            else
+            {
+                // Current: Directory -> Action: Go back to WAD
+                ModeIcon.Kind = Material.Icons.MaterialIconKind.ArchiveOutline;
+                SwitchModeButton.ToolTip = "Switch back to LoL WAD Mode";
+            }
         }
 
         private void GridViewToggle_Click(object sender, RoutedEventArgs e)
@@ -63,6 +80,14 @@ namespace AssetsManager.Views.Controls.Explorer
             if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
             {
                 BreadcrumbVisibilityChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
+            }
+        }
+
+        private void FavoritesToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            {
+                FavoritesVisibilityChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
             }
         }
 

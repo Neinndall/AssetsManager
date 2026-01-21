@@ -5,13 +5,10 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:models="clr-namespace:AssetsManager.Views.Models.Explorer"
-             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
              mc:Ignorable="d">
     <UserControl.Resources>
-        <converters:PathToIconConverter x:Key="PathToIconConverter"/>
-        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
-
+        
         <ContextMenu x:Key="ExplorerContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="Extract Selected" x:Name="ExtractMenuItem" Click="ExtractSelected_Click">
                 <MenuItem.Icon>
@@ -26,6 +23,11 @@
             <MenuItem Header="View Changes" x:Name="ViewChangesMenuItem" Click="ViewChanges_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="CompareHorizontal"/>
+                </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Add to Favorites" x:Name="AddToFavoritesMenuItem" Click="AddToFavorites_Click">
+                <MenuItem.Icon>
+                    <materialIcons:MaterialIcon Kind="StarOutline"/>
                 </MenuItem.Icon>
             </MenuItem>
             <MenuItem Header="Pin" x:Name="PinMenuItem" Click="PinSelected_Click">
@@ -46,16 +48,26 @@
         <local:ExplorerToolbarControl x:Name="Toolbar" 
                                       Grid.Row="0" 
                                       Margin="10,10,10,5" 
-                                      Visibility="Collapsed"/>
+                                      Visibility="{Binding IsToolbarVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+        
+        <!-- Content Area -->
         <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>    <!-- Tree -->
+                <RowDefinition Height="Auto"/> <!-- Favorites -->
+            </Grid.RowDefinitions>
+
+            <!-- Tree View -->
             <TreeView x:Name="FileTreeView" 
+                      Grid.Row="0"
                       Margin="6,0,0,0" 
                       ItemsSource="{Binding RootNodes}"
                       SelectedItemChanged="FileTreeView_SelectedItemChanged"
-                      Style="{StaticResource ModernTreeView}">
+                      Style="{StaticResource ModernTreeView}"
+                      Visibility="{Binding IsTreeReady, Converter={StaticResource BoolToVisibilityConverter}}">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type models:FileSystemNodeModel}" ItemsSource="{Binding Children}">
-                        <Grid>
+                        <Grid Margin="0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -63,7 +75,7 @@
                                 
                             <!-- Icon -->
                             <materialIcons:MaterialIcon Grid.Column="0" 
-                                                        Width="16" Height="16" 
+                                                        Width="18" Height="18" 
                                                         VerticalAlignment="Center" 
                                                         Margin="0,0,6,0" 
                                                         RenderTransformOrigin="0.5, 0.5"
@@ -89,7 +101,7 @@
                                                     </BeginStoryboard>
                                                 </DataTrigger.EnterActions>
                                             </DataTrigger>
-
+                                            
                                             <!-- Status Colors ONLY for Grouping Folders (e.g. [+] New) -->
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
@@ -132,7 +144,8 @@
                             <!-- Standard Text -->
                             <TextBlock Grid.Column="1" 
                                        VerticalAlignment="Center" 
-                                       FontSize="13">
+                                       FontSize="13"
+                                       FontWeight="Normal">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Visible"/>
@@ -142,7 +155,7 @@
                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                             </DataTrigger>
                                             
-                                            <!-- Status Colors for Text -->
+                                            <!-- Status Colors for Text - Still useful for diffs -->
                                             <DataTrigger Binding="{Binding Status}" Value="New">
                                                 <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
                                             </DataTrigger>
@@ -203,85 +216,220 @@
                 </TreeView.ItemContainerStyle>
             </TreeView>
 
-            <!-- Empty State -->
-            <StackPanel x:Name="NoDirectoryMessage"
-                        Orientation="Vertical"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Margin="10"
-                        Visibility="Collapsed">
-                <materialIcons:MaterialIcon Kind="FolderSearchOutline"
-                                            Width="64" Height="64"
-                                            HorizontalAlignment="Center"
-                                            Foreground="{StaticResource TextMuted}"
-                                            Opacity="0.5"/>
-                <TextBlock x:Name="PlaceholderTitle"
-                           Text="No Directory Selected"
-                           FontSize="20"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TextPrimary}"
-                           HorizontalAlignment="Center"
-                           TextWrapping="Wrap"
-                           TextAlignment="Center"
-                           Margin="0,16,0,0"/>
-                <TextBlock x:Name="PlaceholderDescription"
-                           Text="Please select your League of Legends installation folder to start exploring."
-                           TextWrapping="Wrap"
-                           FontSize="14"
-                           Foreground="{StaticResource TextSecondary}"
-                           HorizontalAlignment="Center"
-                           TextAlignment="Center"
-                           Margin="20,8,20,0"/>
-                <Button x:Name="SelectLolDirButton"
-                        Content="Open Folder"
-                        Style="{StaticResource SecondaryButton}"
-                        Click="SelectLolDirButton_Click"
-                        Padding="24,8"
-                        HorizontalAlignment="Center"
-                        Margin="0,24,0,0"/>
+            <!-- Favorites Container (Quick Access + Separator) -->
+            <StackPanel x:Name="FavoritesContainer" Grid.Row="1" Visibility="{Binding AreFavoritesVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                <!-- Separator (Top) -->
+                <Separator Background="{StaticResource BorderColor}" 
+                           Margin="16,8,16,2" 
+                           Opacity="0.4"/>
+                
+                <!-- Favorites Content -->
+                <StackPanel Margin="6,5,10,0">
+                    
+                    <!-- Header with Icon -->
+                    <StackPanel Orientation="Horizontal" Margin="16,0,0,5" Opacity="0.9">
+                        <materialIcons:MaterialIcon Kind="Star" Width="12" Height="12" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,-1,6,0"/>
+                        <TextBlock Text="FAVORITES" 
+                                   FontSize="11" 
+                                   FontWeight="Bold" 
+                                   Foreground="{StaticResource TextSecondary}" 
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <ListView x:Name="FavoritesListView" 
+                              BorderThickness="0" 
+                              Background="Transparent"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              Margin="0,0,0,5"
+                              SelectionChanged="FavoritesListView_SelectionChanged">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,0"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListViewItem">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="4" SnapsToDevicePixels="true">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Background="Transparent" ToolTip="{Binding FullPath}" Margin="20,2,8,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <!-- Visual Content -->
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                        <materialIcons:MaterialIcon Kind="{Binding FullPath, Converter={StaticResource PathToIconConverter}}" 
+                                                                    Width="14" Height="14" 
+                                                                    Margin="0,0,8,0" 
+                                                                    Foreground="{StaticResource TextSecondary}"
+                                                                    VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding DisplayName}" 
+                                                   VerticalAlignment="Center" 
+                                                   FontSize="12" 
+                                                   Foreground="{StaticResource TextPrimary}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+
+                                    <!-- Remove Button -->
+                                    <Button Grid.Column="1" 
+                                            Click="RemoveFavorite_Click" 
+                                            Tag="{Binding}"
+                                            Style="{StaticResource TransparentIconButton}"
+                                            Width="16" Height="16"
+                                            Margin="0,0,0,0"
+                                            ToolTip="Unpin from Favorites">
+                                        <materialIcons:MaterialIcon Kind="Close" Width="10" Height="10" Foreground="{StaticResource TextMuted}"/>
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
             </StackPanel>
+        </Grid>
+
+        <!-- Empty State (Overlay) -->
+        <StackPanel x:Name="NoDirectoryMessage"
+                    Grid.Row="1"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Margin="10"
+                    Visibility="{Binding IsEmptyState, Converter={StaticResource BoolToVisibilityConverter}}">
+            <materialIcons:MaterialIcon Kind="FolderSearchOutline"
+                                        Width="64" Height="64"
+                                        HorizontalAlignment="Center"
+                                        Foreground="{StaticResource TextMuted}"
+                                        Opacity="0.5"/>
+            <TextBlock x:Name="StatusTitle"
+                       Text="No Directory Selected"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimary}"
+                       HorizontalAlignment="Center"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       Margin="0,16,0,0"/>
+            <TextBlock x:Name="StatusDescription"
+                       Text="Please select your League of Legends installation folder to start exploring."
+                       TextWrapping="Wrap"
+                       FontSize="14"
+                       Foreground="{StaticResource TextSecondary}"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       Margin="10,8,10,0"/>
+            <Button x:Name="SelectLolDirButton"
+                    Content="Open Folder"
+                    Style="{StaticResource SecondaryButton}"
+                    Click="SelectLolDirButton_Click"
+                    Padding="24,8"
+                    HorizontalAlignment="Center"
+                    Margin="0,24,0,0"/>
+        </StackPanel>
+        
+        <!-- Loading Indicator (Overlay) -->
+        <Grid x:Name="LoadingIndicator" 
+              Grid.Row="1"
+              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" 
+              IsHitTestVisible="True">
             
-            <!-- Loading Indicator -->
-            <Grid x:Name="LoadingIndicator" 
-                  Visibility="Collapsed" 
-                  Background="{StaticResource SidebarBackground}">
-                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <!-- Modern Spinner Animation -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                
+                <!-- ADVANCED PROGRESS RING COMPOSITION -->
+                <Grid Width="100" Height="100" HorizontalAlignment="Center">
+                    <!-- 1. Outer Static Glow Ring -->
+                    <Ellipse Stroke="{StaticResource AccentBrush}" 
+                             StrokeThickness="1" 
+                             Opacity="0.1" 
+                             Margin="-10"/>
+                    
+                    <!-- 2. Technical Background Ring -->
+                    <Ellipse Stroke="{StaticResource BorderColor}" 
+                             StrokeThickness="4" 
+                             Opacity="0.3"/>
+                    
+                    <!-- 3. Pulsing Core Glow -->
+                    <Ellipse Fill="{StaticResource AccentBrush}" 
+                             Opacity="0.05"
+                             Style="{StaticResource TechnicalGlowStyle}"/>
+
+                    <!-- 4. Rotating "Scanner" Arc -->
                     <materialIcons:MaterialIcon Kind="Loading" 
-                                                Width="48" 
-                                                Height="48" 
+                                                Width="60" 
+                                                Height="60" 
                                                 Foreground="{StaticResource AccentBrush}"
                                                 HorizontalAlignment="Center"
-                                                RenderTransformOrigin="0.5, 0.5">
-                        <materialIcons:MaterialIcon.RenderTransform>
-                            <RotateTransform Angle="0"/>
-                        </materialIcons:MaterialIcon.RenderTransform>
-                        <materialIcons:MaterialIcon.Triggers>
-                            <EventTrigger RoutedEvent="Loaded">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" 
-                                                         From="0" To="360" Duration="0:0:1" 
-                                                         RepeatBehavior="Forever"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </materialIcons:MaterialIcon.Triggers>
+                                                VerticalAlignment="Center"
+                                                Style="{StaticResource SpinningIconStyle}">
                     </materialIcons:MaterialIcon>
                     
-                    <TextBlock Text="Loading assets..."
-                               FontSize="16"
+                    <!-- 5. Central Static Identity Icon -->
+                    <materialIcons:MaterialIcon Kind="FolderSearch" 
+                                                Width="20" 
+                                                Height="20" 
+                                                Foreground="{StaticResource TextSecondary}"
+                                                Opacity="0.6"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"/>
+                </Grid>
+                
+                <!-- TECHNICAL TEXT COMPOSITION -->
+                <StackPanel Margin="0,30,0,0">
+                    <!-- Main Status (All-Caps Tech Style) -->
+                    <TextBlock Text="{Binding LoadingOperation}" 
+                               FontSize="11"
+                               FontWeight="Black"
+                               Foreground="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Center" 
+                               Opacity="0.9">
+                        <TextBlock.Effect>
+                            <DropShadowEffect BlurRadius="15" ShadowDepth="0" Color="{Binding Color, Source={StaticResource AccentBrush}}" Opacity="0.4"/>
+                        </TextBlock.Effect>
+                    </TextBlock>
+
+                    <!-- Dynamic Detail Message -->
+                    <TextBlock Text="{Binding LoadingStatus}"
+                               FontSize="22"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource TextPrimary}"
                                HorizontalAlignment="Center" 
-                               Margin="0,20,0,0"/>
-                    <TextBlock Text="Preparing the file explorer"
+                               Margin="0,4,0,0"/>
+
+                    <!-- Separator Line -->
+                    <Rectangle Width="40" Height="2" 
+                               Fill="{StaticResource AccentBrush}" 
+                               HorizontalAlignment="Center" 
+                               Margin="0,12" 
+                               Opacity="0.5"/>
+
+                    <!-- Sub-Detail Detail Message -->
+                    <TextBlock Text="{Binding LoadingDetail}"
                                FontSize="13"
                                Foreground="{StaticResource TextSecondary}"
                                HorizontalAlignment="Center" 
-                               Margin="0,6,0,0"/>
-                 </StackPanel>
-            </Grid>
+                               Opacity="0.8"/>
+                </StackPanel>
+             </StackPanel>
         </Grid>
     </Grid>
 </UserControl>

@@ -6,6 +6,7 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Shared;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Utils
 {
@@ -35,6 +36,8 @@ namespace AssetsManager.Utils
         public string LastPbeCheckTime { get; set; }
         public string CustomFloorTexturePath { get; set; } = string.Empty;
         public Dictionary<string, long> HashesSizes { get; set; }
+        public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
+        public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Png;
 
         // Dictionary for File Watcher
         public Dictionary<string, DateTime> JsonDataModificationDates { get; set; }
@@ -48,6 +51,7 @@ namespace AssetsManager.Utils
         public Dictionary<string, Dictionary<long, string>> AssetTrackerUrlOverrides { get; set; }
 
         public Dictionary<string, List<long>> AssetTrackerUserRemovedIds { get; set; }
+        public List<string> FavoritePaths { get; set; }
 
         public ApiSettings ApiSettings { get; set; }
 
@@ -116,6 +120,7 @@ namespace AssetsManager.Utils
             settings.AssetTrackerFoundIds ??= new Dictionary<string, List<long>>();
             settings.AssetTrackerUrlOverrides ??= new Dictionary<string, Dictionary<long, string>>();
             settings.AssetTrackerUserRemovedIds ??= new Dictionary<string, List<long>>();
+            settings.FavoritePaths ??= new List<string>();
 
             // Robustly initialize and heal ApiSettings
             if (settings.ApiSettings == null)
@@ -167,6 +172,8 @@ namespace AssetsManager.Utils
                 LolLiveDirectory = null,
                 DefaultExtractedSelectDirectory = null,
                 CustomFloorTexturePath = null,
+                AudioExportFormat = AudioExportFormat.Ogg,
+                ImageExportFormat = ImageExportFormat.Png,
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
                 HashesSizes = new Dictionary<string, long>(),
@@ -178,6 +185,7 @@ namespace AssetsManager.Utils
                 AssetTrackerFoundIds = new Dictionary<string, List<long>>(),
                 AssetTrackerUrlOverrides = new Dictionary<string, Dictionary<long, string>>(),
                 AssetTrackerUserRemovedIds = new Dictionary<string, List<long>>(),
+                FavoritePaths = new List<string>(),
                 ApiSettings = new ApiSettings
                 {
                     Connection = new ConnectionInfo(),
@@ -207,6 +215,8 @@ namespace AssetsManager.Utils
             LolLiveDirectory = defaultSettings.LolLiveDirectory;
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;
             CustomFloorTexturePath = defaultSettings.CustomFloorTexturePath;
+            AudioExportFormat = defaultSettings.AudioExportFormat;
+            ImageExportFormat = defaultSettings.ImageExportFormat;
             SaveDiffHistory = defaultSettings.SaveDiffHistory;
             BackgroundUpdates = defaultSettings.BackgroundUpdates;
             CheckPbeStatus = defaultSettings.CheckPbeStatus;
@@ -224,6 +234,7 @@ namespace AssetsManager.Utils
             AssetTrackerProgress = defaultSettings.AssetTrackerProgress;
             AssetTrackerUrlOverrides = defaultSettings.AssetTrackerUrlOverrides;
             AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
+            FavoritePaths = defaultSettings.FavoritePaths;
             ApiSettings = defaultSettings.ApiSettings;
             // SyncHashesWithCDTB and HashesSizes are intentionally not reset.
         }

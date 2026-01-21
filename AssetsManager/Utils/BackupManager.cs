@@ -83,8 +83,10 @@ namespace AssetsManager.Utils
                         backups.Add(new BackupModel
                         {
                             Name = directoryInfo.Name,
+                            DisplayName = GetBackupDisplayName(directoryInfo.Name),
                             Path = directoryInfo.FullName,
                             CreationDate = directoryInfo.CreationTime,
+                            Size = FormatBytes(GetDirectorySize(directoryInfo.FullName)),
                             IsSelected = false,
                             IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
                         });
@@ -116,8 +118,10 @@ namespace AssetsManager.Utils
                         backups.Add(new BackupModel
                         {
                             Name = directoryInfo.Name,
+                            DisplayName = GetBackupDisplayName(directoryInfo.Name),
                             Path = directoryInfo.FullName,
                             CreationDate = directoryInfo.CreationTime,
+                            Size = FormatBytes(GetDirectorySize(directoryInfo.FullName)),
                             IsSelected = false,
                             IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
                         });
@@ -125,6 +129,49 @@ namespace AssetsManager.Utils
                 }
                 return backups.OrderByDescending(b => b.CreationDate).ToList();
             });
+        }
+
+        private string GetBackupDisplayName(string folderName)
+        {
+            string cleanName = folderName.Replace("_old", "", StringComparison.OrdinalIgnoreCase);
+            if (cleanName.Contains("PBE", StringComparison.OrdinalIgnoreCase))
+            {
+                return "League of Legends PBE";
+            }
+            return "League of Legends LIVE";
+        }
+        
+        private long GetDirectorySize(string path)
+        {
+            long size = 0;
+            var dirInfo = new DirectoryInfo(path);
+
+            try
+            {
+                foreach (FileInfo fi in dirInfo.GetFiles("*", SearchOption.AllDirectories))
+                {
+                    size += fi.Length;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogWarning($"Unable to calculate size for {path}: {ex.Message}");
+            }
+            
+            return size;
+        }
+
+        private string FormatBytes(long bytes)
+        {
+            string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+            int counter = 0;
+            decimal number = (decimal)bytes;
+            while (Math.Round(number / 1024) >= 1)
+            {
+                number = number / 1024;
+                counter++;
+            }
+            return string.Format("{0:n1} {1}", number, suffixes[counter]);
         }
         
         public bool DeleteBackup(string backupPath)

@@ -55,7 +55,7 @@
                                             Background="{StaticResource SidebarBackground}"
                                             BorderBrush="{StaticResource BorderColor}" 
                                             BorderThickness="1" 
-                                            CornerRadius="4">
+                                            CornerRadius="8">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -67,7 +67,7 @@
                                                   Fill="{StaticResource TextSecondary}"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
-                                                  Margin="0,0,8,0"/>
+                                                  Margin="0,0,12,0"/>
                                         </Grid>
                                     </Border>
                                 </ControlTemplate>
@@ -95,7 +95,7 @@
                                         Background="{StaticResource SidebarBackground}"
                                         BorderThickness="1"
                                         BorderBrush="{StaticResource BorderColor}"
-                                        CornerRadius="4"/>
+                                        CornerRadius="8"/>
                                 <ScrollViewer Margin="0" SnapsToDevicePixels="True">
                                     <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
                                 </ScrollViewer>

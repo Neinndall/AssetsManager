@@ -46,8 +46,9 @@
                         ToolTip="Switch Mode (WAD / Directory)" 
                         Margin="0,0,2,0" 
                         Click="SwitchModeButton_Click">
-                    <materialIcons:MaterialIcon Kind="Sync" Width="18" Height="18"/>
+                    <materialIcons:MaterialIcon x:Name="ModeIcon" Kind="ArchiveOutline" Width="18" Height="18"/>
                 </Button>
+
                 <ToggleButton x:Name="GridViewToggleButton" 
                               Style="{StaticResource TransparentIconToggleButton}"
                               ToolTip="Toggle Grid View"
@@ -55,6 +56,7 @@
                               Click="GridViewToggle_Click">
                     <materialIcons:MaterialIcon Kind="ViewGridOutline" Width="18" Height="18"/>
                 </ToggleButton>
+
                 <ToggleButton x:Name="BreadcrumbToggleButton"
                               Style="{StaticResource TransparentIconToggleButton}"
                               Click="BreadcrumbToggleButton_Click"
@@ -62,6 +64,27 @@
                               Margin="0,0,2,0"
                               IsChecked="True">
                     <materialIcons:MaterialIcon Kind="CodeTags" Width="18" Height="18"/>
+                </ToggleButton>
+
+                <ToggleButton x:Name="FavoritesToggleButton"
+                              Style="{StaticResource TransparentIconToggleButton}"
+                              Click="FavoritesToggleButton_Click"
+                              ToolTip="Toggle Favorites"
+                              Margin="0,0,2,0"
+                              IsChecked="False"
+                              Visibility="{Binding IsFavoritesToggleVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <materialIcons:MaterialIcon Width="18" Height="18">
+                        <materialIcons:MaterialIcon.Style>
+                            <Style TargetType="materialIcons:MaterialIcon">
+                                <Setter Property="Kind" Value="StarOutline"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=FavoritesToggleButton}" Value="True">
+                                        <Setter Property="Kind" Value="Star"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialIcons:MaterialIcon.Style>
+                    </materialIcons:MaterialIcon>
                 </ToggleButton>
 
                 <Rectangle Width="1" Height="16" Fill="{StaticResource BorderColor}" Margin="4,0,8,0" VerticalAlignment="Center"/>

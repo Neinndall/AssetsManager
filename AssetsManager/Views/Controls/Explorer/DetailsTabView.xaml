@@ -15,8 +15,8 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,24">
-            <Border Background="{DynamicResource HoverColor}" CornerRadius="8" Width="40" Height="40" Margin="0,0,16,0">
-                <materialIcons:MaterialIcon Kind="FileEditOutline" Width="20" Height="20" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+            <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="40" Height="40" Margin="0,0,16,0">
+                <materialIcons:MaterialIcon Kind="FileEditOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
             </Border>
             <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="File Details" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
@@ -24,40 +24,48 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Status Badge Card -->
-        <Border Grid.Row="1" Background="{DynamicResource SidebarBackground}" CornerRadius="8" Padding="16" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Margin="0,0,0,24">
+        <!-- Status Badge Card (Refined & Compact) -->
+        <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="10" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,24">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource HoverColor}" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="CompareHorizontal" Width="20" Height="20" Foreground="{DynamicResource AccentOrange}"/>
+                
+                <!-- Change Type Badge -->
+                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Margin="0,0,16,0" VerticalAlignment="Center" Background="{StaticResource HoverColor}">
+                    <materialIcons:MaterialIcon Kind="CompareHorizontal" Width="18" Height="18" 
+                                                Foreground="{StaticResource AccentOrange}" 
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
+
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="CHANGE TYPE" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextMuted}"/>
-                    <TextBlock Text="RENAMED" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Margin="0,-2,0,0"/>
+                    <TextBlock Text="CHANGE TYPE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                    <TextBlock Text="RENAMED" 
+                               Foreground="{StaticResource AccentOrange}" 
+                               FontSize="16" FontWeight="Bold" Margin="0,-1,0,0"
+                               Typography.Capitals="AllSmallCaps"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- Content Area -->
         <StackPanel Grid.Row="2">
-            <TextBlock Text="PATH HISTORY" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,12"/>
+            <TextBlock Text="PATH HISTORY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,12"/>
 
             <!-- Old Path -->
             <StackPanel Margin="0,0,0,16">
                 <TextBlock Text="Original Path" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,6"/>
-                <Border Background="{DynamicResource SidebarBackground}" CornerRadius="6" Padding="12,10" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
-                    <TextBlock Text="{Binding OldPath}" Foreground="{DynamicResource TextPrimary}" FontSize="13" TextWrapping="Wrap"/>
+                <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <TextBlock Text="{Binding OldPath}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="Medium" TextWrapping="Wrap"/>
                 </Border>
             </StackPanel>
 
             <!-- New Path -->
             <StackPanel>
                 <TextBlock Text="New Path" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,6"/>
-                <Border Background="{DynamicResource SidebarBackground}" CornerRadius="6" Padding="12,10" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
-                    <TextBlock Text="{Binding FullPath}" Foreground="{DynamicResource TextPrimary}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <TextBlock Text="{Binding FullPath}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="Medium" TextWrapping="Wrap"/>
                 </Border>
             </StackPanel>
         </StackPanel>

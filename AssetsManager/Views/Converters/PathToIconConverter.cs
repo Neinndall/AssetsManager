@@ -21,26 +21,26 @@ namespace AssetsManager.Views.Converters
             { ".html", MaterialIconKind.LanguageHtml5 },
             { ".xml", MaterialIconKind.FileXmlBox },
             { ".lua", MaterialIconKind.LanguageLua },
-            { ".txt", MaterialIconKind.FileDocumentOutline },
-            { ".log", MaterialIconKind.FileDocumentOutline },
-            { ".info", MaterialIconKind.FileDocumentOutline },
+            { ".txt", MaterialIconKind.FileDocumentOutline }, // Outline
+            { ".log", MaterialIconKind.FileDocumentOutline }, // Outline
+            { ".info", MaterialIconKind.FileDocumentOutline }, // Outline
             { ".stringtable", MaterialIconKind.Translate },
-            { ".png", MaterialIconKind.ImageOutline },
-            { ".jpg", MaterialIconKind.ImageOutline },
-            { ".jpeg", MaterialIconKind.ImageOutline },
-            { ".bmp", MaterialIconKind.ImageOutline },
+            { ".png", MaterialIconKind.ImageOutline }, // Outline
+            { ".jpg", MaterialIconKind.ImageOutline }, // Outline
+            { ".jpeg", MaterialIconKind.ImageOutline }, // Outline
+            { ".bmp", MaterialIconKind.ImageOutline }, // Outline
             { ".svg", MaterialIconKind.Svg },
-            { ".dds", MaterialIconKind.FileImageOutline },
-            { ".tex", MaterialIconKind.FileImageOutline },
-            { ".webm", MaterialIconKind.MoviePlayOutline },
-            { ".ogg", MaterialIconKind.MusicNote },
-            { ".bin", MaterialIconKind.FileCodeOutline },
+            { ".dds", MaterialIconKind.Texture }, // Texture (Unique)
+            { ".tex", MaterialIconKind.Texture }, // Texture (Unique)
+            { ".webm", MaterialIconKind.MoviePlayOutline }, // Outline
+            { ".ogg", MaterialIconKind.MusicNoteOutline }, // Outline
+            { ".bin", MaterialIconKind.FileCodeOutline }, // Outline
             { ".troybin", MaterialIconKind.StarFourPoints },
             { ".preload", MaterialIconKind.FormatListBulleted },
-            { ".skl", MaterialIconKind.Person },
-            { ".skn", MaterialIconKind.Person },
-            { ".wpk", MaterialIconKind.FolderMusicOutline },
-            { ".bnk", MaterialIconKind.FolderMusicOutline },
+            { ".skl", MaterialIconKind.HumanMale }, 
+            { ".skn", MaterialIconKind.HumanMale },
+            { ".wpk", MaterialIconKind.FolderMusicOutline }, // Outline
+            { ".bnk", MaterialIconKind.FolderMusicOutline }, // Outline
             { ".wasm", MaterialIconKind.CodeBraces },
             { ".bundle", MaterialIconKind.PackageVariant },
             { ".assetbundle", MaterialIconKind.PackageVariant },
@@ -50,11 +50,12 @@ namespace AssetsManager.Views.Converters
         {
             return value switch
             {
-                WadGroupViewModel => MaterialIconKind.PackageVariant,
+                WadGroupViewModel => MaterialIconKind.ArchiveOutline,
                 DiffTypeGroupViewModel diffType => GetDiffTypeIcon(diffType.Type),
                 SerializableChunkDiff chunk => GetIcon(Path.GetExtension(chunk.Path), chunk.Path),
                 FileSystemNodeModel node => GetNodeIcon(node),
-                _ => MaterialIconKind.FileQuestionOutline,
+                string path => GetIcon(Path.GetExtension(path), path),
+                _ => MaterialIconKind.FileQuestionOutline, // Outline
             };
         }
 
@@ -62,16 +63,16 @@ namespace AssetsManager.Views.Converters
         {
             if (node == null || string.IsNullOrEmpty(node.FullPath))
             {
-                return MaterialIconKind.FileQuestionOutline; // Default icon for nodes without a path
+                return MaterialIconKind.FileQuestionOutline; // Outline
             }
 
             if (node.Type == NodeType.VirtualDirectory)
             {
                 string name = node.Name;
-                if (name.StartsWith("[+]")) return MaterialIconKind.FilePlusOutline;
-                if (name.StartsWith("[~]")) return MaterialIconKind.FileEditOutline;
-                if (name.StartsWith("[»]")) return MaterialIconKind.FileMoveOutline;
-                if (name.StartsWith("[-]")) return MaterialIconKind.FileRemoveOutline;
+                if (name.StartsWith("[+]")) return MaterialIconKind.FilePlusOutline; // Outline
+                if (name.StartsWith("[~]")) return MaterialIconKind.FileEditOutline; // Outline
+                if (name.StartsWith("[»]")) return MaterialIconKind.FileMoveOutline; // Outline
+                if (name.StartsWith("[-]")) return MaterialIconKind.FileRemoveOutline; // Outline
                 if (name.StartsWith("[=]")) return MaterialIconKind.Link;
             }
 
@@ -81,17 +82,24 @@ namespace AssetsManager.Views.Converters
                 case NodeType.VirtualDirectory:
                     if (node.FullPath.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || node.FullPath.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
                     {
-                        return MaterialIconKind.PackageVariant;
+                        return MaterialIconKind.ArchiveOutline;
                     }
-                    return MaterialIconKind.FolderOutline;
+                    return MaterialIconKind.FolderOutline; // Outline
                 case NodeType.WadFile:
-                    return MaterialIconKind.PackageVariant;
+                    return MaterialIconKind.ArchiveOutline;
                 case NodeType.AudioEvent:
-                    return MaterialIconKind.PlaylistMusic;
+                    return MaterialIconKind.PlaylistMusicOutline; // Outline
                 case NodeType.WemFile:
-                    return MaterialIconKind.MusicNote;
+                    return MaterialIconKind.MusicNoteOutline; // Outline
                 default:
-                    return GetIcon(node.Extension, node.FullPath);
+                    var icon = GetIcon(node.Extension, node.FullPath);
+                    // Correction: If GetIcon returns Folder for a file node (because it has no extension), 
+                    // we must override it because we know 'node.Type' is a File type here.
+                    if (string.IsNullOrEmpty(node.Extension) && icon == MaterialIconKind.FolderOutline)
+                    {
+                        return MaterialIconKind.FileQuestionOutline;
+                    }
+                    return icon;
             }
         }
 
@@ -99,12 +107,12 @@ namespace AssetsManager.Views.Converters
         {
             return type switch
             {
-                ChunkDiffType.New => MaterialIconKind.FilePlusOutline,
-                ChunkDiffType.Removed => MaterialIconKind.FileRemoveOutline,
-                ChunkDiffType.Modified => MaterialIconKind.FileEditOutline,
-                ChunkDiffType.Renamed => MaterialIconKind.FileMoveOutline,
+                ChunkDiffType.New => MaterialIconKind.FilePlusOutline, // Outline
+                ChunkDiffType.Removed => MaterialIconKind.FileRemoveOutline, // Outline
+                ChunkDiffType.Modified => MaterialIconKind.FileEditOutline, // Outline
+                ChunkDiffType.Renamed => MaterialIconKind.FileMoveOutline, // Outline
                 ChunkDiffType.Dependency => MaterialIconKind.Link,
-                _ => MaterialIconKind.FileQuestionOutline,
+                _ => MaterialIconKind.FileQuestionOutline, // Outline
             };
         }
 
@@ -113,7 +121,7 @@ namespace AssetsManager.Views.Converters
             // 0. Handle null path for dummy nodes
             if (string.IsNullOrEmpty(fullPath))
             {
-                return MaterialIconKind.FileQuestionOutline;
+                return MaterialIconKind.FileQuestionOutline; // Outline
             }
 
             // 1. Check the curated list for a direct match
@@ -133,8 +141,14 @@ namespace AssetsManager.Views.Converters
                 return MaterialIconKind.LanguageCss3;
             }
 
-            // 3. Default icon if no match is found
-            return MaterialIconKind.FileOutline;
+            // 3. Heuristic: If no extension, assume it's a Directory
+            if (string.IsNullOrEmpty(extension))
+            {
+                return MaterialIconKind.FolderOutline;
+            }
+
+            // 4. Default icon for unknown files
+            return MaterialIconKind.FileOutline; // Outline
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

@@ -139,6 +139,14 @@ namespace AssetsManager.Views.Models.Monitor
             set { _globalStatusIconKind = value; OnPropertyChanged(); }
         }
 
+        // --- Data Status Color (Independent for Telemetry) ---
+        private Brush _dataStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Default Green
+        public Brush DataStatusColor
+        {
+            get => _dataStatusColor;
+            set { _dataStatusColor = value; OnPropertyChanged(); }
+        }
+
         // --- System Health Footer Status ---
         private string _systemHealthFooterText = "Self-Check Passed";
         public string SystemHealthFooterText
@@ -178,7 +186,7 @@ namespace AssetsManager.Views.Models.Monitor
             // Check if an update was already found before this model was created
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
             {
-                AppVersionText = $"{_updateCheckService.AvailableVersion} available!";
+                AppVersionText = $"{_updateCheckService.AvailableVersion} ready!";
                 AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
                 AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
             }
@@ -191,7 +199,7 @@ namespace AssetsManager.Views.Models.Monitor
                 {
                     System.Windows.Application.Current.Dispatcher.Invoke(() =>
                     {
-                        AppVersionText = $"v{latestVersion} available!";
+                        AppVersionText = $"v{latestVersion} ready!";
                         AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
                         AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
                         UpdateGlobalStatus();
@@ -216,7 +224,7 @@ namespace AssetsManager.Views.Models.Monitor
                 PbeStatusText = "No issues detected";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
             }
-            PbeLastCheck = !string.IsNullOrEmpty(_appSettings.LastPbeCheckTime) ? _appSettings.LastPbeCheckTime : "N/A";
+            PbeLastCheck = FormatLastCheckTime(_appSettings.LastPbeCheckTime);
 
             // Initial Loads
             RefreshFileWatcherData();
@@ -310,6 +318,19 @@ namespace AssetsManager.Views.Models.Monitor
             GlobalStatusIconKind = Material.Icons.MaterialIconKind.ShieldCheckOutline;
         }
 
+        private void UpdateDataStatus()
+        {
+            // Check if there are changed files or new assets
+            if (MonitoredFilesChangedCount > 0)
+            {
+                DataStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
+            }
+            else
+            {
+                DataStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
+            }
+        }
+
         private void UpdateSystemHealthFooter()
         {
             // Case 1: Hashes Updating
@@ -399,6 +420,7 @@ namespace AssetsManager.Views.Models.Monitor
                 : "Never";
 
             UpdateGlobalStatus();
+            UpdateDataStatus();
         }
 
         public void RefreshAssetTrackerData()
@@ -413,6 +435,18 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 AssetTrackerStatus = "Idle";
             }
+            UpdateDataStatus();
+        }
+
+        private string FormatLastCheckTime(string timeStr)
+        {
+            if (string.IsNullOrEmpty(timeStr) || timeStr == "N/A") return "N/A";
+
+            if (DateTime.TryParseExact(timeStr, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime dt))
+            {
+                return dt.Date == DateTime.Today ? dt.ToString("HH:mm") : dt.ToString("yyyy-MM-DD HH:mm");
+            }
+            return timeStr;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

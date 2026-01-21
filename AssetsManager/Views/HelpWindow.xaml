@@ -143,7 +143,7 @@
                           Content="Documentation" 
                           Height="32" 
                           Padding="16,0"
-                          Style="{StaticResource ModernButton}"
+                          Style="{StaticResource PrimaryButton}"
                           IsEnabled="False"
                           Visibility="Collapsed"/> 
                 </Grid>

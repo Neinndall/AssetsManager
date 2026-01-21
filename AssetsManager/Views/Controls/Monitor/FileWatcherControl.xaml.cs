@@ -106,6 +106,21 @@ namespace AssetsManager.Views.Controls.Monitor
             }
         }
 
+        private void ClearAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (MonitorService != null && CustomMessageBoxService != null && AppSettings != null)
+            {
+                if (CustomMessageBoxService.ShowYesNo("Clear list", "Are you sure you want to remove ALL monitored URLs? This action cannot be undone.", Window.GetWindow(this)) == true)
+                {
+                    MonitorService.MonitoredItems.Clear();
+                    AppSettings.MonitoredJsonFiles.Clear();
+                    AppSettings.JsonDataModificationDates.Clear();
+                    AppSettings.SaveSettings(AppSettings);
+                    LogService.Log("All file monitors have been cleared.");
+                }
+            }
+        }
+
         public async Task AddMonitoredUrlAsync(string urlsAsText)
         {
             var initialUrls = urlsAsText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)

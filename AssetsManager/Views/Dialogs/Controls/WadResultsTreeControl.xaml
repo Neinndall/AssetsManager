@@ -4,14 +4,10 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:AssetsManager.Views.Dialogs.Controls"
-             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
              
     <UserControl.Resources>
-        <converters:PathToIconConverter x:Key="IconConverter"/>
-        <converters:ChunkDiffTypeToBrushConverter x:Key="DiffTypeToBrushConverter"/>
-
         <ContextMenu x:Key="WadDiffContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="View Differences" x:Name="ViewDifferencesMenuItem" Click="ViewDifferences_Click">
                 <MenuItem.Icon>
@@ -21,31 +17,32 @@
         </ContextMenu>
 
         <HierarchicalDataTemplate x:Key="DiffItemTemplate" ItemsSource="{Binding Files}">
-            <Grid Margin="3,2,0,2">
+            <Grid Margin="0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}" 
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}" 
                                              Width="18" Height="18"
                                              VerticalAlignment="Center" 
-                                             Margin="0,0,5,0"/>
-                <TextBlock Grid.Column="1" Text="{Binding FileName}" VerticalAlignment="Center"/>
+                                             Margin="0,0,6,0"
+                                             Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Grid.Column="1" Text="{Binding FileName}" VerticalAlignment="Center" FontSize="13"/>
             </Grid>
         </HierarchicalDataTemplate>
 
         <HierarchicalDataTemplate x:Key="DiffTypeTemplate" ItemsSource="{Binding Diffs}" ItemTemplate="{StaticResource DiffItemTemplate}">
-            <Grid Margin="3,2,0,2">
+            <Grid Margin="0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}"
-                                             Width="18" Height="18"
-                                             VerticalAlignment="Center" 
-                                             Margin="0,0,5,0" 
-                                             Foreground="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}"/>
-                <TextBlock Grid.Column="1" Text="{Binding TypeNameWithCount}" VerticalAlignment="Center">
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}"
+                                            Width="18" Height="18"
+                                            VerticalAlignment="Center" 
+                                            Margin="0,0,6,0" 
+                                            Foreground="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}"/>
+                <TextBlock Grid.Column="1" Text="{Binding TypeNameWithCount}" VerticalAlignment="Center" FontSize="13">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Foreground" Value="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}"/>
@@ -61,16 +58,17 @@
         </HierarchicalDataTemplate>
 
         <HierarchicalDataTemplate x:Key="WadGroupTemplate" ItemsSource="{Binding Types}" ItemTemplate="{StaticResource DiffTypeTemplate}">
-            <Grid Margin="3,2,0,2">
+            <Grid Margin="0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource IconConverter}}"
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}"
                                              Width="18" Height="18"
                                              VerticalAlignment="Center" 
-                                             Margin="0,0,5,0"/>
-                <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" VerticalAlignment="Center"/>
+                                             Margin="0,0,6,0"
+                                             Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" VerticalAlignment="Center" FontSize="13"/>
             </Grid>
         </HierarchicalDataTemplate>
     </UserControl.Resources>
@@ -83,28 +81,28 @@
             </Grid.RowDefinitions>
             
             <!-- Header -->
-            <Border Grid.Row="0" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="16" Background="{DynamicResource SidebarBackground}" CornerRadius="8,8,0,0">
+            <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
                 <StackPanel Orientation="Horizontal">
-                    <Border Background="{DynamicResource HoverColor}" CornerRadius="6" Width="32" Height="32" Margin="0,0,12,0">
-                        <materialIcons:MaterialIcon Kind="FormatListGroup" Width="18" Height="18" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="32" Height="32" Margin="0,0,12,0">
+                        <materialIcons:MaterialIcon Kind="FormatListGroup" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Border>
                     <TextBlock Text="Differences Explorer" 
                                FontSize="14" 
                                FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimary}"
+                               Foreground="{StaticResource TextPrimary}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
 
             <!-- Search Box Area -->
-            <Border Grid.Row="1" Padding="16,12" Background="{DynamicResource CardBackground}">
+            <Border Grid.Row="1" Padding="16,12" Background="{StaticResource CardBackground}">
                  <TextBox x:Name="searchTextBox"
                      Style="{StaticResource StandardSearchBoxStyle}"
                      TextChanged="SearchTextBox_TextChanged"/>
             </Border>
 
             <!-- Tree Content -->
-            <Border Grid.Row="2" Padding="0" Background="{DynamicResource CardBackground}" CornerRadius="0,0,8,8">
+            <Border Grid.Row="2" Padding="0" Background="{StaticResource CardBackground}" CornerRadius="0,0,12,12">
                 <TreeView x:Name="resultsTreeView" 
                           Style="{StaticResource ModernTreeView}"
                           Background="Transparent"

@@ -5,14 +5,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Forms;
+using System.Windows.Controls; // Added for ContextMenu/MenuItem if needed, though they are in System.Windows.Controls
 using System.Windows.Input;
-using Microsoft.Toolkit.Uwp.Notifications;
+using Hardcodet.Wpf.TaskbarNotification; // Hardcodet Namespace
 using Microsoft.Extensions.DependencyInjection;
-using Windows.Data.Xml.Dom;
-using Windows.UI.Notifications;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Models.Notifications;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
@@ -21,6 +20,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
 using AssetsManager.Views.Controls;
+using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 
@@ -50,11 +50,10 @@ namespace AssetsManager.Views
         private readonly ExtractionService _extractionService;
         private readonly ReportGenerationService _reportGenerationService;
         private readonly TaskCancellationManager _taskCancellationManager;
+        private readonly NotificationService _notificationService;
 
-        private NotifyIcon _notifyIcon;
         private string _latestAppVersionAvailable;
-        private readonly List<string> _notificationMessages = new List<string>();
-
+        
         // New fields to manage the state of the extraction after comparison
         private bool _isExtractingAfterComparison = false;
         private string _extractionOldLolPath;
@@ -86,7 +85,8 @@ namespace AssetsManager.Views
             VersionService versionService,
             ExtractionService extractionService,
             ReportGenerationService reportGenerationService,
-            TaskCancellationManager taskCancellationManager)
+            TaskCancellationManager taskCancellationManager,
+            NotificationService notificationService)
         {
             InitializeComponent();
 
@@ -112,12 +112,23 @@ namespace AssetsManager.Views
             _extractionService = extractionService;
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
+            _notificationService = notificationService;
 
-            _progressUIManager.Initialize(ProgressSummaryButton, StatusTextBlock, ProgressPercentageTextBlock, this);
+            // Initialize NotificationHub
+            var notificationViewModel = new NotificationHubModel(_notificationService);
+            NotificationHub.DataContext = notificationViewModel;
 
-            _logService.SetLogOutput(LogView.richTextBoxLogs);
+            // Initialize ProgressUIManager with controls from the new StatusBarView
+            _progressUIManager.Initialize(StatusBar.ViewModel, this);
+            
+            // Subscribe to Status Bar events
+            StatusBar.ProgressSummaryClicked += (s, e) => _progressUIManager.ShowDetails();
+            
+            _logService.SetLogOutput(LogView.LogRichTextBox);
             LogView.ToggleLogSizeRequested += OnToggleLogSizeRequested;
+            LogView.ClearStatusBarRequested += (s, e) => ClearStatusBar();
             LogView.LogExpandedManually += (s, e) => _isLogMinimized = false;
+            LogView.NotificationClicked += OnNotificationHubRequested;
 
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
@@ -140,7 +151,6 @@ namespace AssetsManager.Views
             _updateCheckService.Start();
             InitializeApplicationAsync();
 
-            InitializeNotifyIcon();
             StateChanged += MainWindow_StateChanged;
             Closing += MainWindow_Closing;
         }
@@ -154,64 +164,60 @@ namespace AssetsManager.Views
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            SingleInstance.RegisterWindow(this, () =>
+
+            // Register window hook to handle single instance restoration message
+            var source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+            source?.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
             {
-                Show();
-                if (WindowState == WindowState.Minimized)
+                if (msg == SingleInstance.WM_SHOW_APP)
                 {
-                    WindowState = WindowState.Normal;
+                    ShowAppFromTray();
+                    handled = true;
                 }
-                Activate();
-                _notifyIcon.Visible = false;
+                return IntPtr.Zero;
             });
+            
+            // SingleInstance registration removed as it is no longer needed for basic notifications
+            // If advanced command line handling is needed for the tray icon, it can be re-added here.
         }
 
-        private void InitializeNotifyIcon()
+        // --- Taskbar / NotifyIcon Logic ---
+
+        private void TrayIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)
         {
-            _notifyIcon = new NotifyIcon();
-            var iconUri = new Uri("pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico", UriKind.RelativeOrAbsolute);
-            _notifyIcon.Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(iconUri).Stream);
-            _notifyIcon.Text = "AssetsManager";
-            _notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
-
-            var contextMenu = new ContextMenuStrip();
-            var exitMenuItem = new ToolStripMenuItem("Exit");
-            exitMenuItem.Click += ExitMenuItem_Click;
-            contextMenu.Items.Add(exitMenuItem);
-
-            _notifyIcon.ContextMenuStrip = contextMenu;
+            ShowAppFromTray();
         }
 
-        private void NotifyIcon_DoubleClick(object sender, EventArgs e)
+        private void MenuItem_Show_Click(object sender, RoutedEventArgs e)
+        {
+            ShowAppFromTray();
+        }
+
+        private void MenuItem_Exit_Click(object sender, RoutedEventArgs e)
+        {
+            System.Windows.Application.Current.Shutdown();
+        }
+
+        private void ShowAppFromTray()
         {
             Show();
             WindowState = WindowState.Normal;
-            _notifyIcon.Visible = false;
-        }
-
-        private void ExitMenuItem_Click(object sender, EventArgs e)
-        {
-            System.Windows.Application.Current.Shutdown();
+            Activate();
+            TrayIcon.Visibility = Visibility.Collapsed;
         }
 
         private void MainWindow_StateChanged(object sender, EventArgs e)
         {
             if (WindowState == WindowState.Minimized && _appSettings.MinimizeToTrayOnClose)
             {
+                TrayIcon.Visibility = Visibility.Visible;
                 Hide();
-                _notifyIcon.Visible = true;
-
-                // Use Dispatcher to avoid COMException when showing toast on state change
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    new ToastContentBuilder()
-                        .AddText("AssetsManager")
-                        .AddText("ℹ️ The application has been minimized to the tray.")
-                        .Show();
-                }));
+                // Show a balloon tip when minimized to tray
+                TrayIcon.ShowBalloonTip("AssetsManager", "The application has been minimized to the tray.", BalloonIcon.Info);
             }
         }
 
+        // --- End Taskbar Logic ---
         private void OnUpdatesFound(string message, string latestVersion)
         {
             if (!string.IsNullOrEmpty(latestVersion))
@@ -219,15 +225,13 @@ namespace AssetsManager.Views
                 _latestAppVersionAvailable = latestVersion;
             }
 
-            // Use the compat manager for robust notification support in WPF
+            // Show System Tray Balloon Notification if window is not visible
             if (Visibility != Visibility.Visible)
             {
-                new ToastContentBuilder()
-                    .AddText("AssetsManager")
-                    .AddText(message)
-                    .Show();
+                TrayIcon.ShowBalloonTip("AssetsManager", message, BalloonIcon.Info);
             }
 
+            // Always update internal notification system
             ShowNotification(true, message);
         }
         
@@ -308,31 +312,17 @@ namespace AssetsManager.Views
 
         public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
         {
-            Dispatcher.Invoke(() =>
+            if (show)
             {
-                if (show)
-                {
-                    if (!_notificationMessages.Contains(message))
-                    {
-                        _notificationMessages.Add(message);
-                    }
-                }
-                else
-                {
-                    _notificationMessages.Clear();
-                }
-
-                NotificationButton.Visibility = _notificationMessages.Any() ? Visibility.Visible : Visibility.Collapsed;
-                string fullMessage = string.Join(" | ", _notificationMessages);
-                NotificationMessageText.Text = fullMessage;
-                NotificationToolTipText.Text = fullMessage;
-            });
+                _notificationService.AddNotification("System Notification", message, NotificationType.Info);
+            }
         }
 
         public void ClearStatusBar()
         {
             _progressUIManager.ClearStatusText();
-            ShowNotification(false);
+            // Delegate to StatusBar
+            StatusBar.ClearStatusBar();
         }
 
         private void OnToggleLogSizeRequested(object sender, EventArgs e)
@@ -360,15 +350,18 @@ namespace AssetsManager.Views
             }
         }
 
-        private async void NotificationButton_Click(object sender, RoutedEventArgs e)
+        private async void OnNotificationHubRequested(object sender, EventArgs e)
         {
-            ShowNotification(false);
+            if (NotificationHub.DataContext is NotificationHubModel vm)
+            {
+                vm.TogglePanel();
+            }
+
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
             {
                 await _updateManager.CheckForUpdatesAsync(this, true);
                 _latestAppVersionAvailable = null;
             }
-            e.Handled = true;
         }
 
         private void OnSidebarNavigationRequested(string viewTag)
@@ -453,13 +446,8 @@ namespace AssetsManager.Views
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
-            _notifyIcon.DoubleClick -= NotifyIcon_DoubleClick;
-            if (_notifyIcon.ContextMenuStrip != null && _notifyIcon.ContextMenuStrip.Items.Count > 0)
-            {
-                _notifyIcon.ContextMenuStrip.Items[0].Click -= ExitMenuItem_Click;
-            }
             StateChanged -= MainWindow_StateChanged;
-            _notifyIcon?.Dispose();
+            TrayIcon?.Dispose();
         }
     }
 }

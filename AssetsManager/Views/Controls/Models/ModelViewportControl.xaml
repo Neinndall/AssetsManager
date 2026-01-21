@@ -25,6 +25,7 @@
                                        ShowCameraInfo="False"
                                        ShowViewCube="False"
                                        IsRotationEnabled="False"
+                                       IsZoomEnabled="False"
                                        PanGesture="RightClick"
                                        SnapsToDevicePixels="False"
                                        UseLayoutRounding="False"
@@ -33,7 +34,14 @@
                                        RenderOptions.BitmapScalingMode="HighQuality">
                     <ModelVisual3D>
                         <ModelVisual3D.Content>
-                            <AmbientLight Color="White"/>
+                            <Model3DGroup>
+                                <!-- Default 'Flat' Lighting (As it was before) -->
+                                <AmbientLight x:Name="GlobalAmbientLight" Color="White"/>
+                                
+                                <!-- Studio Lights (Off by default) -->
+                                <DirectionalLight x:Name="StudioLight" Color="Black" Direction="-1,-1,-1"/>
+                                <DirectionalLight x:Name="FillLight" Color="Black" Direction="1,1,1"/>
+                            </Model3DGroup>
                         </ModelVisual3D.Content>
                     </ModelVisual3D>
                 </helix:HelixViewport3D>
@@ -46,17 +54,8 @@
                         CornerRadius="24"
                         Padding="16,8"
                         BorderBrush="{StaticResource BorderColor}"
-                        BorderThickness="1">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Visibility" Value="Visible"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=ToolbarToggle}" Value="False">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
+                        BorderThickness="1"
+                        Visibility="{Binding IsChecked, ElementName=ToolbarToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Border.Effect>
                         <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="4" Opacity="0.3"/>
                     </Border.Effect>
@@ -94,19 +93,11 @@
                         <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
 
                         <!-- Visuals -->
-                        <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
-                                      ToolTip="Show/Hide Skybox"
-                                      Click="SkyboxToggleButton_Click"
-                                      Width="32" Height="32"
-                                      IsChecked="False">
-                            <materialIcons:MaterialIcon Kind="Panorama" Width="16" Height="16"/>
-                        </ToggleButton>
-                        
                         <Button Style="{StaticResource TransparentIconButton}"
                                 ToolTip="Take Screenshot"
                                 Click="ScreenshotButton_Click"
                                 Width="32" Height="32">
-                            <materialIcons:MaterialIcon Kind="CameraIris" Width="16" Height="16"/>
+                            <materialIcons:MaterialIcon Kind="Camera" Width="16" Height="16"/>
                         </Button>
                         
                         <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>

@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" >
+             
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -13,8 +14,8 @@
 
         <!-- MINIMALIST TOOLBAR HEADER -->
         <Border Grid.Row="0" 
-                Background="{DynamicResource CardBackground}" 
-                BorderBrush="{DynamicResource BorderColor}" 
+                Background="{StaticResource CardBackground}" 
+                BorderBrush="{StaticResource BorderColor}" 
                 BorderThickness="0,0,0,1" 
                 Padding="12,2">
             <Grid>
@@ -30,17 +31,47 @@
                             Click="ToggleLogSize_Click"
                             ToolTip="Show/Hide Logger"
                             Width="28" Height="28"
-                            Margin="0,0,4,0">
-                        <materialIcons:MaterialIcon x:Name="ToggleIcon" Kind="ChevronDown" Width="14" Height="14"/>
+                            Margin="0,0,8,0">
+                        <materialIcons:MaterialIcon x:Name="ToggleIcon" Kind="{Binding ToggleIconKind}" Width="14" Height="14"/>
                     </Button>
+                    
+                    <!-- Notification Hub Button -->
+                    <Button x:Name="NotificationButton"
+                            Style="{StaticResource TransparentIconButton}"
+                            Click="NotificationButton_Click"
+                            ToolTip="View Notifications"
+                            Width="28" Height="28"
+                            Margin="0,0,8,0">
+                        <Grid>
+                            <materialIcons:MaterialIcon Kind="BellOutline" Width="14" Height="14"/>
+                            <!-- Notification Badge -->
+                            <Border Background="{StaticResource AccentRed}" 
+                                    CornerRadius="5" 
+                                    MinWidth="10" Height="10"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    Margin="-4,-2,-4,0"
+                                    Padding="2,0"
+                                    Visibility="{Binding NotificationCount, Converter={StaticResource CountToVisibilityConverter}}">
+                                <TextBlock Text="{Binding NotificationCount}" 
+                                           FontSize="7" 
+                                           FontWeight="Bold" 
+                                           Foreground="White" 
+                                           HorizontalAlignment="Center" 
+                                           VerticalAlignment="Center"
+                                           Margin="0,-1,0,0"/>
+                            </Border>
+                        </Grid>
+                    </Button>
+
+                    <Rectangle Width="1" Height="16" Fill="{StaticResource BorderColor}" Margin="0,0,8,0"/>
 
                     <!-- Reset Status Bar -->
                     <Button Style="{StaticResource TransparentIconButton}"
                             Click="ClearStatusBar_Click"
-                            ToolTip="Clear Status Bar &amp; Notifications"
+                            ToolTip="Clear Status Bar"
                             Width="28" Height="28"
                             Margin="0,0,4,0">
-                        <materialIcons:MaterialIcon Kind="BellOffOutline" Width="14" Height="14"/>
+                        <materialIcons:MaterialIcon Kind="Eraser" Width="14" Height="14"/>
                     </Button>
 
                     <!-- Clear Log -->
@@ -48,7 +79,7 @@
                             Click="ClearLogs_Click"
                             ToolTip="Clear All Logs"
                             Width="28" Height="28">
-                        <materialIcons:MaterialIcon Kind="Broom" Width="14" Height="14" Foreground="{DynamicResource AccentRed}"/>
+                        <materialIcons:MaterialIcon Kind="Broom" Width="14" Height="14" Foreground="{StaticResource AccentRed}"/>
                     </Button>
                 </StackPanel>
             </Grid>
@@ -57,6 +88,7 @@
         <!-- Logs Content -->
         <RichTextBox Grid.Row="1" 
                      x:Name="richTextBoxLogs" 
+                     Visibility="{Binding LogVisibility}"
                      Style="{StaticResource LogRichTextBoxStyle}"/>
     </Grid>
 </UserControl>

@@ -11,14 +11,14 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="HasDropShadow" Value="True"/>
-        <Setter Property="MinWidth" Value="180"/>
+        <Setter Property="MinWidth" Value="160"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContextMenu">
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="8"
+                            CornerRadius="6"
                             SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}">
                         <Border.Effect>
                             <DropShadowEffect Color="Black" 
@@ -29,8 +29,24 @@
                         </Border.Effect>
                         <StackPanel IsItemsHost="True" 
                                   KeyboardNavigation.DirectionalNavigation="Cycle"
-                                  Margin="4"/>
+                                  Margin="2"/>
                     </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Global Separator Style -->
+    <Style TargetType="Separator" BasedOn="{StaticResource {x:Type Separator}}">
+        <Setter Property="Margin" Value="4,2"/>
+        <Setter Property="Background" Value="{StaticResource BorderColor}"/>
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border Background="{TemplateBinding Background}" 
+                            Height="1" 
+                            SnapsToDevicePixels="True"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -40,11 +56,12 @@
     <Style TargetType="MenuItem">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="12,10,16,10"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="10,6,12,6"/>
+        <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="Medium"/>
-        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="MinHeight" Value="26"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
@@ -52,7 +69,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6"
+                            CornerRadius="4"
                             Margin="2,1"
                             SnapsToDevicePixels="True">
                         <Grid>
@@ -68,15 +85,16 @@
                                             ContentSource="Icon"
                                             Grid.Column="0" 
                                             VerticalAlignment="Center" 
-                                            Margin="8,0,12,0"
-                                            Width="18" 
-                                            Height="18"/>
+                                            Margin="6,0,8,0"
+                                            Width="14" 
+                                            Height="14"/>
                             
                             <!-- Texto principal -->
                             <ContentPresenter Grid.Column="1" 
                                             ContentSource="Header" 
                                             RecognizesAccessKey="True" 
-                                            VerticalAlignment="Center"/>
+                                            VerticalAlignment="Center"
+                                            Margin="0,0,8,0"/>
                             
                             <!-- Atajo de teclado -->
                             <TextBlock x:Name="GestureText" 
@@ -84,7 +102,7 @@
                                      Text="{TemplateBinding InputGestureText}"
                                      VerticalAlignment="Center" 
                                      Margin="16,0,8,0"
-                                     FontSize="12"
+                                     FontSize="11"
                                      Foreground="{StaticResource TextSecondary}"
                                      Opacity="0.8"/>
                             
@@ -99,9 +117,9 @@
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <!-- Hover effect -->
+                        <!-- Hover effect: Refined with transparency -->
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="Border" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource MenuHighlightBrush}"/>
                             <Setter Property="Foreground" Value="White"/>
                             <Setter TargetName="GestureText" Property="Foreground" Value="White"/>
                             <Setter TargetName="GestureText" Property="Opacity" Value="0.9"/>

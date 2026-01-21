@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using System.Windows.Controls;
-using System.Windows.Media.Animation;
 using System.Windows;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Models.Controls;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Core
@@ -22,11 +21,9 @@ namespace AssetsManager.Services.Core
         private readonly WadDifferenceService _wadDifferenceService;
         private readonly WadPackagingService _wadPackagingService;
         private readonly DiffViewService _diffViewService;
-        private readonly TaskCancellationManager _taskCancellationManager; // New field
+        private readonly TaskCancellationManager _taskCancellationManager;
 
-        private Button _progressSummaryButton;
-        private TextBlock _statusTextBlock;
-        private TextBlock _progressPercentageTextBlock;
+        private StatusBarViewModel _statusBarViewModel;
         private Window _owner;
 
         private ProgressDetailsWindow _progressDetailsWindow;
@@ -55,13 +52,10 @@ namespace AssetsManager.Services.Core
             _taskCancellationManager.OperationStateChanged += TaskCancellationManager_OperationStateChanged;
         }
 
-        public void Initialize(Button progressSummaryButton, TextBlock statusTextBlock, TextBlock progressPercentageTextBlock, Window owner)
+        public void Initialize(StatusBarViewModel statusBarViewModel, Window owner)
         {
-            _progressSummaryButton = progressSummaryButton;
-            _statusTextBlock = statusTextBlock;
-            _progressPercentageTextBlock = progressPercentageTextBlock;
+            _statusBarViewModel = statusBarViewModel;
             _owner = owner;
-            _progressSummaryButton.Click += ProgressSummaryButton_Click;
         }
 
         public void Cleanup()
@@ -70,15 +64,10 @@ namespace AssetsManager.Services.Core
             {
                 _taskCancellationManager.OperationStateChanged -= TaskCancellationManager_OperationStateChanged;
             }
-            if (_progressSummaryButton != null)
-            {
-                _progressSummaryButton.Click -= ProgressSummaryButton_Click;
-            }
+            
             _progressDetailsWindow?.Close();
             _progressDetailsWindow = null;
-            _progressSummaryButton = null;
-            _statusTextBlock = null;
-            _progressPercentageTextBlock = null;
+            _statusBarViewModel = null;
             _owner = null;
         }
 
@@ -92,7 +81,7 @@ namespace AssetsManager.Services.Core
             {
                 _owner.Dispatcher.Invoke(() =>
                 {
-                    if (_statusTextBlock != null && _statusTextBlock.Text == _taskCancellationManager.CancellationMessage)
+                    if (_statusBarViewModel != null && _statusBarViewModel.StatusText == _taskCancellationManager.CancellationMessage)
                     {
                         UpdateStatusBar("Ready");
                     }
@@ -104,20 +93,26 @@ namespace AssetsManager.Services.Core
         {
             _owner.Dispatcher.Invoke(() =>
             {
-                if (_statusTextBlock != null) _statusTextBlock.Text = message;
+                if (_statusBarViewModel == null) return;
+
+                _statusBarViewModel.StatusText = message;
                 
-                if (_progressPercentageTextBlock != null)
+                if (completed >= 0 && total > 0)
                 {
-                    if (completed >= 0 && total > 0)
-                    {
-                        double percentage = (double)completed / total * 100;
-                        _progressPercentageTextBlock.Text = $"{(int)percentage}%";
-                        _progressPercentageTextBlock.Visibility = Visibility.Visible;
-                    }
-                    else
-                    {
-                        _progressPercentageTextBlock.Visibility = Visibility.Collapsed;
-                    }
+                    double percentage = (double)completed / total * 100;
+                    _statusBarViewModel.ProgressPercentage = $"{(int)percentage}%";
+                }
+                else if (!string.IsNullOrEmpty(message) && message != "Ready")
+                {
+                    // Task is active but no numbers yet (e.g. Initializing)
+                    // Set to empty string so NullToVisibilityConverter shows the button (spinner) 
+                    // but the TextBlock remains empty.
+                    _statusBarViewModel.ProgressPercentage = string.Empty;
+                }
+                else
+                {
+                    // No task or "Ready" state -> Hide the progress button
+                    _statusBarViewModel.ProgressPercentage = null;
                 }
             });
         }
@@ -137,7 +132,6 @@ namespace AssetsManager.Services.Core
             UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
-                _progressSummaryButton.Visibility = Visibility.Collapsed;
                 _progressDetailsWindow?.Close();
             });
         }
@@ -147,9 +141,8 @@ namespace AssetsManager.Services.Core
             _owner.Dispatcher.Invoke(() =>
             {
                 _totalFiles = totalFiles;
-                _progressSummaryButton.Visibility = Visibility.Visible;
-                _progressSummaryButton.ToolTip = "Click to see comparison details";
-
+                
+                // Show progress immediately
                 UpdateStatusBar("Comparing WADs...", 0, totalFiles);
 
                 _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Comparator", _taskCancellationManager);
@@ -177,7 +170,6 @@ namespace AssetsManager.Services.Core
             UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
-                _progressSummaryButton.Visibility = Visibility.Collapsed;
                 _progressDetailsWindow?.Close();
             });
         }
@@ -186,9 +178,6 @@ namespace AssetsManager.Services.Core
         {
             _owner.Dispatcher.Invoke(() =>
             {
-                _progressSummaryButton.Visibility = Visibility.Visible;
-                _progressSummaryButton.ToolTip = "Click to see extraction details";
-
                 UpdateStatusBar("Extracting assets...", 0, data.totalFiles);
 
                 _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Extractor", _taskCancellationManager);
@@ -216,7 +205,6 @@ namespace AssetsManager.Services.Core
             UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
-                _progressSummaryButton.Visibility = Visibility.Collapsed;
                 _progressDetailsWindow?.Close();
             });
         }
@@ -225,9 +213,7 @@ namespace AssetsManager.Services.Core
         {
             _owner.Dispatcher.Invoke(() =>
             {
-                _progressSummaryButton.Visibility = Visibility.Visible;
-                _progressSummaryButton.ToolTip = "Click to see download details";
-
+                // Indeterminate progress initially
                 UpdateStatusBar($"Updating {taskName}...");
 
                 _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Versions Update", _taskCancellationManager);
@@ -245,7 +231,7 @@ namespace AssetsManager.Services.Core
             UpdateStatusBar($"Downloading {data.TaskName}: {data.Details}");
             _owner.Dispatcher.Invoke(() =>
             {
-                _progressDetailsWindow?.UpdateProgress(0, 1, data.Details, true, null); // Indeterminate progress, update current file
+                _progressDetailsWindow?.UpdateProgress(0, 1, data.Details, true, null); 
             });
         }
 
@@ -255,14 +241,13 @@ namespace AssetsManager.Services.Core
             UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
-                _progressSummaryButton.Visibility = Visibility.Collapsed;
                 _progressDetailsWindow?.Close();
 
                 if (data.Success)
                 {
                     _customMessageBoxService.ShowSuccess("Success", data.Message, _owner);
                 }
-                else if (!_taskCancellationManager.IsCancelling) // Don't show error if it was cancelled
+                else if (!_taskCancellationManager.IsCancelling) 
                 {
                     _customMessageBoxService.ShowError("Error", data.Message, _owner);
                 }
@@ -273,10 +258,12 @@ namespace AssetsManager.Services.Core
         {
             UpdateStatusBar("");
         }
-
-        private void ProgressSummaryButton_Click(object sender, RoutedEventArgs e)
+        
+        // This functionality is now handled by the StatusBarView command/event, 
+        // but we keep the method if needed to programmatically show it, though Logic is now in View/VM.
+        public void ShowDetails()
         {
-            if (_progressDetailsWindow != null)
+             if (_progressDetailsWindow != null)
             {
                 if (!_progressDetailsWindow.IsVisible) _progressDetailsWindow.Show();
                 _progressDetailsWindow.Activate();

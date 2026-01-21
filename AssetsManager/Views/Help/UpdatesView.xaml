@@ -6,6 +6,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="800">
+             
     <StackPanel>
         <!-- MODERN INTEGRATED HEADER (Compact) -->
         <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
@@ -45,18 +46,7 @@
             <Grid>
                 <StackPanel>
                     <!-- Up to Date State -->
-                    <StackPanel>
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Visible"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-                        
+                    <StackPanel Visibility="{Binding IsUpdateAvailable, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <materialIcons:MaterialIcon Kind="CheckCircleOutline" Foreground="{StaticResource AccentGreen}" Width="40" Height="40" HorizontalAlignment="Center"/>
                         <TextBlock Text="You are up to date!" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
                         <TextBlock HorizontalAlignment="Center" Margin="0,4,0,0" Foreground="{StaticResource TextSecondary}">
@@ -67,18 +57,7 @@
                     </StackPanel>
 
                     <!-- Update Available State -->
-                    <StackPanel>
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-
+                    <StackPanel Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}">
                         <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Foreground="White" Width="40" Height="40" HorizontalAlignment="Center"/>
                         <TextBlock Text="New Version Available!" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0,12,0,0"/>
                         <TextBlock HorizontalAlignment="Center" Margin="0,4,0,24" Foreground="White" Opacity="0.8">
@@ -90,11 +69,7 @@
                         <Button x:Name="buttonInstallUpdate" 
                                 Content="Download &amp; Install" 
                                 Click="buttonInstallUpdate_Click"
-                                Style="{StaticResource ModernButton}" 
-                                Background="White"
-                                Foreground="{StaticResource AccentBrush}"
-                                FontWeight="Bold"
-                                Padding="24,12"
+                                Style="{StaticResource PrimaryButton}" 
                                 HorizontalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
@@ -111,9 +86,9 @@
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
                             <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentBlue}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Regular Releases" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="Regular Releases" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="We deploy frequent updates delivering performance optimizations, new features, and security patches." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    <TextBlock Text="We deploy frequent updates delivering performance optimizations, new features, and security patches." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
@@ -124,9 +99,9 @@
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
                             <materialIcons:MaterialIcon Kind="BellOutline" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Automatic Notifications" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="Automatic Notifications" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Silent background checks ensure you are always notified of the latest version immediately upon launch." FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                    <TextBlock Text="Silent background checks ensure you are always notified of the latest version immediately upon launch." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
         </UniformGrid>

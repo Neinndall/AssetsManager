@@ -135,17 +135,13 @@
                         <Button x:Name="BtnResetDefaults" 
                                 Content="Reset Defaults"
                                 Click="BtnResetDefaults_Click"
-                                Style="{StaticResource SecondaryButton}"
-                                Height="32"
-                                Padding="12,0"/>
+                                Style="{StaticResource SecondaryButton}"/>
 
                         <Button x:Name="btnSave" 
                                 Content="Save Changes"
                                 Margin="12,0,0,0"
                                 Click="btnSave_Click"
-                                Style="{StaticResource ModernButton}"
-                                Height="32"
-                                Padding="12,0"/>
+                                Style="{StaticResource PrimaryButton}"/>
                     </StackPanel>
                 </Grid>
             </Border>

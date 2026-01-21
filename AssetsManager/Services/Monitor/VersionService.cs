@@ -181,7 +181,7 @@ namespace AssetsManager.Services.Monitor
             }
             finally
             {
-                CleanupManifestDownloader();
+                await CleanupManifestDownloaderAsync();
                 VersionDownloadCompleted?.Invoke(this, ("Downloading League Client Executable", true, "Finished"));
             }
 
@@ -232,19 +232,21 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        private void CleanupManifestDownloader()
+        private async Task CleanupManifestDownloaderAsync()
         {
             string manifestDownloaderPath = Path.Combine(_directoriesCreator.VersionsPath, "ManifestDownloader.exe");
-            if (File.Exists(manifestDownloaderPath))
+            if (!File.Exists(manifestDownloaderPath)) return;
+
+            // Wait a bit to ensure the process has fully released the file handle
+            await Task.Delay(200);
+
+            try
             {
-                try
-                {
-                    File.Delete(manifestDownloaderPath);
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, "Failed to cleanup ManifestDownloader.exe");
-                }
+                File.Delete(manifestDownloaderPath);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to cleanup ManifestDownloader.exe");
             }
         }
 
@@ -342,7 +344,8 @@ namespace AssetsManager.Services.Monitor
                     if (fileName != null)
                     {
                         fileCounter++;
-                        VersionDownloadProgressChanged?.Invoke(this, (taskName, fileCounter, totalFiles, fileName));
+                        string displayName = Path.GetFileName(fileName);
+                        VersionDownloadProgressChanged?.Invoke(this, (taskName, fileCounter, totalFiles, displayName));
                     }
                 }
             }, cancellationToken);
@@ -459,7 +462,7 @@ namespace AssetsManager.Services.Monitor
             finally
             {
                 process?.Dispose();
-                CleanupManifestDownloader();
+                await CleanupManifestDownloaderAsync();
                 VersionDownloadCompleted?.Invoke(this, (taskName, success, message));
             }
         }

@@ -34,6 +34,7 @@ namespace AssetsManager.Views.Controls.Models
         private ModelType _currentMode;
 
         public SknModelLoadingService SknModelLoadingService { get; set; }
+        public ScoModelLoadingService ScoModelLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
@@ -44,6 +45,8 @@ namespace AssetsManager.Views.Controls.Models
         public event EventHandler<AnimationModel> AnimationStopRequested;
         public event EventHandler SceneClearRequested;
         public event EventHandler MapGeometryLoadRequested;
+
+        public ModelViewportControl Viewport { get; set; }
 
         public event Action<SceneModel> ModelReadyForViewport;
         public event Action<SceneModel> ActiveModelChanged;
@@ -72,6 +75,7 @@ namespace AssetsManager.Views.Controls.Models
         public void Cleanup()
         {
             ResetScene();
+            Viewport = null;
         }
 
         public void ResetScene()
@@ -90,7 +94,7 @@ namespace AssetsManager.Views.Controls.Models
             _currentlyPlayingAnimation = null;
 
             // 4. Limpiar UI
-            MeshesItemsControl.ItemsSource = null;
+            MeshesListBox.ItemsSource = null;
             _animationModels.Clear();
             ModelsListBox.SelectedItem = null;
             AnimationControlsPanel.Visibility = Visibility.Collapsed;
@@ -103,15 +107,11 @@ namespace AssetsManager.Views.Controls.Models
             {
                 LoadModelIcon.Kind = MaterialIconKind.Map;
                 LoadModelButton.ToolTip = "Load MapGeometry";
-                LoadAnimationButton.Visibility = Visibility.Collapsed;
-                LoadChromaModelButton.Visibility = Visibility.Collapsed;
             }
             else
             {
                 LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
                 LoadModelButton.ToolTip = "Load Model";
-                LoadAnimationButton.Visibility = Visibility.Visible;
-                LoadChromaModelButton.Visibility = Visibility.Visible;
                 LoadAnimationButton.IsEnabled = true;
             }
         }
@@ -145,8 +145,12 @@ namespace AssetsManager.Views.Controls.Models
             {
                 var openFileDialog = new CommonOpenFileDialog
                 {
-                    Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
-                    Title = "Select a skn file"
+                    Filters = { 
+                        new CommonFileDialogFilter("SKN files", "*.skn"), 
+                        new CommonFileDialogFilter("SCO/SCB files", "*.sco;*.scb"),
+                        new CommonFileDialogFilter("All files", "*.*") 
+                    },
+                    Title = "Select a model file"
                 };
 
                 if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -208,24 +212,37 @@ namespace AssetsManager.Views.Controls.Models
             LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
             LoadModelButton.ToolTip = "Load Model";
 
-            SceneModel newModel;
-            if (string.IsNullOrEmpty(texturePath))
+            SceneModel newModel = null;
+            string extension = Path.GetExtension(modelPath).ToLowerInvariant();
+
+            if (extension == ".sco" || extension == ".scb")
             {
-                newModel = SknModelLoadingService.LoadModel(modelPath);
+                newModel = ScoModelLoadingService.LoadModel(modelPath);
             }
             else
             {
-                newModel = SknModelLoadingService.LoadModel(modelPath, texturePath);
+                if (string.IsNullOrEmpty(texturePath))
+                {
+                    newModel = SknModelLoadingService.LoadModel(modelPath);
+                }
+                else
+                {
+                    newModel = SknModelLoadingService.LoadModel(modelPath, texturePath);
+                }
             }
 
             if (newModel != null)
             {
-                string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
-                if (File.Exists(sklFilePath))
+                // Only try to load .skl for .skn files
+                if (extension == ".skn")
                 {
-                    using (var stream = File.OpenRead(sklFilePath))
+                    string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
+                    if (File.Exists(sklFilePath))
                     {
-                        newModel.Skeleton = new RigResource(stream);
+                        using (var stream = File.OpenRead(sklFilePath))
+                        {
+                            newModel.Skeleton = new RigResource(stream);
+                        }
                     }
                 }
 
@@ -241,7 +258,7 @@ namespace AssetsManager.Views.Controls.Models
                 UpdateTransform(newModel, transformData);
 
                 ModelReadyForViewport?.Invoke(newModel);
-                MeshesItemsControl.ItemsSource = newModel.Parts;
+                MeshesListBox.ItemsSource = newModel.Parts;
 
                 _loadedModels.Add(newModel);
                 ModelsListBox.SelectedItem = newModel;
@@ -353,7 +370,7 @@ namespace AssetsManager.Views.Controls.Models
                 MainContentVisibilityChanged?.Invoke(Visibility.Visible);
 
                 ModelReadyForViewport?.Invoke(newModel);
-                MeshesItemsControl.ItemsSource = newModel.Parts;
+                MeshesListBox.ItemsSource = newModel.Parts;
 
                 foreach (var model in _loadedModels)
                 {
@@ -365,8 +382,6 @@ namespace AssetsManager.Views.Controls.Models
                 CameraResetRequested?.Invoke();
 
                 LoadModelButton.IsEnabled = false;
-                LoadAnimationButton.Visibility = Visibility.Collapsed;
-                LoadChromaModelButton.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -378,31 +393,13 @@ namespace AssetsManager.Views.Controls.Models
             }
         }
 
-        private void AnimationsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (AnimationsListBox.SelectedItem is AnimationModel selectedAnimation)
-            {
-                AnimationControlsPanel.DataContext = selectedAnimation;
-                AnimationControlsPanel.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                AnimationControlsPanel.DataContext = null;
-                AnimationControlsPanel.Visibility = Visibility.Collapsed;
-            }
-        }
-
         private void ModelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Hide animation controls when model selection changes
-            AnimationControlsPanel.Visibility = Visibility.Collapsed;
-            AnimationControlsPanel.DataContext = null;
-
             if (e.AddedItems.Count > 0 && e.AddedItems[0] is SceneModel selectedModel)
             {
                 _selectedModel = selectedModel;
                 ActiveModelChanged?.Invoke(selectedModel);
-                MeshesItemsControl.ItemsSource = selectedModel.Parts;
+                MeshesListBox.ItemsSource = selectedModel.Parts;
 
                 _animationModels.Clear();
                 if (selectedModel.Animations != null)
@@ -415,15 +412,7 @@ namespace AssetsManager.Views.Controls.Models
 
                 if (_transformData.TryGetValue(selectedModel, out var transformData))
                 {
-                    // Unsubscribe from events to prevent feedback loop
-                    PositionXSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    PositionYSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    PositionZSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    RotationXSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    RotationYSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    RotationZSlider.ValueChanged -= TransformSlider_ValueChanged;
-                    ScaleSlider.ValueChanged -= TransformSlider_ValueChanged;
-
+                    // Update Sliders safely
                     PositionXSlider.Value = transformData.Position.X;
                     PositionYSlider.Value = transformData.Position.Y;
                     PositionZSlider.Value = transformData.Position.Z;
@@ -431,15 +420,6 @@ namespace AssetsManager.Views.Controls.Models
                     RotationYSlider.Value = transformData.Rotation.Y;
                     RotationZSlider.Value = transformData.Rotation.Z;
                     ScaleSlider.Value = transformData.Scale;
-
-                    // Re-subscribe to events
-                    PositionXSlider.ValueChanged += TransformSlider_ValueChanged;
-                    PositionYSlider.ValueChanged += TransformSlider_ValueChanged;
-                    PositionZSlider.ValueChanged += TransformSlider_ValueChanged;
-                    RotationXSlider.ValueChanged += TransformSlider_ValueChanged;
-                    RotationYSlider.ValueChanged += TransformSlider_ValueChanged;
-                    RotationZSlider.ValueChanged += TransformSlider_ValueChanged;
-                    ScaleSlider.ValueChanged += TransformSlider_ValueChanged;
                 }
 
                 // Reset locks
@@ -577,6 +557,76 @@ namespace AssetsManager.Views.Controls.Models
                 // and update the visual transform.
                 RotationYSlider.Value = newRotationY;
             }
+        }
+
+        // STUDIO HANDLERS
+        private void EnvironmentCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            // Safety check: Controls might be null during InitializeComponent
+            if (TransparentBgCheck == null || ShowSkyboxCheck == null) return;
+
+            // Mutual exclusivity logic
+            if (sender == TransparentBgCheck && TransparentBgCheck.IsChecked == true)
+            {
+                ShowSkyboxCheck.IsChecked = false;
+            }
+            else if (sender == ShowSkyboxCheck && ShowSkyboxCheck.IsChecked == true)
+            {
+                TransparentBgCheck.IsChecked = false;
+            }
+
+            UpdateEnvironment();
+        }
+
+        private void UpdateEnvironment()
+        {
+            if (Viewport == null || TransparentBgCheck == null || ShowSkyboxCheck == null) return;
+
+            bool isTransparent = TransparentBgCheck.IsChecked ?? false;
+            bool showSkybox = ShowSkyboxCheck.IsChecked ?? true;
+
+            // TransparentBgCheck controls ground visibility
+            Viewport.SetGroundVisibility(!isTransparent); 
+
+            // ShowSkyboxCheck directly controls skybox (mutual exclusivity logic ensures correctness)
+            Viewport.SetSkyboxVisibility(showSkybox);
+        }
+
+        private void FovSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            Viewport?.SetFieldOfView(e.NewValue);
+        }
+
+        private void LightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (LightRotationSlider != null && LightHeightSlider != null && AmbientIntensitySlider != null)
+            {
+                Viewport?.SetLightDirection(LightRotationSlider.Value, LightHeightSlider.Value);
+                Viewport?.SetAmbientIntensity(AmbientIntensitySlider.Value);
+            }
+        }
+
+        private void SnapshotButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Request 4K Snapshot (Scale 4.0)
+            Viewport?.InitiateSnapshot(4.0);
+        }
+
+        private void ResetStudio_Click(object sender, RoutedEventArgs e)
+        {
+            // Reset Sliders to Neutral
+            FovSlider.Value = 45;
+            LightRotationSlider.Value = 0;
+            LightHeightSlider.Value = 0;
+            AmbientIntensitySlider.Value = 100; // Return to 100% (Normal mode)
+
+            // Reset Environment Toggles
+            TransparentBgCheck.IsChecked = false;
+            ShowSkyboxCheck.IsChecked = true;
+
+            // Trigger Reset on Viewport and update visuals
+            Viewport?.ResetStudioLighting();
+            UpdateEnvironment();
         }
     }
 }

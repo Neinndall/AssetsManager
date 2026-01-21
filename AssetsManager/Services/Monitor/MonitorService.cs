@@ -37,11 +37,17 @@ namespace AssetsManager.Services.Monitor
             LoadMonitoredUrls();
 
             _jsonDataService.FileUpdated += OnFileUpdated;
+            _jsonDataService.FileCheckStarted += OnFileCheckStarted;
+            _jsonDataService.FileCheckFailed += OnFileCheckFailed;
+            _jsonDataService.FileCheckUpToDate += OnFileCheckUpToDate;
         }
 
         public void Dispose()
         {
             _jsonDataService.FileUpdated -= OnFileUpdated;
+            _jsonDataService.FileCheckStarted -= OnFileCheckStarted;
+            _jsonDataService.FileCheckFailed -= OnFileCheckFailed;
+            _jsonDataService.FileCheckUpToDate -= OnFileCheckUpToDate;
         }
 
         public void LoadMonitoredUrls()
@@ -53,13 +59,13 @@ namespace AssetsManager.Services.Monitor
 
                 string statusText = "Pending check";
                 string lastChecked = "N/A";
-                Brush statusColor = new SolidColorBrush(Colors.Gray);
+                Brush statusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
 
                 if (lastUpdated != DateTime.MinValue)
                 {
                     statusText = "Up-to-date";
                     lastChecked = $"Last Update: {lastUpdated:yyyy-MMM-dd HH:mm}";
-                    statusColor = new SolidColorBrush(Colors.MediumSeaGreen);
+                    statusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
                 }
 
                 MonitoredItems.Add(new MonitoredUrl
@@ -82,7 +88,7 @@ namespace AssetsManager.Services.Monitor
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     item.StatusText = "Updated";
-                    item.StatusColor = new SolidColorBrush(Colors.DodgerBlue);
+                    item.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBlue");
                     item.LastChecked = $"Last Update: {fileUpdateInfo.Timestamp:yyyy-MMM-dd HH:mm}";
                     item.HasChanges = true;
                     item.OldFilePath = fileUpdateInfo.OldFilePath;
@@ -90,6 +96,45 @@ namespace AssetsManager.Services.Monitor
                 });
                 _appSettings.JsonDataModificationDates[fileUpdateInfo.FullUrl] = fileUpdateInfo.Timestamp;
                 AppSettings.SaveSettings(_appSettings);
+            }
+        }
+
+        private void OnFileCheckStarted(string url)
+        {
+            var item = MonitoredItems.FirstOrDefault(x => x.Url == url);
+            if (item != null)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    item.StatusText = "Checking";
+                    item.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBrush");
+                });
+            }
+        }
+
+        private void OnFileCheckFailed(string url)
+        {
+            var item = MonitoredItems.FirstOrDefault(x => x.Url == url);
+            if (item != null)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    item.StatusText = "Error";
+                    item.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                });
+            }
+        }
+
+        private void OnFileCheckUpToDate(string url)
+        {
+            var item = MonitoredItems.FirstOrDefault(x => x.Url == url);
+            if (item != null)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    item.StatusText = "Up-to-date";
+                    item.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                });
             }
         }
 

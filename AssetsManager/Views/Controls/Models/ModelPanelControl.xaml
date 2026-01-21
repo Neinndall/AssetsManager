@@ -20,7 +20,7 @@
 
             <!-- NAVIGATION (Segmented Control) -->
             <Border Grid.Row="0" Margin="16,16,16,12" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                <UniformGrid Columns="4">
+                <UniformGrid Columns="5">
                     <RadioButton x:Name="TabModels" IsChecked="True" GroupName="MPT" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Models List">
                         <materialIcons:MaterialIcon Kind="CubeOutline" Width="18" Height="18"/>
                     </RadioButton>
@@ -33,23 +33,17 @@
                     <RadioButton x:Name="TabAnimations" GroupName="MPT" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Animations">
                         <materialIcons:MaterialIcon Kind="AnimationPlay" Width="18" Height="18"/>
                     </RadioButton>
+                    <RadioButton x:Name="TabStudio" GroupName="MPT" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Studio &amp; Render">
+                        <materialIcons:MaterialIcon Kind="CameraIris" Width="18" Height="18"/>
+                    </RadioButton>
                 </UniformGrid>
             </Border>
 
             <!-- CONTENT AREA -->
             <Grid Grid.Row="1" Margin="16,0,16,0">
                 <!-- MODELS -->
-                <Grid x:Name="ModelsPanel">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabModels}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
+                <Grid x:Name="ModelsPanel" 
+                      Visibility="{Binding IsChecked, ElementName=TabModels, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <ListBox x:Name="ModelsListBox" Style="{StaticResource SmoothScrollListBox}" SelectionChanged="ModelsListBox_SelectionChanged" Background="Transparent" BorderThickness="0">
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
@@ -129,81 +123,228 @@
                     </ListBox>
                 </Grid>
 
-                <!-- MESHES -->
-                <Grid x:Name="MeshesPanel">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabMeshes}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="MeshesItemsControl">
-                            <ItemsControl.ItemTemplate>
+                <!-- STUDIO (New Panel) -->
+                <ScrollViewer x:Name="StudioPanel" VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsChecked, ElementName=TabStudio, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Margin="0,0,0,32">
+                        <!-- ENVIRONMENT -->
+                        <GroupBox Header="Environment" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
+                            <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,6" Padding="10,8">
+                                    <Grid>
                                         <StackPanel>
-                                            <!-- Row 1: Visibility & Name -->
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                            </Grid>
-
-                                            <!-- Row 2: Texture Selector (Compact & Visual) -->
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                
-                                                <!-- Icon Indicator -->
-                                                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="4" Width="28" Height="28" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="Active Texture">
-                                                     <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
-
-                                                <!-- Combo -->
-                                                <ComboBox Grid.Column="1" 
-                                                          Style="{StaticResource ModernComboBox}" 
-                                                          Height="28" 
-                                                          FontSize="11" 
-                                                          ItemsSource="{Binding AvailableTextureNames}" 
-                                                          SelectedItem="{Binding SelectedTextureName}"
-                                                          VerticalAlignment="Center"/>
-                                            </Grid>
+                                            <TextBlock Text="Environment" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="Visual style and background." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
                                         </StackPanel>
-                                    </Border>
+                                    </Grid>
                                 </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                            </GroupBox.HeaderTemplate>
+                            <UniformGrid Columns="2" Margin="0,4">
+                                <!-- Skybox Toggle -->
+                                <ToggleButton x:Name="ShowSkyboxCheck" 
+                                              Style="{StaticResource ModernTileToggleButton}" 
+                                              IsChecked="True" 
+                                              Checked="EnvironmentCheck_Changed" 
+                                              Unchecked="EnvironmentCheck_Changed"
+                                              Margin="0,0,4,0"
+                                              ToolTip="Show the 3D Skybox environment">
+                                    <StackPanel>
+                                        <materialIcons:MaterialIcon Kind="Earth" Width="24" Height="24" Margin="0,0,0,4" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Skybox" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+
+                                <!-- Transparent Toggle -->
+                                <ToggleButton x:Name="TransparentBgCheck" 
+                                              Style="{StaticResource ModernTileToggleButton}" 
+                                              Checked="EnvironmentCheck_Changed" 
+                                              Unchecked="EnvironmentCheck_Changed"
+                                              Margin="4,0,0,0"
+                                              ToolTip="Remove background for transparency">
+                                    <StackPanel>
+                                        <materialIcons:MaterialIcon Kind="ImageOff" Width="24" Height="24" Margin="0,0,0,4" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="No Background" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                            </UniformGrid>
+                        </GroupBox>
+
+                        <!-- CAMERA -->
+                        <GroupBox Header="Camera Lens" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
+                            <GroupBox.HeaderTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <StackPanel>
+                                            <TextBlock Text="Camera Lens" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="FOV and perspective controls." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </GroupBox.HeaderTemplate>
+                            <StackPanel>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="FocusAuto" Width="16" Foreground="{StaticResource AccentBlue}" Margin="0,0,10,0" ToolTip="Field of View (FOV)"/>
+                                    <Slider Grid.Column="1" x:Name="FovSlider" Minimum="10" Maximum="120" Value="45" 
+                                            ValueChanged="FovSlider_ValueChanged" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=FovSlider, StringFormat={}{0:F0}}" 
+                                               FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- LIGHTING -->
+                        <GroupBox Header="Studio Lighting" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
+                            <GroupBox.HeaderTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <StackPanel>
+                                            <TextBlock Text="Studio Lighting" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="Sun rotation and altitude." FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </GroupBox.HeaderTemplate>
+                            <StackPanel>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="LightbulbOnOutline" Width="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" ToolTip="Ambient Intensity (Base Light)"/>
+                                    <Slider Grid.Column="1" x:Name="AmbientIntensitySlider" Minimum="0" Maximum="100" Value="100" 
+                                            ValueChanged="LightSlider_ValueChanged" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=AmbientIntensitySlider, StringFormat={}{0:F0}%}" 
+                                               FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Grid>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="Orbit" Width="16" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0" ToolTip="Rotation"/>
+                                    <Slider Grid.Column="1" x:Name="LightRotationSlider" Minimum="0" Maximum="360" Value="0" 
+                                            ValueChanged="LightSlider_ValueChanged" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=LightRotationSlider, StringFormat={}{0:F0}}" 
+                                               FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Grid>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="ArrowUpBold" Width="16" Foreground="{StaticResource AccentYellow}" Margin="0,0,10,0" ToolTip="Altitude"/>
+                                    <Slider Grid.Column="1" x:Name="LightHeightSlider" Minimum="0" Maximum="90" Value="0" 
+                                            ValueChanged="LightSlider_ValueChanged" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=LightHeightSlider, StringFormat={}{0:F0}}" 
+                                               FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- RENDER ACTIONS -->
+                        <StackPanel Margin="0,4,0,0">
+                            <Button x:Name="SnapshotButton" Click="SnapshotButton_Click" Style="{StaticResource PrimaryButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="Camera" Width="16" Height="16" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Take 4K Snapshot" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            
+                            <Button Click="ResetStudio_Click" Style="{StaticResource SecondaryButton}" Margin="0,6,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="Refresh" Width="16" Height="16" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Reset Studio Settings" FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- MESHES -->
+                <Grid x:Name="MeshesPanel"
+                      Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ListBox x:Name="MeshesListBox" 
+                             Background="Transparent" 
+                             BorderThickness="0"
+                             VirtualizingStackPanel.IsVirtualizing="True"
+                             VirtualizingStackPanel.VirtualizationMode="Recycling"
+                             VirtualizingStackPanel.CacheLengthUnit="Item"
+                             VirtualizingStackPanel.CacheLength="10,10"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,6" Padding="10,8">
+                                    <StackPanel>
+                                        <!-- Row 1: Visibility & Name -->
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                        </Grid>
+
+                                        <!-- Row 2: Texture Selector (Compact & Visual) -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- Icon Indicator -->
+                                            <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="4" Width="28" Height="28" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="Active Texture">
+                                                 <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+
+                                            <!-- Combo -->
+                                            <ComboBox Grid.Column="1" 
+                                                      Style="{StaticResource ModernComboBox}" 
+                                                      Height="28" 
+                                                      FontSize="11" 
+                                                      ItemsSource="{Binding AvailableTextureNames}" 
+                                                      SelectedItem="{Binding SelectedTextureName}"
+                                                      VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Grid>
 
                 <!-- TRANSFORM -->
-                <ScrollViewer x:Name="TransformPanel" VerticalScrollBarVisibility="Auto">
-                    <ScrollViewer.Style>
-                        <Style TargetType="ScrollViewer">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabTransform}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ScrollViewer.Style>
+                <ScrollViewer x:Name="TransformPanel" VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsChecked, ElementName=TabTransform, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel>
                         <!-- POSITION -->
                         <GroupBox Header="Position" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
                             <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Grid Width="230">
+                                    <Grid>
                                         <TextBlock Text="Position" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
                                         <Button HorizontalAlignment="Right" Click="ResetPosition_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Position">
                                             <materialIcons:MaterialIcon Kind="Refresh" Width="16"/>
@@ -221,7 +362,7 @@
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="ArrowRight" Width="16" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0"/>
                                     <Slider Grid.Column="1" x:Name="PositionXSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionXSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=PositionXSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="PositionXLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
                                         <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/>
                                     </ToggleButton>
@@ -235,7 +376,7 @@
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="ArrowUp" Width="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0"/>
                                     <Slider Grid.Column="1" x:Name="PositionYSlider" Minimum="-1000" Maximum="3000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionYSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=PositionYSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="PositionYLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
                                         <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/>
                                     </ToggleButton>
@@ -249,7 +390,7 @@
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="ArrowDown" Width="16" Foreground="{StaticResource AccentBlue}" Margin="0,0,10,0"/>
                                     <Slider Grid.Column="1" x:Name="PositionZSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=PositionZSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=PositionZSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="PositionZLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
                                         <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/>
                                     </ToggleButton>
@@ -261,9 +402,9 @@
                         <GroupBox Header="Rotation" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
                             <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Grid Width="230">
+                                    <Grid>
                                         <TextBlock Text="Rotation" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
-                                        <Button HorizontalAlignment="Right" Click="ResetRotation_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Rotation">
+                                        <Button HorizontalAlignment="Right" Click="ResetPosition_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Position">
                                             <materialIcons:MaterialIcon Kind="Refresh" Width="16"/>
                                         </Button>
                                     </Grid>
@@ -279,7 +420,7 @@
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="Rotate3d" Width="16" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0"/>
                                     <Slider Grid.Column="1" x:Name="RotationXSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationXSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=RotationXSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="RotationXLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
                                         <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/>
                                     </ToggleButton>
@@ -293,7 +434,7 @@
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="Rotate3d" Width="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0"/>
                                     <Slider Grid.Column="1" x:Name="RotationYSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationYSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=RotationYSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="RotationYLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
                                         <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/>
                                     </ToggleButton>
@@ -307,7 +448,7 @@
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="Rotate3d" Width="16" Foreground="{StaticResource AccentBlue}" Margin="0,0,10,0"/>
                                     <Slider Grid.Column="1" x:Name="RotationZSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding ElementName=RotationZSlider, Path=Value, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=RotationZSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="RotationZLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
                                         <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/>
                                     </ToggleButton>
@@ -319,9 +460,9 @@
                         <GroupBox Header="Scale" Style="{StaticResource SettingsGroupBoxStyle}" Margin="0,0,0,6">
                             <GroupBox.HeaderTemplate>
                                 <DataTemplate>
-                                    <Grid Width="230">
+                                    <Grid>
                                         <TextBlock Text="Scale" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
-                                        <Button HorizontalAlignment="Right" Click="ResetScale_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Scale">
+                                        <Button HorizontalAlignment="Right" Click="ResetPosition_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Position">
                                             <materialIcons:MaterialIcon Kind="Refresh" Width="16"/>
                                         </Button>
                                     </Grid>
@@ -336,7 +477,8 @@
                                 </Grid.ColumnDefinitions>
                                 <materialIcons:MaterialIcon Kind="Resize" Width="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,10,0"/>
                                 <Slider Grid.Column="1" x:Name="ScaleSlider" Minimum="0.1" Maximum="5" Value="1" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="2" Text="{Binding ElementName=ScaleSlider, Path=Value, StringFormat={}{0:F2}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=ScaleSlider, Converter={StaticResource ValueMultiplierConverter}, ConverterParameter=100, StringFormat={}{0:F0}%}" 
+                                           FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                 <ToggleButton Grid.Column="3" x:Name="ScaleLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
                                     <materialIcons:MaterialIcon Kind="LockOpenVariant" Width="14"/>
                                 </ToggleButton>
@@ -346,23 +488,14 @@
                 </ScrollViewer>
 
                 <!-- ANIMATIONS -->
-                <Grid x:Name="AnimationsPanel">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabAnimations}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
+                <Grid x:Name="AnimationsPanel"
+                      Visibility="{Binding IsChecked, ElementName=TabAnimations, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     
-                    <ListBox x:Name="AnimationsListBox" SelectionChanged="AnimationsListBox_SelectionChanged" Background="Transparent" BorderThickness="0" Style="{StaticResource SmoothScrollListBox}">
+                    <ListBox x:Name="AnimationsListBox" Background="Transparent" BorderThickness="0" Style="{StaticResource SmoothScrollListBox}">
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -410,7 +543,12 @@
                     </ListBox>                
                     
                     <!-- Animation Controls -->
-                    <Border Grid.Row="1" x:Name="AnimationControlsPanel" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="12,10" Margin="0,8,0,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Visibility="Collapsed">
+                    <Border Grid.Row="1" x:Name="AnimationControlsPanel" 
+                            Background="{StaticResource CardBackground}" 
+                            CornerRadius="12" Padding="12,10" Margin="0,8,0,8" 
+                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
+                            DataContext="{Binding SelectedItem, ElementName=AnimationsListBox}"
+                            Visibility="{Binding SelectedItem, ElementName=AnimationsListBox, Converter={StaticResource NullToVisibilityConverter}}">
                         <StackPanel>
                             <Grid Margin="0,0,0,8">
                                 <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="140" HorizontalAlignment="Left"/>
@@ -419,12 +557,29 @@
                                         <materialIcons:MaterialIcon Kind="Play" Width="16" Foreground="{StaticResource AccentGreen}"/>
                                     </Button>
                                     <ToggleButton Click="StopButton_Click" IsChecked="{Binding IsPlaying, Mode=OneWay}" Style="{StaticResource IconToggleButton}" Width="28" Height="28" Margin="4,0,0,0">
-                                        <materialIcons:MaterialIcon Kind="Pause" Width="16" Foreground="{StaticResource AccentRed}"/>
+                                        <materialIcons:MaterialIcon Width="16">
+                                            <materialIcons:MaterialIcon.Style>
+                                                <Style TargetType="materialIcons:MaterialIcon">
+                                                    <!-- Por defecto (Cuando está pausado -> Mostrar el Cuadrado para Resume) -->
+                                                    <Setter Property="Kind" Value="Stop" />
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
+                                                    <Style.Triggers>
+                                                        <!-- Cuando está reproduciendo -> Mostrar Pausa -->
+                                                        <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                                            <Setter Property="Kind" Value="Pause" />
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialIcons:MaterialIcon.Style>
+                                        </materialIcons:MaterialIcon>
                                     </ToggleButton>
                                 </StackPanel>
                             </Grid>
                             
-                            <Slider Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Height="20" Margin="0,0,0,8"/>
+                            <Slider Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" 
+                                    Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" 
+                                    ValueChanged="AnimationSlider_ValueChanged" Height="20" Margin="0,0,0,8"/>
                             
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -450,13 +605,15 @@
                             <TextBlock x:Name="LoadModelText" Text="Model" FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="LoadChromaModelButton" Click="LoadChromaModelButton_Click" Style="{StaticResource SecondaryButton}" Height="56" Width="80" Margin="3,0,3,0" Padding="0">
+                    <Button x:Name="LoadChromaModelButton" Click="LoadChromaModelButton_Click" Style="{StaticResource SecondaryButton}" Height="56" Width="80" Margin="3,0,3,0" Padding="0"
+                            Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=!Map}">
                         <StackPanel VerticalAlignment="Center">
                             <materialIcons:MaterialIcon x:Name="LoadChromaModelIcon" Kind="Palette" Width="20" Height="20" Foreground="{StaticResource AccentPurple}"/>
                             <TextBlock Text="Chroma" FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="56" Width="80" Margin="6,0,0,0" Padding="0">
+                    <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="56" Width="80" Margin="6,0,0,0" Padding="0"
+                            Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=!Map}">
                         <StackPanel VerticalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="AnimationPlay" Width="20" Height="20" Foreground="{StaticResource AccentGreen}"/>
                             <TextBlock Text="Anims" FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" HorizontalAlignment="Center"/>

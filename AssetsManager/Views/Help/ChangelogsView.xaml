@@ -6,6 +6,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="800">
+             
     <StackPanel Margin="0,0,0,40">
         <!-- MODERN INTEGRATED HEADER (Compact) -->
         <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
@@ -164,17 +165,7 @@
                         </ToggleButton>
 
                         <!-- Content Area with Vertical Line -->
-                        <Grid Grid.Row="1" Margin="0,8,0,0">
-                            <Grid.Style>
-                                <Style TargetType="Grid">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsExpanded}" Value="False">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Grid.Style>
+                        <Grid Grid.Row="1" Margin="0,8,0,0" Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="50"/>
                                 <ColumnDefinition Width="*"/>
@@ -185,20 +176,7 @@
 
                             <StackPanel Grid.Column="1" Margin="4,8,0,12">
                                 <!-- HERO SECTION (Inside notes) -->
-                                <StackPanel Margin="0,0,0,20">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding UpdateDescription}" Value="{x:Null}">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding UpdateDescription}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
-
+                                <StackPanel Margin="0,0,0,20" Visibility="{Binding UpdateDescription, Converter={StaticResource NullToVisibilityConverter}}">
                                     <TextBlock Text="{Binding UpdateType}" 
                                                FontSize="16" 
                                                FontWeight="Bold" 
@@ -216,11 +194,46 @@
                                     <Border Height="1" Background="{StaticResource BorderColor}" Margin="0,16,0,0" Opacity="0.3"/>
                                 </StackPanel>
 
-                                <!-- GROUPS -->
-                                <ItemsControl ItemsSource="{Binding Groups}">
+                                <!-- QUICK NAVIGATION -->
+                                <ItemsControl ItemsSource="{Binding Groups}" Margin="0,0,0,24">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <StackPanel Margin="2,0,0,24">
+                                            <Button Click="QuickNavButton_Click" Tag="{Binding Title}" Margin="0,0,8,8" Cursor="Hand">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{StaticResource SidebarBackground}" 
+                                                                BorderBrush="{StaticResource BorderColor}" 
+                                                                BorderThickness="1" 
+                                                                CornerRadius="12" 
+                                                                Padding="10,4">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <materialIcons:MaterialIcon Kind="{Binding Icon}" Foreground="{Binding IconColor}" Width="12" Height="12" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding Title}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="6,0,0,0" VerticalAlignment="Center" Typography.Capitals="AllSmallCaps"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="BorderBrush" Value="{Binding IconColor}"/>
+                                                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- GROUPS -->
+                                <ItemsControl ItemsSource="{Binding Groups}" Tag="GroupsContainer">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="2,0,0,24" Tag="GroupTarget">
                                                 <!-- Group Title and Icon -->
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                                     <materialIcons:MaterialIcon Kind="{Binding Icon}" 
@@ -250,28 +263,59 @@
 
                                                                 <!-- Indentation Guide Lines (Subtle) -->
                                                                 <Border Grid.Column="0">
-                                                                    <Border.Style>
-                                                                        <Style TargetType="Border">
-                                                                            <Setter Property="Width" Value="0"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IndentationLevel}" Value="1"><Setter Property="Width" Value="0"/></DataTrigger>
-                                                                                <DataTrigger Binding="{Binding IndentationLevel}" Value="2"><Setter Property="Width" Value="18"/></DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </Border.Style>
+                                                                                                                                        <Border.Style>
+                                                                                                                                            <Style TargetType="Border">
+                                                                                                                                                <Setter Property="Width" Value="0"/>
+                                                                                                                                                <Style.Triggers>
+                                                                                                                                                    <DataTrigger Binding="{Binding IndentationLevel}" Value="2"><Setter Property="Width" Value="18"/></DataTrigger>
+                                                                                                                                                    <DataTrigger Binding="{Binding IndentationLevel}" Value="3"><Setter Property="Width" Value="36"/></DataTrigger>
+                                                                                                                                                    <DataTrigger Binding="{Binding IndentationLevel}" Value="4"><Setter Property="Width" Value="54"/></DataTrigger>
+                                                                                                                                                </Style.Triggers>
+                                                                                                                                            </Style>
+                                                                                                                                        </Border.Style>
                                                                 </Border>
 
                                                                 <materialIcons:MaterialIcon Grid.Column="1" Kind="CircleMedium" 
-                                                                                            Foreground="{StaticResource BorderColor}" 
+                                                                                            Foreground="{StaticResource TextSecondary}" 
                                                                                             Width="6" Height="6"
                                                                                             VerticalAlignment="Top" 
                                                                                             Margin="0,9,8,0">
                                                                     <materialIcons:MaterialIcon.Style>
                                                                         <Style TargetType="materialIcons:MaterialIcon">
                                                                             <Setter Property="Visibility" Value="Visible"/>
+                                                                            <Setter Property="Kind" Value="CircleMedium"/> <!-- Default for Lvl 1 -->
+                                                                            
                                                                             <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding IsSubheading}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
-                                                                                <DataTrigger Binding="{Binding IsDescription}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                                                                <!-- Use Dash for nested items (Lvl 2+) -->
+                                                                                <DataTrigger Binding="{Binding IndentationLevel}" Value="2">
+                                                                                    <Setter Property="Kind" Value="Minus"/>
+                                                                                    <Setter Property="Width" Value="8"/>
+                                                                                    <Setter Property="Height" Value="2"/>
+                                                                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                                    <Setter Property="Margin" Value="0,11,8,0"/>
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding IndentationLevel}" Value="3">
+                                                                                    <Setter Property="Kind" Value="Minus"/>
+                                                                                    <Setter Property="Width" Value="8"/>
+                                                                                    <Setter Property="Height" Value="2"/>
+                                                                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                                    <Setter Property="Margin" Value="0,11,8,0"/>
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding IndentationLevel}" Value="4">
+                                                                                    <Setter Property="Kind" Value="Minus"/>
+                                                                                    <Setter Property="Width" Value="8"/>
+                                                                                    <Setter Property="Height" Value="2"/>
+                                                                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                                    <Setter Property="Margin" Value="0,11,8,0"/>
+                                                                                </DataTrigger>
+
+                                                                                <!-- Hide icon for titles (subheadings) and descriptions -->
+                                                                                <DataTrigger Binding="{Binding IsSubheading}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
+                                                                                <DataTrigger Binding="{Binding IsDescription}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
                                                                             </Style.Triggers>
                                                                         </Style>
                                                                     </materialIcons:MaterialIcon.Style>
@@ -286,10 +330,34 @@
                                                                             <Setter Property="Opacity" Value="0.9"/>
                                                                             <Style.Triggers>
                                                                                 <DataTrigger Binding="{Binding IsSubheading}" Value="True">
-                                                                                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                                                                                    <Setter Property="FontWeight" Value="SemiBold"/>
-                                                                                    <Setter Property="Margin" Value="0,6,0,6"/>
+                                                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                                                    <Setter Property="Margin" Value="0,2,0,4"/>
                                                                                 </DataTrigger>
+                                                                                <!-- Nested Subheadings Style (Lvl 2, 3, 4) -->
+                                                                                <MultiDataTrigger>
+                                                                                    <MultiDataTrigger.Conditions>
+                                                                                        <Condition Binding="{Binding IsSubheading}" Value="True"/>
+                                                                                        <Condition Binding="{Binding IndentationLevel}" Value="2"/>
+                                                                                    </MultiDataTrigger.Conditions>
+                                                                                    <Setter Property="FontSize" Value="13"/>
+                                                                                    <Setter Property="Margin" Value="0,2,0,2"/>
+                                                                                </MultiDataTrigger>
+                                                                                <MultiDataTrigger>
+                                                                                    <MultiDataTrigger.Conditions>
+                                                                                        <Condition Binding="{Binding IsSubheading}" Value="True"/>
+                                                                                        <Condition Binding="{Binding IndentationLevel}" Value="3"/>
+                                                                                    </MultiDataTrigger.Conditions>
+                                                                                    <Setter Property="FontSize" Value="13"/>
+                                                                                    <Setter Property="Margin" Value="0,2,0,2"/>
+                                                                                </MultiDataTrigger>
+                                                                                <MultiDataTrigger>
+                                                                                    <MultiDataTrigger.Conditions>
+                                                                                        <Condition Binding="{Binding IsSubheading}" Value="True"/>
+                                                                                        <Condition Binding="{Binding IndentationLevel}" Value="4"/>
+                                                                                    </MultiDataTrigger.Conditions>
+                                                                                    <Setter Property="FontSize" Value="13"/>
+                                                                                    <Setter Property="Margin" Value="0,2,0,2"/>
+                                                                                </MultiDataTrigger>
                                                                                 <DataTrigger Binding="{Binding IsDescription}" Value="True">
                                                                                     <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
                                                                                     <Setter Property="FontStyle" Value="Italic"/>

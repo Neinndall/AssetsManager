@@ -46,6 +46,26 @@ namespace AssetsManager.Views.Models.Wad
         public ulong NewPathHash { get; set; }
         public string Path => NewPath ?? OldPath;
         public string FileName => System.IO.Path.GetFileName(Path);
+        public string DisplayPath
+        {
+            get
+            {
+                string dir = System.IO.Path.GetDirectoryName(Path);
+                return string.IsNullOrEmpty(dir) ? "N/A" : dir;
+            }
+        }
+
+        [JsonIgnore]
+        public string OldSizeString => FormatSize(OldUncompressedSize);
+        [JsonIgnore]
+        public string NewSizeString => FormatSize(NewUncompressedSize);
+
+        private string FormatSize(ulong? sizeInBytes)
+        {
+            if (sizeInBytes == null) return "N/A";
+            double sizeInKB = (double)sizeInBytes / 1024.0;
+            return $"{sizeInKB:F2} KB";
+        }
 
         public WadChunkCompression? OldCompressionType { get; set; }
         public WadChunkCompression? NewCompressionType { get; set; }

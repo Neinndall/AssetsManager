@@ -424,6 +424,13 @@ namespace AssetsManager.Services.Explorer
                 Status = status
             };
 
+            // Prevent duplicates: Check if the file already exists in the current directory
+            var existingNode = currentNode.Children.FirstOrDefault(c => c.Name.Equals(fileNode.Name, StringComparison.OrdinalIgnoreCase));
+            if (existingNode != null)
+            {
+                return existingNode;
+            }
+
             currentNode.Children.Add(fileNode);
             return fileNode;
         }

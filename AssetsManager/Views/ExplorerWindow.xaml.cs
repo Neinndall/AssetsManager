@@ -31,7 +31,8 @@ namespace AssetsManager.Views
             AudioBankLinkerService audioBankLinkerService,
             WadSavingService wadSavingService,
             HashResolverService hashResolverService,
-            TaskCancellationManager taskCancellationManager // Added this line
+            TaskCancellationManager taskCancellationManager,
+            FavoritesManager favoritesManager
         )
         {
             InitializeComponent();
@@ -51,6 +52,7 @@ namespace AssetsManager.Views
             FileExplorer.AudioBankLinkerService = audioBankLinkerService;
             FileExplorer.HashResolverService = hashResolverService;
             FileExplorer.TaskCancellationManager = taskCancellationManager; // Added this line
+            FileExplorer.FavoritesManager = favoritesManager;
 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;

@@ -5,11 +5,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              mc:Ignorable="d">
     <UserControl.Resources>
-        <converters:PathToIconConverter x:Key="PathToIconConverter"/>
-        
         <DataTemplate x:Key="FileGridItemTemplate">
             <!-- Main Card Container -->
             <Border Margin="8" Width="140" Height="170" CornerRadius="12"
@@ -42,33 +39,14 @@
 
                             <!-- Material Icon Fallback -->
                             <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
-                                                        Width="56" Height="56" 
+                                                        Width="64" Height="64" 
                                                         HorizontalAlignment="Center" VerticalAlignment="Center" 
-                                                        Foreground="{StaticResource TextSecondary}" Opacity="0.8">
-                                <materialIcons:MaterialIcon.Style>
-                                    <Style TargetType="materialIcons:MaterialIcon">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ImagePreview}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </materialIcons:MaterialIcon.Style>
-                            </materialIcons:MaterialIcon>
+                                                        Foreground="{StaticResource TextSecondary}"
+                                                        Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
                             
                             <!-- Image Preview (using Border+ImageBrush for perfect corner clipping) -->
-                            <Border CornerRadius="11,11,0,0">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ImagePreview}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
+                            <Border CornerRadius="11,11,0,0"
+                                    Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
                                 <Border.Background>
                                     <ImageBrush ImageSource="{Binding ImagePreview}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
                                 </Border.Background>

@@ -31,6 +31,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public FilePreviewerControl FilePreviewer { get; set; }
 
         public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "PinMenuItem");
+        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "AddToFavoritesMenuItem");
         public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewChangesMenuItem");
         public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ExtractMenuItem");
         public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "SaveMenuItem");
@@ -46,6 +47,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public AppSettings AppSettings { get; set; }
         public TreeBuilderService TreeBuilderService { get; set; }
         public TreeUIManager TreeUIManager { get; set; }
+        public FavoritesManager FavoritesManager { get; set; }
         public AudioBankService AudioBankService { get; set; }
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
         public HashResolverService HashResolverService { get; set; }
@@ -54,19 +56,21 @@ namespace AssetsManager.Views.Controls.Explorer
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
 
-        public ObservableCollection<FileSystemNodeModel> RootNodes { get; set; }
+        public ObservableCollection<FileSystemNodeModel> RootNodes => _viewModel.RootNodes;
+
+        private readonly FileExplorerModel _viewModel;
+        
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
-        private bool _isWadMode = true;
-        private bool _isBackupMode = false;
-        private bool _isSortingEnabled = true;
         private string _backupJsonPath;
 
         public FileExplorerControl()
         {
             InitializeComponent();
-            RootNodes = new ObservableCollection<FileSystemNodeModel>();
-            DataContext = this;
+            
+            _viewModel = new FileExplorerModel();
+            DataContext = _viewModel;
+            
             this.Loaded += FileExplorerControl_Loaded;
 
             _searchTimer = new DispatcherTimer();
@@ -93,6 +97,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.LoadComparisonClicked -= Toolbar_LoadComparisonClicked;
                 Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
                 Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
+                Toolbar.FavoritesVisibilityChanged -= Toolbar_FavoritesVisibilityChanged;
                 Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
                 Toolbar.ViewModeChanged -= Toolbar_ViewModeChanged;
             }
@@ -108,17 +113,22 @@ namespace AssetsManager.Views.Controls.Explorer
             }
 
             // 5. CRÍTICO: Limpiar recursivamente todos los nodos
-            if (RootNodes != null)
+            if (_viewModel.RootNodes != null)
             {
-                foreach (var rootNode in RootNodes.ToList())
+                foreach (var rootNode in _viewModel.RootNodes.ToList())
                 {
                     rootNode.Dispose(); // ← Usa el nuevo método Dispose
                 }
-                RootNodes.Clear();
-                RootNodes = null;
+                _viewModel.RootNodes.Clear();
             }
 
-            // 6. Romper referencias cruzadas
+            // 6. Desuscribir de favoritos
+            if (FavoritesManager != null)
+            {
+                FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
+            }
+
+            // 7. Romper referencias cruzadas
             FilePreviewer = null; // Remove reference
 
             // 8. Limpiar paths
@@ -128,24 +138,32 @@ namespace AssetsManager.Views.Controls.Explorer
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
             // First, do the synchronous checks to decide the initial UI state.
-            bool shouldLoadWadTree = _isWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory);
-            bool shouldLoadDirTree = !_isWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
+            bool shouldLoadWadTree = _viewModel.IsWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory);
+            bool shouldLoadDirTree = !_viewModel.IsWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
 
             if (shouldLoadWadTree || shouldLoadDirTree)
             {
-                // If we are going to load, show the indicator immediately.
-                LoadingIndicator.Visibility = Visibility.Visible;
-                NoDirectoryMessage.Visibility = Visibility.Collapsed;
-                FileTreeView.Visibility = Visibility.Collapsed;
+                // Start with Hashes since it's the first async operation
+                _viewModel.SetLoadingState(ExplorerLoadingState.LoadingHashes);
             }
             else
             {
                 // If we are not going to load, show the correct placeholder immediately.
-                ShowPlaceholder(_isWadMode);
+                ShowStatusMessage(_viewModel.IsWadMode);
             }
 
             // Now, perform the async hash loading.
             await HashResolverService.LoadAllHashesAsync();
+
+            // Bind Favorites
+            if (FavoritesManager != null)
+            {
+                FavoritesListView.ItemsSource = FavoritesManager.Favorites;
+                
+                // Track changes to update visibility
+                FavoritesManager.Favorites.CollectionChanged += Favorites_CollectionChanged;
+                _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
+            }
 
             // Setup toolbar events (can be done regardless of loading)
             Toolbar.SearchTextChanged += Toolbar_SearchTextChanged;
@@ -153,8 +171,11 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;
             Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
             Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
+            Toolbar.FavoritesVisibilityChanged += Toolbar_FavoritesVisibilityChanged;
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
             Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
+
+            Toolbar.SetWadMode(_viewModel.IsWadMode);
             
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
@@ -165,6 +186,11 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 await BuildDirectoryTreeAsync(DirectoriesCreator.AssetsDownloadedPath);
             }
+        }
+
+        private void Favorites_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
         }
 
         private void Toolbar_ViewModeChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
@@ -182,7 +208,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
         {
-            _isWadMode = !_isWadMode;
+            _viewModel.IsWadMode = !_viewModel.IsWadMode;
+            Toolbar.SetWadMode(_viewModel.IsWadMode);
             // Mode switched, we keep the current view mode (Grid/Preview) preference.
             
             if (FilePreviewer != null)
@@ -197,10 +224,15 @@ namespace AssetsManager.Views.Controls.Explorer
             BreadcrumbVisibilityChanged?.Invoke(this, e);
         }
 
+        private void Toolbar_FavoritesVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        {
+            _viewModel.IsFavoritesEnabled = e.NewValue;
+        }
+
         private async void Toolbar_SortStateChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
-            _isSortingEnabled = e.NewValue;
-            if (_isBackupMode)
+            _viewModel.IsSortingEnabled = e.NewValue;
+            if (_viewModel.IsBackupMode)
             {
                 await BuildTreeFromBackupAsync(_backupJsonPath);
             }
@@ -208,7 +240,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ReloadTreeAsync()
         {
-            if (_isWadMode)
+            if (_viewModel.IsWadMode)
             {
                 if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
                 {
@@ -216,7 +248,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    ShowPlaceholder(true);
+                    ShowStatusMessage(true);
                 }
             }
             else
@@ -227,26 +259,27 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    ShowPlaceholder(false);
+                    ShowStatusMessage(false);
                 }
             }
         }
 
-        private void ShowPlaceholder(bool isWadMode)
+        private void ShowStatusMessage(bool isWadMode)
         {
             if (isWadMode) {
-                PlaceholderTitle.Text = "Select a LoL Directory";
-                PlaceholderDescription.Text = "Choose the root folder where you installed League of Legends to browse its WAD files.";
+                StatusTitle.Text = "Select a LoL Directory";
+                StatusDescription.Text = "Choose the root folder where you installed League of Legends to browse its WAD files.";
                 SelectLolDirButton.Visibility = Visibility.Visible;
             } else {
-                PlaceholderTitle.Text = "Assets Directory Not Found";
-                PlaceholderDescription.Text = "The application could not find the directory for downloaded assets.";
+                StatusTitle.Text = "Assets Directory Not Found";
+                StatusDescription.Text = "The application could not find the directory for downloaded assets.";
                 SelectLolDirButton.Visibility = Visibility.Collapsed;
             }
-            RootNodes.Clear();
-            FileTreeView.Visibility = Visibility.Collapsed;
-            NoDirectoryMessage.Visibility = Visibility.Visible;
-            LoadingIndicator.Visibility = Visibility.Collapsed;
+            
+            _viewModel.RootNodes.Clear();
+            _viewModel.IsBusy = false;
+            _viewModel.IsTreeReady = false;
+            _viewModel.IsEmptyState = true;
         }
 
         private async void Toolbar_LoadComparisonClicked(object sender, RoutedEventArgs e)
@@ -266,15 +299,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task BuildWadTreeAsync(string rootPath)
         {
-            _isBackupMode = false;
+            _viewModel.IsBackupMode = false;
             var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
             NewLolPath = null;
             OldLolPath = null;
-            NoDirectoryMessage.Visibility = Visibility.Collapsed;
-            FileTreeView.Visibility = Visibility.Collapsed;
-            LoadingIndicator.Visibility = Visibility.Visible;
+            
+            _viewModel.SetLoadingState(ExplorerLoadingState.LoadingWads);
 
             Toolbar.IsSortButtonVisible = false;
 
@@ -283,16 +315,16 @@ namespace AssetsManager.Views.Controls.Explorer
                 var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                RootNodes.Clear();
+                _viewModel.RootNodes.Clear();
                 foreach (var node in newNodes)
                 {
-                    RootNodes.Add(node);
+                    _viewModel.RootNodes.Add(node);
                 }
 
-                if (RootNodes.Count == 0)
+                if (_viewModel.RootNodes.Count == 0)
                 {
                     CustomMessageBoxService.ShowError("Error", "Could not find any WAD files in 'Game' or 'Plugins' subdirectories.", Window.GetWindow(this));
-                    NoDirectoryMessage.Visibility = Visibility.Visible;
+                    _viewModel.IsEmptyState = true;
                 }
 
                 TaskCancellationManager.CompleteCurrentOperation();
@@ -307,41 +339,40 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 LogService.LogError(ex, "Failed to build initial tree.");
                 CustomMessageBoxService.ShowError("Error", "Could not load the directory. Please check the logs.", Window.GetWindow(this));
-                NoDirectoryMessage.Visibility = Visibility.Visible;
+                _viewModel.IsEmptyState = true;
             }
             finally
             {
-                LoadingIndicator.Visibility = Visibility.Collapsed;
-                FileTreeView.Visibility = Visibility.Visible;
-                Toolbar.Visibility = Visibility.Visible;
-
+                _viewModel.IsBusy = false;
+                if (!_viewModel.IsEmptyState)
+                {
+                    _viewModel.IsTreeReady = true;
+                }
             }
         }
 
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
-            _isBackupMode = false;
+            _viewModel.IsBackupMode = false;
             var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
             _currentRootPath = rootPath;
             NewLolPath = null;
             OldLolPath = null;
-            NoDirectoryMessage.Visibility = Visibility.Collapsed;
-            FileTreeView.Visibility = Visibility.Collapsed;
+            
+            _viewModel.SetLoadingState(ExplorerLoadingState.ExploringDirectory);
 
             Toolbar.IsSortButtonVisible = false;
-
-            LoadingIndicator.Visibility = Visibility.Visible;
 
             try
             {
                 var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                RootNodes.Clear();
+                _viewModel.RootNodes.Clear();
                 foreach (var node in newNodes)
                 {
-                    RootNodes.Add(node);
+                    _viewModel.RootNodes.Add(node);
                 }
 
                 TaskCancellationManager.CompleteCurrentOperation();
@@ -356,43 +387,39 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 LogService.LogError(ex, "Failed to build directory tree.");
                 CustomMessageBoxService.ShowError("Error", "Could not load the directory. Please check the logs.", Window.GetWindow(this));
-                NoDirectoryMessage.Visibility = Visibility.Visible;
+                _viewModel.IsEmptyState = true;
             }
             finally
             {
-                // The indicatorTask will be implicitly cancelled by the main token,
-                // or its continuation will check t.IsCanceled.
-                // No need for explicit cts.Cancel() here as the token is already cancelled by _cancellationTokenSource?.Cancel()
-                LoadingIndicator.Visibility = Visibility.Collapsed;
-                FileTreeView.Visibility = Visibility.Visible;
-                Toolbar.Visibility = Visibility.Visible;
-
+                _viewModel.IsBusy = false;
+                if (!_viewModel.IsEmptyState)
+                {
+                    _viewModel.IsTreeReady = true;
+                }
             }
         }
 
         private async Task BuildTreeFromBackupAsync(string jsonPath)
         {
-            _isBackupMode = true;
+            _viewModel.IsBackupMode = true;
             _backupJsonPath = jsonPath;
             var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
-            NoDirectoryMessage.Visibility = Visibility.Collapsed;
-            FileTreeView.Visibility = Visibility.Collapsed;
-            LoadingIndicator.Visibility = Visibility.Visible;
+            _viewModel.SetLoadingState(ExplorerLoadingState.LoadingBackup);
 
             Toolbar.IsSortButtonVisible = true;
 
             try
             {
-                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _isSortingEnabled, cancellationToken);
+                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _viewModel.IsSortingEnabled, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                RootNodes.Clear();
+                _viewModel.RootNodes.Clear();
                 NewLolPath = newLolPath;
                 OldLolPath = oldLolPath;
                 foreach (var node in backupNodes)
                 {
-                    RootNodes.Add(node);
+                    _viewModel.RootNodes.Add(node);
                 }
 
                 TaskCancellationManager.CompleteCurrentOperation();
@@ -407,14 +434,15 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 LogService.LogError(ex, "Failed to build tree from backup.");
                 CustomMessageBoxService.ShowError("Error", "Could not load the backup file. Please check the logs.", Window.GetWindow(this));
-                NoDirectoryMessage.Visibility = Visibility.Visible;
+                _viewModel.IsEmptyState = true;
             }
             finally
             {
-                LoadingIndicator.Visibility = Visibility.Collapsed;
-                FileTreeView.Visibility = Visibility.Visible;
-                Toolbar.Visibility = Visibility.Visible;
-
+                _viewModel.IsBusy = false;
+                if (!_viewModel.IsEmptyState)
+                {
+                    _viewModel.IsTreeReady = true;
+                }
             }
         }
 
@@ -527,19 +555,33 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     LogService.Log("Processing and saving selected files...");
 
-                    string finalLogPath = destinationPath;
-                    if (selectedNode.Type == NodeType.SoundBank)
-                    {
-                        finalLogPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
-                    }
-                    else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
-                    {
-                        finalLogPath = Path.Combine(destinationPath, selectedNode.Name);
-                    }
+                    var savedFiles = new List<string>();
+                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => savedFiles.Add(path));
 
-                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, RootNodes, _currentRootPath, cancellationToken);
+                    if (savedFiles.Count > 0)
+                    {
+                        string finalLogPath = destinationPath;
+                        string displayName = selectedNode.Name;
 
-                    LogService.LogInteractiveSuccess($"Successfully saved {selectedNode.Name}.", finalLogPath, selectedNode.Name);
+                        // Original logic for container paths
+                        if (selectedNode.Type == NodeType.SoundBank)
+                        {
+                            finalLogPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
+                        }
+                        else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
+                        {
+                            finalLogPath = Path.Combine(destinationPath, selectedNode.Name);
+                        }
+
+                        // Special case: If it was a single file, we use the actual saved path/name (e.g. reflects .mp3 conversion)
+                        if (savedFiles.Count == 1)
+                        {
+                            finalLogPath = savedFiles.First();
+                            displayName = Path.GetFileName(finalLogPath);
+                        }
+
+                        LogService.LogInteractiveSuccess($"Successfully saved {displayName}.", finalLogPath, displayName);
+                    }
 
                     TaskCancellationManager.CompleteCurrentOperation();
                 }
@@ -569,30 +611,77 @@ namespace AssetsManager.Views.Controls.Explorer
             string oldPbePath = this.OldLolPath;
             string newPbePath = this.NewLolPath;
 
-            if (_isBackupMode)
+            if (_viewModel.IsBackupMode)
             {
                 oldPbePath = null;
                 newPbePath = null;
             }
 
-            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _isBackupMode ? _backupJsonPath : null);
+            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _viewModel.IsBackupMode ? _backupJsonPath : null);
         }
 
         private void PinSelected_Click(object sender, RoutedEventArgs e)
         {
             if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode && FilePreviewer != null)
             {
-                var existingNormalPin = FilePreviewer.ViewModel.PinnedFiles.FirstOrDefault(p => p.Node == selectedNode && !p.IsDetailsTab);
+                var existingNormalPin = FilePreviewer.ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == selectedNode && !p.IsDetailsTab);
 
                 if (existingNormalPin != null)
                 {
-                    FilePreviewer.ViewModel.SelectedFile = existingNormalPin;
+                    FilePreviewer.ViewModel.PinnedFilesManager.SelectedFile = existingNormalPin;
                 }
                 else
                 {
                     var newPin = new PinnedFileModel(selectedNode);
-                    FilePreviewer.ViewModel.PinnedFiles.Add(newPin);
-                    FilePreviewer.ViewModel.SelectedFile = newPin;
+                    FilePreviewer.ViewModel.PinnedFilesManager.PinnedFiles.Add(newPin);
+                    FilePreviewer.ViewModel.PinnedFilesManager.SelectedFile = newPin;
+                }
+            }
+        }
+
+        private void AddToFavorites_Click(object sender, RoutedEventArgs e)
+        {
+            if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode)
+            {
+                var path = TreeUIManager.FindNodePath(_viewModel.RootNodes, selectedNode);
+                if (path != null)
+                {
+                    // Filter out any "Loading..." nodes that might be in the path
+                    // And join by '/'
+                    var validNodes = path.Where(n => n.Name != "Loading...");
+                    string fullPath = string.Join("/", validNodes.Select(n => n.Name));
+                    
+                    FavoritesManager.AddFavorite(fullPath);
+                }
+            }
+        }
+
+        private void RemoveFavorite_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is FavoriteItemModel item)
+            {
+                FavoritesManager.RemoveFavorite(item);
+                e.Handled = true; // Stop bubbling
+            }
+        }
+
+        private async void FavoritesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (FavoritesListView.SelectedItem is FavoriteItemModel item)
+            {
+                // Deselect immediately so it can be clicked again
+                FavoritesListView.SelectedItem = null;
+
+                var node = await WadSearchBoxService.NavigateToPathAsync(item.FullPath, _viewModel.RootNodes, LoadAllChildrenForSearch);
+
+                if (node != null)
+                {
+                    TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, node, true);
+                }
+                else
+                {
+                    LogService.LogWarning($"Favorite node not found: {item.FullPath}");
+                    CustomMessageBoxService.ShowInfo("Not Found", $"Could not find '{item.DisplayName}' in the current tree.", Window.GetWindow(this));
                 }
             }
         }
@@ -603,17 +692,23 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (ExtractMenuItem is not null)
             {
-                ExtractMenuItem.IsEnabled = _isWadMode;
+                ExtractMenuItem.IsEnabled = _viewModel.IsWadMode;
             }
 
             if (SaveMenuItem is not null)
             {
-                SaveMenuItem.IsEnabled = _isWadMode;
+                SaveMenuItem.IsEnabled = _viewModel.IsWadMode;
             }
 
             if (PinMenuItem is not null)
             {
                 PinMenuItem.IsEnabled = selectedNode.Type != NodeType.RealDirectory && selectedNode.Type != NodeType.VirtualDirectory && selectedNode.Type != NodeType.WadFile;
+            }
+
+            if (AddToFavoritesMenuItem is not null)
+            {
+                // Favorites are only supported in pure WAD Mode (not Backup, not Directory)
+                 AddToFavoritesMenuItem.IsEnabled = _viewModel.IsWadMode && !_viewModel.IsBackupMode; 
             }
 
             if (ViewChangesMenuItem is not null)
@@ -664,7 +759,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
         {
-            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, RootNodes, _currentRootPath);
+            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, _viewModel.RootNodes, _currentRootPath);
             if (linkedBank == null)
             {
                 return; // Errors are logged by the service
@@ -757,7 +852,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode) return;
 
-            var path = TreeUIManager.FindNodePath(RootNodes, selectedNode);
+            var path = TreeUIManager.FindNodePath(_viewModel.RootNodes, selectedNode);
             if (path == null) return;
 
             FileSystemNodeModel containerNode = null;
@@ -791,7 +886,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, containerNode, false);
+                    TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, containerNode, false);
                 }), DispatcherPriority.ContextIdle);
             }
         }
@@ -806,13 +901,13 @@ namespace AssetsManager.Views.Controls.Explorer
                 FilePreviewer.SetSearchFilter(searchText);
             }
 
-            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, RootNodes, LoadAllChildrenForSearch);
+            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, LoadAllChildrenForSearch);
 
             if (nodeToSelect != null)
             {
                 _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, nodeToSelect, false);
+                    TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, nodeToSelect, false);
                 }), DispatcherPriority.ContextIdle);
             }
             else
@@ -822,7 +917,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     _ = Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, selectedNode);
+                        TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, selectedNode);
                     }), DispatcherPriority.ContextIdle);
                 }
             }
@@ -836,7 +931,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public void SelectNode(FileSystemNodeModel node)
         {
             if (node == null) return;
-            TreeUIManager.SelectAndFocusNode(FileTreeView, RootNodes, node, false);
+            TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, node, false);
         }
     }
 }

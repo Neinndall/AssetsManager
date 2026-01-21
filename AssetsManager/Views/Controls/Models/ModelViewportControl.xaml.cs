@@ -29,7 +29,6 @@ namespace AssetsManager.Views.Controls.Models
         public event Action<AnimationModel, bool> PlaybackStateChanged;
         public event EventHandler<double> AnimationProgressChanged;
         public event EventHandler<bool> MaximizeClicked;
-        public event EventHandler<bool> SkyboxVisibilityChanged;
         public event EventHandler<double> AutoRotationStopped;
 
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
@@ -43,6 +42,10 @@ namespace AssetsManager.Views.Controls.Models
         private SceneModel _activeSceneModel;
         private AnimationModel _activeAnimationModel;
         private readonly List<SceneModel> _loadedModels = new();
+
+        // Environment references
+        private ModelVisual3D _skyVisual;
+        private ModelVisual3D _groundVisual;
 
         public ModelViewportControl()
         {
@@ -61,6 +64,13 @@ namespace AssetsManager.Views.Controls.Models
             CompositionTarget.Rendering += CompositionTarget_Rendering;
             _lastFrameTime = DateTime.Now;
         }
+
+        public void RegisterEnvironment(ModelVisual3D sky, ModelVisual3D ground)
+        {
+            _skyVisual = sky;
+            _groundVisual = ground;
+        }
+
 
         public void Cleanup()
         {
@@ -85,6 +95,8 @@ namespace AssetsManager.Views.Controls.Models
 
             // 6. Limpiar referencias
             _animationPlayer = null;
+            _skyVisual = null;
+            _groundVisual = null;
         }
 
         public void SetAnimation(AnimationModel animationModel)
@@ -136,6 +148,11 @@ namespace AssetsManager.Views.Controls.Models
         {
             StopAnimation();
 
+            // RESET LIGHTING TO 'NORMAL' MODE (Como antes)
+            if (GlobalAmbientLight != null) GlobalAmbientLight.Color = Colors.White;
+            if (StudioLight != null) StudioLight.Color = Colors.Black;
+            if (FillLight != null) FillLight.Color = Colors.Black;
+
             foreach (var model in _loadedModels)
             {
                 if (Viewport.Children.Contains(model.RootVisual))
@@ -144,6 +161,10 @@ namespace AssetsManager.Views.Controls.Models
             }
             _loadedModels.Clear();
             _activeSceneModel = null;
+            
+            // Clear environment refs as they are wiped from children
+            _skyVisual = null;
+            _groundVisual = null;
 
             if (AutoRotateToggleButton != null)
             {
@@ -271,10 +292,107 @@ namespace AssetsManager.Views.Controls.Models
             camera.UpDirection = upDirection;
             camera.FieldOfView = 45;
             camera.NearPlaneDistance = 1.0; // Evita clipping cercano
-            camera.FarPlaneDistance = 20000; // Asegura ver objetos lejanos
+            camera.FarPlaneDistance = 50000; // Asegura ver objetos lejanos (Mapas completos)
         }
 
-        public void TakeScreenshot(string filePath)
+        public void SetFieldOfView(double fov)
+        {
+            if (Viewport.Camera is PerspectiveCamera camera)
+            {
+                camera.FieldOfView = fov;
+            }
+        }
+
+        private double _currentPhi = 0;
+        private double _currentTheta = 0;
+        private double _currentAmbient = 100;
+
+        public void SetAmbientIntensity(double intensity)
+        {
+            _currentAmbient = intensity;
+            UpdateStudioLighting();
+        }
+
+        public void SetLightDirection(double phi, double theta)
+        {
+            _currentPhi = phi;
+            _currentTheta = theta;
+            UpdateStudioLighting();
+        }
+
+        private void UpdateStudioLighting()
+        {
+            if (GlobalAmbientLight == null || StudioLight == null || FillLight == null) return;
+
+            // 1. Set Ambient Color
+            byte ambVal = (byte)(255 * (_currentAmbient / 100.0));
+            GlobalAmbientLight.Color = Color.FromRgb(ambVal, ambVal, ambVal);
+
+            // 2. Set Studio Lights Intensity (Inverse of Ambient)
+            // If Ambient is 100, Studio lights are 0 (Black).
+            // If Ambient is 0, Studio lights are 100 (Full Color).
+            double studioFactor = 1.0 - (_currentAmbient / 100.0);
+            
+            if (studioFactor <= 0)
+            {
+                StudioLight.Color = Colors.Black;
+                FillLight.Color = Colors.Black;
+            }
+            else
+            {
+                byte keyVal = (byte)(255 * studioFactor);
+                byte fillVal = (byte)(64 * studioFactor);
+                StudioLight.Color = Color.FromRgb(keyVal, keyVal, keyVal);
+                FillLight.Color = Color.FromRgb(fillVal, fillVal, fillVal);
+            }
+
+            // 3. Update Studio Light Direction
+            double phiRad = _currentPhi * Math.PI / 180.0;
+            double thetaRad = _currentTheta * Math.PI / 180.0;
+            double x = Math.Cos(thetaRad) * Math.Sin(phiRad);
+            double y = Math.Sin(thetaRad);
+            double z = Math.Cos(thetaRad) * Math.Cos(phiRad);
+            StudioLight.Direction = new Vector3D(-x, -y, -z);
+        }
+
+        public void ResetStudioLighting()
+        {
+            _currentAmbient = 100;
+            _currentPhi = 0;
+            _currentTheta = 0;
+            UpdateStudioLighting();
+            if (Viewport.Camera is PerspectiveCamera camera) camera.FieldOfView = 45;
+        }
+
+        public void SetSkyboxVisibility(bool isVisible)
+        {
+            if (_skyVisual == null) return;
+
+            if (isVisible && !Viewport.Children.Contains(_skyVisual))
+            {
+                Viewport.Children.Add(_skyVisual);
+            }
+            else if (!isVisible && Viewport.Children.Contains(_skyVisual))
+            {
+                Viewport.Children.Remove(_skyVisual);
+            }
+        }
+
+        public void SetGroundVisibility(bool isVisible)
+        {
+            if (_groundVisual == null) return;
+
+            if (isVisible && !Viewport.Children.Contains(_groundVisual))
+            {
+                Viewport.Children.Add(_groundVisual);
+            }
+            else if (!isVisible && Viewport.Children.Contains(_groundVisual))
+            {
+                Viewport.Children.Remove(_groundVisual);
+            }
+        }
+
+        public void TakeScreenshot(string filePath, double scaleFactor = 1.0)
         {
             string finalFilePath = filePath;
             if (Path.GetExtension(finalFilePath).ToLower() != ".png")
@@ -288,9 +406,15 @@ namespace AssetsManager.Views.Controls.Models
             {
                 Viewport3D.ShowFrameRate = false;
 
-                int supersamplingFactor = 4;
+                // Base size logic
                 int baseWidth = (int)Viewport3D.ActualWidth;
                 int baseHeight = (int)Viewport3D.ActualHeight;
+                
+                // If scaleFactor is high (e.g. 4 for 4K-ish), we use that. 
+                // Helix RenderBitmap uses a scaling factor (supersampling).
+                // If we want exact resolution (e.g. 3840x2160), we might need a different approach, 
+                // but scaling the current view is usually what "Snapshot" implies.
+                int supersamplingFactor = (int)Math.Max(1, scaleFactor);
 
                 if (baseWidth <= 0 || baseHeight <= 0)
                 {
@@ -306,7 +430,7 @@ namespace AssetsManager.Views.Controls.Models
                     return;
                 }
 
-                // Use the built-in helper from HelixToolkit, providing the base size and a supersampling factor.
+                // Use the built-in helper from HelixToolkit
                 var backgroundBrush = Viewport3D.Background ?? Brushes.Transparent;
                 var rtb = Viewport3DHelper.RenderBitmap(underlyingViewport, baseWidth, baseHeight, backgroundBrush, supersamplingFactor);
 
@@ -319,7 +443,7 @@ namespace AssetsManager.Views.Controls.Models
                     pngEncoder.Save(stream);
                 }
 
-                LogService.LogInteractiveSuccess($"Screenshot saved to {Path.GetFileName(finalFilePath)}", finalFilePath, Path.GetFileName(finalFilePath));
+                LogService.LogInteractiveSuccess($"Snapshot saved ({baseWidth * supersamplingFactor}x{baseHeight * supersamplingFactor})", finalFilePath, Path.GetFileName(finalFilePath));
             }
             catch (Exception ex)
             {
@@ -331,6 +455,31 @@ namespace AssetsManager.Views.Controls.Models
             }
         }
 
+        public void InitiateSnapshot(double scaleFactor = 1.0)
+        {
+            if (_activeSceneModel == null || string.IsNullOrEmpty(_activeSceneModel.Name))
+            {
+                LogService.LogWarning("No model loaded to name the screenshot automatically. Using default name.");
+            }
+
+            string modelName = _activeSceneModel?.Name ?? "Model";
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string defaultFileName = $"{modelName}_{timestamp}.png";
+
+            var saveFileDialog = new CommonSaveFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
+                Title = scaleFactor > 1.5 ? "Save 4K Snapshot" : "Save Screenshot",
+                DefaultExtension = ".png",
+                DefaultFileName = defaultFileName
+            };
+
+            if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                TakeScreenshot(saveFileDialog.FileName, scaleFactor);
+            }
+        }
+
         private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             ResetCamera();
@@ -338,28 +487,7 @@ namespace AssetsManager.Views.Controls.Models
 
         private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_activeSceneModel == null || string.IsNullOrEmpty(_activeSceneModel.Name))
-            {
-                LogService.LogWarning("No model loaded to name the screenshot automatically. Please load a model first.");
-                return;
-            }
-
-            string modelName = _activeSceneModel.Name;
-            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            string defaultFileName = $"{modelName}_{timestamp}.png";
-
-            var saveFileDialog = new CommonSaveFileDialog
-            {
-                Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
-                Title = "Save screenshot file",
-                DefaultExtension = ".png",
-                DefaultFileName = defaultFileName // Pre-populate with the generated name
-            };
-
-            if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                TakeScreenshot(saveFileDialog.FileName);
-            }
+            InitiateSnapshot(1.0);
         }
 
         private void FpsToggleButton_Click(object sender, RoutedEventArgs e)
@@ -393,14 +521,6 @@ namespace AssetsManager.Views.Controls.Models
                         ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                     }
                 }
-            }
-        }
-
-        private void SkyboxToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
-            {
-                SkyboxVisibilityChanged?.Invoke(this, !(toggleButton.IsChecked ?? false));
             }
         }
 

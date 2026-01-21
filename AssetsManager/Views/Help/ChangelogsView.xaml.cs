@@ -196,7 +196,16 @@ namespace AssetsManager.Views.Help
 
                     if (trimmedLine.StartsWith("-"))
                     {
-                        item.IsSubheading = true;
+                        // Only treat as a subheading if it's a top-level section title
+                        if (indentation <= 1)
+                        {
+                            item.IsSubheading = true;
+                        }
+                        else
+                        {
+                            // Otherwise, it's a nested list item that happens to use a dash
+                            item.IsSubheading = false;
+                        }
                         item.Text = trimmedLine.Substring(1).Trim();
                     }
                     else if (trimmedLine.StartsWith("*"))
@@ -243,6 +252,71 @@ namespace AssetsManager.Views.Help
                 return ("MEDIUM UPDATE", (SolidColorBrush)new BrushConverter().ConvertFrom("#448AFF")); // Blue
 
             return ("MAJOR UPDATE", (SolidColorBrush)new BrushConverter().ConvertFrom("#FF5252")); // Red
+        }
+
+        private void QuickNavButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is ChangeGroup targetGroup)
+            {
+                // Radar Scan: Walk up the tree, and at each step, look down for our target container.
+                // This finds the nearest "GroupsContainer" (which is a sibling/cousin in the visual tree).
+                var groupsControl = FindSiblingGroupsContainer(btn);
+
+                if (groupsControl != null)
+                {
+                    // Use the generator to find the actual visual container for the data item
+                    var container = groupsControl.ItemContainerGenerator.ContainerFromItem(targetGroup) as FrameworkElement;
+                    
+                    // Force layout update just in case it's not fully realized yet
+                    if (container == null)
+                    {
+                        groupsControl.UpdateLayout();
+                        container = groupsControl.ItemContainerGenerator.ContainerFromItem(targetGroup) as FrameworkElement;
+                    }
+
+                    if (container != null)
+                    {
+                        container.BringIntoView();
+                    }
+                }
+            }
+        }
+
+        private ItemsControl FindSiblingGroupsContainer(DependencyObject startNode)
+        {
+            var current = startNode;
+            // Go up up to 10 levels (safety limit)
+            for (int i = 0; i < 10; i++)
+            {
+                current = VisualTreeHelper.GetParent(current);
+                if (current == null) return null;
+
+                // Look down from this height
+                var found = FindChild<ItemsControl>(current, x => x.Tag is string tag && tag == "GroupsContainer");
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private static T FindChild<T>(DependencyObject parent, Func<T, bool> predicate) where T : FrameworkElement
+        {
+            if (parent == null) return null;
+
+            int childrenCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < childrenCount; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+
+                if (child is T typedChild && predicate(typedChild))
+                {
+                    return typedChild;
+                }
+
+                var foundChild = FindChild<T>(child, predicate);
+                if (foundChild != null) return foundChild;
+            }
+
+            return null;
         }
     }
 }

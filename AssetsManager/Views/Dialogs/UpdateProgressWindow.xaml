@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Title="Downloading Update" Height="Auto" Width="400"
+        Title="Downloading Update" Width="440" Height="200"
         ResizeMode="NoResize" WindowStyle="None"
         AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen"
@@ -18,8 +18,8 @@
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="*"/> <!-- Body -->
             </Grid.RowDefinitions>
 
             <!-- Header -->
@@ -54,25 +54,25 @@
             <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Opacity="0.1"/>
 
             <!-- Dark Body Area -->
-            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,12,12" Padding="0">
-                <Grid Margin="24,24,24,32">
-                    <StackPanel>
-                        <Grid Margin="0,0,0,12">
-                             <TextBlock x:Name="MessageTextBlock" 
-                                       Text="Initializing download..." 
-                                       Foreground="{DynamicResource TextSecondary}"
-                                       FontSize="16"
-                                       VerticalAlignment="Bottom"/>
-                        </Grid>
+            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,12,12" Padding="24">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="MessageTextBlock" 
+                               Text="Initializing download..." 
+                               Foreground="{StaticResource TextPrimary}"
+                               FontSize="14"
+                               FontWeight="Medium"
+                               Margin="0,0,0,20"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"/>
 
-                        <ProgressBar x:Name="DownloadProgressBar" 
-                                     Height="8" 
-                                     Minimum="0" Maximum="100" 
-                                     HorizontalAlignment="Stretch" 
-                                     Style="{DynamicResource ModernProgressBar}" 
-                                     BorderThickness="0"/>
-                    </StackPanel>
-                </Grid>
+                    <ProgressBar x:Name="DownloadProgressBar" 
+                                 Height="10" 
+                                 Minimum="0" Maximum="100" 
+                                 HorizontalAlignment="Stretch" 
+                                 Style="{StaticResource ModernProgressBar}" 
+                                 BorderThickness="0"/>
+                </StackPanel>
             </Border>
         </Grid>
     </Border>

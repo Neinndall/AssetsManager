@@ -7,48 +7,63 @@
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="900">
 
-    <Grid Margin="0,10,0,0">
+    <Grid Margin="0,10,0,24">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Hero Header -->
-            <RowDefinition Height="*"/>    <!-- Service Grid -->
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="*"/>    <!-- Bento Grid -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HERO HEADER: Standardized Settings Style -->
-        <Border Grid.Row="0" Margin="0,0,0,24" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+        <!-- HEADER: DASHBOARD HUD -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,24" Padding="24,18">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" ShadowDepth="2" Opacity="0.1"/>
+            </Border.Effect>
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/> <!-- Global Status Column -->
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="ViewDashboard" Width="22" Height="22" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Operations Dashboard" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Real-time monitoring of game services and assets" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
-                </StackPanel>
+                    <!-- Module Icon Spanning both lines -->
+                    <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="MonitorDashboard" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
 
-                <!-- Global Status Indicator (Integrated into Header) -->
-                <Border Grid.Column="2" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" VerticalAlignment="Center" Margin="0,0,16,0">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="{Binding GlobalStatusIconKind}" Foreground="{Binding GlobalStatusColor}" Width="16" Height="16" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding GlobalStatusText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    <!-- Titles Stacked to the right of the icon -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="DASHBOARD" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,2"/>
+                        <TextBlock Text="OPERATIONS CENTER" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                     </StackPanel>
-                </Border>
+                </Grid>
 
-                <!-- Background Icon (Watermark) -->
-                <materialIcons:MaterialIcon Grid.Column="1" Grid.ColumnSpan="2" Kind="MonitorDashboard" Width="64" Height="64" Foreground="{StaticResource AccentOrange}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
+                <!-- HUD Indicators -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Telemetry Strip -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="10" Padding="16,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="PBE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Ellipse Fill="{Binding PbeStatusColor}" Style="{StaticResource PulsingLedTestStyle}" Margin="0,0,16,0"/>
+                            <TextBlock Text="DATA" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Ellipse Fill="{Binding DataStatusColor}" Style="{StaticResource PulsingLedTestStyle}" Margin="0,0,16,0"/>
+                            <TextBlock Text="CORE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Ellipse Fill="{Binding AppVersionColor}" Style="{StaticResource PulsingLedTestStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
-        <!-- 2. SERVICE GRID: 2x2 Dashboard Layout -->
-        <UniformGrid Grid.Row="1" Columns="2">
+        <!-- BENTO GRID -->
+        <UniformGrid Grid.Row="1" Columns="4">
             
-            <!-- CARD 1: PBE SERVER (Network Focus) -->
-            <Border Background="{StaticResource CardBackground}" CornerRadius="12" Margin="0,0,12,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="24">
+            <!-- CARD 1: PBE SERVER -->
+            <Border Background="{StaticResource CardBackground}" CornerRadius="16" Margin="0,0,8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -56,43 +71,98 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <Grid Grid.Row="0" Margin="0,0,0,20">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                            <materialIcons:MaterialIcon Kind="ServerNetwork" Width="24" Height="24" Foreground="{Binding PbeStatusColor}"/>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Width="36" Height="36" CornerRadius="10" Background="#1A3498DB">
+                            <materialIcons:MaterialIcon Kind="ServerNetwork" Width="18" Height="18" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="PBE SERVER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
-                            <TextBlock Text="Riot Games Environment" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </Grid>
-                    
-                    <!-- Main Content -->
-                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,0,0,16">
-                        <TextBlock Text="CURRENT STATUS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Border Width="10" Height="10" CornerRadius="5" Background="{Binding PbeStatusColor}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <TextBlock Text="{Binding PbeStatusText}" Foreground="{StaticResource TextPrimary}" FontSize="20" FontWeight="Bold" TextWrapping="Wrap"/>
+                        <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
+                            <TextBlock Text="Environment" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="PBE SERVER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
                     
-                    <!-- Footer -->
-                    <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,8" VerticalAlignment="Bottom">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="ClockTimeFiveOutline" Foreground="{StaticResource TextMuted}" Width="14" Height="14" Margin="0,0,8,0"/>
-                                <TextBlock Text="Last Checked" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding PbeStatusText}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" LineHeight="14" TextAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <Border Grid.Row="2" Background="#1A3498DB" BorderBrush="#333498DB" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="ClockOutline" Width="12" Foreground="{StaticResource AccentBlue}" Margin="0,0,6,0"/>
+                            <TextBlock Text="{Binding PbeLastCheck}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- CARD 2: SYSTEM HEALTH -->
+            <Border Background="{StaticResource CardBackground}" CornerRadius="16" Margin="8,0,8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Width="36" Height="36" CornerRadius="10" Background="#1A9B59B6">
+                            <materialIcons:MaterialIcon Kind="Pulse" Width="18" Height="18" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
+                            <TextBlock Text="Diagnostics" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="SYSTEM HEALTH" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="2,0,0,0">
+                        <!-- Version Item -->
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <!-- Icon Box -->
+                            <Border Grid.Column="0" Width="32" Height="32" CornerRadius="8" Background="{Binding AppVersionColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
+                                <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="16" Height="16" Foreground="{Binding AppVersionColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Core Build" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="{Binding AppVersionText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                             </StackPanel>
-                            <TextBlock Grid.Column="1" Text="{Binding PbeLastCheck}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- DB Item -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <!-- Icon Box -->
+                            <Border Grid.Column="0" Width="32" Height="32" CornerRadius="8" Background="{Binding DataStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
+                                <materialIcons:MaterialIcon Kind="DatabaseCheckOutline" Width="16" Height="16" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Hash Database" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="{Binding HashesStatus}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border Grid.Row="2" Background="{Binding SystemHealthFooterColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}" 
+                            BorderBrush="{Binding SystemHealthFooterColor}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
+                        <Grid HorizontalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding SystemHealthFooterIconKind}" Foreground="{Binding SystemHealthFooterColor}" Width="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding SystemHealthFooterText}" FontSize="9" FontWeight="Bold" Foreground="{Binding SystemHealthFooterColor}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                         </Grid>
                     </Border>
                 </Grid>
             </Border>
 
-            <!-- CARD 2: FILE WATCHER (Activity Focus) -->
-            <Border Background="{StaticResource CardBackground}" CornerRadius="12" Margin="12,0,0,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="24">
+            <!-- CARD 3: FILE WATCHER -->
+            <Border Background="{StaticResource CardBackground}" CornerRadius="16" Margin="8,0,8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -100,60 +170,42 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <Grid Grid.Row="0" Margin="0,0,0,20">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                            <materialIcons:MaterialIcon Kind="EyeSettingsOutline" Width="24" Height="24" Foreground="{StaticResource AccentBlue}"/>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Width="36" Height="36" CornerRadius="10" Background="#1A2ECC71">
+                            <materialIcons:MaterialIcon Kind="EyeSettingsOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="FILE WATCHER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
-                            <TextBlock Text="Remote Manifest Monitoring" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                        <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
+                            <TextBlock Text="Surveillance" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="FILE WATCHER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
-                    </Grid>
+                    </StackPanel>
 
-                    <!-- Main Content -->
-                    <Grid Grid.Row="1" VerticalAlignment="Center" Margin="0,0,0,16">
+                    <Grid Grid.Row="1" VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/> <!-- Divider -->
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <!-- Metric 1 -->
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="MONITORED" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="{Binding MonitoredFilesCount}" FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Files Active" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text="WATCHING" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding MonitoredFilesCount}" FontSize="28" FontWeight="Light" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
                         </StackPanel>
-
-                        <!-- Divider -->
-                        <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="16,4"/>
-
-                        <!-- Metric 2 -->
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="UPDATES" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="{Binding MonitoredFilesChangedCount}" FontSize="26" FontWeight="Bold" Foreground="{StaticResource AccentRed}"/>
-                            <TextBlock Text="Pending Review" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="UPDATED" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding MonitoredFilesChangedCount}" FontSize="28" FontWeight="Light" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Grid>
 
-                    <!-- Footer -->
-                    <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,8" VerticalAlignment="Bottom">
-                         <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="Update" Foreground="{StaticResource TextMuted}" Width="14" Height="14" Margin="0,0,8,0"/>
-                                <TextBlock Text="Latest Activity" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <TextBlock Grid.Column="1" Text="{Binding WatcherLastUpdate}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                        </Grid>
+                    <Border Grid.Row="2" Background="#1A2ECC71" BorderBrush="#332ECC71" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="History" Width="12" Foreground="{StaticResource AccentGreen}" Margin="0,0,6,0"/>
+                            <TextBlock Text="{Binding WatcherLastUpdate}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" MaxWidth="140" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>
 
-            <!-- CARD 3: ASSET TRACKER (Data Focus) -->
-            <Border Background="{StaticResource CardBackground}" CornerRadius="12" Margin="0,12,12,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="24">
+            <!-- CARD 4: ASSET TRACKER -->
+            <Border Background="{StaticResource CardBackground}" CornerRadius="16" Margin="8,0,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -161,112 +213,36 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <Grid Grid.Row="0" Margin="0,0,0,20">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                            <materialIcons:MaterialIcon Kind="ImageSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}"/>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Width="36" Height="36" CornerRadius="10" Background="#1AE67E22">
+                            <materialIcons:MaterialIcon Kind="ImageSearchOutline" Width="18" Height="18" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="ASSET TRACKER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
-                            <TextBlock Text="Discovery &amp; Archival" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                        <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
+                            <TextBlock Text="Discovery" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="ASSET TRACKER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
-                    </Grid>
-
-                    <!-- Main Content -->
-                    <Grid Grid.Row="1" VerticalAlignment="Center" Margin="0,0,0,16">
-                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/> <!-- Divider -->
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="LIBRARY" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="{Binding AssetTrackerTotalFound}" FontSize="26" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
-                            <TextBlock Text="Assets Found" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
-                        </StackPanel>
-
-                         <!-- Divider -->
-                        <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="16,4"/>
-
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="SCOPE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="{Binding AssetTrackerCategoriesCount}" FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Categories" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Footer -->
-                    <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,8" VerticalAlignment="Bottom">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <materialIcons:MaterialIcon Kind="Sync" Foreground="{StaticResource TextMuted}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="{Binding AssetTrackerStatus}" FontSize="11" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </Border>
-
-            <!-- CARD 4: SYSTEM HEALTH (Integrity Focus) -->
-            <Border Background="{StaticResource CardBackground}" CornerRadius="12" Margin="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="24">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Header -->
-                    <Grid Grid.Row="0" Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                            <materialIcons:MaterialIcon Kind="Pulse" Width="24" Height="24" Foreground="{StaticResource AccentOrange}"/>
-                        </Border>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="SYSTEM HEALTH" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
-                            <TextBlock Text="Component Integrity" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Main Content: Detailed List -->
-                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,0,0,10">
-                        
-                        <!-- Item 1: App Version -->
-                        <Grid Margin="0,0,0,12">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Width="32" Height="32">
-                                <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="16" Height="16" Foreground="{Binding AppVersionColor}"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="Application Version" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
-                                <TextBlock Text="{Binding AppVersionText}" FontSize="13" FontWeight="Bold" Foreground="{Binding AppVersionColor}"/>
-                            </StackPanel>
-                        </Grid>
-                        
-                        <!-- Item 2: Hash DB -->
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Width="32" Height="32">
-                                <materialIcons:MaterialIcon Kind="DatabaseCheckOutline" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="Hash Database" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
-                                <TextBlock Text="{Binding HashesStatus}" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                            </StackPanel>
-                        </Grid>
-
                     </StackPanel>
 
-                    <!-- Footer -->
-                    <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,8" VerticalAlignment="Bottom">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="{Binding SystemHealthFooterIconKind}" Foreground="{Binding SystemHealthFooterColor}" Width="14" Height="14" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding SystemHealthFooterText}" FontSize="11" Foreground="{Binding SystemHealthFooterColor}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Grid>
+                    <Grid Grid.Row="1" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="TOTAL FOUND" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding AssetTrackerTotalFound}" FontSize="28" FontWeight="Light" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="CATEGORIES" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding AssetTrackerCategoriesCount}" FontSize="28" FontWeight="Light" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Grid.Row="2" Background="#1AE67E22" BorderBrush="#33E67E22" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="NavigationVariantOutline" Width="12" Foreground="{StaticResource AccentOrange}" Margin="0,0,6,0"/>
+                            <TextBlock Text="{Binding AssetTrackerStatus}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" MaxWidth="140" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>

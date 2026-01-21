@@ -85,8 +85,6 @@ namespace AssetsManager.Views.Controls.Monitor
             return deletedCount;
         }
 
-
-
         private void DeleteSelectedBackups_Click(object sender, RoutedEventArgs e)
         {
             var selectedBackups = AllBackups.Where(b => b.IsSelected).ToList();

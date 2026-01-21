@@ -6,7 +6,7 @@
              xmlns:info="clr-namespace:AssetsManager.Info"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="730" d:DesignWidth="180"
+             d:DesignHeight="730" d:DesignWidth="64"
              Width="64">
 
     <Border Background="{StaticResource CardBackground}" 
@@ -23,7 +23,7 @@
             </Grid.RowDefinitions>
 
             <!-- Header: Toggle Button -->
-            <StackPanel Grid.Row="0" Margin="0,0,0,24">
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
                 <RadioButton x:Name="ToggleExpansionButton" Style="{StaticResource ModernSidebarNavigationStyle}" Click="ToggleExpansion_Click" Margin="0,0,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -34,6 +34,8 @@
                         <TextBlock Grid.Column="1" Text="Panel" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
+                <!-- Visual Separator -->
+                <Border Height="1" Background="{StaticResource BorderColor}" Margin="16,8,16,0" Opacity="0.4"/>
             </StackPanel>
 
             <!-- Main Navigation Tools -->
@@ -44,7 +46,7 @@
                             <ColumnDefinition Width="64"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="Home" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="ViewDashboardOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         <TextBlock Grid.Column="1" Text="Home" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>

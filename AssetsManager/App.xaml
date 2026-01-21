@@ -1,7 +1,8 @@
-﻿<Application x:Class="AssetsManager.App"
+<Application x:Class="AssetsManager.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:AssetsManager">
+             xmlns:local="clr-namespace:AssetsManager"
+             xmlns:converters="clr-namespace:AssetsManager.Views.Converters">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -22,6 +23,22 @@
                 <ResourceDictionary Source="/Themes/ModernListView.xaml"/>
                 <ResourceDictionary Source="/Themes/ApiTemplates.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Global WPF Standard Converters -->
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+            <!-- Global Custom Converters -->
+            <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+            <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+            <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+            <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+            <converters:EqualityToVisibilityConverter x:Key="EqualityToVisibilityConverter"/>
+            <converters:PathToIconConverter x:Key="PathToIconConverter"/>
+            <converters:ChunkDiffTypeToBrushConverter x:Key="DiffTypeToBrushConverter"/>
+            <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
+            <converters:ValueMultiplierConverter x:Key="ValueMultiplierConverter"/>
+            
         </ResourceDictionary>
     </Application.Resources>
 </Application>

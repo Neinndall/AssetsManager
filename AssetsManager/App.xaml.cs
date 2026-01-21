@@ -10,6 +10,7 @@ using AssetsManager.Services.Updater;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models;
+using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Help;
 using AssetsManager.Views.Settings;
 using AssetsManager.Views.Controls;
@@ -61,6 +62,7 @@ namespace AssetsManager
 
       // Core Services
       services.AddSingleton<LogService>();
+      services.AddSingleton<NotificationService>();
       services.AddSingleton<TaskCancellationManager>(); // Added for managing task cancellations
       services.AddSingleton<DiffViewService>();
       services.AddSingleton<CustomMessageBoxService>();
@@ -98,7 +100,7 @@ namespace AssetsManager
       services.AddSingleton<JsBeautifierService>();
       services.AddSingleton<JsonFormatterService>();
       services.AddSingleton<ContentFormatterService>();
-      services.AddSingleton<WemConversionService>();
+      services.AddSingleton<AudioConversionService>();
  
       // Explorer Services
       services.AddTransient<ExplorerPreviewService>();
@@ -108,6 +110,7 @@ namespace AssetsManager
       services.AddSingleton<WadSearchBoxService>();
       services.AddTransient<TreeBuilderService>();
       services.AddTransient<TreeUIManager>();
+      services.AddSingleton<FavoritesManager>();
     
       // Downloads Services
       services.AddSingleton<AssetDownloader>();
@@ -133,6 +136,7 @@ namespace AssetsManager
 
       // Models Services
       services.AddSingleton<SknModelLoadingService>();
+      services.AddSingleton<ScoModelLoadingService>();
       services.AddSingleton<MapGeometryLoadingService>();
 
       // Audio Services
@@ -155,7 +159,6 @@ namespace AssetsManager
       services.AddTransient<InputDialog>();
       services.AddTransient<ConfirmationDialog>();
 
-
       // Secondary Views
       services.AddTransient<LogView>();
       services.AddTransient<GeneralSettingsView>();
@@ -176,9 +179,8 @@ namespace AssetsManager
         return;
       }
 
-      // Set the AUMID for the application to ensure that notifications are correctly associated with the app.
-      // This is called as early as possible to handle any UI elements or notifications that might appear during startup.
-      SingleInstance.SetCurrentProcessExplicitAppUserModelID(SingleInstance.AUMID);
+      // Pin the application identity for Windows to avoid duplicates in notification settings and registry.
+      SingleInstance.SetCurrentProcessExplicitAppUserModelID(SingleInstance.AppId);
 
       base.OnStartup(e);
 
