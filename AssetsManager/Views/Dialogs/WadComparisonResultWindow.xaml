@@ -14,6 +14,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -64,8 +65,65 @@
             </Grid>
         </Border>
 
+        <!-- Stats Dashboard -->
+        <Grid Grid.Row="1" Margin="24,12,24,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- New Files Card -->
+            <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="12,8">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#1A00E676" CornerRadius="8" Width="32" Height="32">
+                        <materialIcons:MaterialIcon Kind="Plus" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
+                    </Border>
+                    <TextBlock Text="New Files:" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="12,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="CountNewText" Text="0" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Modified Files Card -->
+            <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="12,8">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#1AFF9100" CornerRadius="8" Width="32" Height="32">
+                        <materialIcons:MaterialIcon Kind="Pencil" Width="16" Height="16" Foreground="{StaticResource AccentOrange}"/>
+                    </Border>
+                    <TextBlock Text="Modified:" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="12,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="CountModifiedText" Text="0" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Removed Files Card -->
+            <Border Grid.Column="4" Style="{StaticResource SettingsCard}" Padding="12,8">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#1AFF5252" CornerRadius="8" Width="32" Height="32">
+                        <materialIcons:MaterialIcon Kind="Minus" Width="18" Height="18" Foreground="{StaticResource AccentRed}"/>
+                    </Border>
+                    <TextBlock Text="Removed:" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="12,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="CountRemovedText" Text="0" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Renamed Files Card -->
+            <Border Grid.Column="6" Style="{StaticResource SettingsCard}" Padding="12,8">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#1A00D1FF" CornerRadius="8" Width="32" Height="32">
+                        <materialIcons:MaterialIcon Kind="Rename" Width="16" Height="16" Foreground="{StaticResource AccentBlue}"/>
+                    </Border>
+                    <TextBlock Text="Renamed:" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="12,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="CountRenamedText" Text="0" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
         <!-- Main Content -->
-        <Grid Grid.Row="1" Margin="24">
+        <Grid Grid.Row="2" Margin="24,10,24,24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*"/>
                 <ColumnDefinition Width="Auto"/>

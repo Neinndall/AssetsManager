@@ -258,6 +258,15 @@ namespace AssetsManager.Views.Dialogs
             }).ToList();
 
             ResultsTree.ItemsSource = wadGroups;
+            UpdateDashboardStats(diffs);
+        }
+
+        private void UpdateDashboardStats(List<SerializableChunkDiff> diffs)
+        {
+            CountNewText.Text = diffs.Count(d => d.Type == ChunkDiffType.New).ToString();
+            CountModifiedText.Text = diffs.Count(d => d.Type == ChunkDiffType.Modified).ToString();
+            CountRemovedText.Text = diffs.Count(d => d.Type == ChunkDiffType.Removed).ToString();
+            CountRenamedText.Text = diffs.Count(d => d.Type == ChunkDiffType.Renamed).ToString();
         }
 
         private void ResultsTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
