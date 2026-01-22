@@ -55,7 +55,7 @@ namespace AssetsManager.Services.Explorer
                 // Ensure paths are updated with the latest hash resolutions
                 foreach (var file in wadGroup)
                 {
-                    // [SIMPLIFIED] Attempt to resolve both Old and New hashes if they exist.
+                    // Attempt to resolve both Old and New hashes if they exist.
                     // This handles New, Removed, Modified, and Renamed automatically without complex switching.
                     if (file.OldPathHash != 0)
                     {
@@ -69,6 +69,8 @@ namespace AssetsManager.Services.Explorer
                         if (resolved != file.NewPathHash.ToString("x16")) file.NewPath = resolved;
                     }
 
+                    // [TEST] Commented out to verify if dependency resolution is redundant
+                    /*
                     if (file.Dependencies != null)
                     {
                         foreach (var dep in file.Dependencies)
@@ -84,6 +86,7 @@ namespace AssetsManager.Services.Explorer
                             }
                         }
                     }
+                    */
                 }
 
                 var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
