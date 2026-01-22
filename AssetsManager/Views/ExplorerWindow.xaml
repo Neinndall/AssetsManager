@@ -11,7 +11,7 @@
         <!-- Cuerpo Principal -->
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="405*" MinWidth="250"/>
+                <ColumnDefinition Width="800*" MinWidth="250"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="1000*" MinWidth="220"/>
             </Grid.ColumnDefinitions>
