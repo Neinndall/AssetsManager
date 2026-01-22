@@ -223,40 +223,18 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Unified Header: Shows both Old and New info -->
+                    <!-- Unified Header: Simplified Title View -->
                     <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
                         <Border Padding="12,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Old Info -->
-                                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                    <Border Background="#1AFF9100" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,0">
-                                        <icons:MaterialIcon Kind="History" Width="16" Height="16" Foreground="{StaticResource AccentOrange}"/>
-                                    </Border>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="OLD VERSION" FontSize="9" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.7"/>
-                                        <TextBlock x:Name="UnifiedOldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#1A5C85FF" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                    <icons:MaterialIcon Kind="ViewStream" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="UNIFIED VIEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentBrush}" Opacity="0.8"/>
+                                    <TextBlock x:Name="UnifiedFileNameLabel" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
-
-                                <Border Grid.Column="1" Background="{StaticResource BorderColor}" Width="1" Margin="20,4"/>
-
-                                <!-- New Info -->
-                                <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                    <Border Background="#1A00E676" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,0">
-                                        <icons:MaterialIcon Kind="FlashOutline" Width="16" Height="16" Foreground="{StaticResource AccentGreen}"/>
-                                    </Border>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="NEW VERSION" FontSize="9" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.7"/>
-                                        <TextBlock x:Name="UnifiedNewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Grid>
+                            </StackPanel>
                         </Border>
                     </Border>
 

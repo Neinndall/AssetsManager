@@ -66,7 +66,7 @@
         </Border>
 
         <!-- Stats Dashboard -->
-        <Grid Grid.Row="1" Margin="24,12,24,0">
+        <Grid Grid.Row="1" Margin="24,8,24,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="12"/>
@@ -123,7 +123,7 @@
         </Grid>
 
         <!-- Main Content -->
-        <Grid Grid.Row="2" Margin="24,10,24,24">
+        <Grid Grid.Row="2" Margin="24,0,24,24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*"/>
                 <ColumnDefinition Width="Auto"/>

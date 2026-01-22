@@ -106,8 +106,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _newText = newText;
                 OldFileNameLabel.Text = oldFileName;
                 NewFileNameLabel.Text = newFileName;
-                UnifiedOldFileNameLabel.Text = oldFileName;
-                UnifiedNewFileNameLabel.Text = newFileName;
+                UnifiedFileNameLabel.Text = newFileName;
 
                 _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
 
