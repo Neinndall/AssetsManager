@@ -51,6 +51,44 @@ namespace AssetsManager.Services.Explorer
             foreach (var wadGroup in diffsByWad)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                // Ensure paths are updated with the latest hash resolutions
+                foreach (var file in wadGroup)
+                {
+                    // Attempt to resolve both Old and New hashes if they exist.
+                    // This handles New, Removed, Modified, and Renamed automatically without complex switching.
+                    if (file.OldPathHash != 0)
+                    {
+                        string resolved = _hashResolverService.ResolveHash(file.OldPathHash);
+                        if (resolved != file.OldPathHash.ToString("x16")) file.OldPath = resolved;
+                    }
+
+                    if (file.NewPathHash != 0)
+                    {
+                        string resolved = _hashResolverService.ResolveHash(file.NewPathHash);
+                        if (resolved != file.NewPathHash.ToString("x16")) file.NewPath = resolved;
+                    }
+
+                    // [TEST] Commented out to verify if dependency resolution is redundant
+                    /*
+                    if (file.Dependencies != null)
+                    {
+                        foreach (var dep in file.Dependencies)
+                        {
+                            ulong depHash = dep.NewPathHash != 0 ? dep.NewPathHash : dep.OldPathHash;
+                            if (depHash != 0)
+                            {
+                                string depResolved = _hashResolverService.ResolveHash(depHash);
+                                if (depResolved != depHash.ToString("x16"))
+                                {
+                                    dep.Path = depResolved;
+                                }
+                            }
+                        }
+                    }
+                    */
+                }
+
                 var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
 
                 if (isSortingEnabled)

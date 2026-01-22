@@ -33,12 +33,14 @@ namespace AssetsManager.Views.Models.Explorer
                 {
                     _isGridMode = value;
                     OnPropertyChanged();
-                    OnPropertyChanged(nameof(IsPreviewMode));
+                    OnPropertyChanged(nameof(IsGridVisible));
+                    OnPropertyChanged(nameof(IsPreviewVisible));
                 }
             }
         }
 
-        public bool IsPreviewMode => !IsGridMode;
+        public bool IsGridVisible => IsGridMode && HasSelectedNode;
+        public bool IsPreviewVisible => !IsGridVisible;
 
         public bool HasSelectedNode
         {
@@ -50,6 +52,8 @@ namespace AssetsManager.Views.Models.Explorer
                     _hasSelectedNode = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(AreBreadcrumbsVisible));
+                    OnPropertyChanged(nameof(IsGridVisible));
+                    OnPropertyChanged(nameof(IsPreviewVisible));
                 }
             }
         }
@@ -112,7 +116,7 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isWebVisible = value; OnPropertyChanged(); }
         }
 
-        private bool _isSelectFileMessageVisible;
+        private bool _isSelectFileMessageVisible = true;
         public bool IsSelectFileMessageVisible
         {
             get => _isSelectFileMessageVisible;
