@@ -69,6 +69,17 @@
 
                         <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,4" CornerRadius="1"/>
 
+                        <!-- View Options -->
+                        <ToggleButton x:Name="InlineViewButton"
+                                      Click="InlineViewButton_Click"
+                                      Style="{StaticResource TransparentIconToggleButton}"
+                                      Width="34" Height="34"
+                                      ToolTip="Toggle Unified (Inline) View">
+                             <icons:MaterialIcon Kind="ViewStream" Width="18" Height="18"/>
+                        </ToggleButton>
+
+                        <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,4" CornerRadius="1"/>
+
                         <!-- Settings Group -->
                         <ToggleButton x:Name="WordWrapButton"
                                       Click="WordWrapButton_Click"
@@ -203,6 +214,57 @@
                     </Grid>
                 </Border>
             </Grid>
+
+            <!-- Unified Diff Editor (Inline) -->
+            <Border x:Name="UnifiedDiffContainer" Grid.Row="1" Visibility="Collapsed" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Unified Header: Shows both Old and New info -->
+                    <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                        <Border Padding="12,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Old Info -->
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <Border Background="#1AFF9100" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,0">
+                                        <icons:MaterialIcon Kind="History" Width="16" Height="16" Foreground="{StaticResource AccentOrange}"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="OLD VERSION" FontSize="9" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.7"/>
+                                        <TextBlock x:Name="UnifiedOldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <Border Grid.Column="1" Background="{StaticResource BorderColor}" Width="1" Margin="20,4"/>
+
+                                <!-- New Info -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                    <Border Background="#1A00E676" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,0">
+                                        <icons:MaterialIcon Kind="FlashOutline" Width="16" Height="16" Foreground="{StaticResource AccentGreen}"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="NEW VERSION" FontSize="9" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.7"/>
+                                        <TextBlock x:Name="UnifiedNewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Border>
+
+                    <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
+                        <avalonEdit:TextEditor x:Name="UnifiedDiffEditor" Style="{StaticResource BaseTextEditorStyle}" IsReadOnly="True" ShowLineNumbers="True"/>
+                    </Border>
+                </Grid>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>
