@@ -250,20 +250,29 @@ namespace AssetsManager.Views.Models.Monitor
 
             _monitorService.CategoryCheckCompleted += (category) =>
             {
-                // Race condition fix: When this event fires, 'category.Status' might still be 'Checking'.
-                // We check if ANY OTHER category is checking. If not, we are effectively Idle.
-                bool anyOtherChecking = _monitorService.AssetCategories
-                    .Where(c => c != category)
-                    .Any(c => c.Status == CategoryStatus.Checking);
-
-                if (!anyOtherChecking)
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
-                    AssetTrackerStatus = "Service Idle - Waiting...";
-                }
+                    // Race condition fix: When this event fires, 'category.Status' might still be 'Checking'.
+                    // We check if ANY OTHER category is checking. If not, we are effectively Idle.
+                    bool anyOtherChecking = _monitorService.AssetCategories
+                        .Where(c => c != category)
+                        .Any(c => c.Status == CategoryStatus.Checking);
 
-                RefreshAssetTrackerData();
+                    if (!anyOtherChecking)
+                    {
+                        AssetTrackerStatus = "Service Idle - Waiting...";
+                    }
+
+                    RefreshAssetTrackerData();
+                });
             };
-            _monitorService.CategoryCheckStarted += (category) => AssetTrackerStatus = $"Category: {category.Name} - Checking...";
+            _monitorService.CategoryCheckStarted += (category) =>
+            {
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    AssetTrackerStatus = $"Category: {category.Name} - Checking...";
+                });
+            };
 
             _pbeStatusService.StatusChecked += () =>
             {
