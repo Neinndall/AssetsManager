@@ -181,7 +181,7 @@ namespace AssetsManager.Utils
                 if (Directory.Exists(backupPath))
                 {
                     Directory.Delete(backupPath, true);
-                    _logService.Log($"Deleted backup: {backupPath}");
+                    _logService.LogSuccess("The selected backup was deleted successfully.");
                     _currentSessionBackups.Remove(backupPath);
                     return true;
                 }
