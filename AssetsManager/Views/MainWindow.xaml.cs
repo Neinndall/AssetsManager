@@ -51,6 +51,7 @@ namespace AssetsManager.Views
         private readonly ReportGenerationService _reportGenerationService;
         private readonly TaskCancellationManager _taskCancellationManager;
         private readonly NotificationService _notificationService;
+        private readonly ComparisonHistoryService _comparisonHistoryService;
 
         private string _latestAppVersionAvailable;
         
@@ -86,7 +87,8 @@ namespace AssetsManager.Views
             ExtractionService extractionService,
             ReportGenerationService reportGenerationService,
             TaskCancellationManager taskCancellationManager,
-            NotificationService notificationService)
+            NotificationService notificationService,
+            ComparisonHistoryService comparisonHistoryService)
         {
             InitializeComponent();
 
@@ -113,6 +115,7 @@ namespace AssetsManager.Views
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
             _notificationService = notificationService;
+            _comparisonHistoryService = comparisonHistoryService;
 
             // Initialize NotificationHub
             var notificationViewModel = new NotificationHubModel(_notificationService);
@@ -296,6 +299,31 @@ namespace AssetsManager.Views
             }
             else
             {
+                if (_appSettings.SaveWadComparisonHistory)
+                {
+                    string displayName = "Unknown";
+                    
+                    // Logic to determine a better display name
+                    var uniqueWads = serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
+                    
+                    if (uniqueWads.Count == 1)
+                    {
+                        // Single WAD comparison: Use the WAD name without extensions
+                        string wadFileName = System.IO.Path.GetFileName(uniqueWads[0]);
+                        // Strip common extensions: .wad.client, .wad, .es_ES, .en_US, etc.
+                        displayName = wadFileName.Split('.')[0]; 
+                    }
+                    else
+                    {
+                        // Directory comparison: Use the folder name
+                        displayName = System.IO.Path.GetFileName(newLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+                        if (string.IsNullOrEmpty(displayName)) displayName = "Root";
+                    }
+
+                    // Fire and forget (or await if we want to ensure it's saved before showing result, but fire and forget is better for UX here)
+                    _ = _comparisonHistoryService.SaveComparisonAsync(serializableDiffs, oldLolPath, newLolPath, $"Comparison from {displayName}");
+                }
+
                 Dispatcher.Invoke(() =>
                 {
                     ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);

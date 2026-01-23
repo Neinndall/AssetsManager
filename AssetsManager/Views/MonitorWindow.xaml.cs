@@ -28,7 +28,8 @@ namespace AssetsManager.Views
             BackupManager backupManager,
             PbeStatusService pbeStatusService,
             Status statusService,
-            UpdateCheckService updateCheckService) 
+            UpdateCheckService updateCheckService,
+            ComparisonHistoryService comparisonHistoryService) 
         {
             InitializeComponent();
 
@@ -54,6 +55,8 @@ namespace AssetsManager.Views
             HistoryViewControl.LogService = logService;
             HistoryViewControl.CustomMessageBoxService = customMessageBoxService;
             HistoryViewControl.DiffViewService = diffViewService;
+            HistoryViewControl.ComparisonHistoryService = comparisonHistoryService;
+            HistoryViewControl.ServiceProvider = serviceProvider;
 
             // Setup and inject dependencies for AssetTrackerControl
             AssetTrackerControl.MonitorService = monitorService;

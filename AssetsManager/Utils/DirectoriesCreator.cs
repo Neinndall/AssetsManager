@@ -36,6 +36,8 @@ namespace AssetsManager.Utils
         public string TempPreviewPath { get; private set; }
         public string ApiCachePath { get; private set; }
 
+        public string HistoryCachePath { get; private set; }
+
         public string WadComparisonDirName { get; private set; }
         public string WadComparisonFullPath { get; private set; }
         public string OldChunksPath { get; private set; }
@@ -65,6 +67,7 @@ namespace AssetsManager.Utils
             WebView2DataPath = Path.Combine(appFolderPath, "webview2data");
             TempPreviewPath = Path.Combine(WebView2DataPath, "TempPreview");
             ApiCachePath = Path.Combine(appFolderPath, "api_cache");
+            HistoryCachePath = Path.Combine(appFolderPath, "history_cache");
 
             WadComparisonSavePath = Path.Combine(appFolderPath, "wadcomparison");
             VersionsPath = Path.Combine(appFolderPath, "versions");
@@ -109,6 +112,7 @@ namespace AssetsManager.Utils
         public Task CreateDirTempPreviewAsync() => CreateDirectoryInternal(TempPreviewPath, false);
         public Task CreateDirWebView2DataAsync() => CreateDirectoryInternal(WebView2DataPath, false);
         public Task CreateDirApiCacheAsync() => CreateDirectoryInternal(ApiCachePath, false);
+        public Task CreateDirHistoryCacheAsync() => CreateDirectoryInternal(HistoryCachePath, false);
 
         public Task CreateHashesDirectories()
         {

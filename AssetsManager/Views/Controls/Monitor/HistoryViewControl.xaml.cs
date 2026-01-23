@@ -5,9 +5,11 @@ using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -17,6 +19,8 @@ namespace AssetsManager.Views.Controls.Monitor
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public DiffViewService DiffViewService { get; set; }
+        public ComparisonHistoryService ComparisonHistoryService { get; set; }
+        public IServiceProvider ServiceProvider { get; set; }
 
         private HistoryModel _viewModel;
 
@@ -38,11 +42,34 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void btnViewDiff_Click(object sender, RoutedEventArgs e)
         {
-            var selectedEntry = (sender as FrameworkElement)?.DataContext as JsonDiffHistoryEntry ?? DiffHistoryListView.SelectedItem as JsonDiffHistoryEntry;
+            var selectedEntry = (sender as FrameworkElement)?.DataContext as HistoryEntry ?? DiffHistoryListView.SelectedItem as HistoryEntry;
 
             if (selectedEntry != null)
             {
-                await DiffViewService.ShowFileDiffAsync(selectedEntry.OldFilePath, selectedEntry.NewFilePath, Window.GetWindow(this));
+                if (selectedEntry.Type == HistoryEntryType.WadComparison)
+                {
+                    var (data, path) = await ComparisonHistoryService.LoadComparisonAsync(selectedEntry.ReferenceId);
+                    if (data != null)
+                    {
+                        // Resolve dependencies for the window
+                        var resultWindow = ActivatorUtilities.CreateInstance<WadComparisonResultWindow>(
+                            ServiceProvider, 
+                            data.Diffs, 
+                            data.OldLolPath, 
+                            data.NewLolPath
+                        );
+                        resultWindow.Owner = Window.GetWindow(this);
+                        resultWindow.Show();
+                    }
+                    else
+                    {
+                        CustomMessageBoxService.ShowError("Error", "Could not load the comparison history. The file might be missing or corrupted.", Window.GetWindow(this));
+                    }
+                }
+                else
+                {
+                    await DiffViewService.ShowFileDiffAsync(selectedEntry.OldFilePath, selectedEntry.NewFilePath, Window.GetWindow(this));
+                }
             }
             else
             {
@@ -52,10 +79,10 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void btnRemoveSelected_Click(object sender, RoutedEventArgs e)
         {
-            var entryToRemove = (sender as FrameworkElement)?.DataContext as JsonDiffHistoryEntry;
+            var entryToRemove = (sender as FrameworkElement)?.DataContext as HistoryEntry;
             var itemsToRemove = entryToRemove != null 
-                ? new List<JsonDiffHistoryEntry> { entryToRemove }
-                : DiffHistoryListView.SelectedItems.Cast<JsonDiffHistoryEntry>().ToList();
+                ? new List<HistoryEntry> { entryToRemove }
+                : DiffHistoryListView.SelectedItems.Cast<HistoryEntry>().ToList();
 
             if (itemsToRemove.Count > 0)
             {
@@ -69,11 +96,18 @@ namespace AssetsManager.Views.Controls.Monitor
                     {
                         foreach (var selectedEntry in itemsToRemove)
                         {
-                            string historyDirectoryPath = Path.GetDirectoryName(selectedEntry.OldFilePath);
-
-                            if (!string.IsNullOrEmpty(historyDirectoryPath) && Directory.Exists(historyDirectoryPath))
+                            if (selectedEntry.Type == HistoryEntryType.WadComparison)
                             {
-                                Directory.Delete(historyDirectoryPath, true);
+                                ComparisonHistoryService.DeleteComparison(selectedEntry);
+                            }
+                            else
+                            {
+                                string historyDirectoryPath = Path.GetDirectoryName(selectedEntry.OldFilePath);
+
+                                if (!string.IsNullOrEmpty(historyDirectoryPath) && Directory.Exists(historyDirectoryPath))
+                                {
+                                    Directory.Delete(historyDirectoryPath, true);
+                                }
                             }
 
                             AppSettings.DiffHistory.Remove(selectedEntry);

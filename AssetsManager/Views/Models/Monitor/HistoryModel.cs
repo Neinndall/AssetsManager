@@ -9,16 +9,16 @@ namespace AssetsManager.Views.Models.Monitor
 {
     public class HistoryModel : INotifyPropertyChanged
     {
-        public PaginationModel<JsonDiffHistoryEntry> Paginator { get; }
+        public PaginationModel<HistoryEntry> Paginator { get; }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         public HistoryModel()
         {
-            Paginator = new PaginationModel<JsonDiffHistoryEntry> { PageSize = 10 };
+            Paginator = new PaginationModel<HistoryEntry> { PageSize = 10 };
         }
 
-        public void LoadHistory(IEnumerable<JsonDiffHistoryEntry> historyEntries)
+        public void LoadHistory(IEnumerable<HistoryEntry> historyEntries)
         {
             Paginator.SetFullList(historyEntries);
         }
