@@ -161,13 +161,19 @@ namespace AssetsManager.Views.Dialogs.Controls
                 DiffNavigationPanel.ScrollRequested += ScrollToLine;
 
                 EventHandler layoutHandler = null;
-                layoutHandler = (s, e) =>
+                layoutHandler = async (s, e) =>
                 {
                     UnifiedDiffEditor.TextArea.TextView.LayoutUpdated -= layoutHandler;
-                    if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
-                        DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
-                    else
-                        FocusFirstDifference();
+                    
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
+                            DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
+                        else
+                            FocusFirstDifference();
+                        
+                        LogService?.Log($"[JsonDiffControl] Inline view restored at index {diffIndexToRestore}.");
+                    }, System.Windows.Threading.DispatcherPriority.Render);
                 };
                 UnifiedDiffEditor.TextArea.TextView.LayoutUpdated += layoutHandler;
 
@@ -197,18 +203,24 @@ namespace AssetsManager.Views.Dialogs.Controls
             DiffNavigationPanel.ScrollRequested += ScrollToLine;
 
             EventHandler layoutUpdatedHandler = null;
-            layoutUpdatedHandler = (s, e) =>
+            layoutUpdatedHandler = async (s, e) =>
             {
                 NewJsonContent.TextArea.TextView.LayoutUpdated -= layoutUpdatedHandler;
-                if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
+                
+                // Use ContextIdle to ensure the UI is fully stable before manipulating Caret/Scroll
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
-                }
-                else
-                {
-                    if (diffIndexToRestore == null) FocusFirstDifference();
-                }
-                RefreshGuidePosition();
+                    if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
+                    {
+                        DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
+                    }
+                    else
+                    {
+                        if (diffIndexToRestore == null) FocusFirstDifference();
+                    }
+                    RefreshGuidePosition();
+                    LogService?.Log($"[JsonDiffControl] SideBySide view restored at index {diffIndexToRestore}.");
+                }, System.Windows.Threading.DispatcherPriority.Render);
             };
             NewJsonContent.TextArea.TextView.LayoutUpdated += layoutUpdatedHandler;
         }
@@ -228,15 +240,45 @@ namespace AssetsManager.Views.Dialogs.Controls
             UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Add(new UnifiedDiffBackgroundRenderer(linesToShow));
         }
 
+        public LogService LogService { get; set; }
+
         private async void ComparisonInlineMode_Checked(object sender, RoutedEventArgs e)
         {
-            if (UnifiedBtn == null) return;
+            if (UnifiedBtn == null || SideBySideBtn == null) return;
 
-            int currentLine = State.IsInlineMode ? UnifiedDiffEditor.TextArea.Caret.Line : NewJsonContent.TextArea.Caret.Line;
+            // Determine source editor based on which button was clicked.
+            // If sender is UnifiedBtn, we are switching TO Inline, so source is SideBySide (NewJsonContent).
+            bool switchingToInline = sender == UnifiedBtn;
+            var sourceEditor = switchingToInline ? NewJsonContent : UnifiedDiffEditor;
+            
+            int currentLine = GetCurrentLineRobust(sourceEditor);
             int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(currentLine) ?? -1;
+
+            LogService?.Log($"[JsonDiffControl] Mode Switch. ToInline: {switchingToInline}. Line: {currentLine}. Index: {currentDiffIndex}. Offset: {sourceEditor.TextArea.TextView.ScrollOffset.Y}");
 
             // Note: DataBinding handles State.IsInlineMode update via IsChecked binding
             await UpdateDiffView(currentDiffIndex);
+        }
+
+        private int GetCurrentLineRobust(ICSharpCode.AvalonEdit.TextEditor editor)
+        {
+            if (editor == null) return 1;
+
+            int caretLine = editor.TextArea.Caret.Line;
+            double verticalOffset = editor.TextArea.TextView.ScrollOffset.Y;
+
+            // If Caret is at 1 but we are scrolled down significantly, rely on scroll position
+            if (caretLine == 1 && verticalOffset > 20)
+            {
+                var visualTop = editor.TextArea.TextView.GetDocumentLineByVisualTop(verticalOffset);
+                if (visualTop != null)
+                {
+                    LogService?.Log($"[JsonDiffControl] Fallback line detection triggered. Caret: 1, Offset: {verticalOffset}, Calculated: {visualTop.LineNumber}");
+                    return visualTop.LineNumber;
+                }
+            }
+
+            return caretLine;
         }
 
         private SideBySideDiffModel FilterDiffModel(SideBySideDiffModel originalModel)
@@ -269,6 +311,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (State.IsInlineMode)
             {
+                UnifiedDiffEditor.UpdateLayout();
                 UnifiedDiffEditor.ScrollTo(lineNumber, 0);
                 UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
                 UnifiedDiffEditor.Focus();
@@ -280,6 +323,9 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             try
             {
+                OldJsonContent.UpdateLayout();
+                NewJsonContent.UpdateLayout();
+
                 OldJsonContent.ScrollTo(lineNumber, 0);
                 NewJsonContent.ScrollTo(lineNumber, 0);
 
@@ -288,8 +334,6 @@ namespace AssetsManager.Views.Dialogs.Controls
                     DiffNavigationPanel.CurrentLine = lineNumber;
                     DiffNavigationPanel.UpdateViewportGuide();
                 }
-
-                UpdateLayout();
 
                 NewJsonContent.TextArea.Caret.Line = lineNumber;
                 NewJsonContent.TextArea.Caret.Column = 1;

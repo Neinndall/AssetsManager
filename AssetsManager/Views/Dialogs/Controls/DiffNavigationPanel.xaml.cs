@@ -254,11 +254,17 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
             else if (_diffModel != null)
             {
-                if (_originalDiffModel != _diffModel && _diffModel.NewText.Lines.Count > 0)
-                diffLineSet.Add(1);
+                // Detect change on the very first line (Line 1)
+                if (_diffModel.NewText.Lines.Count > 0 && (_diffModel.NewText.Lines[0].Type != ChangeType.Unchanged || _diffModel.OldText.Lines[0].Type != ChangeType.Unchanged))
+                {
+                    diffLineSet.Add(1);
+                }
 
-                ChangeType lastChangeTypeNew = _diffModel.NewText.Lines[0].Type;
-                ChangeType lastChangeTypeOld = _diffModel.OldText.Lines[0].Type;
+                if (_originalDiffModel != _diffModel && _diffModel.NewText.Lines.Count > 0 && !diffLineSet.Contains(1))
+                    diffLineSet.Add(1);
+
+                ChangeType lastChangeTypeNew = _diffModel.NewText.Lines.Count > 0 ? _diffModel.NewText.Lines[0].Type : ChangeType.Unchanged;
+                ChangeType lastChangeTypeOld = _diffModel.OldText.Lines.Count > 0 ? _diffModel.OldText.Lines[0].Type : ChangeType.Unchanged;
 
                 for (int i = 1; i < _diffModel.NewText.Lines.Count; i++)
                 {
