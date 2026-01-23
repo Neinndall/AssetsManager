@@ -17,7 +17,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         private TextEditor _newEditor;
         private SideBySideDiffModel _diffModel;
         private SideBySideDiffModel _originalDiffModel;
-        private IList<DiffPiece> _unifiedLines;
         private bool _isDragging;
         private Point _dragStartPoint;
         private bool _wasActuallyDragged;
@@ -78,7 +77,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             _newEditor = null;
             _diffModel = null;
             _originalDiffModel = null;
-            _unifiedLines = null;
             _diffLines.Clear();
             _oldViewportGuide = null;
             _newViewportGuide = null;
@@ -90,24 +88,11 @@ namespace AssetsManager.Views.Dialogs.Controls
             _newEditor = newEditor;
             _diffModel = diffModel;
             _originalDiffModel = originalDiffModel ?? diffModel;
-            _unifiedLines = null;
 
             SetupEvents();
             FindDiffLines();
             InitializeDiffMarkers();
             UpdateViewportGuide();
-        }
-
-        public void Initialize(TextEditor editor, IList<DiffPiece> lines)
-        {
-            _newEditor = editor;
-            _unifiedLines = lines;
-            _diffModel = null;
-            _originalDiffModel = null;
-
-            // En modo unificado ocultamos los hosts de visuales si queremos, 
-            // pero para mantener la logica de navegacion solo necesitamos FindDiffLines.
-            FindDiffLines();
         }
 
         private void SetupEvents()
@@ -223,20 +208,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             _diffLines.Clear();
             var diffLineSet = new HashSet<int>();
 
-            if (_unifiedLines != null)
-            {
-                ChangeType lastChangeType = ChangeType.Unchanged;
-                for (int i = 0; i < _unifiedLines.Count; i++)
-                {
-                    var currentLine = _unifiedLines[i];
-                    if (currentLine.Type != ChangeType.Unchanged && currentLine.Type != lastChangeType)
-                    {
-                        diffLineSet.Add(i + 1);
-                    }
-                    lastChangeType = currentLine.Type;
-                }
-            }
-            else if (_diffModel != null)
+            if (_diffModel != null)
             {
                 if (_originalDiffModel != _diffModel && _diffModel.NewText.Lines.Count > 0)
                 diffLineSet.Add(1);
@@ -258,7 +230,14 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                     if (typeChanged || gapDetected)
                     {
-                        diffLineSet.Add(i + 1);
+                        // Solo añadir si la línea actual NO es Unchanged.
+                        // Esto evita que salte al inicio de un bloque "limpio" (el final de una diferencia).
+                        bool isCurrentLineDiff = currentLineNew.Type != ChangeType.Unchanged || currentLineOld.Type != ChangeType.Unchanged;
+
+                        if (isCurrentLineDiff)
+                        {
+                            diffLineSet.Add(i + 1);
+                        }
                     }
 
                     lastChangeTypeNew = currentLineNew.Type;

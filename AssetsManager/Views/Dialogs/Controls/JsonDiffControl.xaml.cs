@@ -187,11 +187,22 @@ namespace AssetsManager.Views.Dialogs.Controls
             layoutUpdatedHandler = (s, e) =>
             {
                 NewJsonContent.TextArea.TextView.LayoutUpdated -= layoutUpdatedHandler;
-                if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
+                
+                // Use Dispatcher to ensure layout is fully finished before positioning
+                Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
-                }
-
+                    if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
+                    {
+                        DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
+                    }
+                    else
+                    {
+                        // If no specific index, just ensure we show something useful (like top or first diff)
+                        // For Side-by-Side initial load, we usually focus first diff
+                        if (diffIndexToRestore == null) FocusFirstDifference();
+                    }
+                    RefreshGuidePosition();
+                }), System.Windows.Threading.DispatcherPriority.Background);
             };
             NewJsonContent.TextArea.TextView.LayoutUpdated += layoutUpdatedHandler;
         }
@@ -209,11 +220,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Clear();
             UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Add(new UnifiedDiffBackgroundRenderer(linesToShow));
-
-            // Initialize navigation for Unified mode
-            DiffNavigationPanel.Initialize(UnifiedDiffEditor, linesToShow);
-            DiffNavigationPanel.ScrollRequested -= ScrollToLine;
-            DiffNavigationPanel.ScrollRequested += ScrollToLine;
         }
 
         private void ComparisonInlineMode_Checked(object sender, RoutedEventArgs e)
