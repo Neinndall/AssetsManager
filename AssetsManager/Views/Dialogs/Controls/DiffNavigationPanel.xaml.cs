@@ -254,71 +254,39 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
             else if (_diffModel != null)
             {
-                // Detect change on the very first line (Line 1)
-                if (_diffModel.NewText.Lines.Count > 0 && (_diffModel.NewText.Lines[0].Type != ChangeType.Unchanged || _diffModel.OldText.Lines[0].Type != ChangeType.Unchanged))
+                var newLines = _diffModel.NewText.Lines;
+                var oldLines = _diffModel.OldText.Lines;
+                int count = Math.Min(newLines.Count, oldLines.Count);
+
+                if (count > 0)
                 {
-                    diffLineSet.Add(1);
-                }
+                    // Check first line
+                    if (newLines[0].Type != ChangeType.Unchanged || oldLines[0].Type != ChangeType.Unchanged)
+                        diffLineSet.Add(1);
 
-                if (_originalDiffModel != _diffModel && _diffModel.NewText.Lines.Count > 0 && !diffLineSet.Contains(1))
-                    diffLineSet.Add(1);
-
-                ChangeType lastChangeTypeNew = _diffModel.NewText.Lines.Count > 0 ? _diffModel.NewText.Lines[0].Type : ChangeType.Unchanged;
-                ChangeType lastChangeTypeOld = _diffModel.OldText.Lines.Count > 0 ? _diffModel.OldText.Lines[0].Type : ChangeType.Unchanged;
-
-                for (int i = 1; i < _diffModel.NewText.Lines.Count; i++)
-                {
-                    var currentLineNew = _diffModel.NewText.Lines[i];
-                    var prevLineNew = _diffModel.NewText.Lines[i - 1];
-                    var currentLineOld = _diffModel.OldText.Lines[i];
-                    var prevLineOld = _diffModel.OldText.Lines[i - 1];
-
-                    bool typeChanged = currentLineNew.Type != lastChangeTypeNew || currentLineOld.Type != lastChangeTypeOld;
-
-                    bool gapDetected = (currentLineNew.Position.HasValue && prevLineNew.Position.HasValue && currentLineNew.Position.Value != prevLineNew.Position.Value + 1) ||
-                                     (currentLineOld.Position.HasValue && prevLineOld.Position.HasValue && currentLineOld.Position.Value != prevLineOld.Position.Value + 1);
-
-                    if (typeChanged || gapDetected)
+                    // Check subsequent lines
+                    for (int i = 1; i < count; i++)
                     {
-                        // Solo añadir si la línea actual NO es Unchanged.
-                        // Esto evita que salte al inicio de un bloque "limpio" (el final de una diferencia).
-                        bool isCurrentLineDiff = currentLineNew.Type != ChangeType.Unchanged || currentLineOld.Type != ChangeType.Unchanged;
+                        var currNew = newLines[i];
+                        var prevNew = newLines[i - 1];
+                        var currOld = oldLines[i];
+                        var prevOld = oldLines[i - 1];
 
-                        if (isCurrentLineDiff)
+                        bool typeChanged = currNew.Type != prevNew.Type || currOld.Type != prevOld.Type;
+                        
+                        // Gap detection logic for filtered views
+                        bool gapDetected = (currNew.Position.HasValue && prevNew.Position.HasValue && currNew.Position.Value != prevNew.Position.Value + 1) ||
+                                           (currOld.Position.HasValue && prevOld.Position.HasValue && currOld.Position.Value != prevOld.Position.Value + 1);
+
+                        if (typeChanged || gapDetected)
                         {
-                            diffLineSet.Add(i + 1);
+                            bool isCurrentLineDiff = currNew.Type != ChangeType.Unchanged || currOld.Type != ChangeType.Unchanged;
+                            if (isCurrentLineDiff)
+                            {
+                                diffLineSet.Add(i + 1);
+                            }
                         }
                     }
-
-                    lastChangeTypeNew = currentLineNew.Type;
-                    lastChangeTypeOld = currentLineOld.Type;
-                }
-            }
-            else
-            {
-                ChangeType lastChangeType = ChangeType.Unchanged;
-                for (int i = 0; i < _diffModel.NewText.Lines.Count; i++)
-                {
-                    var currentLine = _diffModel.NewText.Lines[i];
-                    if (currentLine.Type != ChangeType.Unchanged && currentLine.Type != lastChangeType)
-                    {
-                        diffLineSet.Add(i + 1);
-                    }
-                    lastChangeType = currentLine.Type;
-                }
-
-                lastChangeType = ChangeType.Unchanged;
-                for (int i = 0; i < _diffModel.OldText.Lines.Count; i++)
-                {
-                    var currentLine = _diffModel.OldText.Lines[i];
-                    if (currentLine.Type != ChangeType.Unchanged && currentLine.Type != lastChangeType)
-                    {
-                        if (!diffLineSet.Contains(i + 1))
-                        {
-                            diffLineSet.Add(i + 1);
-                        }
-                    }
-                    lastChangeType = currentLine.Type;
                 }
             }
 
@@ -359,16 +327,8 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_diffLines.Count == 0) return -1;
 
-            var nextDiffLine = _diffLines.FirstOrDefault(line => line >= currentLine);
-
-            if (nextDiffLine != 0)
-            {
-                return _diffLines.IndexOf(nextDiffLine);
-            }
-            else
-            {
-                return _diffLines.Count - 1;
-            }
+            var closestLine = _diffLines.OrderBy(line => Math.Abs(line - currentLine)).First();
+            return _diffLines.IndexOf(closestLine);
         }
 
         private void ScrollToLine(int lineNumber)

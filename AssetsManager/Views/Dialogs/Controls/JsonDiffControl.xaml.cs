@@ -30,6 +30,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         private DiffPaneModel _unifiedModel;
         private string _oldText;
         private string _newText;
+        private bool _isUpdatingView;
 
         // Cache to prevent flickering
         private TextDocument _cachedOldDoc;
@@ -161,21 +162,30 @@ namespace AssetsManager.Views.Dialogs.Controls
         #endregion
 
         #region View Logic
-        private async Task UpdateDiffView(int? diffIndexToRestore = null)
+        private async Task UpdateDiffView(int? diffIndexToRestore = null, int? explicitLine = null)
         {
             if (_originalDiffModel == null) return;
 
-            if (State.IsInlineMode)
+            _isUpdatingView = true;
+            try
             {
-                await SwitchToInlineView(diffIndexToRestore);
+                if (State.IsInlineMode)
+                {
+                    await SwitchToInlineView(diffIndexToRestore, explicitLine);
+                }
+                else
+                {
+                    await SwitchToSideBySideView(diffIndexToRestore, explicitLine);
+                }
             }
-            else
+            catch
             {
-                await SwitchToSideBySideView(diffIndexToRestore);
+                _isUpdatingView = false;
+                throw;
             }
         }
 
-        private async Task SwitchToInlineView(int? diffIndexToRestore)
+        private async Task SwitchToInlineView(int? diffIndexToRestore, int? explicitLine)
         {
             if (_unifiedModel == null)
             {
@@ -198,11 +208,10 @@ namespace AssetsManager.Views.Dialogs.Controls
             DiffNavigationPanel.Initialize(UnifiedDiffEditor, linesToShow);
             SetupNavigationEvents();
 
-            UnifiedDiffEditor.UpdateLayout();
-            await RestoreViewPositionAsync(UnifiedDiffEditor, diffIndexToRestore);
+            RestoreViewPosition(UnifiedDiffEditor, diffIndexToRestore, explicitLine);
         }
 
-        private async Task SwitchToSideBySideView(int? diffIndexToRestore)
+        private async Task SwitchToSideBySideView(int? diffIndexToRestore, int? explicitLine)
         {
             var modelToShow = State.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
             var originalModelForNav = State.HideUnchangedLines ? _originalDiffModel : null;
@@ -238,13 +247,10 @@ namespace AssetsManager.Views.Dialogs.Controls
                 if (NewJsonContent.Document != _cachedNewDoc) NewJsonContent.Document = _cachedNewDoc;
             }
 
-            OldJsonContent.UpdateLayout();
-            NewJsonContent.UpdateLayout();
-
             DiffNavigationPanel.Initialize(OldJsonContent, NewJsonContent, modelToShow, originalModelForNav);
             SetupNavigationEvents();
 
-            await RestoreViewPositionAsync(NewJsonContent, diffIndexToRestore);
+            RestoreViewPosition(NewJsonContent, diffIndexToRestore, explicitLine);
         }
 
         private void SetupNavigationEvents()
@@ -253,30 +259,39 @@ namespace AssetsManager.Views.Dialogs.Controls
             DiffNavigationPanel.ScrollRequested += ScrollToLine;
         }
 
-        private async Task RestoreViewPositionAsync(ICSharpCode.AvalonEdit.TextEditor editor, int? diffIndex)
+        private void RestoreViewPosition(ICSharpCode.AvalonEdit.TextEditor editor, int? diffIndex, int? explicitLine)
         {
-            EventHandler layoutHandler = null;
-            layoutHandler = async (s, e) =>
+            try
             {
-                editor.TextArea.TextView.LayoutUpdated -= layoutHandler;
-                await Dispatcher.InvokeAsync(() =>
+                // Force immediate layout update to allow synchronous scrolling and avoid visual "flashing" at line 0
+                editor.UpdateLayout();
+
+                if (explicitLine.HasValue && explicitLine.Value > 0)
                 {
-                    if (diffIndex.HasValue && diffIndex.Value != -1)
-                        DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndex.Value);
-                    else
-                        FocusFirstDifference();
-                    
-                    RefreshGuidePosition();
-                }, DispatcherPriority.Render);
-            };
-            editor.TextArea.TextView.LayoutUpdated += layoutHandler;
+                    ScrollToLine(explicitLine.Value);
+                }
+                else if (diffIndex.HasValue && diffIndex.Value != -1)
+                {
+                    DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndex.Value);
+                }
+                else
+                {
+                    FocusFirstDifference();
+                }
+
+                RefreshGuidePosition();
+            }
+            finally
+            {
+                _isUpdatingView = false;
+            }
         }
         #endregion
 
         #region Event Handlers
         private async void ComparisonInlineMode_Checked(object sender, RoutedEventArgs e)
         {
-            if (UnifiedBtn == null || SideBySideBtn == null) return;
+            if (!this.IsLoaded || UnifiedBtn == null || SideBySideBtn == null) return;
 
             bool switchingToInline = sender == UnifiedBtn;
             var sourceEditor = switchingToInline ? NewJsonContent : UnifiedDiffEditor;
@@ -290,8 +305,17 @@ namespace AssetsManager.Views.Dialogs.Controls
             await UpdateDiffView(currentDiffIndex);
         }
 
-        private void OldEditor_ScrollChanged(object sender, EventArgs e) => SyncScroll(sender, NewJsonContent);
-        private void NewEditor_ScrollChanged(object sender, EventArgs e) => SyncScroll(sender, OldJsonContent);
+        private void OldEditor_ScrollChanged(object sender, EventArgs e)
+        {
+            if (_isUpdatingView) return;
+            SyncScroll(sender, NewJsonContent);
+        }
+
+        private void NewEditor_ScrollChanged(object sender, EventArgs e)
+        {
+            if (_isUpdatingView) return;
+            SyncScroll(sender, OldJsonContent);
+        }
 
         private void WordWrapButton_Click(object sender, RoutedEventArgs e)
         {
@@ -323,8 +347,15 @@ namespace AssetsManager.Views.Dialogs.Controls
         private async void HideUnchangedButton_Click(object sender, RoutedEventArgs e)
         {
             _cachedOldDoc = null; // Force regeneration
-            int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(NewJsonContent.TextArea.Caret.Line) ?? -1;
-            await UpdateDiffView(currentDiffIndex);
+
+            // Determine active editor to get accurate visible line
+            var editor = State.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            int currentLine = GetCurrentLineRobust(editor);
+            
+            // Revert to using Diff Index for filtering operations as line numbers change drastically
+            int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(currentLine) ?? -1;
+            
+            await UpdateDiffView(currentDiffIndex, null);
         }
         #endregion
 
@@ -371,7 +402,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (State.IsInlineMode)
             {
-                UnifiedDiffEditor.UpdateLayout();
                 UnifiedDiffEditor.ScrollTo(lineNumber, 0);
                 UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
                 UnifiedDiffEditor.Focus();
@@ -383,9 +413,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             try
             {
-                OldJsonContent.UpdateLayout();
-                NewJsonContent.UpdateLayout();
-
                 OldJsonContent.ScrollTo(lineNumber, 0);
                 NewJsonContent.ScrollTo(lineNumber, 0);
 
