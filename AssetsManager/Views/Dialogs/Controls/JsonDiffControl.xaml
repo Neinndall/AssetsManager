@@ -56,10 +56,12 @@
                         <!-- MODES SECTION -->
                         <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}"/>
                         <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ViewMode"
-                                     IsChecked="True" Checked="ComparisonInlineMode_Checked" ToolTip="Side by Side View">
+                                     IsChecked="{Binding IsInlineMode, Converter={StaticResource InverseBooleanConverter}}" 
+                                     Checked="ComparisonInlineMode_Checked" ToolTip="Side by Side View">
                             <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
                         </RadioButton>
                         <RadioButton x:Name="UnifiedBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ViewMode"
+                                     IsChecked="{Binding IsInlineMode}"
                                      Checked="ComparisonInlineMode_Checked" ToolTip="Unified Inline Mode">
                             <icons:MaterialIcon Kind="ViewStream" Width="18" Height="18"/>
                         </RadioButton>
@@ -88,6 +90,7 @@
                         <!-- TOOLS SECTION -->
                         <TextBlock Text="TOOLS" Style="{StaticResource ToolSectionLabel}"/>
                         <ToggleButton x:Name="WordWrapButton"
+                                      IsChecked="{Binding IsWordWrapEnabled}"
                                       Click="WordWrapButton_Click"
                                       Style="{StaticResource TransparentIconToggleButton}"
                                       Width="34" Height="34"
@@ -95,6 +98,7 @@
                              <icons:MaterialIcon Kind="Wrap" Width="18" Height="18"/>
                         </ToggleButton>
                         <ToggleButton x:Name="WordLevelDiffButton"
+                                      IsChecked="{Binding IsWordLevelDiff}"
                                       Margin="4,0,0,0"
                                       Click="WordLevelDiffButton_Click"
                                       Style="{StaticResource TransparentIconToggleButton}"
@@ -103,6 +107,7 @@
                              <icons:MaterialIcon Kind="FormatText" Width="18" Height="18"/>
                         </ToggleButton>
                         <ToggleButton x:Name="HideUnchangedButton"
+                                      IsChecked="{Binding HideUnchangedLines}"
                                       Margin="4,0,0,0"
                                       Click="HideUnchangedButton_Click"
                                       Style="{StaticResource TransparentIconToggleButton}"
@@ -118,7 +123,7 @@
         <!-- Main Content -->
         <Grid Grid.Row="1" Margin="24">
             <!-- Diff Grid -->
-            <Grid x:Name="DiffGrid" Visibility="Collapsed">
+            <Grid x:Name="DiffGrid" Visibility="{Binding IsInlineMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -222,7 +227,7 @@
             </Grid>
 
             <!-- Unified Diff Editor (Inline) -->
-            <Border x:Name="UnifiedDiffContainer" Grid.Row="1" Visibility="Collapsed" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+            <Border x:Name="UnifiedDiffContainer" Grid.Row="1" Visibility="{Binding IsInlineMode, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
