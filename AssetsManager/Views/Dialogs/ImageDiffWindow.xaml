@@ -31,16 +31,6 @@
             </DrawingBrush.Drawing>
         </DrawingBrush>
 
-        <!-- Tool Section Label Style -->
-        <Style x:Key="ToolSectionLabel" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="10"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="10,0,6,0"/>
-            <Setter Property="Opacity" Value="0.8"/>
-        </Style>
-
         <!-- Dynamic Background Style for Image Containers -->
         <Style x:Key="ImageContainerStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource DarkBackground}"/>

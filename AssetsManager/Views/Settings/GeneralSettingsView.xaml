@@ -106,17 +106,8 @@
                         <TextBlock Text="Periodically check for updates while the application is running" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
                         <!-- Frequency Selector -->
-                        <Border Margin="28,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked, ElementName=checkBoxBackgroundUpdates}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
+                        <Border Margin="28,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                Visibility="{Binding IsChecked, ElementName=checkBoxBackgroundUpdates, Converter={StaticResource BooleanToVisibilityConverter}}">
                             
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -163,16 +154,22 @@
                     <StackPanel Grid.Column="1">
                         <CheckBox IsChecked="{Binding Settings.EnableExtraction, Mode=TwoWay}" 
                                   x:Name="EnableExtractionCheckBox" 
-                                  Content="Auto-extract new files"
+                                  Content="Auto-extract new assets"
                                   Style="{StaticResource ModernCheckBox}"
                                   IsEnabled="{Binding IsChecked, ElementName=ReportGenerationCheckBox, Converter={StaticResource InverseBooleanConverter}}"/>
-                        <TextBlock Text="Extract found files after comparison to AssetsDownloaded folder" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
+                        <TextBlock Text="Extract new assets after the comparison is finished" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
-                        <CheckBox IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}" 
-                                  Content="Organize extracted files into folders"
-                                  Style="{StaticResource ModernCheckBox}"
-                                  IsEnabled="{Binding IsChecked, ElementName=EnableExtractionCheckBox}"/>
-                        <TextBlock Text="If enabled, extracted assets will be organized into folders" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,0" TextWrapping="Wrap"/>
+                        <!-- Organize Assets Option (Nested & Conditional) -->
+                        <Border Margin="28,0,0,8" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,6,16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                Visibility="{Binding IsChecked, ElementName=EnableExtractionCheckBox, Converter={StaticResource BooleanToVisibilityConverter}}">
+
+                            <StackPanel>
+                                <CheckBox IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}" 
+                                          Content="Organize extracted assets into folders"
+                                          Style="{StaticResource ModernCheckBox}"/>
+                                <TextBlock Text="If enabled, extracted assets will be organized into folders" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,0,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Grid>
             </StackPanel>
@@ -235,17 +232,8 @@
                         <Border Margin="0,-16,0,24" 
                                 Padding="12" 
                                 Background="{StaticResource SidebarBackground}" 
-                                CornerRadius="8">
-                             <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding AudioExportFormat}" Value="Mp3">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                             </Border.Style>
+                                CornerRadius="8"
+                                Visibility="{Binding AudioExportFormat, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=Mp3}">
                              <StackPanel Orientation="Horizontal">
                                 <materialIcons:MaterialIcon Kind="InformationOutline" Width="16" Height="16" Foreground="{StaticResource TextSecondary}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="MP3 conversion might take slightly longer due to encoding." 
@@ -314,17 +302,8 @@
                         <TextBlock Text="An assets.log file will be created instead of extracting the assets" Foreground="{StaticResource TextMuted}" FontSize="12" Margin="28,4,0,16" TextWrapping="Wrap"/>
 
                         <!-- Filter Options -->
-                        <Border Margin="28,0,0,8" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked, ElementName=ReportGenerationCheckBox}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
+                        <Border Margin="28,0,0,8" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12,16,4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                Visibility="{Binding IsChecked, ElementName=ReportGenerationCheckBox, Converter={StaticResource BooleanToVisibilityConverter}}">
                             
                             <StackPanel>
                                 <TextBlock Text="Include in report:" Foreground="{StaticResource TextSecondary}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,12"/>

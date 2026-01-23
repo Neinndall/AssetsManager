@@ -1,113 +1,61 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Input;
+using System.Windows.Threading;
+using System.Xml;
 using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
-using ICSharpCode.AvalonEdit.Rendering;
+using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
-using System.Xml;
-using System.IO;
-using System.Reflection;
-using System.Threading.Tasks;
-using System.Linq;
-using System.Windows.Media.Animation;
-using ICSharpCode.AvalonEdit.Document;
-using AssetsManager.Services;
+using ICSharpCode.AvalonEdit.Rendering;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Dialogs;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
     public partial class JsonDiffControl : UserControl, IDisposable
     {
+        #region Fields
         private SideBySideDiffModel _originalDiffModel;
-        private bool _isWordLevelDiff = false;
-        private bool _hideUnchangedLines = false;
+        private DiffPaneModel _unifiedModel;
+        private string _oldText;
+        private string _newText;
+        private bool _isUpdatingView;
+
+        // Cache to prevent flickering
+        private TextDocument _cachedOldDoc;
+        private TextDocument _cachedNewDoc;
+        #endregion
+
+        #region Properties
+        public JsonDiffModel State { get; } = new JsonDiffModel();
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public JsonFormatterService JsonFormatterService { get; set; }
-        public event EventHandler<bool> ComparisonFinished;
+        public LogService LogService { get; set; }
+        #endregion
 
+        #region Events
+        public event EventHandler<bool> ComparisonFinished;
+        #endregion
+
+        #region Constructor & Setup
         public JsonDiffControl()
         {
             InitializeComponent();
+            this.DataContext = State;
             LoadJsonSyntaxHighlighting();
             SetupScrollSync();
         }
-
-        public void Dispose()
-        {
-            // Desuscribir todos los eventos
-            if (DiffNavigationPanel != null)
-            {
-                DiffNavigationPanel.ScrollRequested -= ScrollToLine;
-            }
-            if (OldJsonContent != null)
-            {
-                OldJsonContent.Loaded -= OldJsonContent_Loaded;
-                if (OldJsonContent.TextArea?.TextView != null)
-                {
-                    OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
-                    OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_UpdateViewportGuide;
-                }
-            }
-            if (NewJsonContent != null)
-            {
-                if (NewJsonContent.TextArea?.TextView != null)
-                {
-                    NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
-                    NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_UpdateViewportGuide;
-                }
-            }
-
-            // Limpiar renderers y documentos de AvalonEdit
-            OldJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
-            NewJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
-            OldJsonContent.Document = null;
-            NewJsonContent.Document = null;
-
-            // Anular referencias a objetos pesados
-            _originalDiffModel = null;
-
-            // Anular referencias a otros controles y servicios
-            DiffNavigationPanel = null;
-            CustomMessageBoxService = null;
-        }
-
-
-        public void FocusFirstDifference()
-        {
-            DiffNavigationPanel?.NavigateToNextDifference(0);
-        }
-
-        public void RefreshGuidePosition()
-        {
-            DiffNavigationPanel?.UpdateViewportGuide();
-        }
-
-        public async Task LoadAndDisplayDiffAsync(string oldText, string newText, string oldFileName, string newFileName)
-        {
-            try
-            {
-                OldFileNameLabel.Text = oldFileName;
-                NewFileNameLabel.Text = newFileName;
-
-                _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
-
-                DiffGrid.Visibility = Visibility.Visible;
-                await UpdateDiffView();
-            }
-            catch (Exception ex)
-            {
-                CustomMessageBoxService.ShowError("Error", $"Failed to load comparison: {ex.Message}. Check logs for details.", Window.GetWindow(this));
-                OnComparisonFinished(false);
-            }
-        }
-
 
         private void LoadJsonSyntaxHighlighting()
         {
@@ -125,52 +73,364 @@ namespace AssetsManager.Views.Dialogs.Controls
                         var jsonHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
                         OldJsonContent.SyntaxHighlighting = jsonHighlighting;
                         NewJsonContent.SyntaxHighlighting = jsonHighlighting;
+                        UnifiedDiffEditor.SyntaxHighlighting = jsonHighlighting;
                     }
                 }
             }
             catch
             {
-                // Silently continue
+                // Ignore highlighting errors
             }
         }
 
-        private async Task UpdateDiffView(int? diffIndexToRestore = null)
+        private void SetupScrollSync()
+        {
+            OldJsonContent.Loaded += (s, e) =>
+            {
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += (sender, args) => RefreshGuidePosition();
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += (sender, args) => RefreshGuidePosition();
+            };
+        }
+        #endregion
+
+        #region Public Methods
+        public void Dispose()
+        {
+            if (DiffNavigationPanel != null) DiffNavigationPanel.ScrollRequested -= ScrollToLine;
+            
+            // Unsubscribe events
+            if (OldJsonContent?.TextArea?.TextView != null)
+            {
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
+            }
+            if (NewJsonContent?.TextArea?.TextView != null)
+            {
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
+            }
+
+            // Clear heavy resources
+            OldJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
+            NewJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
+            UnifiedDiffEditor?.TextArea?.TextView?.BackgroundRenderers.Clear();
+
+            OldJsonContent.Document = null;
+            NewJsonContent.Document = null;
+            UnifiedDiffEditor.Document = null;
+
+            _cachedOldDoc = null;
+            _cachedNewDoc = null;
+            _originalDiffModel = null;
+            _unifiedModel = null;
+        }
+
+        public void FocusFirstDifference()
+        {
+            DiffNavigationPanel?.NavigateToNextDifference(0);
+        }
+
+        public void RefreshGuidePosition()
+        {
+            DiffNavigationPanel?.UpdateViewportGuide();
+        }
+
+        public async Task LoadAndDisplayDiffAsync(string oldText, string newText, string oldFileName, string newFileName)
+        {
+            try
+            {
+                _oldText = oldText;
+                _newText = newText;
+                OldFileNameLabel.Text = oldFileName;
+                NewFileNameLabel.Text = newFileName;
+                UnifiedFileNameLabel.Text = newFileName;
+
+                _cachedOldDoc = null;
+                _cachedNewDoc = null;
+                _unifiedModel = null;
+
+                _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
+
+                await UpdateDiffView();
+            }
+            catch (Exception ex)
+            {
+                CustomMessageBoxService?.ShowError("Error", $"Failed to load comparison: {ex.Message}", Window.GetWindow(this));
+                ComparisonFinished?.Invoke(this, false);
+            }
+        }
+        #endregion
+
+        #region View Logic
+        private async Task UpdateDiffView(int? diffIndexToRestore = null, int? explicitLine = null)
         {
             if (_originalDiffModel == null) return;
 
-            var modelToShow = _hideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
-            var originalModelForNav = _hideUnchangedLines ? _originalDiffModel : null;
-
-            var (normalizedOld, normalizedNew) = await Task.Run(() =>
+            _isUpdatingView = true;
+            try
             {
-                var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText);
-                var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText);
-                return (nOld, nNew);
-            });
+                if (State.IsInlineMode)
+                {
+                    await SwitchToInlineView(diffIndexToRestore, explicitLine);
+                }
+                else
+                {
+                    await SwitchToSideBySideView(diffIndexToRestore, explicitLine);
+                }
+            }
+            catch
+            {
+                _isUpdatingView = false;
+                throw;
+            }
+        }
 
-            OldJsonContent.Document = new TextDocument(normalizedOld.Text);
-            NewJsonContent.Document = new TextDocument(normalizedNew.Text);
+        private async Task SwitchToInlineView(int? diffIndexToRestore, int? explicitLine)
+        {
+            if (_unifiedModel == null)
+            {
+                _unifiedModel = await Task.Run(() => new InlineDiffBuilder(new Differ()).BuildDiffModel(_oldText, _newText));
+            }
 
-            OldJsonContent.UpdateLayout();
-            NewJsonContent.UpdateLayout();
+            var linesToShow = State.HideUnchangedLines
+                ? _unifiedModel.Lines.Where(l => l.Type != ChangeType.Unchanged).ToList()
+                : _unifiedModel.Lines;
 
-            ApplyDiffHighlighting(modelToShow);
+            string combinedText = string.Join(Environment.NewLine, linesToShow.Select(l => l.Text));
+
+            if (UnifiedDiffEditor.Document == null || UnifiedDiffEditor.Document.TextLength != combinedText.Length || UnifiedDiffEditor.Text != combinedText)
+            {
+                UnifiedDiffEditor.Document = new TextDocument(combinedText);
+                UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Clear();
+                UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Add(new UnifiedDiffBackgroundRenderer(linesToShow));
+            }
+
+            DiffNavigationPanel.Initialize(UnifiedDiffEditor, linesToShow);
+            SetupNavigationEvents();
+
+            RestoreViewPosition(UnifiedDiffEditor, diffIndexToRestore, explicitLine);
+        }
+
+        private async Task SwitchToSideBySideView(int? diffIndexToRestore, int? explicitLine)
+        {
+            var modelToShow = State.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
+            var originalModelForNav = State.HideUnchangedLines ? _originalDiffModel : null;
+
+            // Only recreate docs if not cached or if filtering changed content
+            bool needRecreate = _cachedOldDoc == null || State.HideUnchangedLines;
+
+            // Reuse cache if just switching modes without filtering
+            if (needRecreate && !State.HideUnchangedLines && _cachedOldDoc != null && OldJsonContent.Document == _cachedOldDoc)
+            {
+                needRecreate = false;
+            }
+
+            if (needRecreate)
+            {
+                var (normalizedOld, normalizedNew) = await Task.Run(() =>
+                {
+                    var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText);
+                    var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText);
+                    return (nOld, nNew);
+                });
+
+                _cachedOldDoc = new TextDocument(normalizedOld.Text);
+                _cachedNewDoc = new TextDocument(normalizedNew.Text);
+                OldJsonContent.Document = _cachedOldDoc;
+                NewJsonContent.Document = _cachedNewDoc;
+                
+                ApplyDiffHighlighting(modelToShow);
+            }
+            else
+            {
+                if (OldJsonContent.Document != _cachedOldDoc) OldJsonContent.Document = _cachedOldDoc;
+                if (NewJsonContent.Document != _cachedNewDoc) NewJsonContent.Document = _cachedNewDoc;
+            }
 
             DiffNavigationPanel.Initialize(OldJsonContent, NewJsonContent, modelToShow, originalModelForNav);
-            DiffNavigationPanel.ScrollRequested -= ScrollToLine; // Avoid multiple subscriptions
-            DiffNavigationPanel.ScrollRequested += ScrollToLine;
+            SetupNavigationEvents();
 
-            EventHandler layoutUpdatedHandler = null;
-            layoutUpdatedHandler = (s, e) =>
+            RestoreViewPosition(NewJsonContent, diffIndexToRestore, explicitLine);
+        }
+
+        private void SetupNavigationEvents()
+        {
+            DiffNavigationPanel.ScrollRequested -= ScrollToLine;
+            DiffNavigationPanel.ScrollRequested += ScrollToLine;
+        }
+
+        private void RestoreViewPosition(ICSharpCode.AvalonEdit.TextEditor editor, int? diffIndex, int? explicitLine)
+        {
+            try
             {
-                NewJsonContent.TextArea.TextView.LayoutUpdated -= layoutUpdatedHandler;
-                if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
+                // Force immediate layout update to allow synchronous scrolling and avoid visual "flashing" at line 0
+                editor.UpdateLayout();
+
+                if (explicitLine.HasValue && explicitLine.Value > 0)
                 {
-                    DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
+                    ScrollToLine(explicitLine.Value);
+                }
+                else if (diffIndex.HasValue && diffIndex.Value != -1)
+                {
+                    DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndex.Value);
+                }
+                else
+                {
+                    FocusFirstDifference();
                 }
 
-            };
-            NewJsonContent.TextArea.TextView.LayoutUpdated += layoutUpdatedHandler;
+                RefreshGuidePosition();
+            }
+            finally
+            {
+                _isUpdatingView = false;
+            }
+        }
+        #endregion
+
+        #region Event Handlers
+        private async void ComparisonInlineMode_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!this.IsLoaded || UnifiedBtn == null || SideBySideBtn == null) return;
+
+            bool switchingToInline = sender == UnifiedBtn;
+            var sourceEditor = switchingToInline ? NewJsonContent : UnifiedDiffEditor;
+
+            // Smart persistence: Calculate where we are before switching
+            int currentLine = GetCurrentLineRobust(sourceEditor);
+            int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(currentLine) ?? 0;
+
+            LogService?.Log($"[JsonDiffControl] Mode Switch. ToInline: {switchingToInline}. Restoring Index: {currentDiffIndex} (Line: {currentLine})");
+
+            await UpdateDiffView(currentDiffIndex);
+        }
+
+        private void OldEditor_ScrollChanged(object sender, EventArgs e)
+        {
+            if (_isUpdatingView) return;
+            SyncScroll(sender, NewJsonContent);
+        }
+
+        private void NewEditor_ScrollChanged(object sender, EventArgs e)
+        {
+            if (_isUpdatingView) return;
+            SyncScroll(sender, OldJsonContent);
+        }
+
+        private void WordWrapButton_Click(object sender, RoutedEventArgs e)
+        {
+            OldJsonContent.WordWrap = State.IsWordWrapEnabled;
+            NewJsonContent.WordWrap = State.IsWordWrapEnabled;
+            UnifiedDiffEditor.WordWrap = State.IsWordWrapEnabled;
+        }
+
+        private void NextDiffButton_Click(object sender, RoutedEventArgs e)
+        {
+            var editor = State.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            DiffNavigationPanel?.NavigateToNextDifference(editor.TextArea.Caret.Line);
+        }
+
+        private void PreviousDiffButton_Click(object sender, RoutedEventArgs e)
+        {
+            var editor = State.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            DiffNavigationPanel?.NavigateToPreviousDifference(editor.TextArea.Caret.Line);
+        }
+
+        private void WordLevelDiffButton_Click(object sender, RoutedEventArgs e)
+        {
+            var modelToShow = State.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
+            ApplyDiffHighlighting(modelToShow);
+            OldJsonContent.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
+            NewJsonContent.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
+        }
+
+        private async void HideUnchangedButton_Click(object sender, RoutedEventArgs e)
+        {
+            _cachedOldDoc = null; // Force regeneration
+
+            // Determine active editor to get accurate visible line
+            var editor = State.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            int currentLine = GetCurrentLineRobust(editor);
+            
+            // Revert to using Diff Index for filtering operations as line numbers change drastically
+            int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(currentLine) ?? -1;
+            
+            await UpdateDiffView(currentDiffIndex, null);
+        }
+        #endregion
+
+        #region Helpers
+        private int GetCurrentLineRobust(ICSharpCode.AvalonEdit.TextEditor editor)
+        {
+            if (editor == null) return 1;
+            int caretLine = editor.TextArea.Caret.Line;
+            double verticalOffset = editor.TextArea.TextView.ScrollOffset.Y;
+
+            if (caretLine == 1 && verticalOffset > 20)
+            {
+                var visualTop = editor.TextArea.TextView.GetDocumentLineByVisualTop(verticalOffset);
+                if (visualTop != null) return visualTop.LineNumber;
+            }
+            return caretLine;
+        }
+
+        private void SyncScroll(object sender, ICSharpCode.AvalonEdit.TextEditor target)
+        {
+            target.TextArea.TextView.ScrollOffsetChanged -= (State.IsInlineMode ? (EventHandler)null : (target == OldJsonContent ? OldEditor_ScrollChanged : NewEditor_ScrollChanged));
+            // Note: Simplification above is tricky due to event signature matching, keeping explicit unsubscription is safer in SyncScroll
+            
+            // Re-implementing with explicit safety
+            if (target == OldJsonContent) target.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
+            else target.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
+
+            try
+            {
+                var sourceView = (TextView)sender;
+                var newV = Math.Min(sourceView.VerticalOffset, target.ExtentHeight - target.ViewportHeight);
+                var newH = Math.Min(sourceView.HorizontalOffset, target.ExtentWidth - target.ViewportWidth);
+                target.ScrollToVerticalOffset(newV);
+                target.ScrollToHorizontalOffset(newH);
+            }
+            finally
+            {
+                if (target == OldJsonContent) target.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
+                else target.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
+            }
+        }
+
+        private void ScrollToLine(int lineNumber)
+        {
+            if (State.IsInlineMode)
+            {
+                UnifiedDiffEditor.ScrollTo(lineNumber, 0);
+                UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
+                UnifiedDiffEditor.Focus();
+                return;
+            }
+
+            OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
+            NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
+
+            try
+            {
+                OldJsonContent.ScrollTo(lineNumber, 0);
+                NewJsonContent.ScrollTo(lineNumber, 0);
+
+                if (DiffNavigationPanel != null)
+                {
+                    DiffNavigationPanel.CurrentLine = lineNumber;
+                    DiffNavigationPanel.UpdateViewportGuide();
+                }
+
+                NewJsonContent.TextArea.Caret.Line = lineNumber;
+                NewJsonContent.TextArea.Caret.Column = 1;
+                NewJsonContent.Focus();
+            }
+            finally
+            {
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
+            }
         }
 
         private SideBySideDiffModel FilterDiffModel(SideBySideDiffModel originalModel)
@@ -195,150 +455,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             OldJsonContent.TextArea.TextView.BackgroundRenderers.Clear();
             NewJsonContent.TextArea.TextView.BackgroundRenderers.Clear();
 
-            OldJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, _isWordLevelDiff, true));
-            NewJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, _isWordLevelDiff, false));
+            OldJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, State.IsWordLevelDiff, true));
+            NewJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, State.IsWordLevelDiff, false));
         }
-
-        private void ScrollToLine(int lineNumber)
-        {
-            OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
-            NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
-
-            try
-            {
-                OldJsonContent.ScrollTo(lineNumber, 0);
-                NewJsonContent.ScrollTo(lineNumber, 0);
-
-                if (DiffNavigationPanel != null)
-                {
-                    DiffNavigationPanel.CurrentLine = lineNumber;
-                    DiffNavigationPanel.UpdateViewportGuide();
-                }
-
-                UpdateLayout();
-
-                // The viewport guide is updated automatically by the ScrollOffsetChanged event
-
-                NewJsonContent.TextArea.Caret.Line = lineNumber;
-                NewJsonContent.TextArea.Caret.Column = 1;
-                NewJsonContent.Focus();
-            }
-            finally
-            {
-                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
-            }
-        }
-
-        private void SetupScrollSync()
-        {
-            OldJsonContent.Loaded += OldJsonContent_Loaded;
-        }
-
-        private void OldJsonContent_Loaded(object sender, RoutedEventArgs e)
-        {
-            SetupScrollSyncAfterLoaded();
-        }
-
-        private void SetupScrollSyncAfterLoaded()
-        {
-            OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
-            NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
-
-            // This is the main optimization: only update the viewport guide on scroll
-            OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_UpdateViewportGuide;
-            NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_UpdateViewportGuide;
-        }
-
-        private void OldEditor_UpdateViewportGuide(object sender, EventArgs e)
-        {
-            DiffNavigationPanel?.UpdateViewportGuide();
-        }
-
-        private void NewEditor_UpdateViewportGuide(object sender, EventArgs e)
-        {
-            DiffNavigationPanel?.UpdateViewportGuide();
-        }
-
-        private void OldEditor_ScrollChanged(object sender, EventArgs e)
-        {
-            NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
-            try
-            {
-                var sourceView = (TextView)sender;
-                var newVerticalOffset = Math.Min(sourceView.VerticalOffset, NewJsonContent.ExtentHeight - NewJsonContent.ViewportHeight);
-                var newHorizontalOffset = Math.Min(sourceView.HorizontalOffset, NewJsonContent.ExtentWidth - NewJsonContent.ViewportWidth);
-                NewJsonContent.ScrollToVerticalOffset(newVerticalOffset);
-                NewJsonContent.ScrollToHorizontalOffset(newHorizontalOffset);
-            }
-            finally
-            {
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
-            }
-        }
-
-        private void NewEditor_ScrollChanged(object sender, EventArgs e)
-        {
-            OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
-            try
-            {
-                var sourceView = (TextView)sender;
-                var newVerticalOffset = Math.Min(sourceView.VerticalOffset, OldJsonContent.ExtentHeight - OldJsonContent.ViewportHeight);
-                var newHorizontalOffset = Math.Min(sourceView.HorizontalOffset, OldJsonContent.ExtentWidth - OldJsonContent.ViewportWidth);
-                OldJsonContent.ScrollToVerticalOffset(newVerticalOffset);
-                OldJsonContent.ScrollToHorizontalOffset(newHorizontalOffset);
-            }
-            finally
-            {
-                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
-            }
-        }
-
-        private void WordWrapButton_Click(object sender, RoutedEventArgs e)
-        {
-            bool isEnabled = WordWrapButton.IsChecked ?? false;
-            OldJsonContent.WordWrap = isEnabled;
-            NewJsonContent.WordWrap = isEnabled;
-        }
-
-        private void NextDiffButton_Click(object sender, RoutedEventArgs e)
-        {
-            DiffNavigationPanel?.NavigateToNextDifference(NewJsonContent.TextArea.Caret.Line);
-        }
-
-        private void PreviousDiffButton_Click(object sender, RoutedEventArgs e)
-        {
-            DiffNavigationPanel?.NavigateToPreviousDifference(NewJsonContent.TextArea.Caret.Line);
-        }
-
-        private void WordLevelDiffButton_Click(object sender, RoutedEventArgs e)
-        {
-            _isWordLevelDiff = WordLevelDiffButton.IsChecked ?? false;
-
-            var modelToShow = _hideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
-            ApplyDiffHighlighting(modelToShow);
-
-            OldJsonContent.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
-            NewJsonContent.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
-        }
-
-        private async void HideUnchangedButton_Click(object sender, RoutedEventArgs e)
-        {
-            _hideUnchangedLines = HideUnchangedButton.IsChecked ?? false;
-            int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(NewJsonContent.TextArea.Caret.Line) ?? -1;
-            try
-            {
-                await UpdateDiffView(currentDiffIndex);
-            }
-            catch (Exception ex)
-            {
-                CustomMessageBoxService.ShowError("Error", $"Failed to update view: {ex.Message}", Window.GetWindow(this));
-            }
-        }
-
-        protected virtual void OnComparisonFinished(bool success)
-        {
-            ComparisonFinished?.Invoke(this, success);
-        }
+        #endregion
     }
 }

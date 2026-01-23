@@ -17,36 +17,6 @@ namespace AssetsManager.Views.Settings
             this.DataContext = model;
         }
 
-        private void btnBrowseNew_Click(object sender, RoutedEventArgs e)
-        {
-            using (var folderBrowserDialog = new CommonOpenFileDialog
-            {
-                IsFolderPicker = true,
-                Title = "Select new hashes folder"
-            })
-            {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    textBoxNewHashPath.Text = folderBrowserDialog.FileName;
-                }
-            }
-        }
-
-        private void btnBrowseOld_Click(object sender, RoutedEventArgs e)
-        {
-            using (var folderBrowserDialog = new CommonOpenFileDialog
-            {
-                IsFolderPicker = true,
-                Title = "Select olds hashes folder"
-            })
-            {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    textBoxOldHashPath.Text = folderBrowserDialog.FileName;
-                }
-            }
-        }
-
         private void btnBrowseLol_Click(object sender, RoutedEventArgs e)
         {
             using (var folderBrowserDialog = new CommonOpenFileDialog

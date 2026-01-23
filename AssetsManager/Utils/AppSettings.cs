@@ -27,8 +27,6 @@ namespace AssetsManager.Utils
         public int AssetTrackerFrequency { get; set; }
         public int PbeStatusFrequency { get; set; }
 
-        public string NewHashesPath { get; set; }
-        public string OldHashesPath { get; set; }
         public string LolPbeDirectory { get; set; }
         public string LolLiveDirectory { get; set; }
         public string DefaultExtractedSelectDirectory { get; set; }
@@ -166,8 +164,6 @@ namespace AssetsManager.Utils
                 UpdateCheckFrequency = 10,
                 AssetTrackerFrequency = 60,
                 PbeStatusFrequency = 10,
-                NewHashesPath = null,
-                OldHashesPath = null,
                 LolPbeDirectory = null,
                 LolLiveDirectory = null,
                 DefaultExtractedSelectDirectory = null,
@@ -209,8 +205,6 @@ namespace AssetsManager.Utils
             EnableExtraction = defaultSettings.EnableExtraction;
             OrganizeExtractedAssets = defaultSettings.OrganizeExtractedAssets;
             ReportGeneration = defaultSettings.ReportGeneration;
-            NewHashesPath = defaultSettings.NewHashesPath;
-            OldHashesPath = defaultSettings.OldHashesPath;
             LolPbeDirectory = defaultSettings.LolPbeDirectory;
             LolLiveDirectory = defaultSettings.LolLiveDirectory;
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;

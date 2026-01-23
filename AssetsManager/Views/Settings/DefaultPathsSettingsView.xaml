@@ -30,58 +30,6 @@
             </Grid>
         </Border>
 
-        <!-- SECTION 1: Hash Directories -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <!-- Header -->
-                <Grid Margin="0,0,0,24">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="40" Height="40" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <materialIcons:MaterialIcon Kind="DatabaseSearchOutline" Foreground="{StaticResource AccentPurple}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
-                        <TextBlock Text="Hash Database Locations" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Set where resolved filename databases are stored and loaded" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Grid>
-                
-                <Grid Margin="8,0,0,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Width="2" Background="{StaticResource AccentPurple}" Opacity="0.2" CornerRadius="1" Margin="0,4,20,4"/>
-
-                    <StackPanel Grid.Column="1">
-                        <!-- New Hash Directory -->
-                        <TextBlock Text="New Hash Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Location where synchronized hash files will be stored" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                        <Grid Margin="0,0,0,24">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBox x:Name="textBoxNewHashPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.NewHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button x:Name="btnBrowseNew" Grid.Column="1" Click="btnBrowseNew_Click" Style="{StaticResource BrowseButtonStyle}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-
-                        <!-- Old Hash Directory -->
-                        <TextBlock Text="Old Hash Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Reference location for comparison database" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBox x:Name="textBoxOldHashPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.OldHashesPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button x:Name="btnBrowseOld" Grid.Column="1" Click="btnBrowseOld_Click" Style="{StaticResource BrowseButtonStyle}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
-
         <!-- SECTION 2: LoL Client Directories -->
         <Border Style="{StaticResource SettingsCard}">
             <StackPanel>
@@ -104,7 +52,7 @@
                     <StackPanel Grid.Column="1">
                         <!-- PBE Directory -->
                         <TextBlock Text="PBE Client Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Main source for Asset Tracker and latest game data" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Directory for the Public Beta server" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                         <Grid Margin="0,0,0,24">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBox x:Name="textBoxLolPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolPbeDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -118,7 +66,7 @@
 
                         <!-- Live Directory -->
                         <TextBlock Text="Live Client Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Reference for stable version comparison" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Directory for the official server" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBox x:Name="textBoxLolLivePath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolLiveDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />

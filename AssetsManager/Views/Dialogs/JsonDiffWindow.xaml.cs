@@ -8,11 +8,12 @@ namespace AssetsManager.Views.Dialogs
 {
     public partial class JsonDiffWindow : Window
     {
-        public JsonDiffWindow(CustomMessageBoxService customMessageBoxService, JsonFormatterService jsonFormatterService)
+        public JsonDiffWindow(CustomMessageBoxService customMessageBoxService, JsonFormatterService jsonFormatterService, LogService logService)
         {
             InitializeComponent();
             JsonDiffControl.CustomMessageBoxService = customMessageBoxService;
             JsonDiffControl.JsonFormatterService = jsonFormatterService;
+            JsonDiffControl.LogService = logService;
             JsonDiffControl.ComparisonFinished += JsonDiffControl_ComparisonFinished;
 
             // Start invisible to prevent visual jump

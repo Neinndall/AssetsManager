@@ -52,51 +52,39 @@ namespace AssetsManager.Views.Dialogs
 
         private void GenerateDifferenceMap()
         {
-            if (_diffMap != null) return; // Only generate once
+            if (_diffMap != null || OldImage.Source is not BitmapSource oldS || NewImage.Source is not BitmapSource newS) return;
 
-            var oldBmp = OldImage.Source as BitmapSource;
-            var newBmp = NewImage.Source as BitmapSource;
+            // Normalize formats to Bgra32
+            var oldC = new FormatConvertedBitmap(oldS, PixelFormats.Bgra32, null, 0);
+            var newC = new FormatConvertedBitmap(newS, PixelFormats.Bgra32, null, 0);
 
-            if (oldBmp == null || newBmp == null) return;
+            int w = Math.Max(oldC.PixelWidth, newC.PixelWidth);
+            int h = Math.Max(oldC.PixelHeight, newC.PixelHeight);
+            _diffMap = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
 
-            // Ensure we are working with the same format (Bgra32 is easy to manipulate)
-            FormatConvertedBitmap oldConverted = new FormatConvertedBitmap(oldBmp, PixelFormats.Bgra32, null, 0);
-            FormatConvertedBitmap newConverted = new FormatConvertedBitmap(newBmp, PixelFormats.Bgra32, null, 0);
+            // Using uint arrays for faster pixel manipulation
+            uint[] oldD = new uint[oldC.PixelWidth * oldC.PixelHeight];
+            uint[] newD = new uint[newC.PixelWidth * newC.PixelHeight];
+            oldC.CopyPixels(oldD, oldC.PixelWidth * 4, 0);
+            newC.CopyPixels(newD, newC.PixelWidth * 4, 0);
 
-            int width = oldConverted.PixelWidth;
-            int height = oldConverted.PixelHeight;
-
-            _diffMap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgra32, null);
-
-            int stride = width * 4;
-            byte[] oldPixels = new byte[height * stride];
-            byte[] newPixels = new byte[height * stride];
-            byte[] diffPixels = new byte[height * stride];
-
-            oldConverted.CopyPixels(oldPixels, stride, 0);
-            newConverted.CopyPixels(newPixels, stride, 0);
-
-            for (int i = 0; i < oldPixels.Length; i += 4)
+            uint[] diff = new uint[w * h];
+            for (int y = 0; y < h; y++)
             {
-                // Compare B, G, R, A
-                bool isDifferent = oldPixels[i] != newPixels[i] || 
-                                   oldPixels[i + 1] != newPixels[i + 1] || 
-                                   oldPixels[i + 2] != newPixels[i + 2] ||
-                                   oldPixels[i + 3] != newPixels[i + 3];
+                for (int x = 0; x < w; x++)
+                {
+                    bool inO = x < oldC.PixelWidth && y < oldC.PixelHeight;
+                    bool inN = x < newC.PixelWidth && y < newC.PixelHeight;
+                    
+                    uint p1 = inO ? oldD[y * oldC.PixelWidth + x] : 0;
+                    uint p2 = inN ? newD[y * newC.PixelWidth + x] : 0;
 
-                if (isDifferent)
-                {
-                    // Magenta for differences
-                    diffPixels[i] = 255; diffPixels[i + 1] = 0; diffPixels[i + 2] = 255; diffPixels[i + 3] = 255;
-                }
-                else
-                {
-                    // Black for identical
-                    diffPixels[i] = 0; diffPixels[i + 1] = 0; diffPixels[i + 2] = 0; diffPixels[i + 3] = 255;
+                    // Black (identical) or Magenta (different)
+                    diff[y * w + x] = (inO == inN && p1 == p2) ? 0xFF000000 : 0xFFFF00FF;
                 }
             }
 
-            _diffMap.WritePixels(new Int32Rect(0, 0, width, height), diffPixels, stride, 0);
+            _diffMap.WritePixels(new Int32Rect(0, 0, w, h), diff, w * 4, 0);
             DiffImageOverlay.Source = _diffMap;
         }
 
