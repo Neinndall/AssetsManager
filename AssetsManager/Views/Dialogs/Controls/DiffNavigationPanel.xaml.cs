@@ -17,6 +17,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         private TextEditor _newEditor;
         private SideBySideDiffModel _diffModel;
         private SideBySideDiffModel _originalDiffModel;
+        private IList<DiffPiece> _unifiedLines;
         private bool _isDragging;
         private Point _dragStartPoint;
         private bool _wasActuallyDragged;
@@ -77,6 +78,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             _newEditor = null;
             _diffModel = null;
             _originalDiffModel = null;
+            _unifiedLines = null;
             _diffLines.Clear();
             _oldViewportGuide = null;
             _newViewportGuide = null;
@@ -88,6 +90,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             _newEditor = newEditor;
             _diffModel = diffModel;
             _originalDiffModel = originalDiffModel ?? diffModel;
+            _unifiedLines = null;
 
             SetupEvents();
             FindDiffLines();
@@ -95,8 +98,32 @@ namespace AssetsManager.Views.Dialogs.Controls
             UpdateViewportGuide();
         }
 
+        public void Initialize(TextEditor editor, IList<DiffPiece> lines)
+        {
+            _oldEditor = null;
+            _newEditor = editor;
+            _unifiedLines = lines;
+            _diffModel = null;
+            _originalDiffModel = null;
+
+            // En modo unificado NO necesitamos el mapa visual ni sus eventos.
+            // Solo calculamos las líneas para que funcionen los botones de navegación.
+            FindDiffLines();
+        }
+
         private void SetupEvents()
         {
+            // Limpiar eventos previos antes de re-suscribir para evitar duplicados
+            OldDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
+            OldDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
+            OldDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
+            OldDiffMapHost.SizeChanged -= OldDiffMapHost_SizeChanged;
+
+            NewDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
+            NewDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
+            NewDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
+            NewDiffMapHost.SizeChanged -= NewDiffMapHost_SizeChanged;
+
             OldDiffMapHost.MouseLeftButtonDown += NavigationPanel_MouseLeftButtonDown;
             OldDiffMapHost.MouseMove += NavigationPanel_MouseMove;
             OldDiffMapHost.MouseLeftButtonUp += NavigationPanel_MouseLeftButtonUp;
@@ -125,6 +152,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             OldDiffMapHost.ClearVisuals();
             NewDiffMapHost.ClearVisuals();
 
+            if (_unifiedLines != null) return; // Unified mode doesn't show map for now
             if (_diffModel?.OldText?.Lines == null) return;
 
             var panelHeight = OldDiffMapHost.ActualHeight > 0 ? OldDiffMapHost.ActualHeight : 600;
@@ -141,6 +169,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             // Remove the old viewport visual from the host
             if (_oldViewportGuide != null) OldDiffMapHost.RemoveVisual(_oldViewportGuide);
             if (_newViewportGuide != null) NewDiffMapHost.RemoveVisual(_newViewportGuide);
+
+            if (_unifiedLines != null) return; // Unified mode doesn't show map for now
+            if (_diffModel == null) return;
 
             var panelHeight = OldDiffMapHost.ActualHeight;
             if (panelHeight <= 0) return;
@@ -208,7 +239,20 @@ namespace AssetsManager.Views.Dialogs.Controls
             _diffLines.Clear();
             var diffLineSet = new HashSet<int>();
 
-            if (_diffModel != null)
+            if (_unifiedLines != null)
+            {
+                if (_unifiedLines.Count > 0 && _unifiedLines[0].Type != ChangeType.Unchanged)
+                    diffLineSet.Add(1);
+
+                for (int i = 1; i < _unifiedLines.Count; i++)
+                {
+                    if (_unifiedLines[i].Type != ChangeType.Unchanged && _unifiedLines[i].Type != _unifiedLines[i - 1].Type)
+                    {
+                        diffLineSet.Add(i + 1);
+                    }
+                }
+            }
+            else if (_diffModel != null)
             {
                 if (_originalDiffModel != _diffModel && _diffModel.NewText.Lines.Count > 0)
                 diffLineSet.Add(1);
@@ -387,7 +431,9 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (!_diffLines.Any()) return;
 
-            var totalLines = Math.Max(_diffModel.OldText.Lines.Count, _diffModel.NewText.Lines.Count);
+            var totalLines = _unifiedLines?.Count ?? Math.Max(_diffModel?.OldText.Lines.Count ?? 0, _diffModel?.NewText.Lines.Count ?? 0);
+            if (totalLines == 0) return;
+
             var panelHeight = (panel as FrameworkElement).ActualHeight;
             if (panelHeight <= 0) return;
 
@@ -398,7 +444,9 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void HandleNavigation(IInputElement panel, double y)
         {
-            var totalLines = Math.Max(_diffModel.OldText.Lines.Count, _diffModel.NewText.Lines.Count);
+            var totalLines = _unifiedLines?.Count ?? Math.Max(_diffModel?.OldText.Lines.Count ?? 0, _diffModel?.NewText.Lines.Count ?? 0);
+            if (totalLines == 0) return;
+
             var panelHeight = (panel as FrameworkElement).ActualHeight;
             if (panelHeight <= 0) return;
             var lineNumber = (int)((y / panelHeight) * totalLines) + 1;
