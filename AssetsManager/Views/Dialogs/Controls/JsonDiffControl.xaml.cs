@@ -20,6 +20,8 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Views.Helpers;
+using System.Collections.Generic;
+using AssetsManager.Views.Models.Controls;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
@@ -29,9 +31,9 @@ namespace AssetsManager.Views.Dialogs.Controls
         private DiffPaneModel _unifiedModel;
         private string _oldText;
         private string _newText;
-        private bool _isInlineMode = false;
-        private bool _isWordLevelDiff = false;
-        private bool _hideUnchangedLines = false;
+        
+        public JsonDiffModel State { get; } = new JsonDiffModel();
+        
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public JsonFormatterService JsonFormatterService { get; set; }
         public event EventHandler<bool> ComparisonFinished;
@@ -39,13 +41,13 @@ namespace AssetsManager.Views.Dialogs.Controls
         public JsonDiffControl()
         {
             InitializeComponent();
+            this.DataContext = State;
             LoadJsonSyntaxHighlighting();
             SetupScrollSync();
         }
 
         public void Dispose()
         {
-            // Desuscribir todos los eventos
             if (DiffNavigationPanel != null)
             {
                 DiffNavigationPanel.ScrollRequested -= ScrollToLine;
@@ -68,7 +70,6 @@ namespace AssetsManager.Views.Dialogs.Controls
                 }
             }
 
-            // Limpiar renderers y documentos de AvalonEdit
             OldJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
             NewJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
             UnifiedDiffEditor?.TextArea?.TextView?.BackgroundRenderers.Clear();
@@ -76,12 +77,10 @@ namespace AssetsManager.Views.Dialogs.Controls
             NewJsonContent.Document = null;
             UnifiedDiffEditor.Document = null;
 
-            // Anular referencias a objetos pesados
             _originalDiffModel = null;
             _oldText = null;
             _newText = null;
 
-            // Anular referencias a otros controles y servicios
             DiffNavigationPanel = null;
             CustomMessageBoxService = null;
         }
@@ -89,7 +88,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void FocusFirstDifference()
         {
-            if (_isInlineMode) return; // Navigation not yet implemented for inline
             DiffNavigationPanel?.NavigateToNextDifference(0);
         }
 
@@ -150,19 +148,34 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_originalDiffModel == null) return;
 
-            if (_isInlineMode)
+            if (State.IsInlineMode)
             {
-                DiffGrid.Visibility = Visibility.Collapsed;
-                UnifiedDiffContainer.Visibility = Visibility.Visible;
                 await DisplayUnifiedDiff();
+
+                var linesForUnified = State.HideUnchangedLines
+                    ? _unifiedModel.Lines.Where(l => l.Type != ChangeType.Unchanged).ToList()
+                    : _unifiedModel.Lines;
+
+                DiffNavigationPanel.Initialize(UnifiedDiffEditor, linesForUnified);
+                DiffNavigationPanel.ScrollRequested -= ScrollToLine;
+                DiffNavigationPanel.ScrollRequested += ScrollToLine;
+
+                EventHandler layoutHandler = null;
+                layoutHandler = (s, e) =>
+                {
+                    UnifiedDiffEditor.TextArea.TextView.LayoutUpdated -= layoutHandler;
+                    if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
+                        DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
+                    else
+                        FocusFirstDifference();
+                };
+                UnifiedDiffEditor.TextArea.TextView.LayoutUpdated += layoutHandler;
+
                 return;
             }
 
-            DiffGrid.Visibility = Visibility.Visible;
-            UnifiedDiffContainer.Visibility = Visibility.Collapsed;
-
-            var modelToShow = _hideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
-            var originalModelForNav = _hideUnchangedLines ? _originalDiffModel : null;
+            var modelToShow = State.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
+            var originalModelForNav = State.HideUnchangedLines ? _originalDiffModel : null;
 
             var (normalizedOld, normalizedNew) = await Task.Run(() =>
             {
@@ -180,29 +193,22 @@ namespace AssetsManager.Views.Dialogs.Controls
             ApplyDiffHighlighting(modelToShow);
 
             DiffNavigationPanel.Initialize(OldJsonContent, NewJsonContent, modelToShow, originalModelForNav);
-            DiffNavigationPanel.ScrollRequested -= ScrollToLine; // Avoid multiple subscriptions
+            DiffNavigationPanel.ScrollRequested -= ScrollToLine;
             DiffNavigationPanel.ScrollRequested += ScrollToLine;
 
             EventHandler layoutUpdatedHandler = null;
             layoutUpdatedHandler = (s, e) =>
             {
                 NewJsonContent.TextArea.TextView.LayoutUpdated -= layoutUpdatedHandler;
-                
-                // Use Dispatcher to ensure layout is fully finished before positioning
-                Dispatcher.BeginInvoke(new Action(() =>
+                if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
                 {
-                    if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
-                    {
-                        DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
-                    }
-                    else
-                    {
-                        // If no specific index, just ensure we show something useful (like top or first diff)
-                        // For Side-by-Side initial load, we usually focus first diff
-                        if (diffIndexToRestore == null) FocusFirstDifference();
-                    }
-                    RefreshGuidePosition();
-                }), System.Windows.Threading.DispatcherPriority.Background);
+                    DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
+                }
+                else
+                {
+                    if (diffIndexToRestore == null) FocusFirstDifference();
+                }
+                RefreshGuidePosition();
             };
             NewJsonContent.TextArea.TextView.LayoutUpdated += layoutUpdatedHandler;
         }
@@ -211,7 +217,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             _unifiedModel = await Task.Run(() => new InlineDiffBuilder(new Differ()).BuildDiffModel(_oldText, _newText));
             
-            var linesToShow = _hideUnchangedLines 
+            var linesToShow = State.HideUnchangedLines 
                 ? _unifiedModel.Lines.Where(l => l.Type != ChangeType.Unchanged).ToList() 
                 : _unifiedModel.Lines;
 
@@ -222,11 +228,15 @@ namespace AssetsManager.Views.Dialogs.Controls
             UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Add(new UnifiedDiffBackgroundRenderer(linesToShow));
         }
 
-        private void ComparisonInlineMode_Checked(object sender, RoutedEventArgs e)
+        private async void ComparisonInlineMode_Checked(object sender, RoutedEventArgs e)
         {
             if (UnifiedBtn == null) return;
-            _isInlineMode = UnifiedBtn.IsChecked == true;
-            _ = UpdateDiffView();
+
+            int currentLine = State.IsInlineMode ? UnifiedDiffEditor.TextArea.Caret.Line : NewJsonContent.TextArea.Caret.Line;
+            int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(currentLine) ?? -1;
+
+            // Note: DataBinding handles State.IsInlineMode update via IsChecked binding
+            await UpdateDiffView(currentDiffIndex);
         }
 
         private SideBySideDiffModel FilterDiffModel(SideBySideDiffModel originalModel)
@@ -251,13 +261,13 @@ namespace AssetsManager.Views.Dialogs.Controls
             OldJsonContent.TextArea.TextView.BackgroundRenderers.Clear();
             NewJsonContent.TextArea.TextView.BackgroundRenderers.Clear();
 
-            OldJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, _isWordLevelDiff, true));
-            NewJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, _isWordLevelDiff, false));
+            OldJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, State.IsWordLevelDiff, true));
+            NewJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, State.IsWordLevelDiff, false));
         }
 
         private void ScrollToLine(int lineNumber)
         {
-            if (_isInlineMode)
+            if (State.IsInlineMode)
             {
                 UnifiedDiffEditor.ScrollTo(lineNumber, 0);
                 UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
@@ -280,8 +290,6 @@ namespace AssetsManager.Views.Dialogs.Controls
                 }
 
                 UpdateLayout();
-
-                // The viewport guide is updated automatically by the ScrollOffsetChanged event
 
                 NewJsonContent.TextArea.Caret.Line = lineNumber;
                 NewJsonContent.TextArea.Caret.Column = 1;
@@ -309,7 +317,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
             NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
 
-            // This is the main optimization: only update the viewport guide on scroll
             OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_UpdateViewportGuide;
             NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_UpdateViewportGuide;
         }
@@ -360,29 +367,26 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void WordWrapButton_Click(object sender, RoutedEventArgs e)
         {
-            bool isEnabled = WordWrapButton.IsChecked ?? false;
-            OldJsonContent.WordWrap = isEnabled;
-            NewJsonContent.WordWrap = isEnabled;
-            UnifiedDiffEditor.WordWrap = isEnabled;
+            OldJsonContent.WordWrap = State.IsWordWrapEnabled;
+            NewJsonContent.WordWrap = State.IsWordWrapEnabled;
+            UnifiedDiffEditor.WordWrap = State.IsWordWrapEnabled;
         }
 
         private void NextDiffButton_Click(object sender, RoutedEventArgs e)
         {
-            int currentLine = _isInlineMode ? UnifiedDiffEditor.TextArea.Caret.Line : NewJsonContent.TextArea.Caret.Line;
+            int currentLine = State.IsInlineMode ? UnifiedDiffEditor.TextArea.Caret.Line : NewJsonContent.TextArea.Caret.Line;
             DiffNavigationPanel?.NavigateToNextDifference(currentLine);
         }
 
         private void PreviousDiffButton_Click(object sender, RoutedEventArgs e)
         {
-            int currentLine = _isInlineMode ? UnifiedDiffEditor.TextArea.Caret.Line : NewJsonContent.TextArea.Caret.Line;
+            int currentLine = State.IsInlineMode ? UnifiedDiffEditor.TextArea.Caret.Line : NewJsonContent.TextArea.Caret.Line;
             DiffNavigationPanel?.NavigateToPreviousDifference(currentLine);
         }
 
         private void WordLevelDiffButton_Click(object sender, RoutedEventArgs e)
         {
-            _isWordLevelDiff = WordLevelDiffButton.IsChecked ?? false;
-
-            var modelToShow = _hideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
+            var modelToShow = State.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
             ApplyDiffHighlighting(modelToShow);
 
             OldJsonContent.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
@@ -391,7 +395,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async void HideUnchangedButton_Click(object sender, RoutedEventArgs e)
         {
-            _hideUnchangedLines = HideUnchangedButton.IsChecked ?? false;
             int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(NewJsonContent.TextArea.Caret.Line) ?? -1;
             try
             {
