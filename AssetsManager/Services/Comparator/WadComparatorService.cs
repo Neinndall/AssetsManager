@@ -95,7 +95,14 @@ namespace AssetsManager.Services.Comparator
                 NotifyComparisonCompleted(allDiffs, oldDir, newDir);
                 if (allDiffs != null)
                 {
-                    _logService.LogSuccess($"Single WAD comparison completed. Found {allDiffs.Count} differences.");
+                    if (allDiffs.Count == 0)
+                    {
+                        _logService.LogSuccess("Comparison completed with no differences found.");
+                    }
+                    else
+                    {
+                        _logService.LogSuccess($"Single WAD comparison completed. Found {allDiffs.Count} {(allDiffs.Count == 1 ? "difference" : "differences")}.");
+                    }
                 }
                 else if (allDiffs == null && !cancellationToken.IsCancellationRequested) // Only log error if not cancelled
                 {
@@ -167,7 +174,14 @@ namespace AssetsManager.Services.Comparator
                 NotifyComparisonCompleted(allDiffs, oldDir, newDir);
                 if (allDiffs != null)
                 {
-                    _logService.LogSuccess($"WADs comparison completed. Found {allDiffs.Count} differences.");
+                    if (allDiffs.Count == 0)
+                    {
+                        _logService.LogSuccess("Comparison completed with no differences found.");
+                    }
+                    else
+                    {
+                        _logService.LogSuccess($"WADs comparison completed. Found {allDiffs.Count} {(allDiffs.Count == 1 ? "difference" : "differences")}.");
+                    }
                 }
                 else if (allDiffs == null && !cancellationToken.IsCancellationRequested) // Only log error if not cancelled
                 {

@@ -280,7 +280,6 @@ namespace AssetsManager.Views
 
             if (!serializableDiffs.Any())
             {
-                _logService.Log("Comparison completed with no differences found.");
                 return;
             }
 
