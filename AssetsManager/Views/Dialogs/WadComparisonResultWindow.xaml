@@ -14,7 +14,6 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -26,10 +25,12 @@
                 Padding="24,20">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
+                <!-- Title -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
                         <materialIcons:MaterialIcon Kind="Compare" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -46,8 +47,48 @@
                                    Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
+
+                <!-- Compact Stats Dashboard -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <!-- New Files -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
+                        <Border Background="#1A00E676" CornerRadius="6" Width="28" Height="28" Margin="0,0,8,0">
+                            <materialIcons:MaterialIcon Kind="Plus" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="New:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBlock x:Name="CountNewText" Text="0" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Modified Files -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
+                        <Border Background="#1AFF9100" CornerRadius="6" Width="28" Height="28" Margin="0,0,8,0">
+                            <materialIcons:MaterialIcon Kind="Pencil" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Modified:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBlock x:Name="CountModifiedText" Text="0" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Removed Files -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
+                        <Border Background="#1AFF5252" CornerRadius="6" Width="28" Height="28" Margin="0,0,8,0">
+                            <materialIcons:MaterialIcon Kind="Minus" Width="14" Height="14" Foreground="{StaticResource AccentRed}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Removed:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBlock x:Name="CountRemovedText" Text="0" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Renamed Files -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
+                        <Border Background="#1A00D1FF" CornerRadius="6" Width="28" Height="28" Margin="0,0,8,0">
+                            <materialIcons:MaterialIcon Kind="Rename" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Renamed:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBlock x:Name="CountRenamedText" Text="0" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
                 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="reloadHashesButton"
                             Content="Reload Hashes" 
                             Style="{StaticResource SecondaryButton}"
@@ -56,7 +97,7 @@
                             Click="ReloadHashesButton_Click"
                             ToolTip="Reloads hashes from the default application path"/>
                     <Button x:Name="saveButton"
-                            Content="Save Report"
+                            Content="Save Report" 
                             Style="{StaticResource PrimaryButton}"
                             HorizontalContentAlignment="Center"
                             Click="SaveButton_Click"
@@ -65,65 +106,8 @@
             </Grid>
         </Border>
 
-        <!-- Stats Dashboard -->
-        <Grid Grid.Row="1" Margin="24,8,24,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- New Files Card -->
-            <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="12,8">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#1A00E676" CornerRadius="8" Width="32" Height="32">
-                        <materialIcons:MaterialIcon Kind="Plus" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
-                    </Border>
-                    <TextBlock Text="New Files:" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="12,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="CountNewText" Text="0" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Modified Files Card -->
-            <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="12,8">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#1AFF9100" CornerRadius="8" Width="32" Height="32">
-                        <materialIcons:MaterialIcon Kind="Pencil" Width="16" Height="16" Foreground="{StaticResource AccentOrange}"/>
-                    </Border>
-                    <TextBlock Text="Modified:" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="12,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="CountModifiedText" Text="0" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Removed Files Card -->
-            <Border Grid.Column="4" Style="{StaticResource SettingsCard}" Padding="12,8">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#1AFF5252" CornerRadius="8" Width="32" Height="32">
-                        <materialIcons:MaterialIcon Kind="Minus" Width="18" Height="18" Foreground="{StaticResource AccentRed}"/>
-                    </Border>
-                    <TextBlock Text="Removed:" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="12,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="CountRemovedText" Text="0" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Renamed Files Card -->
-            <Border Grid.Column="6" Style="{StaticResource SettingsCard}" Padding="12,8">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#1A00D1FF" CornerRadius="8" Width="32" Height="32">
-                        <materialIcons:MaterialIcon Kind="Rename" Width="16" Height="16" Foreground="{StaticResource AccentBlue}"/>
-                    </Border>
-                    <TextBlock Text="Renamed:" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="12,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="CountRenamedText" Text="0" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Border>
-        </Grid>
-
         <!-- Main Content -->
-        <Grid Grid.Row="2" Margin="24,0,24,24">
+        <Grid Grid.Row="1" Margin="24,24,24,24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*"/>
                 <ColumnDefinition Width="Auto"/>
