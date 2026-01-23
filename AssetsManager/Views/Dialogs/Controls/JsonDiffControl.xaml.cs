@@ -216,9 +216,10 @@ namespace AssetsManager.Views.Dialogs.Controls
             DiffNavigationPanel.ScrollRequested += ScrollToLine;
         }
 
-        private void InlineViewButton_Click(object sender, RoutedEventArgs e)
+        private void ComparisonInlineMode_Checked(object sender, RoutedEventArgs e)
         {
-            _isInlineMode = InlineViewButton.IsChecked ?? false;
+            if (UnifiedBtn == null) return;
+            _isInlineMode = UnifiedBtn.IsChecked == true;
             _ = UpdateDiffView();
         }
 
