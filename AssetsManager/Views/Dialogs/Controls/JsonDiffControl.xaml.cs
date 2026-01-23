@@ -32,10 +32,15 @@ namespace AssetsManager.Views.Dialogs.Controls
         private string _oldText;
         private string _newText;
         
+        // Cache documents to avoid recreation and flickering
+        private TextDocument _cachedOldDoc;
+        private TextDocument _cachedNewDoc;
+
         public JsonDiffModel State { get; } = new JsonDiffModel();
         
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public JsonFormatterService JsonFormatterService { get; set; }
+        public LogService LogService { get; set; }
         public event EventHandler<bool> ComparisonFinished;
 
         public JsonDiffControl()
@@ -73,18 +78,22 @@ namespace AssetsManager.Views.Dialogs.Controls
             OldJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
             NewJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
             UnifiedDiffEditor?.TextArea?.TextView?.BackgroundRenderers.Clear();
+            
             OldJsonContent.Document = null;
             NewJsonContent.Document = null;
             UnifiedDiffEditor.Document = null;
+            
+            _cachedOldDoc = null;
+            _cachedNewDoc = null;
 
             _originalDiffModel = null;
             _oldText = null;
             _newText = null;
+            _unifiedModel = null;
 
             DiffNavigationPanel = null;
             CustomMessageBoxService = null;
         }
-
 
         public void FocusFirstDifference()
         {
@@ -105,6 +114,11 @@ namespace AssetsManager.Views.Dialogs.Controls
                 OldFileNameLabel.Text = oldFileName;
                 NewFileNameLabel.Text = newFileName;
                 UnifiedFileNameLabel.Text = newFileName;
+                
+                // Reset caches on new load
+                _cachedOldDoc = null;
+                _cachedNewDoc = null;
+                _unifiedModel = null;
 
                 _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
 
@@ -116,7 +130,6 @@ namespace AssetsManager.Views.Dialogs.Controls
                 OnComparisonFinished(false);
             }
         }
-
 
         private void LoadJsonSyntaxHighlighting()
         {
@@ -148,137 +161,135 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_originalDiffModel == null) return;
 
+            // --- INLINE MODE LOGIC ---
             if (State.IsInlineMode)
             {
-                await DisplayUnifiedDiff();
+                // Only build model and document if not already cached or if hiding unchanged lines
+                // (Filtering changes the document content, so we might need to regenerate if that setting changed)
+                // For this implementation, to ensure smoothness on mode switch, we cache the FULL unified doc.
+                // If HideUnchangedLines is toggled, we might need to regenerate. 
+                // But for simple Mode Switching, we use the cache.
+
+                if (_unifiedModel == null)
+                {
+                     _unifiedModel = await Task.Run(() => new InlineDiffBuilder(new Differ()).BuildDiffModel(_oldText, _newText));
+                }
 
                 var linesForUnified = State.HideUnchangedLines
                     ? _unifiedModel.Lines.Where(l => l.Type != ChangeType.Unchanged).ToList()
                     : _unifiedModel.Lines;
+                
+                // Fix variable naming consistency
+                var linesToShow = linesForUnified;
+
+                // Create document only if needed or if content changed due to filtering
+                // Note: Recreating document is necessary if we filter lines, as the text changes.
+                // But for mode switch without filtering change, we can preserve it?
+                // For simplicity and fluidity, we will regenerate the text only if needed.
+                
+                // Let's just generate the text. Text generation is fast. Document creation causes flash if assigned.
+                string combinedText = string.Join(Environment.NewLine, linesToShow.Select(l => l.Text));
+                
+                if (UnifiedDiffEditor.Document == null || UnifiedDiffEditor.Document.TextLength != combinedText.Length || UnifiedDiffEditor.Text != combinedText)
+                {
+                     UnifiedDiffEditor.Document = new TextDocument(combinedText);
+                     UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Clear();
+                     UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Add(new UnifiedDiffBackgroundRenderer(linesToShow));
+                }
 
                 DiffNavigationPanel.Initialize(UnifiedDiffEditor, linesForUnified);
                 DiffNavigationPanel.ScrollRequested -= ScrollToLine;
                 DiffNavigationPanel.ScrollRequested += ScrollToLine;
 
-                EventHandler layoutHandler = null;
-                layoutHandler = async (s, e) =>
+                // Force layout update and restore position instantly
+                UnifiedDiffEditor.UpdateLayout();
+                
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    UnifiedDiffEditor.TextArea.TextView.LayoutUpdated -= layoutHandler;
-                    
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
-                            DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
-                        else
-                            FocusFirstDifference();
-                        
-                        LogService?.Log($"[JsonDiffControl] Inline view restored at index {diffIndexToRestore}.");
-                    }, System.Windows.Threading.DispatcherPriority.Render);
-                };
-                UnifiedDiffEditor.TextArea.TextView.LayoutUpdated += layoutHandler;
+                     if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
+                        DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
+                    else
+                        FocusFirstDifference();
+                }, System.Windows.Threading.DispatcherPriority.Render);
 
                 return;
             }
 
+            // --- SIDE BY SIDE MODE LOGIC ---
             var modelToShow = State.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
             var originalModelForNav = State.HideUnchangedLines ? _originalDiffModel : null;
 
-            var (normalizedOld, normalizedNew) = await Task.Run(() =>
-            {
-                var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText);
-                var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText);
-                return (nOld, nNew);
-            });
+            // Only regenerate documents if we don't have them cached OR if we are filtering (which changes content)
+            // If State.HideUnchangedLines changed, we MUST regenerate.
+            // If just switching modes, _cachedOldDoc should be reused.
+            
+            bool needToRecreateDocs = _cachedOldDoc == null || State.HideUnchangedLines; 
+            // Better check: compare current doc text with model text? Too slow.
+            // Simple approach: If cached is null, create. If HideUnchanged is true, we always recreate for now (filtering).
+            // But for the specific case of SWITCHING MODES (HideUnchanged=false), we reuse.
 
-            OldJsonContent.Document = new TextDocument(normalizedOld.Text);
-            NewJsonContent.Document = new TextDocument(normalizedNew.Text);
+            if (needToRecreateDocs && !State.HideUnchangedLines)
+            {
+                 // Only reuse if not filtering. If filtering, we regenerate for now to be safe.
+                 if (_cachedOldDoc != null && OldJsonContent.Document == _cachedOldDoc) needToRecreateDocs = false;
+            }
+
+            if (needToRecreateDocs)
+            {
+                var (normalizedOld, normalizedNew) = await Task.Run(() =>
+                {
+                    var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText);
+                    var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText);
+                    return (nOld, nNew);
+                });
+
+                _cachedOldDoc = new TextDocument(normalizedOld.Text);
+                _cachedNewDoc = new TextDocument(normalizedNew.Text);
+                
+                OldJsonContent.Document = _cachedOldDoc;
+                NewJsonContent.Document = _cachedNewDoc;
+                
+                ApplyDiffHighlighting(modelToShow);
+            }
+            else
+            {
+                // Ensure the editor has the cached docs assigned (in case they were detached, though we don't detach them)
+                if (OldJsonContent.Document != _cachedOldDoc) OldJsonContent.Document = _cachedOldDoc;
+                if (NewJsonContent.Document != _cachedNewDoc) NewJsonContent.Document = _cachedNewDoc;
+            }
 
             OldJsonContent.UpdateLayout();
             NewJsonContent.UpdateLayout();
-
-            ApplyDiffHighlighting(modelToShow);
 
             DiffNavigationPanel.Initialize(OldJsonContent, NewJsonContent, modelToShow, originalModelForNav);
             DiffNavigationPanel.ScrollRequested -= ScrollToLine;
             DiffNavigationPanel.ScrollRequested += ScrollToLine;
 
-            EventHandler layoutUpdatedHandler = null;
-            layoutUpdatedHandler = async (s, e) =>
+            // Instant restore
+            await Dispatcher.InvokeAsync(() =>
             {
-                NewJsonContent.TextArea.TextView.LayoutUpdated -= layoutUpdatedHandler;
-                
-                // Use ContextIdle to ensure the UI is fully stable before manipulating Caret/Scroll
-                await Dispatcher.InvokeAsync(() =>
+                if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
                 {
-                    if (diffIndexToRestore.HasValue && diffIndexToRestore.Value != -1)
-                    {
-                        DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
-                    }
-                    else
-                    {
-                        if (diffIndexToRestore == null) FocusFirstDifference();
-                    }
-                    RefreshGuidePosition();
-                    LogService?.Log($"[JsonDiffControl] SideBySide view restored at index {diffIndexToRestore}.");
-                }, System.Windows.Threading.DispatcherPriority.Render);
-            };
-            NewJsonContent.TextArea.TextView.LayoutUpdated += layoutUpdatedHandler;
+                    DiffNavigationPanel?.NavigateToDifferenceByIndex(diffIndexToRestore.Value);
+                }
+                else
+                {
+                    if (diffIndexToRestore == null) FocusFirstDifference();
+                }
+                RefreshGuidePosition();
+            }, System.Windows.Threading.DispatcherPriority.Render);
         }
-
-        private async Task DisplayUnifiedDiff()
-        {
-            _unifiedModel = await Task.Run(() => new InlineDiffBuilder(new Differ()).BuildDiffModel(_oldText, _newText));
-            
-            var linesToShow = State.HideUnchangedLines 
-                ? _unifiedModel.Lines.Where(l => l.Type != ChangeType.Unchanged).ToList() 
-                : _unifiedModel.Lines;
-
-            string combinedText = string.Join(Environment.NewLine, linesToShow.Select(l => l.Text));
-            UnifiedDiffEditor.Document = new TextDocument(combinedText);
-
-            UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Clear();
-            UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Add(new UnifiedDiffBackgroundRenderer(linesToShow));
-        }
-
-        public LogService LogService { get; set; }
 
         private async void ComparisonInlineMode_Checked(object sender, RoutedEventArgs e)
         {
             if (UnifiedBtn == null || SideBySideBtn == null) return;
 
-            // Determine source editor based on which button was clicked.
-            // If sender is UnifiedBtn, we are switching TO Inline, so source is SideBySide (NewJsonContent).
-            bool switchingToInline = sender == UnifiedBtn;
-            var sourceEditor = switchingToInline ? NewJsonContent : UnifiedDiffEditor;
-            
-            int currentLine = GetCurrentLineRobust(sourceEditor);
-            int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(currentLine) ?? -1;
+            // Always go to the first difference when switching modes to prevent jumps.
+            int currentDiffIndex = 0;
 
-            LogService?.Log($"[JsonDiffControl] Mode Switch. ToInline: {switchingToInline}. Line: {currentLine}. Index: {currentDiffIndex}. Offset: {sourceEditor.TextArea.TextView.ScrollOffset.Y}");
+            LogService?.Log($"[JsonDiffControl] Mode Switch. Resetting to First Difference.");
 
-            // Note: DataBinding handles State.IsInlineMode update via IsChecked binding
             await UpdateDiffView(currentDiffIndex);
-        }
-
-        private int GetCurrentLineRobust(ICSharpCode.AvalonEdit.TextEditor editor)
-        {
-            if (editor == null) return 1;
-
-            int caretLine = editor.TextArea.Caret.Line;
-            double verticalOffset = editor.TextArea.TextView.ScrollOffset.Y;
-
-            // If Caret is at 1 but we are scrolled down significantly, rely on scroll position
-            if (caretLine == 1 && verticalOffset > 20)
-            {
-                var visualTop = editor.TextArea.TextView.GetDocumentLineByVisualTop(verticalOffset);
-                if (visualTop != null)
-                {
-                    LogService?.Log($"[JsonDiffControl] Fallback line detection triggered. Caret: 1, Offset: {verticalOffset}, Calculated: {visualTop.LineNumber}");
-                    return visualTop.LineNumber;
-                }
-            }
-
-            return caretLine;
         }
 
         private SideBySideDiffModel FilterDiffModel(SideBySideDiffModel originalModel)
@@ -439,6 +450,9 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async void HideUnchangedButton_Click(object sender, RoutedEventArgs e)
         {
+            // When filtering toggles, we MUST recreate documents/content, so flash is expected here, but not on mode switch.
+            _cachedOldDoc = null; 
+            
             int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(NewJsonContent.TextArea.Caret.Line) ?? -1;
             try
             {
