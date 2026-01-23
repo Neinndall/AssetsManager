@@ -21,7 +21,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Views.Helpers;
 using System.Collections.Generic;
-using AssetsManager.Views.Models.Controls;
+using AssetsManager.Views.Models.Dialogs;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
