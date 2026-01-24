@@ -40,7 +40,6 @@ namespace AssetsManager.Views.Dialogs
             
             // Sync Slider value
             OverlaySlider.Value = 50;
-
             _isInitialized = true;
 
             // Force Side-by-Side as default
@@ -208,19 +207,17 @@ namespace AssetsManager.Views.Dialogs
             double width = NewImageOverlay.ActualWidth;
             double height = NewImageOverlay.ActualHeight;
 
-            // If layout is not ready, we can't position correctly yet
             if (width <= 0) return;
 
-            // The slider acts as a curtain from LEFT to RIGHT
-            // At 0%: Clip width is 0 (New image hidden)
-            // At 100%: Clip width is full width (New image fully visible)
-            double visibleWidth = width * percentage;
-            SliderClip.Rect = new Rect(0, 0, visibleWidth, height);
+            // Natural movement: xPos follows the slider
+            double xPos = width * percentage;
+            
+            // Revelado desde la izquierda (NEW oculta a OLD progresivamente)
+            SliderClip.Rect = new Rect(0, 0, xPos, height);
 
-            // Position the visual line relative to image pixels using TranslateTransform
             if (SliderOffsetTranslate != null)
             {
-                SliderOffsetTranslate.X = visibleWidth;
+                SliderOffsetTranslate.X = xPos;
                 SliderSeparatorLine.Margin = new Thickness(0); 
             }
         }
