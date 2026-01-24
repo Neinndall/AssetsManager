@@ -88,7 +88,21 @@
 
                             <!-- File Icon Box -->
                             <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
-                                <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <materialIcons:MaterialIcon Width="18" Height="18" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon.Style>
+                                        <Style TargetType="materialIcons:MaterialIcon">
+                                            <Setter Property="Kind" Value="FileQuestionOutline"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type}" Value="FileDiff">
+                                                    <Setter Property="Kind" Value="FileDocumentOutline"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="WadComparison">
+                                                    <Setter Property="Kind" Value="FolderZipOutline"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </materialIcons:MaterialIcon.Style>
+                                </materialIcons:MaterialIcon>
                             </Border>
 
                             <!-- Info -->

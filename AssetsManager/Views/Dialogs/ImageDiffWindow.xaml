@@ -143,11 +143,15 @@
                             </StackPanel.Style>
                             <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,4" CornerRadius="1"/>
                             <TextBlock Text="ADJUST" Style="{StaticResource ToolSectionLabel}"/>
-                            <Slider x:Name="OverlaySlider" Width="100" Minimum="0" Maximum="100" Value="50" 
-                                    VerticalAlignment="Center" Margin="4,0,8,0"
+                            
+                            <TextBlock Text="OLD" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="8,0,4,0" Opacity="0.8"/>
+                            <Slider x:Name="OverlaySlider" Width="120" Minimum="0" Maximum="100" Value="50" 
+                                    VerticalAlignment="Center" Margin="0"
                                     ValueChanged="OverlaySlider_ValueChanged"/>
+                            <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="4,0,8,0" Opacity="0.8"/>
+
                             <TextBlock Text="{Binding Value, ElementName=OverlaySlider, StringFormat={}{0:0}%}" 
-                                       Foreground="{StaticResource AccentBrush}" FontWeight="Bold" VerticalAlignment="Center" FontSize="11" Width="30" Margin="0,0,8,0"/>
+                                       Foreground="{StaticResource TextPrimary}" FontWeight="Bold" VerticalAlignment="Center" FontSize="11" Width="30" Margin="0,0,8,0"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -298,7 +302,24 @@
                                         </TextBlock>
                                     </StackPanel>
 
-                                    <TextBlock Grid.Column="2" Text="NEW vs OLD" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.6"/>
+                                    <TextBlock Grid.Column="2" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.6">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                <Setter Property="Text" Value="OLD vs NEW"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
+                                                        <Setter Property="Text" Value="OLD (Left) | NEW (Right)"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
+                                                        <Setter Property="Text" Value="OLD → NEW (Opacity Transition)"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=DiffBtn}" Value="True">
+                                                        <Setter Property="Text" Value="OLD ↔ NEW (Diff Map)"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </Grid>
                             </Border>
                         </Border>

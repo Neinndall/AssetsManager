@@ -124,6 +124,7 @@ namespace AssetsManager
       services.AddSingleton<RiotApiService>();
       services.AddSingleton<VersionService>();
       services.AddSingleton<JsonDataService>();
+      services.AddSingleton<ComparisonHistoryService>();
 
       // Hashes Services
       services.AddSingleton<HashResolverService>();

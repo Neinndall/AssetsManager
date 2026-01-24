@@ -18,7 +18,8 @@ namespace AssetsManager.Utils
         public ReportGenerationSettings ReportGeneration { get; set; }
         public bool CheckJsonDataUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
-        public bool SaveDiffHistory { get; set; }
+        public bool SaveJsonHistory { get; set; }
+        public bool SaveWadComparisonHistory { get; set; }
         public bool BackgroundUpdates { get; set; }
         public bool CheckPbeStatus { get; set; }
         public bool MinimizeToTrayOnClose { get; set; }
@@ -42,7 +43,7 @@ namespace AssetsManager.Utils
 
         // New structure for monitored files and directories
         public List<string> MonitoredJsonFiles { get; set; }
-        public List<JsonDiffHistoryEntry> DiffHistory { get; set; }
+        public List<HistoryEntry> DiffHistory { get; set; }
         public Dictionary<string, long> AssetTrackerProgress { get; set; }
         public Dictionary<string, List<long>> AssetTrackerFailedIds { get; set; }
         public Dictionary<string, List<long>> AssetTrackerFoundIds { get; set; }
@@ -112,7 +113,7 @@ namespace AssetsManager.Utils
 
             settings.MonitoredJsonFiles ??= new List<string>();
             settings.JsonDataModificationDates ??= new Dictionary<string, DateTime>();
-            settings.DiffHistory ??= new List<JsonDiffHistoryEntry>();
+            settings.DiffHistory ??= new List<HistoryEntry>();
             settings.AssetTrackerProgress ??= new Dictionary<string, long>();
             settings.AssetTrackerFailedIds ??= new Dictionary<string, List<long>>();
             settings.AssetTrackerFoundIds ??= new Dictionary<string, List<long>>();
@@ -157,7 +158,8 @@ namespace AssetsManager.Utils
                 },
                 CheckJsonDataUpdates = false,
                 AssetTrackerTimer = false,
-                SaveDiffHistory = false,
+                SaveJsonHistory = false,
+                SaveWadComparisonHistory = false,
                 BackgroundUpdates = false,
                 CheckPbeStatus = false,
                 MinimizeToTrayOnClose = false,
@@ -175,7 +177,7 @@ namespace AssetsManager.Utils
                 HashesSizes = new Dictionary<string, long>(),
                 JsonDataModificationDates = new Dictionary<string, DateTime>(),
                 MonitoredJsonFiles = new List<string>(),
-                DiffHistory = new List<JsonDiffHistoryEntry>(),
+                DiffHistory = new List<HistoryEntry>(),
                 AssetTrackerProgress = new Dictionary<string, long>(),
                 AssetTrackerFailedIds = new Dictionary<string, List<long>>(),
                 AssetTrackerFoundIds = new Dictionary<string, List<long>>(),
@@ -211,7 +213,8 @@ namespace AssetsManager.Utils
             CustomFloorTexturePath = defaultSettings.CustomFloorTexturePath;
             AudioExportFormat = defaultSettings.AudioExportFormat;
             ImageExportFormat = defaultSettings.ImageExportFormat;
-            SaveDiffHistory = defaultSettings.SaveDiffHistory;
+            SaveJsonHistory = defaultSettings.SaveJsonHistory;
+            SaveWadComparisonHistory = defaultSettings.SaveWadComparisonHistory;
             BackgroundUpdates = defaultSettings.BackgroundUpdates;
             CheckPbeStatus = defaultSettings.CheckPbeStatus;
             MinimizeToTrayOnClose = defaultSettings.MinimizeToTrayOnClose;

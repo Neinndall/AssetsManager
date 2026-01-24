@@ -204,7 +204,7 @@ namespace AssetsManager.Services.Monitor
                         {
                             await File.WriteAllBytesAsync(newFilePath, fileBytes);
 
-                            if (_appSettings.SaveDiffHistory && isUpdate)
+                            if (_appSettings.SaveJsonHistory && isUpdate)
                             {
                                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
                                 string historyKey = key.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? key.Substring(0, key.Length - 5) : key;
@@ -218,12 +218,13 @@ namespace AssetsManager.Services.Monitor
                                 File.Copy(newFilePath, historyNewFilePath, true);
                                 File.Copy(oldFilePath, historyOldFilePath, true);
 
-                                _appSettings.DiffHistory.Insert(0, new JsonDiffHistoryEntry
+                                _appSettings.DiffHistory.Insert(0, new HistoryEntry
                                 {
                                     FileName = key,
                                     OldFilePath = historyOldFilePath,
                                     NewFilePath = historyNewFilePath,
-                                    Timestamp = DateTime.Now
+                                    Timestamp = DateTime.Now,
+                                    Type = HistoryEntryType.FileDiff
                                 });
                             }
 

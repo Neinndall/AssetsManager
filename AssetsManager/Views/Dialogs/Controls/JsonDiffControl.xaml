@@ -55,12 +55,12 @@
                         
                         <!-- MODES SECTION -->
                         <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}"/>
-                        <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ViewMode"
+                        <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}"
                                      IsChecked="{Binding IsInlineMode, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}" 
                                      Checked="ComparisonInlineMode_Checked" ToolTip="Side by Side View">
                             <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
                         </RadioButton>
-                        <RadioButton x:Name="UnifiedBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ViewMode"
+                        <RadioButton x:Name="UnifiedBtn" Style="{StaticResource ModernIconRadioButton}"
                                      IsChecked="{Binding IsInlineMode}"
                                      Checked="ComparisonInlineMode_Checked" ToolTip="Unified Inline Mode">
                             <icons:MaterialIcon Kind="ViewStream" Width="18" Height="18"/>

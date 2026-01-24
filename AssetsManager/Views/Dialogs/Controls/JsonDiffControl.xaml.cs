@@ -41,7 +41,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         public JsonDiffModel State { get; } = new JsonDiffModel();
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public JsonFormatterService JsonFormatterService { get; set; }
-        public LogService LogService { get; set; }
         #endregion
 
         #region Events
@@ -299,8 +298,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             // Smart persistence: Calculate where we are before switching
             int currentLine = GetCurrentLineRobust(sourceEditor);
             int currentDiffIndex = DiffNavigationPanel?.FindClosestDifferenceIndex(currentLine) ?? 0;
-
-            LogService?.Log($"[JsonDiffControl] Mode Switch. ToInline: {switchingToInline}. Restoring Index: {currentDiffIndex} (Line: {currentLine})");
 
             await UpdateDiffView(currentDiffIndex);
         }
