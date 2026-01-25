@@ -14,7 +14,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             InitializeComponent();
             this.DataContext = new NotificationHubModel(notificationService);
-            this.Deactivated += NotificationHubControl_Deactivated;
             this.Topmost = true;
         }
 
@@ -27,20 +26,10 @@ namespace AssetsManager.Views.Dialogs.Controls
                 return;
             }
 
-            // Position relative to owner (Bottom-Right)
             this.Owner = owner;
-            this.Left = owner.Left + owner.ActualWidth - this.Width - 24;
-            this.Top = owner.Top + owner.ActualHeight - this.Height - 80;
-
             this.Show();
             this.Activate();
             if (ViewModel != null) ViewModel.IsOpen = true;
-        }
-
-        private void NotificationHubControl_Deactivated(object sender, System.EventArgs e)
-        {
-            this.Hide();
-            if (ViewModel != null) ViewModel.IsOpen = false;
         }
 
         private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

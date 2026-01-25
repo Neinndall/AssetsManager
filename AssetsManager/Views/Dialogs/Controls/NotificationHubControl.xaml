@@ -14,7 +14,7 @@
         Background="Transparent"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        WindowStartupLocation="Manual"
+        WindowStartupLocation="CenterOwner"
         Topmost="True"
         FontFamily="{StaticResource AppFontFamily}">
 
