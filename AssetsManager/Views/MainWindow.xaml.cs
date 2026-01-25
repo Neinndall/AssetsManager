@@ -55,7 +55,7 @@ namespace AssetsManager.Views
         private readonly ComparisonHistoryService _comparisonHistoryService;
 
         private string _latestAppVersionAvailable;
-        private NotificationHubControl _notificationHubControl;
+        private NotificationHubWindow _notificationHubWindow;
         
         // New fields to manage the state of the extraction after comparison
         private bool _isExtractingAfterComparison = false;
@@ -119,7 +119,6 @@ namespace AssetsManager.Views
             _notificationService = notificationService;
             _comparisonHistoryService = comparisonHistoryService;
 
-            // Initialize ProgressUIManager with controls from the new StatusBarView
             _progressUIManager.Initialize(StatusBar.ViewModel, this);
             
             // Subscribe to Status Bar events
@@ -381,13 +380,13 @@ namespace AssetsManager.Views
 
         private async void OnNotificationHubRequested(object sender, EventArgs e)
         {
-            if (_notificationHubControl == null)
+            if (_notificationHubWindow == null)
             {
-                _notificationHubControl = _serviceProvider.GetRequiredService<NotificationHubControl>();
-                _notificationHubControl.Owner = this;
+                _notificationHubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
+                _notificationHubWindow.Owner = this;
             }
 
-            _notificationHubControl.ShowHub(this);
+            _notificationHubWindow.ShowHub(this);
 
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
             {

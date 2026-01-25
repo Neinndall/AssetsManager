@@ -155,7 +155,7 @@ namespace AssetsManager
       services.AddTransient<MonitorWindow>();
       services.AddTransient<HelpWindow>();
       services.AddTransient<JsonDiffWindow>();
-      services.AddTransient<NotificationHubControl>();
+      services.AddTransient<NotificationHubWindow>();
       services.AddTransient<SettingsWindow>();
       services.AddTransient<ProgressDetailsWindow>();
       services.AddTransient<UpdateProgressWindow>();

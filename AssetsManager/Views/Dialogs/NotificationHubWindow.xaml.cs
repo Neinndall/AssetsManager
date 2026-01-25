@@ -4,13 +4,13 @@ using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Notifications;
 
-namespace AssetsManager.Views.Dialogs.Controls
+namespace AssetsManager.Views.Dialogs
 {
-    public partial class NotificationHubControl : Window
+    public partial class NotificationHubWindow : Window
     {
         public NotificationHubModel ViewModel => DataContext as NotificationHubModel;
 
-        public NotificationHubControl(NotificationService notificationService)
+        public NotificationHubWindow(NotificationService notificationService)
         {
             InitializeComponent();
             this.DataContext = new NotificationHubModel(notificationService);
