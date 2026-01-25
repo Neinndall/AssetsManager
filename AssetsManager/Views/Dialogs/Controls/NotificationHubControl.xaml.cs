@@ -1,89 +1,60 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
+using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Notifications;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
-    public partial class NotificationHubControl : UserControl
+    public partial class NotificationHubControl : Window
     {
         public NotificationHubModel ViewModel => DataContext as NotificationHubModel;
 
-        private bool _isDragging;
-        private Point _startPoint;
-
-        public NotificationHubControl()
+        public NotificationHubControl(NotificationService notificationService)
         {
             InitializeComponent();
+            this.DataContext = new NotificationHubModel(notificationService);
+            this.Deactivated += NotificationHubControl_Deactivated;
+            this.Topmost = true;
         }
 
-        private void Overlay_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        public void ShowHub(Window owner)
         {
-            if (ViewModel != null)
-                ViewModel.IsOpen = false;
+            if (this.IsVisible)
+            {
+                this.Hide();
+                if (ViewModel != null) ViewModel.IsOpen = false;
+                return;
+            }
+
+            // Position relative to owner (Bottom-Right)
+            this.Owner = owner;
+            this.Left = owner.Left + owner.ActualWidth - this.Width - 24;
+            this.Top = owner.Top + owner.ActualHeight - this.Height - 80;
+
+            this.Show();
+            this.Activate();
+            if (ViewModel != null) ViewModel.IsOpen = true;
         }
 
-        // --- Drag Logic ---
+        private void NotificationHubControl_Deactivated(object sender, System.EventArgs e)
+        {
+            this.Hide();
+            if (ViewModel != null) ViewModel.IsOpen = false;
+        }
 
         private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            var border = sender as FrameworkElement;
-            if (border == null) return;
-
-            _isDragging = true;
-            _startPoint = e.GetPosition(this);
-            border.CaptureMouse();
-        }
-
-        private void Header_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (_isDragging && e.LeftButton == MouseButtonState.Pressed)
+            if (e.LeftButton == MouseButtonState.Pressed)
             {
-                // We access the transform directly via the field name defined in XAML
-                // I'll ensure the Transform is named 'PanelTranslateTransform' in XAML
-                if (PanelTranslateTransform != null)
-                {
-                    var currentPoint = e.GetPosition(this);
-                    var offset = currentPoint - _startPoint;
-
-                    PanelTranslateTransform.X += offset.X;
-                    PanelTranslateTransform.Y += offset.Y;
-
-                    // Update start point to prevent acceleration
-                    _startPoint = currentPoint;
-                }
+                this.DragMove();
             }
         }
 
-        private void Header_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            _isDragging = false;
-            var border = sender as FrameworkElement;
-            border?.ReleaseMouseCapture();
-        }
-
-        // --- Buttons ---
-
         private void Close_Click(object sender, RoutedEventArgs e)
         {
+            this.Hide(); 
             if (ViewModel != null) ViewModel.IsOpen = false;
-            ResetPosition();
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            if (ViewModel != null) ViewModel.IsOpen = false;
-            // Optional: Don't reset position if just minimizing?
-        }
-
-        private void ResetPosition()
-        {
-             if (PanelTranslateTransform != null)
-             {
-                 PanelTranslateTransform.X = 0;
-                 PanelTranslateTransform.Y = 0;
-             }
         }
 
         private void MarkAllRead_Click(object sender, RoutedEventArgs e)
