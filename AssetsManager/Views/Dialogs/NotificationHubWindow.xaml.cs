@@ -14,7 +14,6 @@ namespace AssetsManager.Views.Dialogs
         {
             InitializeComponent();
             this.DataContext = new NotificationHubModel(notificationService);
-            this.Topmost = true;
         }
 
         public void ShowHub(Window owner)
@@ -44,6 +43,11 @@ namespace AssetsManager.Views.Dialogs
         {
             this.Hide(); 
             if (ViewModel != null) ViewModel.IsOpen = false;
+        }
+
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
         }
 
         private void MarkAllRead_Click(object sender, RoutedEventArgs e)

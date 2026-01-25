@@ -12,9 +12,7 @@
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
-        ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        Topmost="True"
         FontFamily="{StaticResource AppFontFamily}">
 
     <Window.Resources>
@@ -111,12 +109,12 @@
         </DataTemplate>
     </Window.Resources>
 
-    <!-- Main Window Container -->
-    <Border Background="{StaticResource DarkBackground}" 
+    <!-- Main Window Container with correctly rounded background and shadow -->
+    <Border Background="{StaticResource SidebarBackground}" 
             CornerRadius="12" 
             BorderBrush="{StaticResource BorderColor}" 
             BorderThickness="1" 
-            Margin="12">
+            Margin="12"> <!-- Margin for shadow bleed -->
         <Border.Effect>
             <DropShadowEffect BlurRadius="25" ShadowDepth="8" Direction="270" Opacity="0.5" Color="Black"/>
         </Border.Effect>
@@ -145,9 +143,15 @@
                         <TextBlock Text="{Binding UnreadCount, StringFormat='\{0\} NEW'}" Foreground="White" FontSize="10" FontWeight="Bold"/>
                     </Border>
                     
-                    <Button Grid.Column="3" Style="{StaticResource TransparentIconButton}" Click="Close_Click" Width="28" Height="28">
-                        <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
-                    </Button>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{StaticResource TransparentIconButton}" Click="Minimize_Click" Width="28" Height="28" Margin="0,0,4,0">
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                        </Button>
+
+                        <Button Style="{StaticResource TransparentIconButton}" Click="Close_Click" Width="28" Height="28">
+                            <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -175,6 +179,7 @@
 
             <!-- Row 2: Content -->
             <Grid Grid.Row="2">
+                <!-- Empty State -->
                 <Grid Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}" Margin="0,40,0,40">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <Border Background="{StaticResource CardBackground}" CornerRadius="50" Width="80" Height="80" Margin="0,0,0,16">
@@ -185,6 +190,7 @@
                     </StackPanel>
                 </Grid>
 
+                <!-- List Area -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16" 
                               Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}}">
                     <ItemsControl ItemsSource="{Binding Notifications}"/>
