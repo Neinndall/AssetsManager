@@ -254,6 +254,46 @@ namespace AssetsManager.Services.Core
             });
         }
 
+        public void OnBackupStarted(object sender, int totalFiles)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                UpdateStatusBar("Creating backup...", 0, totalFiles);
+
+                _progressDetailsWindow = new ProgressDetailsWindow(_logService, "Backup Manager", _taskCancellationManager);
+                _progressDetailsWindow.Owner = _owner;
+                _progressDetailsWindow.OperationVerb = "Backing up";
+                _progressDetailsWindow.HeaderIconKind = "ContentSave";
+                _progressDetailsWindow.HeaderText = "Creating Backup";
+                _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
+                _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
+            });
+        }
+
+        public void OnBackupProgressChanged(object sender, (int Processed, int Total, string CurrentFile) data)
+        {
+            UpdateStatusBar($"Backing up: {data.CurrentFile}", data.Processed, data.Total);
+            _owner.Dispatcher.Invoke(() =>
+            {
+                _progressDetailsWindow?.UpdateProgress(data.Processed, data.Total, data.CurrentFile, true, null);
+            });
+        }
+
+        public async void OnBackupCompleted(object sender, bool success)
+        {
+            if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
+            UpdateStatusBar("Ready");
+            _owner.Dispatcher.Invoke(() =>
+            {
+                _progressDetailsWindow?.Close();
+                // Success message is handled by BackupsControl currently, but we can do it here if we want consistency.
+                // However, BackupsControl has its own success logic which reloads the list.
+                // Let's leave the success message to the control or just show it if it's generic.
+                // The current implementation in BackupsControl shows "LoL backup completed successfully."
+                // so we don't strictly need to show it here to avoid double popup.
+            });
+        }
+
         public void ClearStatusText()
         {
             UpdateStatusBar("");

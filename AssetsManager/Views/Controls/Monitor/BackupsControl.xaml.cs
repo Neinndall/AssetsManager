@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Backup;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Shared;
@@ -133,6 +134,7 @@ namespace AssetsManager.Views.Controls.Monitor
             try
             {
                 await BackupManager.CreateLolPbeDirectoryBackupAsync(sourceLolPath, destinationBackupPath);
+                LogService.LogSuccess($"LoL backup completed successfully.");
                 CustomMessageBoxService.ShowInfo("Info", "LoL backup completed successfully.", Window.GetWindow(this));
                 await LoadBackupsAsync();
             }
@@ -149,7 +151,6 @@ namespace AssetsManager.Views.Controls.Monitor
             finally
             {
                 createBackupButton.IsEnabled = true;
-                LogService.LogSuccess($"LoL backup completed successfully.");
             }
         }
         

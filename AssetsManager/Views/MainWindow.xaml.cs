@@ -19,6 +19,7 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
+using AssetsManager.Services.Backup;
 using AssetsManager.Views.Controls;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
@@ -141,6 +142,10 @@ namespace AssetsManager.Views
             _extractionService.ExtractionStarted += _progressUIManager.OnExtractionStarted;
             _extractionService.ExtractionProgressChanged += (sender, progress) => _progressUIManager.OnExtractionProgressChanged(progress.extractedCount, progress.totalFiles, progress.message);
             _extractionService.ExtractionCompleted += (sender, e) => OnExtractionCompleted(sender, e);
+
+            _backupManager.BackupStarted += _progressUIManager.OnBackupStarted;
+            _backupManager.BackupProgressChanged += _progressUIManager.OnBackupProgressChanged;
+            _backupManager.BackupCompleted += _progressUIManager.OnBackupCompleted;
 
             _versionService.VersionDownloadStarted += (sender, e) => _progressUIManager.OnVersionDownloadStarted(sender, e);
             _versionService.VersionDownloadProgressChanged += (sender, e) => _progressUIManager.OnDownloadProgressChanged(e.CurrentValue, e.TotalValue, e.CurrentFile, true, null);
