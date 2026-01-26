@@ -22,6 +22,9 @@ namespace AssetsManager.Views.Dialogs
             {
                 this.Hide();
                 if (ViewModel != null) ViewModel.IsOpen = false;
+
+                // Return focus to the owner window when toggling off
+                if (owner != null) owner.Activate();
                 return;
             }
 
@@ -43,6 +46,12 @@ namespace AssetsManager.Views.Dialogs
         {
             this.Hide(); 
             if (ViewModel != null) ViewModel.IsOpen = false;
+
+            // Return focus to the owner window to prevent background apps (like terminal) from jumping to front
+            if (this.Owner != null)
+            {
+                this.Owner.Activate();
+            }
         }
 
         private void Minimize_Click(object sender, RoutedEventArgs e)
