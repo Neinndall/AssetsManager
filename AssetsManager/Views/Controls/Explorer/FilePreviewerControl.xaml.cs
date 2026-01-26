@@ -344,7 +344,9 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 if (ct.IsCancellationRequested) return;
 
-                if (SupportedFileTypes.Images.Contains(vm.Node.Extension) || SupportedFileTypes.Textures.Contains(vm.Node.Extension))
+                if (SupportedFileTypes.Images.Contains(vm.Node.Extension) || 
+                    SupportedFileTypes.Textures.Contains(vm.Node.Extension) ||
+                    SupportedFileTypes.VectorImages.Contains(vm.Node.Extension))
                 {
                     await LoadImagePreviewAsync(vm);
                 }

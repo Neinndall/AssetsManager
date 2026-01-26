@@ -532,7 +532,7 @@ namespace AssetsManager.Services.Explorer
 
         public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node)
         {
-            if (node == null || (!SupportedFileTypes.Images.Contains(node.Extension) && !SupportedFileTypes.Textures.Contains(node.Extension)))
+            if (node == null || (!SupportedFileTypes.Images.Contains(node.Extension) && !SupportedFileTypes.Textures.Contains(node.Extension) && !SupportedFileTypes.VectorImages.Contains(node.Extension)))
             {
                 return null;
             }
@@ -565,6 +565,26 @@ namespace AssetsManager.Services.Explorer
                 else if (SupportedFileTypes.Textures.Contains(node.Extension))
                 {
                     return await Task.Run(() => TextureUtils.LoadTexture(new MemoryStream(data), node.Extension));
+                }
+                else if (SupportedFileTypes.VectorImages.Contains(node.Extension))
+                {
+                    return await Task.Run(() =>
+                    {
+                        using var stream = new MemoryStream(data);
+                        WpfDrawingSettings settings = new WpfDrawingSettings();
+                        settings.IncludeRuntime = false;
+                        settings.TextAsGeometry = true;
+
+                        StreamSvgConverter converter = new StreamSvgConverter(settings);
+                        using (MemoryStream dummyOutputStream = new MemoryStream())
+                        {
+                            converter.Convert(stream, dummyOutputStream);
+                        }
+                        
+                        DrawingImage drawingImage = new DrawingImage(converter.Drawing);
+                        drawingImage.Freeze();
+                        return (ImageSource)drawingImage;
+                    });
                 }
             }
             catch (Exception ex)
