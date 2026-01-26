@@ -78,8 +78,6 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else // Preview Mode
             {
-                SwitchToFilePreview(); 
-                
                 if (_currentNode != null && _currentNode != _currentFolderNode)
                 {
                     _ = ShowPreviewAsync(_currentNode);
@@ -161,7 +159,9 @@ namespace AssetsManager.Views.Controls.Explorer
                     return;
                 }
                 
-                SwitchToFilePreview();
+                _currentNode = selectedPin.Node;
+                ViewModel.HasSelectedNode = true;
+                ViewModel.IsSelectedNodeContainer = false;
                 UpdateBreadcrumbs(selectedPin.Node);
 
                 if (selectedPin.IsDetailsTab)
@@ -305,7 +305,10 @@ namespace AssetsManager.Views.Controls.Explorer
             ViewModel.HasSelectedNode = node != null;
             UpdateBreadcrumbs(node);
 
-            if (node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent))
+            bool isContainer = node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent);
+            ViewModel.IsSelectedNodeContainer = isContainer;
+
+            if (isContainer)
             {
                 _currentFolderNode = node;
 
@@ -321,10 +324,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     _ = ExplorerPreviewService.ResetPreviewAsync();
                 }
-                else
-                {
-                    SwitchToFolderView();
-                }
 
                 foreach (var vm in gridItems)
                 {
@@ -334,20 +333,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
                 }
             }
-            else
-            {
-                SwitchToFilePreview();
-            }
-        }
-
-        private void SwitchToFolderView()
-        {
-            ViewModel.IsGridMode = true; 
-        }
-
-        private void SwitchToFilePreview()
-        {
-            ViewModel.IsGridMode = false;
         }
 
         private async Task LoadImagePreviewAsync(FileGridViewModel vm)
