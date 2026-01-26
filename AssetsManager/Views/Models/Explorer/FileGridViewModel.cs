@@ -11,6 +11,8 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool IsFolder => Node.Type == NodeType.VirtualDirectory || Node.Type == NodeType.RealDirectory || Node.Type == NodeType.WadFile || Node.Type == NodeType.SoundBank || Node.Type == NodeType.AudioEvent;
 
+        public string FileExtensionDisplay => IsFolder ? "DIR" : (string.IsNullOrEmpty(Node.Extension) ? "FILE" : Node.Extension.TrimStart('.').ToUpper());
+
         public string DisplayNameShort => PathUtils.TruncateForDisplay(Node.DisplayName, 50);
 
         public string SubfolderCount => IsUnloadedSoundBank 

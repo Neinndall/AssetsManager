@@ -56,20 +56,10 @@
                             <!-- Top-Right Badge (Type Indicator) -->
                             <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0" 
                                     CornerRadius="4" Padding="6,2" Background="#CC000000">
-                                <TextBlock FontSize="9" FontWeight="Bold" Foreground="White">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Text" Value="FILE"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsFolder}" Value="True">
-                                                    <Setter Property="Text" Value="DIR"/>
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                                </DataTrigger>
-                                                <!-- You could add more triggers here for specific extensions if available in VM -->
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+                                <TextBlock Text="{Binding FileExtensionDisplay}" 
+                                           FontSize="9" 
+                                           FontWeight="Bold" 
+                                           Foreground="White"/>
                             </Border>
                         </Grid>
                     </Border>
