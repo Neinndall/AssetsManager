@@ -45,7 +45,8 @@
                                                         Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
                             
                             <!-- Image Preview (using Border+ImageBrush for perfect corner clipping) -->
-                            <Border CornerRadius="11,11,0,0"
+                            <Border x:Name="ImageBorder"
+                                    CornerRadius="11,11,0,0"
                                     Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
                                 <Border.Background>
                                     <ImageBrush ImageSource="{Binding ImagePreview}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>

@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -37,6 +38,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private ObservableCollection<FileSystemNodeModel> _rootNodes;
         private bool _isShowingTemporaryPreview = false;
         private string _currentSearchFilter = string.Empty;
+        private CancellationTokenSource _thumbnailCts;
 
         public FilePreviewerControl()
         {
@@ -229,6 +231,10 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             try
             {
+                _thumbnailCts?.Cancel();
+                _thumbnailCts?.Dispose();
+                _thumbnailCts = null;
+
                 await ExplorerPreviewService.ResetPreviewAsync();
                 
                 ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
@@ -325,12 +331,22 @@ namespace AssetsManager.Views.Controls.Explorer
                     _ = ExplorerPreviewService.ResetPreviewAsync();
                 }
 
-                foreach (var vm in gridItems)
+                // Sequential Loading Queue with Cancellation
+                _thumbnailCts?.Cancel();
+                _thumbnailCts = new CancellationTokenSource();
+                _ = LoadThumbnailsQueueAsync(gridItems, _thumbnailCts.Token);
+            }
+        }
+
+        private async Task LoadThumbnailsQueueAsync(ObservableCollection<FileGridViewModel> items, CancellationToken ct)
+        {
+            foreach (var vm in items)
+            {
+                if (ct.IsCancellationRequested) return;
+
+                if (SupportedFileTypes.Images.Contains(vm.Node.Extension) || SupportedFileTypes.Textures.Contains(vm.Node.Extension))
                 {
-                    if (SupportedFileTypes.Images.Contains(vm.Node.Extension) || SupportedFileTypes.Textures.Contains(vm.Node.Extension))
-                    {
-                        _ = LoadImagePreviewAsync(vm);
-                    }
+                    await LoadImagePreviewAsync(vm);
                 }
             }
         }
