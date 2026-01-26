@@ -392,22 +392,15 @@ namespace AssetsManager.Services.Explorer
         {
             try
             {
-                await using var stream = new MemoryStream(data);
-
-                WpfDrawingSettings settings = new WpfDrawingSettings();
-                settings.IncludeRuntime = false;
-                settings.TextAsGeometry = true;
-
-                StreamSvgConverter converter = new StreamSvgConverter(settings);
-
-                using (MemoryStream dummyOutputStream = new MemoryStream())
+                var drawingImage = await Task.Run(() => SvgUtils.LoadSvg(data));
+                if (drawingImage != null)
                 {
-                    converter.Convert(stream, dummyOutputStream);
+                    await SetPreviewerAsync(Previewer.Image, drawingImage);
                 }
-
-                DrawingGroup drawing = converter.Drawing;
-
-                await SetPreviewerAsync(Previewer.Image, new DrawingImage(drawing));
+                else
+                {
+                    await ShowUnsupportedPreviewAsync(".svg");
+                }
             }
             catch (Exception ex)
             {
@@ -568,23 +561,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 else if (SupportedFileTypes.VectorImages.Contains(node.Extension))
                 {
-                    return await Task.Run(() =>
-                    {
-                        using var stream = new MemoryStream(data);
-                        WpfDrawingSettings settings = new WpfDrawingSettings();
-                        settings.IncludeRuntime = false;
-                        settings.TextAsGeometry = true;
-
-                        StreamSvgConverter converter = new StreamSvgConverter(settings);
-                        using (MemoryStream dummyOutputStream = new MemoryStream())
-                        {
-                            converter.Convert(stream, dummyOutputStream);
-                        }
-                        
-                        DrawingImage drawingImage = new DrawingImage(converter.Drawing);
-                        drawingImage.Freeze();
-                        return (ImageSource)drawingImage;
-                    });
+                    return await Task.Run(() => SvgUtils.LoadSvg(data));
                 }
             }
             catch (Exception ex)
