@@ -89,6 +89,7 @@
                                     <ColumnDefinition Width="Auto" MinWidth="16"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
+                                
                                 <ToggleButton x:Name="Expander"
                                               Grid.Column="0"
                                               Style="{StaticResource TreeViewToggleButton}"
@@ -111,6 +112,12 @@
                                         Margin="16,0,0,0"/>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <!-- Multi-Selection Highlight (Background only) -->
+                        <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </DataTrigger>
+
                         <Trigger Property="IsExpanded" Value="true">
                             <Setter TargetName="ItemsHost" Property="Visibility" Value="Visible"/>
                         </Trigger>
@@ -118,7 +125,7 @@
                             <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
                         </Trigger>
                         
-                        <!-- Selection Style -->
+                        <!-- Main Selection Style -->
                         <Trigger Property="IsSelected" Value="true">
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverColor}"/> 
                             <Setter Property="Foreground" Value="White"/> 
