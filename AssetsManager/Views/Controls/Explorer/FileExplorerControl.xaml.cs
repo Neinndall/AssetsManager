@@ -521,15 +521,23 @@ namespace AssetsManager.Views.Controls.Explorer
 
                     foreach (var node in selectedNodes)
                     {
+                        await WadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken);
+                    }
+
+                    if (selectedNodes.Count == 1)
+                    {
+                        var node = selectedNodes[0];
                         string logPath = destinationPath;
                         if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                         {
                             logPath = Path.Combine(destinationPath, node.Name);
                         }
-
-                        await WadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken);
-
                         LogService.LogInteractiveSuccess($"Successfully extracted {node.Name}.", logPath, node.Name);
+                    }
+                    else
+                    {
+                        string folderName = Path.GetFileName(destinationPath);
+                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items in {folderName}.", destinationPath, folderName);
                     }
                     
                     TaskCancellationManager.CompleteCurrentOperation();
@@ -600,35 +608,47 @@ namespace AssetsManager.Views.Controls.Explorer
                         LogService.Log($"Processing and saving {selectedNodes.Count} selected items...");
                     }
 
+                    string singleSavedPath = null;
+                    string singleDisplayName = null;
+
                     foreach (var node in selectedNodes)
                     {
                         var savedFiles = new List<string>();
                         await WadSavingService.ProcessAndSaveAsync(node, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => savedFiles.Add(path));
 
-                        if (savedFiles.Count > 0)
+                        if (selectedNodes.Count == 1 && savedFiles.Count > 0)
                         {
-                            string finalLogPath = destinationPath;
-                            string displayName = node.Name;
+                            singleSavedPath = destinationPath;
+                            singleDisplayName = node.Name;
 
-                            // Original logic for container paths
                             if (node.Type == NodeType.SoundBank)
                             {
-                                finalLogPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(node.Name));
+                                singleSavedPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(node.Name));
                             }
                             else if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                             {
-                                finalLogPath = Path.Combine(destinationPath, node.Name);
+                                singleSavedPath = Path.Combine(destinationPath, node.Name);
                             }
 
-                            // Special case: If it was a single file, we use the actual saved path/name (e.g. reflects .mp3 conversion)
                             if (savedFiles.Count == 1)
                             {
-                                finalLogPath = savedFiles.First();
-                                displayName = Path.GetFileName(finalLogPath);
+                                singleSavedPath = savedFiles.First();
+                                singleDisplayName = Path.GetFileName(singleSavedPath);
                             }
-
-                            LogService.LogInteractiveSuccess($"Successfully saved {displayName}.", finalLogPath, displayName);
                         }
+                    }
+
+                    if (selectedNodes.Count == 1)
+                    {
+                        if (singleSavedPath != null)
+                        {
+                            LogService.LogInteractiveSuccess($"Successfully saved {singleDisplayName}.", singleSavedPath, singleDisplayName);
+                        }
+                    }
+                    else
+                    {
+                        string folderName = Path.GetFileName(destinationPath);
+                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items in {folderName}.", destinationPath, folderName);
                     }
 
                     TaskCancellationManager.CompleteCurrentOperation();
