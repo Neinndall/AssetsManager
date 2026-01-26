@@ -510,7 +510,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    LogService.Log($"Extracting {selectedNodes.Count} selected item(s)...");
+                    if (selectedNodes.Count == 1)
+                    {
+                        LogService.Log($"Extracting {selectedNodes[0].Name}...");
+                    }
+                    else
+                    {
+                        LogService.Log($"Extracting {selectedNodes.Count} selected items...");
+                    }
 
                     foreach (var node in selectedNodes)
                     {
@@ -584,7 +591,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    LogService.Log($"Processing and saving {selectedNodes.Count} selected item(s)...");
+                    if (selectedNodes.Count == 1)
+                    {
+                        LogService.Log($"Processing and saving {selectedNodes[0].Name}...");
+                    }
+                    else
+                    {
+                        LogService.Log($"Processing and saving {selectedNodes.Count} selected items...");
+                    }
 
                     foreach (var node in selectedNodes)
                     {
