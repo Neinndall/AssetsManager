@@ -4,7 +4,7 @@ using System.Globalization;
 using System.IO;
 using Material.Icons;
 using System.Windows.Data;
-using AssetsManager.Views.Dialogs;
+using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
 

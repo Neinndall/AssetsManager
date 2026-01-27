@@ -125,6 +125,13 @@
                                 <TextBlock Text="New Size" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
                                 <TextBlock Text="{Binding NewSizeString}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14" Margin="0,4,0,0"/>
                             </StackPanel>
+
+                            <!-- Size Delta -->
+                            <StackPanel MinWidth="150" Margin="0,0,16,12"
+                                        Visibility="{Binding SizeDifferenceString, Converter={StaticResource NullToVisibilityConverter}}">
+                                <TextBlock Text="Size Change" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                                <TextBlock Text="{Binding SizeDifferenceString}" Foreground="{StaticResource AccentOrange}" FontWeight="Bold" FontSize="14" Margin="0,4,0,0"/>
+                            </StackPanel>
                         </WrapPanel>
 
                         <StackPanel Margin="0,4,0,0">

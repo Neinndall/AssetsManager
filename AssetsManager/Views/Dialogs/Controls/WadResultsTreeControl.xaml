@@ -103,20 +103,71 @@
 
             <!-- Tree Content -->
             <Border Grid.Row="2" Padding="0" Background="{StaticResource CardBackground}" CornerRadius="0,0,12,12">
-                <TreeView x:Name="resultsTreeView" 
-                          Style="{StaticResource ModernTreeView}"
-                          Background="Transparent"
-                          BorderThickness="0"
-                          Padding="8"
-                          ItemTemplate="{StaticResource WadGroupTemplate}"
-                          SelectedItemChanged="ResultsTreeView_SelectedItemChanged">
-                    <TreeView.ItemContainerStyle>
-                        <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
-                            <Setter Property="ContextMenu" Value="{StaticResource WadDiffContextMenu}"/>
-                            <EventSetter Event="PreviewMouseRightButtonDown" Handler="TreeViewItem_PreviewMouseRightButtonDown"/>
-                        </Style>
-                    </TreeView.ItemContainerStyle>
-                </TreeView>
+                <Grid>
+                    <!-- Loading Indicator (HUD Style) -->
+                    <StackPanel x:Name="LoadingIndicator" 
+                                VerticalAlignment="Center" 
+                                HorizontalAlignment="Center"
+                                Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid Width="100" Height="100">
+                            <!-- Background Glow -->
+                            <Ellipse Width="60" Height="60" Fill="{StaticResource AccentBrush}" Opacity="0.15">
+                                <Ellipse.Effect>
+                                    <BlurEffect Radius="30"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+
+                            <!-- Pulse Rings -->
+                            <Ellipse Width="50" Height="50" Stroke="{StaticResource AccentBrush}" StrokeThickness="1" Opacity="0.3" Style="{StaticResource TechnicalGlowStyle}"/>
+                            <Ellipse Width="70" Height="70" Stroke="{StaticResource AccentBrush}" StrokeThickness="0.5" Opacity="0.1" Style="{StaticResource TechnicalGlowStyle}"/>
+
+                            <!-- Main Spinner -->
+                            <materialIcons:MaterialIcon Kind="Sync" 
+                                                        Width="42" Height="42" 
+                                                        Foreground="{StaticResource AccentBrush}"
+                                                        Style="{StaticResource SpinningIconStyle}"/>
+
+                            <!-- Inner Tech Icon -->
+                            <materialIcons:MaterialIcon Kind="Memory" 
+                                                        Width="16" Height="16" 
+                                                        Foreground="{StaticResource AccentBrush}"
+                                                        VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                        Opacity="0.8"/>
+                        </Grid>
+
+                        <TextBlock Text="{Binding LoadingText}" 
+                                   HorizontalAlignment="Center" 
+                                   FontSize="11" 
+                                   FontWeight="Bold" 
+                                   Foreground="{StaticResource AccentBrush}" 
+                                   Margin="0,12,0,0"
+                                   Opacity="0.9"/>
+                        <TextBlock Text="PLEASE WAIT" 
+                                   HorizontalAlignment="Center" 
+                                   FontSize="9" 
+                                   Foreground="{StaticResource TextMuted}" 
+                                   Margin="0,4,0,0"
+                                   Opacity="0.6"/>
+                    </StackPanel>
+
+                    <!-- TreeView -->
+                    <TreeView x:Name="resultsTreeView" 
+                              Style="{StaticResource ModernTreeView}"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              Padding="8"
+                              ItemsSource="{Binding WadGroups}"
+                              Visibility="{Binding IsBusy, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
+                              ItemTemplate="{StaticResource WadGroupTemplate}"
+                              SelectedItemChanged="ResultsTreeView_SelectedItemChanged">
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
+                                <Setter Property="ContextMenu" Value="{StaticResource WadDiffContextMenu}"/>
+                                <EventSetter Event="PreviewMouseRightButtonDown" Handler="TreeViewItem_PreviewMouseRightButtonDown"/>
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                    </TreeView>
+                </Grid>
             </Border>
         </Grid>
     </Border>
