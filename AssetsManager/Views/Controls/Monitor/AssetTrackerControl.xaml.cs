@@ -64,9 +64,31 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void CategoryComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // Unsubscribe from previous category to avoid memory leaks and multiple refreshes
+            if (e.RemovedItems.Count > 0 && e.RemovedItems[0] is AssetCategory oldCategory)
+            {
+                oldCategory.PropertyChanged -= OnCategoryPropertyChanged;
+            }
+
             // Update the internal SelectedCategory property from the ComboBox's selection
             SelectedCategory = CategoryComboBox.SelectedItem as AssetCategory;
+
+            // Subscribe to new category property changes
+            if (SelectedCategory != null)
+            {
+                SelectedCategory.PropertyChanged += OnCategoryPropertyChanged;
+            }
+
             RefreshAssetList();
+        }
+
+        private void OnCategoryPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // If the Start ID changes, we refresh the list immediately
+            if (e.PropertyName == nameof(AssetCategory.Start))
+            {
+                RefreshAssetList();
+            }
         }
 
         private void RefreshAssetList()

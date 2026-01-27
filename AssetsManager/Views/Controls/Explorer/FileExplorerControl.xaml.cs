@@ -446,6 +446,32 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private List<FileSystemNodeModel> GetSelectedNodes()
+        {
+            var selected = new List<FileSystemNodeModel>();
+            FindMultiSelectedNodes(_viewModel.RootNodes, selected);
+
+            if (selected.Count == 0 && FileTreeView.SelectedItem is FileSystemNodeModel singleSelected)
+            {
+                selected.Add(singleSelected);
+            }
+
+            return selected;
+        }
+
+        private void FindMultiSelectedNodes(IEnumerable<FileSystemNodeModel> nodes, List<FileSystemNodeModel> result)
+        {
+            if (nodes == null) return;
+            foreach (var node in nodes)
+            {
+                if (node.IsMultiSelected)
+                {
+                    result.Add(node);
+                }
+                FindMultiSelectedNodes(node.Children, result);
+            }
+        }
+
         private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
         {
             if (WadExtractionService == null)
@@ -454,9 +480,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
-            if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode)
+            var selectedNodes = GetSelectedNodes();
+            if (selectedNodes.Count == 0)
             {
-                CustomMessageBoxService.ShowInfo("Info", "Please select a file or folder to extract.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowInfo("Info", "Please select one or more files or folders to extract.", Window.GetWindow(this));
                 return;
             }
 
@@ -483,17 +510,35 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    LogService.Log("Extracting selected files...");
-
-                    string logPath = destinationPath;
-                    if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
+                    if (selectedNodes.Count == 1)
                     {
-                        logPath = Path.Combine(destinationPath, selectedNode.Name);
+                        LogService.Log($"Extracting {selectedNodes[0].Name}...");
+                    }
+                    else
+                    {
+                        LogService.Log($"Extracting {selectedNodes.Count} selected items...");
                     }
 
-                    await WadExtractionService.ExtractNodeAsync(selectedNode, destinationPath, cancellationToken);
+                    foreach (var node in selectedNodes)
+                    {
+                        await WadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken);
+                    }
 
-                    LogService.LogInteractiveSuccess($"Successfully extracted {selectedNode.Name}.", logPath, selectedNode.Name);
+                    if (selectedNodes.Count == 1)
+                    {
+                        var node = selectedNodes[0];
+                        string logPath = destinationPath;
+                        if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
+                        {
+                            logPath = Path.Combine(destinationPath, node.Name);
+                        }
+                        LogService.LogInteractiveSuccess($"Successfully extracted {node.Name}.", logPath, node.Name);
+                    }
+                    else
+                    {
+                        string folderName = Path.GetFileName(destinationPath);
+                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items in {folderName}.", destinationPath, folderName);
+                    }
                     
                     TaskCancellationManager.CompleteCurrentOperation();
                 }
@@ -504,7 +549,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 catch (Exception ex)
                 {
-                    LogService.LogError(ex, $"Failed to extract '{selectedNode.Name}'.");
+                    LogService.LogError(ex, $"Failed during extraction process.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred during extraction: {ex.Message}", Window.GetWindow(this));
                 }
                 finally
@@ -524,9 +569,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
-            if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode)
+            var selectedNodes = GetSelectedNodes();
+            if (selectedNodes.Count == 0)
             {
-                CustomMessageBoxService.ShowInfo("Info", "Please select a file or folder to save.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowInfo("Info", "Please select one or more files or folders to save.", Window.GetWindow(this));
                 return;
             }
 
@@ -553,34 +599,56 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    LogService.Log("Processing and saving selected files...");
-
-                    var savedFiles = new List<string>();
-                    await WadSavingService.ProcessAndSaveAsync(selectedNode, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => savedFiles.Add(path));
-
-                    if (savedFiles.Count > 0)
+                    if (selectedNodes.Count == 1)
                     {
-                        string finalLogPath = destinationPath;
-                        string displayName = selectedNode.Name;
+                        LogService.Log($"Processing and saving {selectedNodes[0].Name}...");
+                    }
+                    else
+                    {
+                        LogService.Log($"Processing and saving {selectedNodes.Count} selected items...");
+                    }
 
-                        // Original logic for container paths
-                        if (selectedNode.Type == NodeType.SoundBank)
-                        {
-                            finalLogPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(selectedNode.Name));
-                        }
-                        else if (selectedNode.Type == NodeType.RealDirectory || selectedNode.Type == NodeType.VirtualDirectory || selectedNode.Type == NodeType.WadFile || selectedNode.Type == NodeType.AudioEvent)
-                        {
-                            finalLogPath = Path.Combine(destinationPath, selectedNode.Name);
-                        }
+                    string singleSavedPath = null;
+                    string singleDisplayName = null;
 
-                        // Special case: If it was a single file, we use the actual saved path/name (e.g. reflects .mp3 conversion)
-                        if (savedFiles.Count == 1)
-                        {
-                            finalLogPath = savedFiles.First();
-                            displayName = Path.GetFileName(finalLogPath);
-                        }
+                    foreach (var node in selectedNodes)
+                    {
+                        var savedFiles = new List<string>();
+                        await WadSavingService.ProcessAndSaveAsync(node, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => savedFiles.Add(path));
 
-                        LogService.LogInteractiveSuccess($"Successfully saved {displayName}.", finalLogPath, displayName);
+                        if (selectedNodes.Count == 1 && savedFiles.Count > 0)
+                        {
+                            singleSavedPath = destinationPath;
+                            singleDisplayName = node.Name;
+
+                            if (node.Type == NodeType.SoundBank)
+                            {
+                                singleSavedPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(node.Name));
+                            }
+                            else if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
+                            {
+                                singleSavedPath = Path.Combine(destinationPath, node.Name);
+                            }
+
+                            if (savedFiles.Count == 1)
+                            {
+                                singleSavedPath = savedFiles.First();
+                                singleDisplayName = Path.GetFileName(singleSavedPath);
+                            }
+                        }
+                    }
+
+                    if (selectedNodes.Count == 1)
+                    {
+                        if (singleSavedPath != null)
+                        {
+                            LogService.LogInteractiveSuccess($"Successfully saved {singleDisplayName}.", singleSavedPath, singleDisplayName);
+                        }
+                    }
+                    else
+                    {
+                        string folderName = Path.GetFileName(destinationPath);
+                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items in {folderName}.", destinationPath, folderName);
                     }
 
                     TaskCancellationManager.CompleteCurrentOperation();
@@ -592,7 +660,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 catch (Exception ex)
                 {
-                    LogService.LogError(ex, $"Failed to save '{selectedNode.Name}'.");
+                    LogService.LogError(ex, $"Failed during save process.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred during save: {ex.Message}", Window.GetWindow(this));
                 }
                 finally

@@ -18,28 +18,37 @@
         <!-- 1. CATEGORY CONFIGURATION -->
         <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <!-- Box and Icon -->
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="ShapeOutline" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+                <!-- ROW 1: CATEGORY SELECTION -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <!-- Text and Combo: Centered vertically -->
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <Grid>
+                    <!-- Icon -->
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="ShapeOutline" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Content -->
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
+                        
+                        <!-- Texts -->
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="Tracked Category" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Select the asset category you want to monitor and scan." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                            <TextBlock Text="Select the asset category you want to monitor." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                         </StackPanel>
 
+                        <!-- Combo -->
                         <ComboBox Grid.Column="1" Name="CategoryComboBox" Style="{StaticResource ModernComboBox}" Width="250" Height="36" HorizontalAlignment="Right" VerticalAlignment="Center" SelectionChanged="CategoryComboBox_SelectionChanged">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
@@ -71,7 +80,40 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
                     </Grid>
-                </StackPanel>
+                </Grid>
+
+                <!-- DIVIDER LINE -->
+                <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Margin="60,-7,0,-7" Opacity="0.3"/>
+
+                <!-- ROW 2: START ID CONFIGURATION -->
+                <Grid Grid.Row="1" Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Icon -->
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="Numeric" Foreground="{StaticResource AccentBlue}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Content -->
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Texts -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Start Sequence ID" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Force scanning to start from a specific ID (Optional)." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                        </StackPanel>
+
+                        <!-- TextBox -->
+                        <TextBox Grid.Column="1" Text="{Binding SelectedItem.Start, ElementName=CategoryComboBox, UpdateSourceTrigger=PropertyChanged}" Width="250" Height="36" Style="{StaticResource ModernTextBoxEditable}" VerticalContentAlignment="Center" Padding="8,0" HorizontalAlignment="Right" ToolTip="Force scanning to start from this ID if higher than last found"/>
+                    </Grid>
+                </Grid>
             </Grid>
         </Border>
 

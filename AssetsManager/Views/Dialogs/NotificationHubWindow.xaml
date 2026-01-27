@@ -1,0 +1,201 @@
+<Window x:Class="AssetsManager.Views.Dialogs.NotificationHubWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:models="clr-namespace:AssetsManager.Views.Models.Notifications"
+        mc:Ignorable="d"
+        Title="Notifications"
+        Height="500" Width="400"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{StaticResource AppFontFamily}">
+
+    <Window.Resources>
+        <!-- DataTemplate for Notifications -->
+        <DataTemplate DataType="{x:Type models:NotificationModel}">
+            <Border x:Name="NotificationBorder" 
+                    Background="{StaticResource CardBackground}" 
+                    CornerRadius="6" 
+                    Margin="0,0,0,8" 
+                    BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="1"
+                    Padding="12"
+                    Cursor="Hand">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                        <ColumnDefinition Width="*"/>    <!-- Content -->
+                        <ColumnDefinition Width="Auto"/> <!-- Close -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 1. Semantic Icon -->
+                    <materialIcons:MaterialIcon Grid.Column="0" Width="16" Height="16" VerticalAlignment="Top" Margin="0,2,12,0">
+                        <materialIcons:MaterialIcon.Style>
+                            <Style TargetType="materialIcons:MaterialIcon">
+                                <Setter Property="Kind" Value="InformationOutline"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Type}" Value="Success">
+                                        <Setter Property="Kind" Value="CheckCircle"/>
+                                        <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Type}" Value="Warning">
+                                        <Setter Property="Kind" Value="AlertCircle"/>
+                                        <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Type}" Value="Error">
+                                        <Setter Property="Kind" Value="CloseCircle"/>
+                                        <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialIcons:MaterialIcon.Style>
+                    </materialIcons:MaterialIcon>
+
+                    <!-- 2. Content Column -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                        <Grid Margin="0,0,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" 
+                                       Text="{Binding Title}" 
+                                       FontWeight="SemiBold" 
+                                       FontSize="13" 
+                                       Foreground="{StaticResource TextPrimary}" 
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="1" 
+                                       Text="{Binding Timestamp, StringFormat='HH:mm'}" 
+                                       FontSize="11" 
+                                       Foreground="{StaticResource TextMuted}" 
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                        
+                        <TextBlock Text="{Binding Message}" 
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextSecondary}" 
+                                   TextWrapping="Wrap"
+                                   LineHeight="18"
+                                   Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- 3. Remove Button -->
+                    <Button Grid.Column="2" 
+                            Style="{StaticResource TransparentIconButton}" 
+                            Width="20" Height="20" 
+                            VerticalAlignment="Top" 
+                            Click="RemoveNotification_Click"
+                            Margin="8,-4,-4,0"
+                            ToolTip="Dismiss">
+                        <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12" Foreground="{StaticResource TextMuted}"/>
+                    </Button>
+                </Grid>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsRead}" Value="False">
+                    <Setter TargetName="NotificationBorder" Property="BorderThickness" Value="1.5"/>
+                    <Setter TargetName="NotificationBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                </DataTrigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="NotificationBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                </Trigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </Window.Resources>
+
+    <!-- Main Window Container with correctly rounded background and shadow -->
+    <Border Background="{StaticResource SidebarBackground}" 
+            CornerRadius="12" 
+            BorderBrush="{StaticResource BorderColor}" 
+            BorderThickness="1" 
+            Margin="12"> <!-- Margin for shadow bleed -->
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="25" ShadowDepth="8" Direction="270" Opacity="0.5" Color="Black"/>
+        </Border.Effect>
+        
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="Auto"/> <!-- Actions -->
+                <RowDefinition Height="*"/>    <!-- Content -->
+            </Grid.RowDefinitions>
+
+            <!-- Row 0: Header -->
+            <Border Grid.Row="0" Padding="20,16" Background="{StaticResource CardBackground}" CornerRadius="11,11,0,0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialIcons:MaterialIcon Grid.Column="0" Kind="BellRing" Width="18" Height="18" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="Notifications" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    
+                    <Border Grid.Column="2" Background="{StaticResource AccentRed}" CornerRadius="10" Padding="8,2" Margin="12,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" 
+                            Visibility="{Binding HasUnread, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{Binding UnreadCount, StringFormat='\{0\} NEW'}" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                    </Border>
+                    
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{StaticResource TransparentIconButton}" Click="Minimize_Click" Width="28" Height="28" Margin="0,0,4,0">
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                        </Button>
+
+                        <Button Style="{StaticResource TransparentIconButton}" Click="Close_Click" Width="28" Height="28">
+                            <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Row 1: Actions -->
+            <Border Grid.Row="1" Padding="20,8" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,1" 
+                    Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                <Grid>
+                    <TextBlock Text="Recent activity" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource TransparentIconButton}" Click="MarkAllRead_Click" Margin="0,0,8,0" Padding="6,4">
+                            <StackPanel Orientation="Horizontal">
+                                <materialIcons:MaterialIcon Kind="CheckAll" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Mark all read" FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource TransparentIconButton}" Click="ClearAll_Click" Padding="6,4">
+                            <StackPanel Orientation="Horizontal">
+                                <materialIcons:MaterialIcon Kind="DeleteOutline" Width="14" Height="14" Foreground="{StaticResource AccentRed}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Clear all" FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Row 2: Content -->
+            <Grid Grid.Row="2">
+                <!-- Empty State -->
+                <Grid Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}" Margin="0,40,0,40">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <Border Background="{StaticResource CardBackground}" CornerRadius="50" Width="80" Height="80" Margin="0,0,0,16">
+                            <materialIcons:MaterialIcon Kind="BellSleepOutline" Width="32" Height="32" Foreground="{StaticResource TextMuted}" Opacity="0.5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="All caught up!" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                        <TextBlock Text="No new notifications at the moment." FontSize="13" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- List Area -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16" 
+                              Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                    <ItemsControl ItemsSource="{Binding Notifications}"/>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

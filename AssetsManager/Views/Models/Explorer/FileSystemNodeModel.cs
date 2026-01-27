@@ -95,6 +95,20 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
+        private bool _isMultiSelected;
+        public bool IsMultiSelected
+        {
+            get { return _isMultiSelected; }
+            set
+            {
+                if (_isMultiSelected != value)
+                {
+                    _isMultiSelected = value;
+                    OnPropertyChanged(nameof(IsMultiSelected));
+                }
+            }
+        }
+
         private bool _isVisible = true;
         public bool IsVisible
         {

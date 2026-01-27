@@ -14,6 +14,7 @@ using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Help;
 using AssetsManager.Views.Settings;
 using AssetsManager.Views.Controls;
+using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
@@ -24,6 +25,7 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
+using AssetsManager.Services.Backup;
 
 namespace AssetsManager
 {
@@ -153,6 +155,7 @@ namespace AssetsManager
       services.AddTransient<MonitorWindow>();
       services.AddTransient<HelpWindow>();
       services.AddTransient<JsonDiffWindow>();
+      services.AddTransient<NotificationHubWindow>();
       services.AddTransient<SettingsWindow>();
       services.AddTransient<ProgressDetailsWindow>();
       services.AddTransient<UpdateProgressWindow>();

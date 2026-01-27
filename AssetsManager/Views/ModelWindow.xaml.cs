@@ -195,7 +195,7 @@ namespace AssetsManager.Views
                 {
                     using (FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
                     {
-                        return TextureUtils.LoadTexture(fileStream, Path.GetExtension(path), 1024);
+                        return TextureUtils.LoadTexture(fileStream, Path.GetExtension(path), 2048);
                     }
                 }
                 else
@@ -203,8 +203,8 @@ namespace AssetsManager.Views
                     // Assume it's a pack URI for resource loading
                     using (Stream resourceStream = Application.GetResourceStream(new Uri(path)).Stream)
                     {
-                        // Resize scene textures to a maximum of 1024x1024 for a balance of quality and memory.
-                        return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(path), 1024);
+                        // Resize scene textures to a maximum of 2048x2048 for a balance of quality and memory.
+                        return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(path), 2048);
                     }
                 }
             }

@@ -5,12 +5,17 @@ using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Services.Backup
 {
     public class BackupManager
     {
+        public event EventHandler<int> BackupStarted;
+        public event EventHandler<(int Processed, int Total, string CurrentFile)> BackupProgressChanged;
+        public event EventHandler<bool> BackupCompleted;
+
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
@@ -37,18 +42,36 @@ namespace AssetsManager.Utils
                     }
 
                     _logService.Log("Starting directory backup...");
-                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath);
+                    
+                    // Count total files for progress
+                    int totalFiles = 0;
+                    try 
+                    {
+                        totalFiles = Directory.GetFiles(sourceLolPath, "*", SearchOption.AllDirectories).Length;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogWarning($"Could not count files for progress: {ex.Message}");
+                    }
+
+                    BackupStarted?.Invoke(this, totalFiles);
+
+                    int processedFiles = 0;
+                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, totalFiles);
+                    
                     _currentSessionBackups.Add(destinationBackupPath);
+                    BackupCompleted?.Invoke(this, true);
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, $"AssetsManager.Utils.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
+                    _logService.LogError(ex, $"AssetsManager.Services.Backup.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
+                    BackupCompleted?.Invoke(this, false);
                     throw; // Re-throw the exception after logging
                 }
             });
         }
 
-        private void CopyDirectoryRecursive(string sourceDir, string destinationDir)
+        private void CopyDirectoryRecursive(string sourceDir, string destinationDir, ref int processedFiles, int totalFiles)
         {
             var dir = new DirectoryInfo(sourceDir);
             if (!dir.Exists)
@@ -59,11 +82,13 @@ namespace AssetsManager.Utils
             foreach (FileInfo file in dir.GetFiles())
             {
                 file.CopyTo(Path.Combine(destinationDir, file.Name), true);
+                processedFiles++;
+                BackupProgressChanged?.Invoke(this, (processedFiles, totalFiles, file.Name));
             }
 
             foreach (DirectoryInfo subDir in dir.GetDirectories())
             {
-                CopyDirectoryRecursive(subDir.FullName, Path.Combine(destinationDir, subDir.Name));
+                CopyDirectoryRecursive(subDir.FullName, Path.Combine(destinationDir, subDir.Name), ref processedFiles, totalFiles);
             }
         }
         

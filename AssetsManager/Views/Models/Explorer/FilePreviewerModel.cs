@@ -12,6 +12,7 @@ namespace AssetsManager.Views.Models.Explorer
         private PinnedFilesManager _pinnedFilesManager;
 
         private bool _hasSelectedNode;
+        private bool _isSelectedNodeContainer;
 
         public FilePreviewerModel()
         {
@@ -39,7 +40,22 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public bool IsGridVisible => IsGridMode && HasSelectedNode;
+        public bool IsSelectedNodeContainer
+        {
+            get => _isSelectedNodeContainer;
+            set
+            {
+                if (_isSelectedNodeContainer != value)
+                {
+                    _isSelectedNodeContainer = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsGridVisible));
+                    OnPropertyChanged(nameof(IsPreviewVisible));
+                }
+            }
+        }
+
+        public bool IsGridVisible => IsGridMode && HasSelectedNode && IsSelectedNodeContainer;
         public bool IsPreviewVisible => !IsGridVisible;
 
         public bool HasSelectedNode

@@ -19,6 +19,7 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
+using AssetsManager.Services.Backup;
 using AssetsManager.Views.Controls;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
@@ -54,6 +55,7 @@ namespace AssetsManager.Views
         private readonly ComparisonHistoryService _comparisonHistoryService;
 
         private string _latestAppVersionAvailable;
+        private NotificationHubWindow _notificationHubWindow;
         
         // New fields to manage the state of the extraction after comparison
         private bool _isExtractingAfterComparison = false;
@@ -117,11 +119,6 @@ namespace AssetsManager.Views
             _notificationService = notificationService;
             _comparisonHistoryService = comparisonHistoryService;
 
-            // Initialize NotificationHub
-            var notificationViewModel = new NotificationHubModel(_notificationService);
-            NotificationHub.DataContext = notificationViewModel;
-
-            // Initialize ProgressUIManager with controls from the new StatusBarView
             _progressUIManager.Initialize(StatusBar.ViewModel, this);
             
             // Subscribe to Status Bar events
@@ -141,6 +138,10 @@ namespace AssetsManager.Views
             _extractionService.ExtractionStarted += _progressUIManager.OnExtractionStarted;
             _extractionService.ExtractionProgressChanged += (sender, progress) => _progressUIManager.OnExtractionProgressChanged(progress.extractedCount, progress.totalFiles, progress.message);
             _extractionService.ExtractionCompleted += (sender, e) => OnExtractionCompleted(sender, e);
+
+            _backupManager.BackupStarted += _progressUIManager.OnBackupStarted;
+            _backupManager.BackupProgressChanged += _progressUIManager.OnBackupProgressChanged;
+            _backupManager.BackupCompleted += _progressUIManager.OnBackupCompleted;
 
             _versionService.VersionDownloadStarted += (sender, e) => _progressUIManager.OnVersionDownloadStarted(sender, e);
             _versionService.VersionDownloadProgressChanged += (sender, e) => _progressUIManager.OnDownloadProgressChanged(e.CurrentValue, e.TotalValue, e.CurrentFile, true, null);
@@ -379,10 +380,13 @@ namespace AssetsManager.Views
 
         private async void OnNotificationHubRequested(object sender, EventArgs e)
         {
-            if (NotificationHub.DataContext is NotificationHubModel vm)
+            if (_notificationHubWindow == null)
             {
-                vm.TogglePanel();
+                _notificationHubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
+                _notificationHubWindow.Owner = this;
             }
+
+            _notificationHubWindow.ShowHub(this);
 
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
             {
