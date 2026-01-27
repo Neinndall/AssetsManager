@@ -12,7 +12,19 @@ namespace AssetsManager.Views.Models.Monitor
         public string Name { get; set; }
         public string BaseUrl { get; set; }
         public string Extension { get; set; }
-        public long Start { get; set; }
+        
+        private long _start;
+        public long Start
+        {
+            get => _start;
+            set
+            {
+                if (_start == value) return;
+                _start = value;
+                OnPropertyChanged();
+            }
+        }
+
         public long LastValid { get; set; }
         public List<long> FoundUrls { get; set; } = new List<long>();
         public List<long> FailedUrls { get; set; } = new List<long>();
