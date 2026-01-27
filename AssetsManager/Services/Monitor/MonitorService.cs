@@ -238,9 +238,11 @@ namespace AssetsManager.Services.Monitor
                 {
                     lastKnownId = allKnownIds.Max();
                 }
-                else
+                
+                // If the user has set a custom Start ID that is higher than what we found, use that.
+                if (category.Start > 0 && (category.Start - 1) > lastKnownId)
                 {
-                    lastKnownId = category.Start > 0 ? category.Start - 1 : 0;
+                    lastKnownId = category.Start - 1;
                 }
 
                 int count = 0;
@@ -278,9 +280,11 @@ namespace AssetsManager.Services.Monitor
                 var lastAssetId = GetAssetIdFromUrl(currentAssets.Last().Url);
                 if (lastAssetId.HasValue) lastNumber = lastAssetId.Value;
             }
-            else
+
+            // If the user has set a custom Start ID that is higher than current max, jump to it.
+            if (category.Start > 0 && (category.Start - 1) > lastNumber)
             {
-                lastNumber = category.Start > 0 ? category.Start - 1 : 0;
+                lastNumber = category.Start - 1;
             }
 
             var existingIds = new HashSet<long>(currentAssets.Select(a => GetAssetIdFromUrl(a.Url) ?? -1));
@@ -453,9 +457,11 @@ namespace AssetsManager.Services.Monitor
                     {
                         lastKnownId = allKnownIds.Max();
                     }
-                    else
+                    
+                    // If the user has set a custom Start ID that is higher than what we found, use that.
+                    if (category.Start > 0 && (category.Start - 1) > lastKnownId)
                     {
-                        lastKnownId = category.Start > 0 ? category.Start - 1 : 0;
+                        lastKnownId = category.Start - 1;
                     }
 
                     int count = 0;
