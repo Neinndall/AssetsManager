@@ -19,7 +19,7 @@ using ICSharpCode.AvalonEdit.Rendering;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Views.Helpers;
-using AssetsManager.Views.Models.Dialogs;
+using AssetsManager.Views.Models.Dialogs.Controls;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {

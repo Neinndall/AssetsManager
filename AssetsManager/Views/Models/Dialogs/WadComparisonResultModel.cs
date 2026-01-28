@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Models.Dialogs.Controls;
 
 namespace AssetsManager.Views.Models.Dialogs
 {

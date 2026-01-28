@@ -4,7 +4,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models.Wad;
 
-namespace AssetsManager.Views.Models.Dialogs
+namespace AssetsManager.Views.Models.Dialogs.Controls
 {
     public class WadResultsTreeModel : INotifyPropertyChanged
     {
