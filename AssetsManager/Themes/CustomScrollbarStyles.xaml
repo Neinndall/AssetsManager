@@ -113,18 +113,6 @@
         </Grid>
     </ControlTemplate>
 
-    <Style x:Key="ModernVerticalScrollBar" TargetType="{x:Type ScrollBar}">
-        <Setter Property="Background" Value="{StaticResource ScrollBarBackground}"/>
-        <Setter Property="Width" Value="8"/>
-        <Setter Property="Template" Value="{StaticResource VerticalScrollBarTemplate}"/>
-    </Style>
-
-    <Style x:Key="ModernHorizontalScrollBar" TargetType="{x:Type ScrollBar}">
-        <Setter Property="Background" Value="{StaticResource ScrollBarBackground}"/>
-        <Setter Property="Height" Value="8"/>
-        <Setter Property="Template" Value="{StaticResource HorizontalScrollBarTemplate}"/>
-    </Style>
-
     <Style TargetType="{x:Type ScrollBar}">
         <Setter Property="Background" Value="{StaticResource ScrollBarBackground}"/>
         <Style.Triggers>
