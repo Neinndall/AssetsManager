@@ -35,15 +35,11 @@ namespace AssetsManager.Services.Explorer
         private enum Previewer { None, Image, WebView, AvalonEdit, StatusPanel }
         private Previewer _activePreviewer = Previewer.None;
         private FileSystemNodeModel _currentlyDisplayedNode;
-
         private Image _imagePreview;
         private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
-
         private TextBlock _unsupportedFileTextBlock;
-
         private FilePreviewerModel _viewModel;
-
         private IHighlightingDefinition _jsonHighlightingDefinition;
 
         private readonly LogService _logService;
@@ -219,7 +215,15 @@ namespace AssetsManager.Services.Explorer
 
         private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false)
         {
-            _logService.Log($"[PreviewService] SetPreviewerAsync called. NewPreviewer: {newPreviewer}");
+            // Part 1: Hide all via ViewModel
+            _viewModel.IsImageVisible = false;
+            _viewModel.IsTextVisible = false;
+            _viewModel.IsWebVisible = false;
+            _viewModel.IsPlaceholderVisible = false;
+            _viewModel.IsDetailsVisible = false;
+            _viewModel.IsSelectFileMessageVisible = false;
+            _viewModel.IsUnsupportedFileMessageVisible = false;
+
             _imagePreview.Source = null;
             _textEditorPreview.Clear();
 
@@ -237,46 +241,37 @@ namespace AssetsManager.Services.Explorer
 
             _activePreviewer = newPreviewer;
 
-            // Part 3: Show the new content via ViewModel enum.
+            // Part 3: Show the new content via ViewModel.
             switch (newPreviewer)
             {
-                case Previewer.None:
-                    _logService.Log("[PreviewService] Setting PreviewMode to None");
-                    _viewModel.PreviewMode = ExplorerPreviewMode.None;
-                    break;
-
                 case Previewer.Image:
                     if (content is ImageSource imageSource)
                     {
-                        _logService.Log("[PreviewService] Setting PreviewMode to Image");
                         _imagePreview.Source = imageSource;
-                        _viewModel.PreviewMode = ExplorerPreviewMode.Image;
+                        _viewModel.IsImageVisible = true;
                     }
                     break;
 
                 case Previewer.WebView:
                     if (content is string htmlContent)
                     {
-                        _logService.Log("[PreviewService] Setting PreviewMode to Web (WebView)");
                         await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
-                        _viewModel.PreviewMode = ExplorerPreviewMode.Web;
+                        _viewModel.IsWebVisible = true;
                     }
                     break;
 
                 case Previewer.AvalonEdit:
                     if (content is ValueTuple<string, IHighlightingDefinition> textData)
                     {
-                        _logService.Log("[PreviewService] Setting PreviewMode to Text (AvalonEdit)");
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
-                        _viewModel.PreviewMode = ExplorerPreviewMode.Text;
+                        _viewModel.IsTextVisible = true;
                         _textEditorPreview.Focus();
                     }
                     break;
 
                 case Previewer.StatusPanel:
-                    _logService.Log("[PreviewService] Setting PreviewMode to Placeholder (StatusPanel)");
-                    _viewModel.PreviewMode = ExplorerPreviewMode.Placeholder;
+                    _viewModel.IsPlaceholderVisible = true;
                     if (content is string extension)
                     {
                         // This is for unsupported files

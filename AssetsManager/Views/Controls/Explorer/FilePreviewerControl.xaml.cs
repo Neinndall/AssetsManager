@@ -148,12 +148,12 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.PropertyName == nameof(PinnedFilesManager.SelectedFile))
             {
+                if (_isShowingTemporaryPreview) return;
+
                 var selectedPin = ViewModel.PinnedFilesManager.SelectedFile;
-                LogService.Log($"[FilePreviewer] Selected pin changed. IsNull: {selectedPin == null}");
 
                 if (selectedPin == null)
                 {
-                    ViewModel.PreviewMode = ExplorerPreviewMode.Placeholder;
                     if (!_isShowingTemporaryPreview)
                     {
                         await ExplorerPreviewService.ResetPreviewAsync();
