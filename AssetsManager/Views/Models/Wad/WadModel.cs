@@ -69,7 +69,7 @@ namespace AssetsManager.Views.Models.Wad
                     return null;
 
                 long diff = (long)NewUncompressedSize - (long)OldUncompressedSize;
-                if (diff == 0) return "No change";
+                if (diff == 0) return "N/A";
                 
                 double diffKB = diff / 1024.0;
                 string sign = diff > 0 ? "+" : "";
