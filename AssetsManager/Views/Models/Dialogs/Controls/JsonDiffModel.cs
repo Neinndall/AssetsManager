@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace AssetsManager.Views.Models.Dialogs
+namespace AssetsManager.Views.Models.Dialogs.Controls
 {
     public class JsonDiffModel : INotifyPropertyChanged
     {

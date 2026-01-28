@@ -41,7 +41,7 @@
                                    FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock x:Name="summaryTextBlock"
-                                   Text="Analyzing differences..." 
+                                   Text="{Binding SummaryText}" 
                                    FontSize="12" 
                                    Foreground="{StaticResource TextSecondary}"
                                    Margin="0,2,0,0"/>
@@ -56,7 +56,7 @@
                             <materialIcons:MaterialIcon Kind="Plus" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="New:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="CountNewText" Text="0" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="CountNewText" Text="{Binding CountNew}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Modified Files -->
@@ -65,7 +65,7 @@
                             <materialIcons:MaterialIcon Kind="Pencil" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="Modified:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="CountModifiedText" Text="0" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="CountModifiedText" Text="{Binding CountModified}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Removed Files -->
@@ -74,7 +74,7 @@
                             <materialIcons:MaterialIcon Kind="Minus" Width="14" Height="14" Foreground="{StaticResource AccentRed}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="Removed:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="CountRemovedText" Text="0" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="CountRemovedText" Text="{Binding CountRemoved}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Renamed Files -->
@@ -83,7 +83,7 @@
                             <materialIcons:MaterialIcon Kind="Rename" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="Renamed:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="CountRenamedText" Text="0" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="CountRenamedText" Text="{Binding CountRenamed}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
                 
@@ -114,12 +114,14 @@
                 <ColumnDefinition Width="3*"/>
             </Grid.ColumnDefinitions>
             <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0"
+                                            DataContext="{Binding TreeModel}"
                                             SelectedItemChanged="ResultsTree_SelectedItemChanged"
                                             SearchTextChanged="SearchTextBox_TextChanged"
                                             WadContextMenuOpening="ResultsTree_ContextMenuOpening"
                                             ViewDifferencesClick="ViewDifferences_Click"/>
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
-            <controls:WadDiffDetailsControl x:Name="DiffDetails" Grid.Column="2"/>
+            <controls:WadDiffDetailsControl x:Name="DiffDetails" Grid.Column="2" 
+                                            DataContext="{Binding SelectedDiff}"/>
         </Grid>
     </Grid>
 </Window>

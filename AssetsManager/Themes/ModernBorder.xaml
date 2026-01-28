@@ -4,14 +4,6 @@
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
-    <!-- Log Header Style -->
-    <Style x:Key="LogHeaderBorderStyle" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-        <Setter Property="BorderThickness" Value="0,0,0,1"/>
-        <Setter Property="Padding" Value="12,8"/>
-    </Style>
-
     <!-- Card Style -->
     <Style x:Key="SettingsCard" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource CardBackground}"/>

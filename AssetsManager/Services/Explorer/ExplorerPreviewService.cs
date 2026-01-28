@@ -35,16 +35,11 @@ namespace AssetsManager.Services.Explorer
         private enum Previewer { None, Image, WebView, AvalonEdit, StatusPanel }
         private Previewer _activePreviewer = Previewer.None;
         private FileSystemNodeModel _currentlyDisplayedNode;
-
         private Image _imagePreview;
         private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
-
         private TextBlock _unsupportedFileTextBlock;
-        private UserControl _detailsPreview;
-
         private FilePreviewerModel _viewModel;
-
         private IHighlightingDefinition _jsonHighlightingDefinition;
 
         private readonly LogService _logService;
@@ -64,13 +59,12 @@ namespace AssetsManager.Services.Explorer
             _wadExtractionService = wadExtractionService;
         }
 
-        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, TextBlock unsupportedFileTextBlock, UserControl detailsPreview, FilePreviewerModel viewModel)
+        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, TextBlock unsupportedFileTextBlock, FilePreviewerModel viewModel)
         {
             _imagePreview = imagePreview;
             _webViewContainer = webViewContainer;
             _textEditorPreview = textEditor;
             _unsupportedFileTextBlock = unsupportedFileTextBlock;
-            _detailsPreview = detailsPreview;
             _viewModel = viewModel;
         }
 

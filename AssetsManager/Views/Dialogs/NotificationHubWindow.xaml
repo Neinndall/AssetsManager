@@ -191,7 +191,9 @@
                 </Grid>
 
                 <!-- List Area -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16" 
+                <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="16" 
                               Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}}">
                     <ItemsControl ItemsSource="{Binding Notifications}"/>
                 </ScrollViewer>

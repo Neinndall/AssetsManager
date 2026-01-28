@@ -97,8 +97,6 @@ namespace AssetsManager.Views.Controls.Models
             MeshesListBox.ItemsSource = null;
             _animationModels.Clear();
             ModelsListBox.SelectedItem = null;
-            AnimationControlsPanel.Visibility = Visibility.Collapsed;
-            AnimationControlsPanel.DataContext = null;
 
             LoadModelButton.IsEnabled = true;
             LoadChromaModelButton.IsEnabled = true;

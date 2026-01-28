@@ -60,6 +60,23 @@ namespace AssetsManager.Views.Models.Wad
         [JsonIgnore]
         public string NewSizeString => FormatSize(NewUncompressedSize);
 
+        [JsonIgnore]
+        public string SizeDifferenceString
+        {
+            get
+            {
+                if (Type != ChunkDiffType.Modified || OldUncompressedSize == null || NewUncompressedSize == null)
+                    return null;
+
+                long diff = (long)NewUncompressedSize - (long)OldUncompressedSize;
+                if (diff == 0) return "N/A";
+                
+                double diffKB = diff / 1024.0;
+                string sign = diff > 0 ? "+" : "";
+                return $"{sign}{diffKB:F2} KB";
+            }
+        }
+
         private string FormatSize(ulong? sizeInBytes)
         {
             if (sizeInBytes == null) return "N/A";

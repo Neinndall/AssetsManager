@@ -3,11 +3,15 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Collections;
-using System.Linq;
+using System.Windows.Controls.Primitives;
 using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Views.Helpers
 {
+    /// <summary>
+    /// Proporciona comportamientos adjuntos para mejorar la interacción con los controles TreeViewItem.
+    /// Incluye soporte para expansión con un solo clic y selección múltiple inteligente.
+    /// </summary>
     public static class TreeViewItemBehavior
     {
         public static readonly DependencyProperty SingleClickExpandProperty =
@@ -27,45 +31,73 @@ namespace AssetsManager.Views.Helpers
 
         private static void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // Ignore if clicking on the expander toggle button
-            if (sender is not TreeViewItem item || e.OriginalSource is System.Windows.Controls.Primitives.ToggleButton) return;
+            // 1. Ignorar clics en el botón de expansión (ToggleButton) para no interferir con el comportamiento nativo
+            if (sender is not TreeViewItem item || e.OriginalSource is ToggleButton) return;
 
-            // Ensure we are clicking on THIS item's header, not a child's header
-            var container = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
-            if (item != container || item.DataContext is not FileSystemNodeModel model) return;
+            // 2. Seguridad: Asegurar que el clic es en el encabezado de ESTE ítem y no en uno de sus hijos
+            if (FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != item) return;
 
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            bool isControlPressed = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+
+            // 3. Lógica de Selección Múltiple (Solo para modelos compatibles)
+            if (isControlPressed && item.DataContext is FileSystemNodeModel model)
             {
-                // CTRL + Click: Toggle multi-selection without changing native selection/expansion
                 model.IsMultiSelected = !model.IsMultiSelected;
-                e.Handled = true;
+                e.Handled = true; // Bloqueamos la selección nativa para mantener nuestra multi-selección
+                return;
             }
-            else
-            {
-                // Normal Click: Clear all multi-selections
-                var treeView = FindAncestor<TreeView>(item);
-                if (treeView != null) ClearAllMultiSelected(treeView.ItemsSource);
 
-                // Handle single click expand logic
+            // 4. Lógica de Navegación y Expansión (Clic Normal)
+            if (!isControlPressed)
+            {
+                // Limpiar estados de multi-selección solo si estamos en un árbol compatible
+                var treeView = FindAncestor<TreeView>(item);
+                if (treeView?.ItemsSource != null)
+                {
+                    ClearAllMultiSelected(treeView.ItemsSource);
+                }
+
+                // Si es un contenedor, alternamos su expansión
                 if (item.HasItems)
                 {
                     item.IsSelected = true;
                     item.IsExpanded = !item.IsExpanded;
-                    e.Handled = true;
+                    e.Handled = true; // Marcamos como manejado para evitar que el TreeView haga su expansión estándar
+                }
+                // Si es un nodo hoja (archivo), dejamos que el evento fluya para que se seleccione y se abra/previsualice
+            }
+        }
+
+        /// <summary>
+        /// Limpia de forma recursiva el estado de multi-selección.
+        /// Optimizado para salir de inmediato si el árbol no utiliza modelos compatibles.
+        /// </summary>
+        private static void ClearAllMultiSelected(IEnumerable nodes)
+        {
+            if (nodes == null) return;
+
+            foreach (var node in nodes)
+            {
+                if (node is FileSystemNodeModel fileNode)
+                {
+                    // Solo actualizamos si es necesario para evitar notificaciones de cambio redundantes
+                    if (fileNode.IsMultiSelected) fileNode.IsMultiSelected = false;
+                    
+                    if (fileNode.Children?.Count > 0)
+                        ClearAllMultiSelected(fileNode.Children);
+                }
+                else
+                {
+                    // Si el primer nivel no es compatible, asumimos que el resto del árbol tampoco
+                    // Esto evita procesar recursivamente árboles de resultados o logs
+                    break;
                 }
             }
         }
 
-        private static void ClearAllMultiSelected(IEnumerable nodes)
-        {
-            if (nodes == null) return;
-            foreach (var node in nodes.OfType<FileSystemNodeModel>())
-            {
-                node.IsMultiSelected = false;
-                ClearAllMultiSelected(node.Children);
-            }
-        }
-
+        /// <summary>
+        /// Busca un ancestro del tipo especificado en el árbol visual o lógico.
+        /// </summary>
         private static T FindAncestor<T>(DependencyObject obj) where T : DependencyObject
         {
             while (obj != null && obj is not T)

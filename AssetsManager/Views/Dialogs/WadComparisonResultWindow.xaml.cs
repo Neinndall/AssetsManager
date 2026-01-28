@@ -1,5 +1,7 @@
 using System;
+using System.Threading.Tasks;
 using AssetsManager.Services.Comparator;
+using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services;
@@ -24,24 +26,6 @@ using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Views.Dialogs
 {
-    #region ViewModel Classes
-    public class WadGroupViewModel
-    {
-        public string WadName { get; set; }
-        public int DiffCount { get; set; }
-        public string WadNameWithCount => $"{WadName} ({DiffCount})";
-        public List<DiffTypeGroupViewModel> Types { get; set; }
-    }
-
-    public class DiffTypeGroupViewModel
-    {
-        public ChunkDiffType Type { get; set; }
-        public int DiffCount { get; set; }
-        public string TypeNameWithCount => $"{Type} ({DiffCount})";
-        public List<SerializableChunkDiff> Diffs { get; set; }
-    }
-    #endregion
-
     public partial class WadComparisonResultWindow : Window
     {
         private readonly List<SerializableChunkDiff> _serializableDiffs;
@@ -60,9 +44,14 @@ namespace AssetsManager.Views.Dialogs
         private readonly string _newPbePath;
         private readonly string _sourceJsonPath; // Path to the loaded wadcomparison.json
 
+        private readonly WadComparisonResultModel _viewModel;
+
         public WadComparisonResultWindow(List<ChunkDiff> diffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, AppSettings appSettings, string oldPbePath, string newPbePath)
         {
             InitializeComponent();
+            _viewModel = new WadComparisonResultModel();
+            DataContext = _viewModel;
+
             _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
             _directoriesCreator = directoriesCreator;
@@ -96,6 +85,9 @@ namespace AssetsManager.Views.Dialogs
         public WadComparisonResultWindow(List<SerializableChunkDiff> serializableDiffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, AppSettings appSettings, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
         {
             InitializeComponent();
+            _viewModel = new WadComparisonResultModel();
+            DataContext = _viewModel;
+
             _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
             _directoriesCreator = directoriesCreator;
@@ -120,14 +112,23 @@ namespace AssetsManager.Views.Dialogs
             ResultsTree.SelectedItemChanged -= ResultsTree_SelectedItemChanged;
             ResultsTree.ContextMenuOpening -= ResultsTree_ContextMenuOpening;
             _serializableDiffs?.Clear();
-            ResultsTree.ItemsSource = null;
+            _viewModel.TreeModel.WadGroups?.Clear();
             ResultsTree.Cleanup();
         }
 
-        private void WadComparisonResultWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void WadComparisonResultWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            TryResolveHashes();
-            PopulateResults(_serializableDiffs);
+            _viewModel.SetLoadingState(ComparisonLoadingState.ResolvingHashes);
+            
+            // Execute heavy logic in a background thread to keep UI responsive
+            var wadGroups = await Task.Run(() =>
+            {
+                TryResolveHashes();
+                return PrepareGroupedResults(_serializableDiffs);
+            });
+
+            // Update UI via Model
+            _viewModel.SetResults(_serializableDiffs, wadGroups);
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -236,14 +237,12 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void PopulateResults(List<SerializableChunkDiff> diffs)
+        private List<WadGroupViewModel> PrepareGroupedResults(List<SerializableChunkDiff> diffs)
         {
             var groupedByWad = diffs.GroupBy(d => d.SourceWadFile)
                                     .OrderBy(g => g.Key);
 
-            summaryTextBlock.Text = $"Found {diffs.Count} differences across {groupedByWad.Count()} WAD files.";
-
-            var wadGroups = groupedByWad.Select(wadGroup => new WadGroupViewModel
+            return groupedByWad.Select(wadGroup => new WadGroupViewModel
             {
                 WadName = wadGroup.Key,
                 DiffCount = wadGroup.Count(),
@@ -256,22 +255,17 @@ namespace AssetsManager.Views.Dialogs
                                       Diffs = typeGroup.OrderBy(d => d.NewPath ?? d.OldPath).ToList()
                                   }).ToList()
             }).ToList();
-
-            ResultsTree.ItemsSource = wadGroups;
-            UpdateDashboardStats(diffs);
         }
 
-        private void UpdateDashboardStats(List<SerializableChunkDiff> diffs)
+        private void PopulateResults(List<SerializableChunkDiff> diffs)
         {
-            CountNewText.Text = diffs.Count(d => d.Type == ChunkDiffType.New).ToString();
-            CountModifiedText.Text = diffs.Count(d => d.Type == ChunkDiffType.Modified).ToString();
-            CountRemovedText.Text = diffs.Count(d => d.Type == ChunkDiffType.Removed).ToString();
-            CountRenamedText.Text = diffs.Count(d => d.Type == ChunkDiffType.Renamed).ToString();
+            var wadGroups = PrepareGroupedResults(diffs);
+            _viewModel.SetResults(diffs, wadGroups);
         }
 
         private void ResultsTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            DiffDetails.DisplayDetails(e.NewValue);
+            _viewModel.SelectedDiff = e.NewValue as SerializableChunkDiff;
         }
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)

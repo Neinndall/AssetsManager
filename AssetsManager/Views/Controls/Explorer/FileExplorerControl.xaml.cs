@@ -293,6 +293,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
+                if (FilePreviewer != null)
+                {
+                    await FilePreviewer.ResetToDefaultState();
+                }
                 await BuildTreeFromBackupAsync(openFileDialog.FileName);
             }
         }
@@ -692,7 +696,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode && FilePreviewer != null)
             {
-                var existingNormalPin = FilePreviewer.ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == selectedNode && !p.IsDetailsTab);
+                var existingNormalPin = FilePreviewer.ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == selectedNode);
 
                 if (existingNormalPin != null)
                 {

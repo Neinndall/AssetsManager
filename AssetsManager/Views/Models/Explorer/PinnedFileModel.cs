@@ -19,8 +19,7 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public bool IsDetailsTab { get; set; }
-        public string Header => IsDetailsTab ? "Details" : Node?.Name;
+        public string Header => Node?.Name;
 
         private bool _isSelected;
         public bool IsSelected

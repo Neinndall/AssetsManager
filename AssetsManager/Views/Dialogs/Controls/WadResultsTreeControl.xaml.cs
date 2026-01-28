@@ -25,12 +25,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             remove { RemoveHandler(ViewDifferencesClickEvent, value); }
         }
 
-        public IEnumerable<object> ItemsSource
-        {
-            get => resultsTreeView.ItemsSource as IEnumerable<object>;
-            set => resultsTreeView.ItemsSource = value;
-        }
-
         public WadResultsTreeControl()
         {
             InitializeComponent();

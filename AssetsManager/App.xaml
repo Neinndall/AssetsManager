@@ -36,7 +36,7 @@
             <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
             <converters:EqualityToVisibilityConverter x:Key="EqualityToVisibilityConverter"/>
             <converters:PathToIconConverter x:Key="PathToIconConverter"/>
-            <converters:ChunkDiffTypeToBrushConverter x:Key="DiffTypeToBrushConverter"/>
+            <converters:ChunkDiffTypeToBrushConverter x:Key="ChunkDiffTypeToBrushConverter"/>
             <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
             <converters:ValueMultiplierConverter x:Key="ValueMultiplierConverter"/>
             

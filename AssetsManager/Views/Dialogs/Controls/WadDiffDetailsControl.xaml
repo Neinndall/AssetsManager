@@ -7,132 +7,277 @@
              xmlns:models="clr-namespace:AssetsManager.Views.Models.Wad"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
-             
+
     <Border Style="{StaticResource SettingsCard}" Padding="0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            
-            <!-- Header -->
-            <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
+
+            <!-- Header Section -->
+            <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="20,16" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0">
                 <StackPanel Orientation="Horizontal">
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="32" Height="32" Margin="0,0,12,0">
-                        <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="36" Height="36" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Border>
-                    <TextBlock Text="Difference Details" 
-                               FontSize="14" 
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"
-                               VerticalAlignment="Center"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="INSPECTOR" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentBrush}" Opacity="0.8"/>
+                        <TextBlock Text="Difference Details" 
+                                   FontSize="16" 
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimary}"
+                                   Margin="0,-2,0,0"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
+            <!-- Content Area -->
             <Border Grid.Row="1" x:Name="detailsPanel"
                     Background="{StaticResource CardBackground}"
                     CornerRadius="0,0,12,12"
-                    Padding="20"
+                    Padding="24"
                     MinHeight="400">
                 <Grid>
                     <!-- No Selection Message -->
                     <StackPanel x:Name="noSelectionPanel" VerticalAlignment="Center" HorizontalAlignment="Center"
                                 Visibility="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}">
-                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="40" Width="80" Height="80" Margin="0,0,0,16">
-                             <materialIcons:MaterialIcon Kind="FileSearchOutline" Foreground="{StaticResource TextMuted}" Height="40" Width="40" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5"/>
-                        </Border>
-                        <TextBlock Text="Select a file to inspect" FontWeight="Bold" FontSize="16" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="Click on any item in the tree to view its properties" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+                        <Grid Width="120" Height="120">
+                            <Ellipse Fill="{StaticResource SidebarBackground}" Opacity="0.5"/>
+                            <materialIcons:MaterialIcon Kind="TextBoxSearchOutline" Foreground="{StaticResource TextMuted}" Height="48" Width="48" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.3"/>
+                        </Grid>
+                        <TextBlock Text="No Asset Selected" FontWeight="Bold" FontSize="18" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,20,0,0"/>
+                        <TextBlock Text="Select a file from the tree to view its technical metadata and path information." 
+                                   Foreground="{StaticResource TextSecondary}" 
+                                   Margin="0,8,0,0" 
+                                   HorizontalAlignment="Center" 
+                                   TextAlignment="Center" 
+                                   Width="280"
+                                   TextWrapping="Wrap"/>
                     </StackPanel>
 
                     <!-- Details Content -->
-                    <StackPanel x:Name="detailsContentPanel" VerticalAlignment="Top"
+                    <StackPanel x:Name="detailsContentPanel" 
+                                VerticalAlignment="Top"
                                 Visibility="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource NullToVisibilityConverter}}">
 
-                        <!-- Main Info Card (Refined & Compact) -->
-                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="10" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,20">
+                        <!-- Asset Primary Identity -->
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,24">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Change Type Badge -->
-                                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Margin="0,0,16,0" VerticalAlignment="Center" Background="{StaticResource HoverColor}">
-                                    <materialIcons:MaterialIcon Kind="FileEditOutline" Width="18" Height="18" 
-                                                                Foreground="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}" 
+                                <!-- Icon -->
+                                <Border Grid.Column="0" Width="48" Height="48" CornerRadius="10" Margin="0,0,20,0" VerticalAlignment="Top" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <materialIcons:MaterialIcon Kind="{Binding Converter={StaticResource PathToIconConverter}}" 
+                                                                Width="24" Height="24" 
+                                                                Foreground="{StaticResource TextPrimary}" 
                                                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
 
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="CHANGE TYPE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                                    <TextBlock Text="{Binding Type}" 
-                                               Foreground="{Binding Type, Converter={StaticResource DiffTypeToBrushConverter}}" 
-                                               FontSize="16" FontWeight="Bold" Margin="0,-1,0,0"
-                                               Typography.Capitals="AllSmallCaps"/>
+                                <!-- Name and Decorative Line -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="FILE IDENTIFIER" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,2"/>
+                                    <TextBlock Text="{Binding FileName}" 
+                                               Foreground="{StaticResource TextPrimary}" 
+                                               FontSize="18" FontWeight="Bold" 
+                                               TextWrapping="Wrap"/>
+                                    <Border Background="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}" 
+                                            HorizontalAlignment="Left" Height="2" Width="40" Margin="0,8,0,0" Opacity="0.8"/>
                                 </StackPanel>
+
+                                <!-- Status Badge -->
+                                <Border Grid.Column="2" 
+                                        Background="{StaticResource HoverColor}" 
+                                        CornerRadius="6" 
+                                        Padding="12,6"
+                                        VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialIcons:MaterialIcon Kind="Circle" Width="8" Height="8" 
+                                                                    Foreground="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}" 
+                                                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding Type}" 
+                                                   Foreground="{StaticResource TextPrimary}" 
+                                                   FontSize="12" FontWeight="SemiBold" 
+                                                   Typography.Capitals="AllSmallCaps"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
                             </Grid>
                         </Border>
 
-                        <!-- Generic File Name (If applicable) -->
-                        <StackPanel x:Name="genericFileNamePanel" Margin="0,0,0,16" 
-                                    Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='!Renamed'}">
-                            <TextBlock Text="File Name" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,6"/>
-                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimary}" FontWeight="Medium" FontSize="14" TextWrapping="Wrap"/>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- Paths Section -->
-                        <TextBlock Text="PATH INFORMATION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,8,0,8"/>
-                        
-                        <StackPanel x:Name="pathPanel" Margin="0,0,0,12"
-                                    Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='!Renamed'}">
-                            <TextBlock Text="Full Path" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
-                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                <TextBlock Text="{Binding DisplayPath}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="Medium" TextWrapping="Wrap"/>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- RENAME-SPECIFIC -->
-                        <StackPanel x:Name="renamedOldNamePanel" Margin="0,0,0,12"
-                                    Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='Renamed'}">
-                            <TextBlock Text="Original Path" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
-                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                <TextBlock Text="{Binding OldPath}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="Medium" TextWrapping="Wrap"/>
-                            </Border>
-                        </StackPanel>
-                        <StackPanel x:Name="renamedNewNamePanel" Margin="0,0,0,12"
-                                    Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='Renamed'}">
-                            <TextBlock Text="New Path" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
-                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                <TextBlock Text="{Binding NewPath}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="Medium" TextWrapping="Wrap"/>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- Technical Details Grid -->
-                         <TextBlock Text="TECHNICAL DETAILS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,16,0,8"/>
-                         
-                        <WrapPanel Orientation="Horizontal">
-                            <StackPanel x:Name="oldSizePanel" MinWidth="150" Margin="0,0,16,12"
-                                        Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='!New'}">
-                                <TextBlock Text="Old Size" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                                <TextBlock Text="{Binding OldSizeString}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14" Margin="0,4,0,0"/>
+                        <!-- Path Hierarchy Section -->
+                        <StackPanel Margin="0,0,0,24">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <materialIcons:MaterialIcon Kind="FolderNetworkOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0"/>
+                                <TextBlock Text="LOCATION HIERARCHY" FontSize="11" FontWeight="Black" Foreground="{StaticResource TextMuted}"/>
                             </StackPanel>
 
-                            <StackPanel x:Name="newSizePanel" MinWidth="150" Margin="0,0,16,12"
-                                        Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='!Removed'}">
-                                <TextBlock Text="New Size" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                                <TextBlock Text="{Binding NewSizeString}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="14" Margin="0,4,0,0"/>
+                            <!-- Standard Path Display -->
+                            <StackPanel Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='!Renamed'}">
+                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="RELATIVE PATH" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4"/>
+                                        <TextBlock Text="{Binding DisplayPath}" Foreground="{StaticResource TextSecondary}" FontSize="13" LineHeight="20" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
-                        </WrapPanel>
 
-                        <StackPanel Margin="0,4,0,0">
-                            <TextBlock Text="Source Container" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <materialIcons:MaterialIcon Kind="ArchiveOutline" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding SourceWadFile}" Foreground="{StaticResource TextPrimary}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <!-- Renamed Flow Display -->
+                            <Grid Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='Renamed'}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <TextBlock Text="ORIGINAL LOCATION" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentRed}" Margin="0,0,0,4" Opacity="0.7"/>
+                                        <TextBlock Text="{Binding OldPath}" Foreground="{StaticResource TextSecondary}" FontSize="13" TextWrapping="Wrap" Opacity="0.8"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="TARGET LOCATION" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" Margin="0,0,0,4" Opacity="0.7"/>
+                                        <TextBlock Text="{Binding NewPath}" Foreground="{StaticResource TextPrimary}" FontSize="13" TextWrapping="Wrap" FontWeight="Medium"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Technical Specs Section -->
+                        <StackPanel Margin="0,0,0,24">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <materialIcons:MaterialIcon Kind="DatabaseOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0"/>
+                                <TextBlock Text="TECHNICAL SPECIFICATIONS" FontSize="11" FontWeight="Black" Foreground="{StaticResource TextMuted}"/>
                             </StackPanel>
+
+                            <!-- Sizes for MODIFIED (3-Column Layout) -->
+                            <UniformGrid Columns="3" Margin="0,0,0,0" Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='Modified'}">
+                                <!-- Previous Size -->
+                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="PREVIOUS SIZE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4"/>
+                                            <TextBlock Text="{Binding OldSizeString}" Foreground="{StaticResource TextSecondary}" FontSize="15" FontWeight="Medium"/>
+                                        </StackPanel>
+                                        <materialIcons:MaterialIcon Grid.Column="1" Kind="History" Width="18" Height="18" Foreground="{StaticResource TextMuted}" Opacity="0.2" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                                <!-- Current Size -->
+                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="4,0,4,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="CURRENT SIZE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4"/>
+                                            <TextBlock Text="{Binding NewSizeString}" Foreground="{StaticResource TextPrimary}" FontSize="15" FontWeight="Bold"/>
+                                        </StackPanel>
+                                        <materialIcons:MaterialIcon Grid.Column="1" Kind="FileOutline" Width="18" Height="18" Foreground="{StaticResource TextPrimary}" Opacity="0.2" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                                <!-- Size Variation -->
+                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="8,0,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="SIZE VARIATION" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentOrange}" Margin="0,0,0,4"/>
+                                            <TextBlock Text="{Binding SizeDifferenceString}" Foreground="{StaticResource AccentOrange}" FontSize="15" FontWeight="Black"/>
+                                        </StackPanel>
+                                        <materialIcons:MaterialIcon Grid.Column="1" Kind="TrendingUp" Width="20" Height="20" Foreground="{StaticResource AccentOrange}" Opacity="0.2" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </UniformGrid>
+
+                            <!-- Size Details for NEW / REMOVED / RENAMED (Context-Aware Card) -->
+                            <StackPanel Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='!Modified'}">
+                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <!-- Dynamic Title -->
+                                            <TextBlock FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="TOTAL PAYLOAD"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Type}" Value="New">
+                                                                <Setter Property="Text" Value="NEW PAYLOAD"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Type}" Value="Removed">
+                                                                <Setter Property="Text" Value="REMOVED PAYLOAD"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+
+                                            <!-- Value -->
+                                            <TextBlock Text="{Binding NewSizeString}" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold"
+                                                       Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='New'}"/>
+                                            <TextBlock Text="{Binding OldSizeString}" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold"
+                                                       Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='Removed'}"/>
+                                            <TextBlock Text="{Binding NewSizeString}" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold"
+                                                       Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='Renamed'}"/>
+                                        </StackPanel>
+
+                                        <!-- Dynamic Icon -->
+                                        <materialIcons:MaterialIcon Grid.Column="1" Width="20" Height="20" Opacity="0.15" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon.Style>
+                                                <Style TargetType="materialIcons:MaterialIcon">
+                                                    <Setter Property="Kind" Value="PackageVariant"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Type}" Value="New">
+                                                            <Setter Property="Kind" Value="PackageVariantPlus"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Type}" Value="Removed">
+                                                            <Setter Property="Kind" Value="PackageVariantMinus"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialIcons:MaterialIcon.Style>
+                                        </materialIcons:MaterialIcon>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Container Information -->
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <materialIcons:MaterialIcon Kind="PackageVariantClosed" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0"/>
+                                <TextBlock Text="SOURCE ARCHIVE" FontSize="11" FontWeight="Black" Foreground="{StaticResource TextMuted}"/>
+                            </StackPanel>
+
+                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="WAD CONTAINER" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Background="#1AFF9100" CornerRadius="4" Width="20" Height="20" Margin="0,0,10,0">
+                                            <materialIcons:MaterialIcon Kind="ArchiveOutline" Width="12" Height="12" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding SourceWadFile}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
