@@ -61,9 +61,9 @@ namespace AssetsManager.Views.Models.Home
         private void UpdateGreeting()
         {
             var hour = DateTime.Now.Hour;
-            if (hour < 12) Greeting = "Good Morning, Summoner";
-            else if (hour < 18) Greeting = "Good Afternoon, Summoner";
-            else Greeting = "Good Evening, Summoner";
+            if (hour >= 6 && hour < 12) Greeting = "Good Morning, Summoner";
+            else if (hour >= 12 && hour < 20) Greeting = "Good Afternoon, Summoner";
+            else Greeting = "Good Night, Summoner";
         }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
