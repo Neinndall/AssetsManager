@@ -58,6 +58,7 @@
 
                     <!-- Details Content -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                                  HorizontalScrollBarVisibility="Disabled"
                                   Visibility="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource NullToVisibilityConverter}}">
                         <StackPanel x:Name="detailsContentPanel" VerticalAlignment="Top">
 
