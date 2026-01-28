@@ -95,6 +95,8 @@ namespace AssetsManager.Views.Controls.Explorer
         private void PinnedFiles_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             UpdateScrollButtonsVisibility();
+            // Trigger a refresh of the tabs visibility property
+            ViewModel.IsRenamedDetailsTabVisible = ViewModel.IsRenamedDetailsTabVisible;
         }
 
         private void ScrollLeftButton_Click(object sender, RoutedEventArgs e)

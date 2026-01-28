@@ -26,8 +26,18 @@ namespace AssetsManager.Views.Models.Explorer
         public bool IsRenamedDetailsTabVisible
         {
             get => _isRenamedDetailsTabVisible;
-            set { _isRenamedDetailsTabVisible = value; OnPropertyChanged(); }
+            set 
+            { 
+                if (_isRenamedDetailsTabVisible != value)
+                {
+                    _isRenamedDetailsTabVisible = value; 
+                    OnPropertyChanged(); 
+                    OnPropertyChanged(nameof(AreTabsVisible));
+                }
+            }
         }
+
+        public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0 || IsRenamedDetailsTabVisible;
 
         private bool _isDetailsTabSelected;
         public bool IsDetailsTabSelected
@@ -39,6 +49,7 @@ namespace AssetsManager.Views.Models.Explorer
         public FilePreviewerModel()
         {
             PinnedFilesManager = new PinnedFilesManager();
+            PinnedFilesManager.PinnedFiles.CollectionChanged += (s, e) => OnPropertyChanged(nameof(AreTabsVisible));
         }
 
         public PinnedFilesManager PinnedFilesManager

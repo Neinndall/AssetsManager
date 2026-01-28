@@ -202,7 +202,7 @@
                 Height="1" 
                 Background="{StaticResource BorderColor}" 
                 Margin="0,5,5,5" 
-                Visibility="{Binding PinnedFilesManager.PinnedFiles.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
+                Visibility="{Binding AreTabsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
         <!-- Breadcrumbs Area -->
         <Grid DockPanel.Dock="Top">
