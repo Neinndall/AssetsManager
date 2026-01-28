@@ -148,16 +148,22 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.PropertyName == nameof(PinnedFilesManager.SelectedFile))
             {
-                if (_isShowingTemporaryPreview) return;
-
                 var selectedPin = ViewModel.PinnedFilesManager.SelectedFile;
+                LogService.Log($"[FilePreviewer] Selected pin changed. IsNull: {selectedPin == null}");
 
                 if (selectedPin == null)
                 {
+                    ViewModel.PreviewMode = ExplorerPreviewMode.Placeholder;
                     if (!_isShowingTemporaryPreview)
                     {
                         await ExplorerPreviewService.ResetPreviewAsync();
                     }
+                    return;
+                }
+
+                if (_isShowingTemporaryPreview) 
+                {
+                    LogService.Log("[FilePreviewer] Ignoring pin change because a temporary preview is being shown.");
                     return;
                 }
                 
@@ -166,18 +172,8 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.IsSelectedNodeContainer = false;
                 UpdateBreadcrumbs(selectedPin.Node);
 
-                if (selectedPin.IsDetailsTab)
-                {
-                    await ExplorerPreviewService.ResetPreviewAsync();
-                    ViewModel.IsPlaceholderVisible = false;
-                    DetailsPreview.DataContext = selectedPin.Node;
-                    ViewModel.IsDetailsVisible = true;
-                }
-                else
-                {
-                    ViewModel.IsDetailsVisible = false;
-                    await ExplorerPreviewService.ShowPreviewAsync(selectedPin.Node);
-                }
+                LogService.Log($"[FilePreviewer] Activating Content mode for pinned node: {selectedPin.Node?.Name}");
+                await ExplorerPreviewService.ShowPreviewAsync(selectedPin.Node);
             }
         }
 
@@ -212,7 +208,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     WebViewContainer,
                     TextEditorPreview,
                     UnsupportedFileMessage,
-                    DetailsPreview,
                     ViewModel
                 );
 
@@ -252,12 +247,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
+            LogService.Log($"[FilePreviewer] ShowPreviewAsync called for node: {node?.Name}");
             _currentNode = node;
 
-            var existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node && !p.IsDetailsTab);
+            var existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node);
 
             if (existingPin != null)
             {
+                LogService.Log($"[FilePreviewer] Found existing pin for node: {node?.Name}. Selecting it.");
                 if (ViewModel.PinnedFilesManager.SelectedFile == existingPin)
                 {
                     await ExplorerPreviewService.ShowPreviewAsync(node);
@@ -269,29 +266,12 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else
             {
+                LogService.Log($"[FilePreviewer] No existing pin. Showing temporary preview for node: {node?.Name}");
                 _isShowingTemporaryPreview = true;
                 ViewModel.PinnedFilesManager.SelectedFile = null;
 
                 await ExplorerPreviewService.ShowPreviewAsync(node);
                 _isShowingTemporaryPreview = false;
-            }
-        }
-
-        public void UpdateAndEnsureSingleDetailsTab(FileSystemNodeModel node)
-        {
-            var existingDetailsPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.IsDetailsTab);
-
-            if (existingDetailsPin != null)
-            {
-                existingDetailsPin.Node = node;
-            }
-            else
-            {
-                var newDetailsPin = new PinnedFileModel(node)
-                {
-                    IsDetailsTab = true
-                };
-                ViewModel.PinnedFilesManager.PinnedFiles.Add(newDetailsPin);
             }
         }
 

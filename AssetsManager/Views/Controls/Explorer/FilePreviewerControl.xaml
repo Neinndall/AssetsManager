@@ -150,13 +150,13 @@
 
         <!-- Main Content Area -->
         <Grid Margin="0">
+            <!-- Grid View -->
             <local:FileGridView x:Name="FileGridView" 
                                 Visibility="{Binding IsGridVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             
+            <!-- Content Previews -->
             <Grid x:Name="PreviewContainer" 
                   Visibility="{Binding IsPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <local:DetailsTabView x:Name="DetailsPreview" 
-                                      Visibility="{Binding IsDetailsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 
                 <!-- Placeholders -->
                 <Grid x:Name="PreviewStatusPanel"

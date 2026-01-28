@@ -41,7 +41,6 @@ namespace AssetsManager.Services.Explorer
         private TextEditor _textEditorPreview;
 
         private TextBlock _unsupportedFileTextBlock;
-        private UserControl _detailsPreview;
 
         private FilePreviewerModel _viewModel;
 
@@ -64,13 +63,12 @@ namespace AssetsManager.Services.Explorer
             _wadExtractionService = wadExtractionService;
         }
 
-        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, TextBlock unsupportedFileTextBlock, UserControl detailsPreview, FilePreviewerModel viewModel)
+        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, TextBlock unsupportedFileTextBlock, FilePreviewerModel viewModel)
         {
             _imagePreview = imagePreview;
             _webViewContainer = webViewContainer;
             _textEditorPreview = textEditor;
             _unsupportedFileTextBlock = unsupportedFileTextBlock;
-            _detailsPreview = detailsPreview;
             _viewModel = viewModel;
         }
 
@@ -221,15 +219,7 @@ namespace AssetsManager.Services.Explorer
 
         private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false)
         {
-            // Part 1: Hide all via ViewModel
-            _viewModel.IsImageVisible = false;
-            _viewModel.IsTextVisible = false;
-            _viewModel.IsWebVisible = false;
-            _viewModel.IsPlaceholderVisible = false;
-            _viewModel.IsDetailsVisible = false;
-            _viewModel.IsSelectFileMessageVisible = false;
-            _viewModel.IsUnsupportedFileMessageVisible = false;
-
+            _logService.Log($"[PreviewService] SetPreviewerAsync called. NewPreviewer: {newPreviewer}");
             _imagePreview.Source = null;
             _textEditorPreview.Clear();
 
@@ -247,37 +237,46 @@ namespace AssetsManager.Services.Explorer
 
             _activePreviewer = newPreviewer;
 
-            // Part 3: Show the new content via ViewModel.
+            // Part 3: Show the new content via ViewModel enum.
             switch (newPreviewer)
             {
+                case Previewer.None:
+                    _logService.Log("[PreviewService] Setting PreviewMode to None");
+                    _viewModel.PreviewMode = ExplorerPreviewMode.None;
+                    break;
+
                 case Previewer.Image:
                     if (content is ImageSource imageSource)
                     {
+                        _logService.Log("[PreviewService] Setting PreviewMode to Image");
                         _imagePreview.Source = imageSource;
-                        _viewModel.IsImageVisible = true;
+                        _viewModel.PreviewMode = ExplorerPreviewMode.Image;
                     }
                     break;
 
                 case Previewer.WebView:
                     if (content is string htmlContent)
                     {
+                        _logService.Log("[PreviewService] Setting PreviewMode to Web (WebView)");
                         await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
-                        _viewModel.IsWebVisible = true;
+                        _viewModel.PreviewMode = ExplorerPreviewMode.Web;
                     }
                     break;
 
                 case Previewer.AvalonEdit:
                     if (content is ValueTuple<string, IHighlightingDefinition> textData)
                     {
+                        _logService.Log("[PreviewService] Setting PreviewMode to Text (AvalonEdit)");
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
-                        _viewModel.IsTextVisible = true;
+                        _viewModel.PreviewMode = ExplorerPreviewMode.Text;
                         _textEditorPreview.Focus();
                     }
                     break;
 
                 case Previewer.StatusPanel:
-                    _viewModel.IsPlaceholderVisible = true;
+                    _logService.Log("[PreviewService] Setting PreviewMode to Placeholder (StatusPanel)");
+                    _viewModel.PreviewMode = ExplorerPreviewMode.Placeholder;
                     if (content is string extension)
                     {
                         // This is for unsupported files

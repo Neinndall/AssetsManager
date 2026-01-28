@@ -692,7 +692,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode && FilePreviewer != null)
             {
-                var existingNormalPin = FilePreviewer.ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == selectedNode && !p.IsDetailsTab);
+                var existingNormalPin = FilePreviewer.ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == selectedNode);
 
                 if (existingNormalPin != null)
                 {
