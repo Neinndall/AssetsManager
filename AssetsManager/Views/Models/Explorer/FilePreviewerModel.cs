@@ -1,3 +1,4 @@
+using AssetsManager.Views.Models.Wad;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -13,6 +14,27 @@ namespace AssetsManager.Views.Models.Explorer
 
         private bool _hasSelectedNode;
         private bool _isSelectedNodeContainer;
+
+        private SerializableChunkDiff _renamedDiffDetails;
+        public SerializableChunkDiff RenamedDiffDetails
+        {
+            get => _renamedDiffDetails;
+            set { _renamedDiffDetails = value; OnPropertyChanged(); }
+        }
+
+        private bool _isRenamedDetailsTabVisible;
+        public bool IsRenamedDetailsTabVisible
+        {
+            get => _isRenamedDetailsTabVisible;
+            set { _isRenamedDetailsTabVisible = value; OnPropertyChanged(); }
+        }
+
+        private bool _isDetailsTabSelected;
+        public bool IsDetailsTabSelected
+        {
+            get => _isDetailsTabSelected;
+            set { _isDetailsTabSelected = value; OnPropertyChanged(); }
+        }
 
         public FilePreviewerModel()
         {

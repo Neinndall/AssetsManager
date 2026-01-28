@@ -16,6 +16,7 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Controls.Explorer;
+using AssetsManager.Views.Models.Wad;
 using NodeClickedEventArgs = AssetsManager.Views.Controls.Explorer.NodeClickedEventArgs;
 
 namespace AssetsManager.Views.Controls.Explorer
@@ -154,7 +155,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 if (selectedPin == null)
                 {
-                    if (!_isShowingTemporaryPreview)
+                    if (!ViewModel.IsDetailsTabSelected && !_isShowingTemporaryPreview)
                     {
                         await ExplorerPreviewService.ResetPreviewAsync();
                     }
@@ -166,15 +167,43 @@ namespace AssetsManager.Views.Controls.Explorer
                     LogService.Log("[FilePreviewer] Ignoring pin change because a temporary preview is being shown.");
                     return;
                 }
-                
+
+                ViewModel.IsDetailsTabSelected = false;
                 _currentNode = selectedPin.Node;
                 ViewModel.HasSelectedNode = true;
                 ViewModel.IsSelectedNodeContainer = false;
+
+                if (selectedPin.Node?.ChunkDiff is SerializableChunkDiff diff && diff.Type == ChunkDiffType.Renamed)
+                {
+                    ViewModel.RenamedDiffDetails = diff;
+                    ViewModel.IsRenamedDetailsTabVisible = true;
+                }
+                else
+                {
+                    ViewModel.RenamedDiffDetails = null;
+                    ViewModel.IsRenamedDetailsTabVisible = false;
+                }
+
                 UpdateBreadcrumbs(selectedPin.Node);
 
                 LogService.Log($"[FilePreviewer] Activating Content mode for pinned node: {selectedPin.Node?.Name}");
                 await ExplorerPreviewService.ShowPreviewAsync(selectedPin.Node);
             }
+        }
+
+        private void DetailsTab_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            ViewModel.IsDetailsTabSelected = true;
+            if (ViewModel.PinnedFilesManager.SelectedFile != null)
+            {
+                ViewModel.PinnedFilesManager.SelectedFile = null;
+            }
+        }
+
+        private void CloseDetailsTabButton_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.IsDetailsTabSelected = false;
+            ViewModel.IsRenamedDetailsTabVisible = false;
         }
 
         private void Tab_MouseDown(object sender, MouseButtonEventArgs e)
@@ -285,9 +314,22 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void UpdateSelectedNode(FileSystemNodeModel node, ObservableCollection<FileSystemNodeModel> rootNodes)
         {
+            ViewModel.IsDetailsTabSelected = false;
             _currentNode = node;
             _rootNodes = rootNodes;
             ViewModel.HasSelectedNode = node != null;
+
+            if (node?.ChunkDiff is SerializableChunkDiff diff && diff.Type == ChunkDiffType.Renamed)
+            {
+                ViewModel.RenamedDiffDetails = diff;
+                ViewModel.IsRenamedDetailsTabVisible = true;
+            }
+            else
+            {
+                ViewModel.RenamedDiffDetails = null;
+                ViewModel.IsRenamedDetailsTabVisible = false;
+            }
+
             UpdateBreadcrumbs(node);
 
             bool isContainer = node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent);
