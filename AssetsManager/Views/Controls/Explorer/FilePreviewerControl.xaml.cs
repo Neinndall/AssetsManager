@@ -186,7 +186,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 UpdateBreadcrumbs(selectedPin.Node);
 
-                LogService.Log($"[FilePreviewer] Activating Content mode for pinned node: {selectedPin.Node?.Name}");
                 await ExplorerPreviewService.ShowPreviewAsync(selectedPin.Node);
             }
         }
@@ -276,14 +275,12 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
-            LogService.Log($"[FilePreviewer] ShowPreviewAsync called for node: {node?.Name}");
             _currentNode = node;
 
             var existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node);
 
             if (existingPin != null)
             {
-                LogService.Log($"[FilePreviewer] Found existing pin for node: {node?.Name}. Selecting it.");
                 if (ViewModel.PinnedFilesManager.SelectedFile == existingPin)
                 {
                     await ExplorerPreviewService.ShowPreviewAsync(node);
@@ -295,7 +292,6 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else
             {
-                LogService.Log($"[FilePreviewer] No existing pin. Showing temporary preview for node: {node?.Name}");
                 _isShowingTemporaryPreview = true;
                 ViewModel.PinnedFilesManager.SelectedFile = null;
 
