@@ -293,6 +293,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
+                if (FilePreviewer != null)
+                {
+                    await FilePreviewer.ResetToDefaultState();
+                }
                 await BuildTreeFromBackupAsync(openFileDialog.FileName);
             }
         }
