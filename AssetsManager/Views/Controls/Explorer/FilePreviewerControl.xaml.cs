@@ -169,6 +169,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 if (selectedPin.IsDetailsTab)
                 {
                     await ExplorerPreviewService.ResetPreviewAsync();
+                    ViewModel.IsPlaceholderVisible = false;
                     DetailsPreview.DataContext = selectedPin.Node;
                     ViewModel.IsDetailsVisible = true;
                 }
@@ -270,8 +271,6 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 _isShowingTemporaryPreview = true;
                 ViewModel.PinnedFilesManager.SelectedFile = null;
-
-                DetailsPreview.Visibility = Visibility.Collapsed;
 
                 await ExplorerPreviewService.ShowPreviewAsync(node);
                 _isShowingTemporaryPreview = false;
