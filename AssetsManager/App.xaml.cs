@@ -129,8 +129,11 @@ namespace AssetsManager
       services.AddSingleton<ComparisonHistoryService>();
 
       // Hashes Services
+      services.AddSingleton<HashFileService>();
+      services.AddSingleton<HashGuesserService>();
+      services.AddSingleton<LcuHashGuesserService>();
+      services.AddSingleton<GameHashGuesserService>();
       services.AddSingleton<HashResolverService>();
-      services.AddSingleton<HashGuessingStrategiesService>();
       services.AddSingleton<HashDiscoveryService>();
 
       // Comparator Services

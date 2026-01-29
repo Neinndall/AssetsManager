@@ -14,10 +14,19 @@ namespace AssetsManager.Services.Hashes
         internal static readonly SemaphoreSlim _hashFileAccessLock = new SemaphoreSlim(1, 1);
 
         private readonly Dictionary<ulong, string> _hashToPathMap = new Dictionary<ulong, string>();
+        public IReadOnlyDictionary<ulong, string> HashToPathMap => _hashToPathMap;
+
         private readonly Dictionary<uint, string> _binHashesMap = new Dictionary<uint, string>();
+        public IReadOnlyDictionary<uint, string> BinHashes => _binHashesMap;
+
         private readonly Dictionary<uint, string> _binEntriesMap = new Dictionary<uint, string>();
+        public IReadOnlyDictionary<uint, string> BinEntries => _binEntriesMap;
+
         private readonly Dictionary<uint, string> _binFieldsMap = new Dictionary<uint, string>();
+        public IReadOnlyDictionary<uint, string> BinFields => _binFieldsMap;
+
         private readonly Dictionary<uint, string> _binTypesMap = new Dictionary<uint, string>();
+        public IReadOnlyDictionary<uint, string> BinTypes => _binTypesMap;
 
         private readonly Dictionary<ulong, string> _fullRstHashesMap = new Dictionary<ulong, string>();
         public IReadOnlyDictionary<ulong, string> FullRstHashes => _fullRstHashesMap;
