@@ -12,6 +12,7 @@ namespace AssetsManager.Utils
 
         public string HashesNewPath { get; private set; }
         public string HashesOldPath { get; private set; }
+        public string HashExportPath { get; private set; }
         public string JsonCacheNewPath { get; private set; }
         public string JsonCacheOldPath { get; private set; }
         public string JsonCacheHistoryPath { get; private set; }
@@ -51,6 +52,7 @@ namespace AssetsManager.Utils
 
             HashesNewPath = Path.Combine(AppDirectory, "hashes", "new");
             HashesOldPath = Path.Combine(AppDirectory, "hashes", "olds");
+            HashExportPath = Path.Combine(AppDirectory, "hashes", "export");
 
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
@@ -118,6 +120,7 @@ namespace AssetsManager.Utils
         {
             CreateDirectoryInternal(HashesNewPath, false);
             CreateDirectoryInternal(HashesOldPath, false);
+            CreateDirectoryInternal(HashExportPath, false);
             return Task.CompletedTask;
         }
 
