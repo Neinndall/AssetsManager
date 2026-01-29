@@ -130,6 +130,9 @@ namespace AssetsManager
 
       // Hashes Services
       services.AddSingleton<HashResolverService>();
+      services.AddSingleton<HashForensicService>();
+      services.AddSingleton<HashGuessingStrategiesService>();
+      services.AddSingleton<HashDiscoveryService>();
 
       // Comparator Services
       services.AddSingleton<WadComparatorService>();
@@ -153,6 +156,7 @@ namespace AssetsManager
       services.AddTransient<ComparatorWindow>();
       services.AddTransient<ModelWindow>();
       services.AddTransient<MonitorWindow>();
+      services.AddTransient<ForensicWindow>();
       services.AddTransient<HelpWindow>();
       services.AddTransient<JsonDiffWindow>();
       services.AddTransient<NotificationHubWindow>();

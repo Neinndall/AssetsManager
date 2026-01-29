@@ -210,5 +210,57 @@ namespace AssetsManager.Services.Hashes
             _loadingTask = null; 
             return LoadAllHashesAsync();
         }
+
+        public async Task AddResolvedHash(ulong hash, string path, string context)
+        {
+            await _hashFileAccessLock.WaitAsync();
+            try
+            {
+                // 1. Update In-Memory Map
+                if (!_hashToPathMap.ContainsKey(hash))
+                {
+                    _hashToPathMap[hash] = path;
+                }
+
+                // 2. Persist to File
+                string fileName = context == "GAME" ? "hashes.game.txt" : "hashes.lcu.txt";
+                string filePath = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
+
+                if (File.Exists(filePath))
+                {
+                    // Check if already in file to avoid corruption
+                    bool alreadyExists = false;
+                    using (var reader = new StreamReader(filePath))
+                    {
+                        string line;
+                        string hexHash = hash.ToString("x16");
+                        while ((line = await reader.ReadLineAsync()) != null)
+                        {
+                            if (line.StartsWith(hexHash, StringComparison.OrdinalIgnoreCase))
+                            {
+                                alreadyExists = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!alreadyExists)
+                    {
+                        using (var writer = new StreamWriter(filePath, true))
+                        {
+                            await writer.WriteLineAsync($"{hash:x16} {path}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to persist discovered hash to {context} dictionary.");
+            }
+            finally
+            {
+                _hashFileAccessLock.Release();
+            }
+        }
     }
 }
