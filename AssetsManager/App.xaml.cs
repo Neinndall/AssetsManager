@@ -130,7 +130,6 @@ namespace AssetsManager
 
       // Hashes Services
       services.AddSingleton<HashResolverService>();
-      services.AddSingleton<HashForensicService>();
       services.AddSingleton<HashGuessingStrategiesService>();
       services.AddSingleton<HashDiscoveryService>();
 

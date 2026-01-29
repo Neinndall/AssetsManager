@@ -53,7 +53,6 @@ namespace AssetsManager.Views
         private readonly TaskCancellationManager _taskCancellationManager;
         private readonly NotificationService _notificationService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
-        private readonly HashForensicService _hashForensicService;
         private readonly HashDiscoveryService _hashDiscoveryService;
 
         private string _latestAppVersionAvailable;
@@ -93,7 +92,6 @@ namespace AssetsManager.Views
             TaskCancellationManager taskCancellationManager,
             NotificationService notificationService,
             ComparisonHistoryService comparisonHistoryService,
-            HashForensicService hashForensicService,
             HashDiscoveryService hashDiscoveryService,
             HashGuessingStrategiesService hashGuessingStrategiesService)
         {
@@ -118,13 +116,11 @@ namespace AssetsManager.Views
             _diffViewService = diffViewService;
             _monitorService = monitorService;
             _versionService = versionService;
-            _hashForensicService = hashForensicService;
             _extractionService = extractionService;
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
             _notificationService = notificationService;
             _comparisonHistoryService = comparisonHistoryService;
-            _hashForensicService = hashForensicService;
             _hashDiscoveryService = hashDiscoveryService;
 
             _progressUIManager.Initialize(StatusBar.ViewModel, this);
@@ -439,7 +435,6 @@ namespace AssetsManager.Views
         private void LoadForensicWindow()
         {
             var forensicWindow = _serviceProvider.GetRequiredService<ForensicWindow>();
-            forensicWindow.ForensicService = _hashForensicService;
             forensicWindow.DiscoveryService = _hashDiscoveryService;
             MainContentArea.Content = forensicWindow;
         }

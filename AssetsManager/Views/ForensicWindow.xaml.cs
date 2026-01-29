@@ -12,7 +12,6 @@ namespace AssetsManager.Views
 {
     public partial class ForensicWindow : UserControl
     {
-        public HashForensicService ForensicService { get; set; }
         public HashDiscoveryService DiscoveryService { get; set; }
         private CancellationTokenSource _cts;
         private List<DiscoveredHash> _harvestedUnknowns = new List<DiscoveredHash>();
@@ -109,66 +108,6 @@ namespace AssetsManager.Views
                 StatusText.Text = $"Guessing error: {ex.Message}";
             }
             finally { LoadingOverlay.Visibility = Visibility.Collapsed; }
-        }
-
-        private async void Analyze_Click(object sender, RoutedEventArgs e)
-        {
-            if (ForensicService == null || string.IsNullOrWhiteSpace(HashInput.Text)) return;
-
-            string input = HashInput.Text.Trim();
-            
-            // UI State
-            ResultsPanel.Visibility = Visibility.Collapsed;
-            EmptyState.Visibility = Visibility.Collapsed;
-            LoadingOverlay.Visibility = Visibility.Visible;
-            StatusText.Text = "Scanning cluster...";
-            
-            _cts?.Cancel();
-            _cts = new CancellationTokenSource();
-
-            try
-            {
-                var result = await ForensicService.ScanHashAsync(input, _cts.Token);
-
-                LoadingOverlay.Visibility = Visibility.Collapsed;
-                
-                if (result != null)
-                {
-                    ResultsPanel.Visibility = Visibility.Visible;
-                    NameText.Text = result.ResolvedName ?? "Unknown";
-                    ContainerText.Text = result.SourceContainer ?? "External/Dictionary only";
-                    ExtensionText.Text = result.Extension?.ToUpper() ?? "Unknown";
-                    CompressionText.Text = result.Compression ?? "N/A";
-                    SizeText.Text = result.FileSize > 0 ? $"{(result.FileSize / 1024.0):F2} KB" : "N/A";
-                    AlgorithmText.Text = input.Length > 8 ? "XXHash64 (WAD Path)" : "FNV-1a (BIN Data)";
-                    
-                    StatusText.Text = result.StatusMessage;
-                    StatusIcon.Kind = result.IsFound ? Material.Icons.MaterialIconKind.CheckDecagram : Material.Icons.MaterialIconKind.AlertDecagram;
-                    
-                    if (result.IsFound)
-                    {
-                        StatusIcon.Foreground = Application.Current.Resources["AccentGreen"] as System.Windows.Media.Brush;
-                    }
-                    else
-                    {
-                        StatusIcon.Foreground = Application.Current.Resources["AccentRed"] as System.Windows.Media.Brush;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                StatusText.Text = $"Diagnostic failed: {ex.Message}";
-                EmptyState.Visibility = Visibility.Visible;
-            }
-            finally
-            {
-                LoadingOverlay.Visibility = Visibility.Collapsed;
-            }
-        }
-
-        private void HashInput_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter) Analyze_Click(null, null);
         }
 
         public void CleanupResources()

@@ -6,229 +6,160 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="730" d:DesignWidth="1100">
-    <UserControl.Resources>
-        <Style x:Key="ForensicLabel" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
-            <Setter Property="FontSize" Value="10"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,0,0,2"/>
-        </Style>
-        <Style x:Key="ForensicValue" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
-        </Style>
-    </UserControl.Resources>
 
     <Grid Margin="32,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Header -->
-            <RowDefinition Height="Auto"/> <!-- Input -->
-            <RowDefinition Height="*"/>    <!-- Workspace -->
-            <RowDefinition Height="40"/>   <!-- Centered Status -->
+            <RowDefinition Height="Auto"/> <!-- Control Deck -->
+            <RowDefinition Height="*"/>    <!-- Main Console -->
+            <RowDefinition Height="Auto"/> <!-- Footer -->
         </Grid.RowDefinitions>
 
-        <!-- 1. Header Section -->
-        <Grid Grid.Row="0" Margin="0,0,0,24">
-            <StackPanel Orientation="Horizontal">
-                <Border Width="42" Height="42" CornerRadius="10" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                    <materialIcons:MaterialIcon Kind="Fingerprint" Width="22" Height="22" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <StackPanel VerticalAlignment="Center" Margin="14,0,0,0">
-                    <TextBlock Text="HASH FORENSIC LAB" FontSize="22" FontWeight="Black" Foreground="White"/>
-                    <TextBlock Text="PBE Discovery &amp; Container Intelligence" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.8"/>
-                </StackPanel>
-            </StackPanel>
-        </Grid>
-
-        <!-- 2. Compact Centered Input -->
-        <Border Grid.Row="1" HorizontalAlignment="Center" Width="600" Background="{StaticResource CardBackground}" CornerRadius="10" Padding="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,24">
+        <!-- 1. Unified Monitor Header -->
+        <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,20" Margin="0,0,0,24">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Kind="Search" Width="18" Height="18" Foreground="{StaticResource AccentBlue}" Margin="8,0,12,0" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" x:Name="HashInput" 
-                         Style="{StaticResource ModernTextBoxEditable}" 
-                         Tag="Enter Target Hash (XXHash64 / FNV-1a)..."
-                         FontSize="14" 
-                         FontFamily="Consolas"
-                         KeyDown="HashInput_KeyDown"
-                         BorderThickness="0"
-                         Background="Transparent"
-                         VerticalAlignment="Center"/>
-                <Button Grid.Column="2" Click="Analyze_Click" Style="{StaticResource PrimaryButton}" Height="32" Width="100" Margin="8,0,0,0">
-                    <TextBlock Text="ANALYZE" FontSize="10" FontWeight="Bold"/>
-                </Button>
+                
+                <!-- Icon & Title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="48" Height="48" CornerRadius="12" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <materialIcons:MaterialIcon Kind="Fingerprint" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="MONITOR HASH FORENSIC" FontSize="20" FontWeight="Black" Foreground="White"/>
+                        <TextBlock Text="ADVANCED PBE DISCOVERY LAB" FontSize="11" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Opacity="0.7"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Watermark / Decor -->
+                <materialIcons:MaterialIcon Grid.Column="1" Kind="Radar" Width="120" Height="120" Foreground="{StaticResource TextMuted}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,-20,-20,-20"/>
             </Grid>
         </Border>
 
-        <!-- 3. Main Workspace -->
-        <Grid Grid.Row="2">
+        <!-- 2. Control Deck (Actions) -->
+        <Grid Grid.Row="1" Margin="0,0,0,16">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Diagnostic Specs (Left) -->
-            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20" Margin="0,0,16,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                        <TextBlock Text="UNIT SPECIFICATIONS" FontWeight="Bold" FontSize="12" Foreground="White" Margin="0,0,0,20"/>
-                        
-                        <StackPanel x:Name="ResultsPanel" Visibility="Collapsed">
-                            <TextBlock Text="RESOLVED PATH" Style="{StaticResource ForensicLabel}"/>
-                            <TextBlock x:Name="NameText" Style="{StaticResource ForensicValue}" Foreground="{StaticResource AccentGreen}" TextWrapping="Wrap"/>
+            <!-- Harvest Action -->
+            <Button Grid.Column="0" Click="Harvest_Click" Style="{StaticResource PrimaryButton}" Height="40" Padding="20,0" Margin="0,0,12,0">
+                <StackPanel Orientation="Horizontal">
+                    <materialIcons:MaterialIcon Kind="ArchiveArrowDownOutline" Width="16" Height="16" Margin="0,0,8,0"/>
+                    <TextBlock Text="HARVEST UNKNOWNS" FontWeight="Bold" FontSize="11"/>
+                </StackPanel>
+            </Button>
 
-                            <TextBlock Text="CONTAINER" Style="{StaticResource ForensicLabel}"/>
-                            <TextBlock x:Name="ContainerText" Style="{StaticResource ForensicValue}"/>
+            <!-- Engine Action -->
+            <Button Grid.Column="1" x:Name="GuessButton" Click="Guess_Click" Style="{StaticResource SecondaryButton}" Height="40" Padding="20,0" IsEnabled="False">
+                <StackPanel Orientation="Horizontal">
+                    <materialIcons:MaterialIcon Kind="AutoFix" Width="16" Height="16" Margin="0,0,8,0"/>
+                    <TextBlock Text="LAUNCH GUESS ENGINE" FontWeight="Bold" FontSize="11"/>
+                </StackPanel>
+            </Button>
 
-                            <TextBlock Text="DATA COMPRESSION" Style="{StaticResource ForensicLabel}"/>
-                            <TextBlock x:Name="CompressionText" Style="{StaticResource ForensicValue}"/>
-
-                            <TextBlock Text="FILE TYPE" Style="{StaticResource ForensicLabel}"/>
-                            <TextBlock x:Name="ExtensionText" Style="{StaticResource ForensicValue}" Foreground="{StaticResource AccentBlue}"/>
-
-                            <TextBlock Text="SIZE" Style="{StaticResource ForensicLabel}"/>
-                            <TextBlock x:Name="SizeText" Style="{StaticResource ForensicValue}"/>
-
-                            <TextBlock Text="ALGORITHM" Style="{StaticResource ForensicLabel}"/>
-                            <TextBlock x:Name="AlgorithmText" Style="{StaticResource ForensicValue}" Margin="0"/>
-                        </StackPanel>
-
-                        <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40" Opacity="0.3">
-                            <materialIcons:MaterialIcon Kind="DatabaseSearch" Width="40" Height="40" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="No Unit Analyzed" Foreground="{StaticResource TextMuted}" FontSize="10" Margin="0,12,0,0"/>
-                        </StackPanel>
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
-
-            <!-- Unified Discovery Console (Right) -->
-            <Border Grid.Column="1" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Console Toolbar -->
-                    <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
-                        <Grid>
-                            <StackPanel Orientation="Horizontal">
-                                <materialIcons:MaterialIcon Kind="Console" Foreground="{StaticResource AccentPurple}" Width="16" Height="16" VerticalAlignment="Center"/>
-                                <TextBlock Text="DISCOVERY CONSOLE" Foreground="White" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                                <TextBlock x:Name="OperationsSummaryText" Text="[IDLE]" Foreground="{StaticResource TextMuted}" FontSize="10" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button x:Name="HarvestButton" Click="Harvest_Click" Style="{StaticResource PrimaryButton}" Height="28" Padding="12,0" Margin="0,0,8,0">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialIcons:MaterialIcon Kind="ArchiveArrowDownOutline" Width="14" Height="14" Margin="0,0,6,0"/>
-                                        <TextBlock Text="HARVEST" FontSize="10"/>
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="GuessButton" Click="Guess_Click" Style="{StaticResource PrimaryButton}" Height="28" Padding="12,0" IsEnabled="False">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialIcons:MaterialIcon Kind="AutoFix" Width="14" Height="14" Margin="0,0,6,0"/>
-                                        <TextBlock Text="LAUNCH ENGINE" FontSize="10"/>
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <ListBox Grid.Row="1" x:Name="DiscoveryList" Background="Transparent" BorderThickness="0" Padding="8">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="4" Margin="0,1" Padding="12,8">
-                                                <ContentPresenter/>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                                </Trigger>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/> <!-- Hash -->
-                                        <ColumnDefinition Width="*"/>    <!-- Path -->
-                                        <ColumnDefinition Width="Auto"/> <!-- Badges -->
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- 1. Technical ID -->
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Width="130">
-                                        <TextBlock Text="HASH_ID" FontSize="8" Foreground="{StaticResource TextMuted}" FontWeight="Bold" Margin="0,0,0,2"/>
-                                        <TextBlock Text="{Binding Hash, StringFormat=x16}" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
-                                    </StackPanel>
-
-                                    <!-- 2. Discovered Path -->
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="24,0">
-                                        <TextBlock Text="DISCOVERED_PATH" FontSize="8" Foreground="{StaticResource AccentBlue}" FontWeight="Bold" Margin="0,0,0,2"/>
-                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource AccentGreen}" FontSize="13" FontWeight="Bold" TextWrapping="Wrap"/>
-                                    </StackPanel>
-
-                                    <!-- 3. Source & Meta -->
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="8,4" Margin="0,0,8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                            <StackPanel>
-                                                <TextBlock Text="CONTAINER" FontSize="7" Foreground="{StaticResource TextMuted}" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="{Binding SourceWad}" FontSize="9" Foreground="White" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="8,4" BorderBrush="{StaticResource AccentPurple}" BorderThickness="1" Opacity="0.8">
-                                            <StackPanel>
-                                                <TextBlock Text="METHOD" FontSize="7" Foreground="{StaticResource AccentPurple}" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="{Binding Method}" FontSize="9" Foreground="White" HorizontalAlignment="Center" FontWeight="Bold"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-
-                    <!-- Discovery Empty State -->
-                    <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.2" IsHitTestVisible="False">
-                        <materialIcons:MaterialIcon Kind="Radar" Width="60" Height="60" Foreground="White"/>
-                        <TextBlock Text="DISCOVERY ENGINE STANDBY" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,12,0,0"/>
-                    </StackPanel>
-
-                    <!-- Loading Overlay -->
-                    <Border Grid.Row="1" x:Name="LoadingOverlay" Background="{StaticResource SidebarBackground}" Opacity="0.9" Visibility="Collapsed">
-                        <StackPanel VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="Sync" Width="40" Height="40" Style="{StaticResource SpinningIconStyle}" Foreground="{StaticResource AccentBlue}"/>
-                            <TextBlock x:Name="DetailedLoadingText" Text="SYNCHRONIZING..." HorizontalAlignment="Center" Foreground="White" FontWeight="Bold" Margin="0,16,0,0" FontSize="10"/>
-                        </StackPanel>
-                    </Border>
-                </Grid>
+            <!-- Stats Display -->
+            <Border Grid.Column="3" Background="{StaticResource CardBackground}" CornerRadius="6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="16,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="DATABASE STATUS:" FontSize="10" Foreground="{StaticResource TextMuted}" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock x:Name="OperationsSummaryText" Text="| CHECKING..." FontSize="11" Foreground="{StaticResource AccentBlue}" FontWeight="Bold" VerticalAlignment="Center"/>
+                </StackPanel>
             </Border>
         </Grid>
 
-        <!-- 4. Footer Status Bar -->
-        <Border Grid.Row="3" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="12,0" Margin="0,12,0,0">
+        <!-- 3. Full Screen Discovery Console -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <materialIcons:MaterialIcon x:Name="StatusIcon" Kind="InformationOutline" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="StatusText" Text="Forensic System Ready" Foreground="{StaticResource TextSecondary}" FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0" FontWeight="Medium"/>
+                <!-- Empty State -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.1" IsHitTestVisible="False">
+                    <materialIcons:MaterialIcon Kind="ConsoleNetwork" Width="80" Height="80" Foreground="White"/>
+                    <TextBlock Text="WAITING FOR TARGETS" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,16,0,0" FontSize="14"/>
                 </StackPanel>
+
+                <!-- List Content -->
+                <ListBox x:Name="DiscoveryList" Background="Transparent" BorderThickness="0" Padding="8">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="4" Margin="0,1" Padding="12,8">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140"/> <!-- Hash -->
+                                    <ColumnDefinition Width="*"/>   <!-- Path -->
+                                    <ColumnDefinition Width="Auto"/> <!-- Badges -->
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 1. Technical ID -->
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="HASH_ID" FontSize="8" Foreground="{StaticResource TextMuted}" FontWeight="Bold" Opacity="0.5"/>
+                                    <TextBlock Text="{Binding Hash, StringFormat=x16}" FontFamily="Consolas" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
+                                </StackPanel>
+
+                                <!-- 2. Discovered Path -->
+                                <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{StaticResource AccentGreen}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="12,0"/>
+
+                                <!-- 3. Source & Meta -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="8,4" Margin="0,0,8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                        <StackPanel>
+                                            <TextBlock Text="SOURCE" FontSize="7" Foreground="{StaticResource TextMuted}" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding SourceWad}" FontSize="9" Foreground="White" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="8,4" BorderBrush="{StaticResource AccentPurple}" BorderThickness="1" Opacity="0.8">
+                                        <StackPanel>
+                                            <TextBlock Text="METHOD" FontSize="7" Foreground="{StaticResource AccentPurple}" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Method}" FontSize="9" Foreground="White" HorizontalAlignment="Center" FontWeight="Bold"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Loading Overlay -->
+                <Border x:Name="LoadingOverlay" Background="{StaticResource SidebarBackground}" Opacity="0.95" Visibility="Collapsed" CornerRadius="12">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Radioactive" Width="48" Height="48" Style="{StaticResource SpinningIconStyle}" Foreground="{StaticResource AccentPurple}"/>
+                        <TextBlock x:Name="DetailedLoadingText" Text="INITIALIZING FORENSIC ENGINE..." HorizontalAlignment="Center" Foreground="White" FontWeight="Bold" Margin="0,20,0,0" FontSize="12"/>
+                        <TextBlock x:Name="StatusText" Text="Please wait while the system processes cluster data." HorizontalAlignment="Center" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
             </Grid>
+        </Border>
+
+        <!-- 4. Footer Status Bar -->
+        <Border Grid.Row="3" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="12,0" Margin="0,12,0,0" Height="32">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <materialIcons:MaterialIcon x:Name="StatusIcon" Kind="InformationOutline" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center"/>
+                <TextBlock Text="Ready for Operation" Foreground="{StaticResource TextSecondary}" FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0" FontWeight="Medium"/>
+            </StackPanel>
         </Border>
     </Grid>
 </UserControl>
