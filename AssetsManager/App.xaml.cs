@@ -26,6 +26,7 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Backup;
+using AssetsManager.Services.Parsers;
 
 namespace AssetsManager
 {
@@ -129,12 +130,8 @@ namespace AssetsManager
       services.AddSingleton<ComparisonHistoryService>();
 
       // Hashes Services
-      services.AddSingleton<HashFileService>();
-      services.AddSingleton<HashGuesserService>();
-      services.AddSingleton<LcuHashGuesserService>();
-      services.AddSingleton<GameHashGuesserService>();
       services.AddSingleton<HashResolverService>();
-      services.AddSingleton<HashDiscoveryService>();
+      services.AddSingleton<RmanParser>();
 
       // Comparator Services
       services.AddSingleton<WadComparatorService>();
@@ -158,7 +155,6 @@ namespace AssetsManager
       services.AddTransient<ComparatorWindow>();
       services.AddTransient<ModelWindow>();
       services.AddTransient<MonitorWindow>();
-      services.AddTransient<ForensicWindow>();
       services.AddTransient<HelpWindow>();
       services.AddTransient<JsonDiffWindow>();
       services.AddTransient<NotificationHubWindow>();
