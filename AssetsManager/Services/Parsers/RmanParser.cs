@@ -224,7 +224,7 @@ namespace AssetsManager.Services.Parsers
         public async Task<bool> DownloadAssetsAsync(
             List<RmanFile> filesToUpdate,
             string outputDir,
-            int maxThreads = 2,
+            int maxThreads = 4,
             CancellationToken ct = default,
             Action<string, int, int> progressCallback = null)
         {

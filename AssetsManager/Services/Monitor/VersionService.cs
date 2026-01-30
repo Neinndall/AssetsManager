@@ -166,7 +166,7 @@ namespace AssetsManager.Services.Monitor
                     var manifest = await _rmanParser.LoadManifestAsync(url);
                     
                     var filesToDownload = await Task.Run(() => _rmanParser.GetFilesToUpdate(manifest, tempDir, filter: $"^{TargetFilename}$"));
-                    await _rmanParser.DownloadAssetsAsync(filesToDownload, tempDir, maxThreads: 2, ct: default);
+                    await _rmanParser.DownloadAssetsAsync(filesToDownload, tempDir, maxThreads: 4, ct: default);
 
                     string exePath = Path.Combine(tempDir, TargetFilename);
                     string version = GetExeVersion(exePath);
@@ -260,25 +260,26 @@ namespace AssetsManager.Services.Monitor
                 VersionDownloadStarted?.Invoke(this, taskName);
                 VersionDownloadProgressChanged?.Invoke(this, (taskName, 0, 0, "Verifying Files..."));
 
-                var manifest = await _rmanParser.LoadManifestAsync(manifestUrl);
-                
-                // DEBUG: Guardar contenido del manifiesto para inspección
-                try {
-                    var debugLines = manifest.Files.Select(f => $"[{string.Join(",", f.Languages)}] {f.Name} ({f.Size} bytes)");
-                    await File.WriteAllLinesAsync(Path.Combine(_directoriesCreator.VersionsPath, "manifest_debug.txt"), debugLines);
-                    _logService.LogDebug($"Manifest debug info saved to manifest_debug.txt");
-                } catch { }
+                // 1. Fase de Verificación Completa (En segundo plano: Carga + Debug + Escaneo)
+                var filesToUpdate = await Task.Run(async () => {
+                    var manifest = await _rmanParser.LoadManifestAsync(manifestUrl);
+                    
+                    // DEBUG: Guardar contenido del manifiesto
+                    try {
+                        var debugLines = manifest.Files.Select(f => $"[{string.Join(",", f.Languages)}] {f.Name} ({f.Size} bytes)");
+                        File.WriteAllLines(Path.Combine(_directoriesCreator.VersionsPath, "manifest_debug.txt"), debugLines);
+                    } catch { }
+
+                    return _rmanParser.GetFilesToUpdate(
+                        manifest, 
+                        targetDirectory, 
+                        locales: locales, 
+                        includeNeutral: true,
+                        filter: taskName.Contains("League Client") ? $"^{TargetFilename}$" : null
+                    );
+                });
 
                 cancellationToken.ThrowIfCancellationRequested();
-
-                // 1. Fase de Verificación (Ahora en segundo plano para evitar tirones)
-                var filesToUpdate = await Task.Run(() => _rmanParser.GetFilesToUpdate(
-                    manifest, 
-                    targetDirectory, 
-                    locales: locales, 
-                    includeNeutral: true,
-                    filter: taskName.Contains("League Client") ? $"^{TargetFilename}$" : null
-                ));
 
                 if (!filesToUpdate.Any())
                 {
@@ -292,7 +293,7 @@ namespace AssetsManager.Services.Monitor
                 bool updatedAny = await _rmanParser.DownloadAssetsAsync(
                     filesToUpdate,
                     targetDirectory,
-                    maxThreads: 2,
+                    maxThreads: 4,
                     ct: cancellationToken,
                     progressCallback: (file, current, total) => 
                     {
