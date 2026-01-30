@@ -38,7 +38,6 @@
     <EmbeddedResource Include="changelogs.txt" />
     <EmbeddedResource Include="Resources\AudioPlayer.html" />
     <EmbeddedResource Include="Resources\JsonSyntaxHighlighting.xshd" />
-    <EmbeddedResource Include="Resources\ManifestDownloader\ManifestDownloader.exe" />
     <EmbeddedResource Include="Resources\Vgmstream\**" />
     <EmbeddedResource Include="Resources\Updater\**" />
   </ItemGroup>
