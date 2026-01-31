@@ -391,13 +391,13 @@ namespace AssetsManager.Services.Monitor
 
         public async Task DownloadPluginsAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
-            await ExecuteDownloadTaskAsync("Updating League Client", manifestUrl, lolPbeDirectory, locales, cancellationToken);
+            await ExecuteDownloadTaskAsync("League Client", manifestUrl, lolPbeDirectory, locales, cancellationToken);
         }
 
         public async Task DownloadGameClientAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
             string gameDirectory = Path.Combine(lolPbeDirectory, "Game");
-            await ExecuteDownloadTaskAsync("Updating Game Client", manifestUrl, gameDirectory, locales, cancellationToken);
+            await ExecuteDownloadTaskAsync("Game Client", manifestUrl, gameDirectory, locales, cancellationToken);
         }
 
         private async Task ExecuteDownloadTaskAsync(string taskName, string manifestUrl, string targetDirectory, List<string> locales, CancellationToken cancellationToken)
@@ -408,7 +408,7 @@ namespace AssetsManager.Services.Monitor
 
             try
             {
-                _logService.Log($"Starting verifying/updating the {taskName.ToLower()}...");
+                _logService.Log($"Verifying/Updating {taskName}...");
                 ExtractManifestDownloader();
 
                 if (string.IsNullOrEmpty(manifestUrl) || string.IsNullOrEmpty(targetDirectory) || locales == null || !locales.Any())
@@ -461,7 +461,7 @@ namespace AssetsManager.Services.Monitor
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"An error occurred during {taskName.ToLower()}.");
+                _logService.LogError(ex, $"An error occurred during {taskName.ToLower()} update.");
             }
             finally
             {
