@@ -275,8 +275,9 @@ namespace AssetsManager.Services.Monitor
                 var outputTask = Task.Run(async () =>
                 {
                     string line;
-                    Regex incorrectRegex = new Regex(@"^File (.+?) is incorrect\.$");
-                    Regex missingRegex = new Regex(@"^File (.+?) is missing\.$");
+                    // FASE DE VERIFICACIÓN: Aquí es donde calculamos el TOTAL real.
+                    Regex incorrectRegex = new Regex(@"^\s*File\s+(.+?)\s+is\s+incorrect\s*\.?\s*$", RegexOptions.IgnoreCase);
+                    Regex missingRegex = new Regex(@"^\s*File\s+(.+?)\s+is\s+missing\s*\.?\s*$", RegexOptions.IgnoreCase);
 
                     while ((line = await outputReader.ReadLineAsync()) != null)
                     {
@@ -288,7 +289,7 @@ namespace AssetsManager.Services.Monitor
                     }
                 });
 
-                var errorTask = errorReader.ReadToEndAsync(); // Read all error output
+                var errorTask = errorReader.ReadToEndAsync(); 
                 
                 await Task.WhenAll(process.WaitForExitAsync(cancellationToken), outputTask);
 
@@ -321,13 +322,15 @@ namespace AssetsManager.Services.Monitor
             {
                 string line;
                 int fileCounter = 0;
-                Regex fixingUpRegex = new Regex(@"^Fixing up file (.+?)\.\.\.$");
-                Regex downloadingRegex = new Regex(@"^Downloading file (.+?)\.\.\.$");
+                // FASE DE DESCARGA: Solo detectamos acciones para avanzar el marcador.
+                Regex fixingUpRegex = new Regex(@"^\s*Fixing up file\s+(.+?)\.\.\.", RegexOptions.IgnoreCase);
+                Regex downloadingRegex = new Regex(@"^\s*Downloading file\s+(.+?)\.\.\.", RegexOptions.IgnoreCase);
 
                 while ((line = await process.StandardOutput.ReadLineAsync()) != null)
                 {
                     if (silent) continue;
 
+                    // Avanzamos nuestro contador con cada archivo procesado (Fixing o Downloading)
                     Match fixingMatch = fixingUpRegex.Match(line);
                     Match downloadingMatch = downloadingRegex.Match(line);
                     string fileName = null;
@@ -345,6 +348,7 @@ namespace AssetsManager.Services.Monitor
                     {
                         fileCounter++;
                         string displayName = Path.GetFileName(fileName);
+                        // totalFiles viene de la fase de verificación previa
                         VersionDownloadProgressChanged?.Invoke(this, (taskName, fileCounter, totalFiles, displayName));
                     }
                 }
