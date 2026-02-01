@@ -112,6 +112,7 @@ namespace AssetsManager
       // Downloads Services
       services.AddSingleton<AssetDownloader>();
       services.AddSingleton<ExtractionService>();
+      services.AddSingleton<ManifestDownloader>();
       services.AddSingleton<Status>();
       services.AddSingleton<Requests>();
        
@@ -125,7 +126,6 @@ namespace AssetsManager
 
       // Riot Native Services (RmanCore)
       services.AddSingleton<RmanService>();
-      services.AddSingleton<DownloadService>();
       services.AddSingleton<HashService>();
       services.AddSingleton<RmanApiService>(); // Manifest Service (New name)
 

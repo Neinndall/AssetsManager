@@ -13,6 +13,7 @@ using AssetsManager.Views.Models.Versions;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Services.Riot;
+using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Services.Monitor
@@ -28,7 +29,7 @@ namespace AssetsManager.Services.Monitor
         private readonly DirectoriesCreator _directoriesCreator;
         
         private readonly RmanService _rmanService;
-        private readonly DownloadService _downloadService;
+        private readonly ManifestDownloader _manifestDownloader;
         private readonly RmanApiService _riotApiService;
 
         public VersionService(
@@ -36,7 +37,7 @@ namespace AssetsManager.Services.Monitor
             HttpClient httpClient, 
             DirectoriesCreator directoriesCreator,
             RmanService rmanService,
-            DownloadService downloadService,
+            ManifestDownloader manifestDownloader,
             RmanApiService riotApiService)
         {
             _logService = logService;
@@ -44,10 +45,10 @@ namespace AssetsManager.Services.Monitor
             _directoriesCreator = directoriesCreator;
             
             _rmanService = rmanService;
-            _downloadService = downloadService;
+            _manifestDownloader = manifestDownloader;
             _riotApiService = riotApiService;
 
-            _downloadService.ProgressChanged += (fileName, current, total) => {
+            _manifestDownloader.ProgressChanged += (fileName, current, total) => {
                 VersionDownloadProgressChanged?.Invoke(this, ("Downloading", current, total, Path.GetFileName(fileName)));
             };
         }
@@ -81,7 +82,6 @@ namespace AssetsManager.Services.Monitor
 
             _logService.LogSuccess("Version fetch process completed successfully.");
             
-            // Avisamos a la UI que todo el proceso ha terminado para que limpie la barra de estado
             VersionDownloadCompleted?.Invoke(this, ("Fetching Versions", true, "Success"));
         }
 
@@ -100,7 +100,7 @@ namespace AssetsManager.Services.Monitor
                     var manifestBytes = await _httpClient.GetByteArrayAsync(url);
                     var manifest = _rmanService.Parse(manifestBytes);
 
-                    await _downloadService.DownloadManifestAsync(manifest, tempDir, 4, "LeagueClient.exe");
+                    await _manifestDownloader.DownloadManifestAsync(manifest, tempDir, 4, "LeagueClient.exe");
 
                     string exePath = Path.Combine(tempDir, "LeagueClient.exe");
                     if (File.Exists(exePath))
@@ -155,7 +155,7 @@ namespace AssetsManager.Services.Monitor
                 var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl);
                 var manifest = _rmanService.Parse(manifestBytes);
 
-                await _downloadService.DownloadManifestAsync(manifest, targetDirectory, 4, null, locales);
+                await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, 4, null, locales);
 
                 _logService.LogSuccess($"{taskName} update finished.");
                 VersionDownloadCompleted?.Invoke(this, (taskName, true, "Finished"));
