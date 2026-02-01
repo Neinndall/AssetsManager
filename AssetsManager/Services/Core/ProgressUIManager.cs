@@ -217,7 +217,19 @@ namespace AssetsManager.Services.Core
         public void OnVersionDownloadStarted(object sender, string taskName)
         {
             // Version download is a bit specific, starts indeterminate
-            StartOperation("Versions Update", "Updating", "Download", 0, $"Updating {taskName}...");
+            StartOperation("Versions Update", "Updating", "Download", 0, "Verifying Files...");
+        }
+
+        public void OnVersionDownloadProgressChanged(object sender, (string TaskName, int CurrentValue, int TotalValue, string CurrentFile) data)
+        {
+            _owner.Dispatcher.Invoke(() =>
+            {
+                if (_progressDetailsWindow != null)
+                {
+                    _progressDetailsWindow.OperationVerb = data.TaskName; // Cambia dinámicamente entre Verifying y Updating
+                }
+            });
+            UpdateOperation($"{data.TaskName}: {data.CurrentFile}", data.CurrentValue, data.TotalValue, data.CurrentFile);
         }
 
         public async void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
@@ -229,11 +241,7 @@ namespace AssetsManager.Services.Core
             {
                 CloseProgressWindow();
 
-                if (data.Success)
-                {
-                    _customMessageBoxService.ShowSuccess("Success", data.Message, _owner);
-                }
-                else if (!_taskCancellationManager.IsCancelling) 
+                if (!data.Success && !_taskCancellationManager.IsCancelling) 
                 {
                     _customMessageBoxService.ShowError("Error", data.Message, _owner);
                 }
