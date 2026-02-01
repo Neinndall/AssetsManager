@@ -163,7 +163,7 @@ namespace AssetsManager.Services.Monitor
                 }
                 else
                 {
-                    _logService.Log("All files are up to date.");
+                    _logService.Log("No updates required for this manifest.");
                 }
                 VersionDownloadCompleted?.Invoke(this, (taskName, true, "Finished"));
             }
