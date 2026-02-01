@@ -43,7 +43,7 @@ public class ManifestDownloader
         public Dictionary<ulong, List<ChunkDownloadTask>> ChunksByBundle { get; set; }
     }
 
-    public async Task DownloadManifestAsync(RmanManifest manifest, string outputPath, int maxThreads, string filter = null, List<string> langs = null)
+    public async Task<int> DownloadManifestAsync(RmanManifest manifest, string outputPath, int maxThreads, string filter = null, List<string> langs = null)
     {
         var regex = !string.IsNullOrEmpty(filter) ? new Regex(filter, RegexOptions.IgnoreCase) : null;
         var selectedLangIds = new HashSet<byte>();
@@ -145,7 +145,7 @@ public class ManifestDownloader
         });
 
         // --- FASE 2: ACTUALIZACIÓN (UPDATING) ---
-        if (!filesToPatch.Any()) return;
+        if (!filesToPatch.Any()) return 0;
 
         var sortedFilesToPatch = filesToPatch.OrderBy(f => f.FileInfo.Name).ToList();
         int totalFilesToPatch = sortedFilesToPatch.Count;
@@ -183,6 +183,8 @@ public class ManifestDownloader
 
             await Task.WhenAll(downloadTasks);
         }
+
+        return totalFilesToPatch;
     }
 
     private async Task DownloadAndPatchChunksAsync(ulong bundleId, List<ChunkDownloadTask> tasks, Decompressor decompressor)

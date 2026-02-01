@@ -155,9 +155,16 @@ namespace AssetsManager.Services.Monitor
                 var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl);
                 var manifest = _rmanService.Parse(manifestBytes);
 
-                await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, 4, null, locales);
+                int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, 4, null, locales);
 
-                _logService.LogSuccess($"{taskName} update finished.");
+                if (updatedCount > 0)
+                {
+                    _logService.LogSuccess($"{taskName} update finished.");
+                }
+                else
+                {
+                    _logService.Log("All files are up to date.");
+                }
                 VersionDownloadCompleted?.Invoke(this, (taskName, true, "Finished"));
             }
             catch (Exception ex)
