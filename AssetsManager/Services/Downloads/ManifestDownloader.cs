@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.IO;
+using ZstdSharp;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -9,11 +10,9 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Views.Models.Monitor;
-using ZstdSharp;
+using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Services.Downloads;
-
-using AssetsManager.Services.Hashes;
 
 public class ManifestDownloader
 {
@@ -21,7 +20,8 @@ public class ManifestDownloader
     private readonly string _bundleBaseUrl = "https://lol.dyn.riotcdn.net/channels/public/bundles";
     private readonly HashService _hashService = new HashService();
 
-    public event Action<string, int, int> ProgressChanged;
+    // Evento compatible con el nuevo sistema de progreso dinámico
+    public event Action<string, string, int, int> ProgressChanged;
 
     public ManifestDownloader(HttpClient httpClient)
     {
@@ -34,6 +34,13 @@ public class ManifestDownloader
         public ulong FileOffset { get; set; }
         public RmanFile FileInfo { get; set; }
         public string FullPath { get; set; }
+    }
+
+    private class FilePatchTask
+    {
+        public RmanFile FileInfo { get; set; }
+        public string FullPath { get; set; }
+        public Dictionary<ulong, List<ChunkDownloadTask>> ChunksByBundle { get; set; }
     }
 
     public async Task DownloadManifestAsync(RmanManifest manifest, string outputPath, int maxThreads, string filter = null, List<string> langs = null)
@@ -64,78 +71,117 @@ public class ManifestDownloader
 
         if (!Directory.Exists(outputPath)) Directory.CreateDirectory(outputPath);
 
-        int totalFiles = filteredFiles.Count;
+        // --- FASE 1: VERIFICACIÓN PARALELA (Background Thread) ---
+        var filesToPatch = new ConcurrentBag<FilePatchTask>();
+        int totalToVerify = filteredFiles.Count;
+        int currentVerify = 0;
+
+        await Task.Run(async () =>
+        {
+            var scanSemaphore = new SemaphoreSlim(maxThreads);
+            var scanTasks = filteredFiles.Select(async file =>
+            {
+                await scanSemaphore.WaitAsync();
+                try 
+                {
+                    var fullPath = Path.Combine(outputPath, file.Name.Replace("/", Path.DirectorySeparatorChar.ToString()));
+                    bool fileExists = File.Exists(fullPath);
+                    bool wrongSize = fileExists && (ulong)new FileInfo(fullPath).Length != file.FileSize;
+                    
+                    var chunksByBundle = new Dictionary<ulong, List<ChunkDownloadTask>>();
+                    ulong currentFileOffset = 0;
+
+                    if (!fileExists || wrongSize)
+                    {
+                        foreach (var chunkId in file.ChunkIds)
+                        {
+                            var chunk = manifest.GetChunk(chunkId);
+                            if (chunk == null) continue;
+                            if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
+                            chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, FullPath = fullPath });
+                            currentFileOffset += chunk.UncompressedSize;
+                        }
+                    }
+                    else
+                    {
+                        using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        {
+                            foreach (var chunkId in file.ChunkIds)
+                            {
+                                var chunk = manifest.GetChunk(chunkId);
+                                if (chunk == null) continue;
+
+                                bool needsUpdate = true;
+                                if ((ulong)fs.Length >= currentFileOffset + chunk.UncompressedSize)
+                                {
+                                    var localData = new byte[chunk.UncompressedSize];
+                                    fs.Position = (long)currentFileOffset;
+                                    await fs.ReadExactlyAsync(localData, 0, (int)chunk.UncompressedSize);
+                                    if (_hashService.VerifyChunk(localData, chunk.ChunkId, file.HashType)) needsUpdate = false;
+                                }
+
+                                if (needsUpdate)
+                                {
+                                    if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
+                                    chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, FullPath = fullPath });
+                                }
+                                currentFileOffset += chunk.UncompressedSize;
+                            }
+                        }
+                    }
+
+                    if (chunksByBundle.Any())
+                    {
+                        filesToPatch.Add(new FilePatchTask { FileInfo = file, FullPath = fullPath, ChunksByBundle = chunksByBundle });
+                    }
+
+                    int completed = Interlocked.Increment(ref currentVerify);
+                    ProgressChanged?.Invoke("Verifying", file.Name, completed, totalToVerify);
+                }
+                finally { scanSemaphore.Release(); }
+            });
+
+            await Task.WhenAll(scanTasks);
+        });
+
+        // --- FASE 2: ACTUALIZACIÓN (UPDATING) ---
+        if (!filesToPatch.Any()) return;
+
+        var sortedFilesToPatch = filesToPatch.OrderBy(f => f.FileInfo.Name).ToList();
+        int totalFilesToPatch = sortedFilesToPatch.Count;
         int completedFiles = 0;
 
-        foreach (var file in filteredFiles)
+        foreach (var task in sortedFilesToPatch)
         {
-            var fullPath = Path.Combine(outputPath, file.Name.Replace("/", Path.DirectorySeparatorChar.ToString()));
-            var dirName = Path.GetDirectoryName(fullPath);
+            completedFiles++;
+            ProgressChanged?.Invoke("Updating", task.FileInfo.Name, completedFiles, totalFilesToPatch);
+
+            var dirName = Path.GetDirectoryName(task.FullPath);
             if (!string.IsNullOrEmpty(dirName) && !Directory.Exists(dirName)) Directory.CreateDirectory(dirName);
 
-            if (!File.Exists(fullPath) || (ulong)new FileInfo(fullPath).Length != file.FileSize)
+            if (!File.Exists(task.FullPath) || (ulong)new FileInfo(task.FullPath).Length != task.FileInfo.FileSize)
             {
-                using (var fs = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                using (var fs = new FileStream(task.FullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
                 {
-                    fs.SetLength((long)file.FileSize);
+                    fs.SetLength((long)task.FileInfo.FileSize);
                 }
             }
 
-            var chunksByBundle = new Dictionary<ulong, List<ChunkDownloadTask>>();
-            ulong currentFileOffset = 0;
-            
-            // Smart Scan
-            if (File.Exists(fullPath))
+            var semaphore = new SemaphoreSlim(maxThreads);
+            var downloadTasks = task.ChunksByBundle.Select(async pair =>
             {
-                using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                await semaphore.WaitAsync();
+                try
                 {
-                    foreach (var chunkId in file.ChunkIds)
+                    using (var decompressor = new Decompressor())
                     {
-                        var chunk = manifest.GetChunk(chunkId);
-                        if (chunk == null) continue;
-
-                        bool needsDownload = true;
-                        if ((ulong)fs.Length >= currentFileOffset + chunk.UncompressedSize)
-                        {
-                            var localData = new byte[chunk.UncompressedSize];
-                            fs.Position = (long)currentFileOffset;
-                            await fs.ReadExactlyAsync(localData, 0, (int)chunk.UncompressedSize);
-                            if (_hashService.VerifyChunk(localData, chunk.ChunkId, file.HashType)) needsDownload = false;
-                        }
-
-                        if (needsDownload)
-                        {
-                            if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
-                            chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask 
-                            { 
-                                Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, FullPath = fullPath 
-                            });
-                        }
-                        currentFileOffset += chunk.UncompressedSize;
+                        await DownloadAndPatchChunksAsync(pair.Key, pair.Value, decompressor);
                     }
                 }
-            }
+                finally { semaphore.Release(); }
+            });
 
-            if (chunksByBundle.Any())
-            {
-                var semaphore = new SemaphoreSlim(maxThreads);
-                var downloadTasks = chunksByBundle.Select(async pair =>
-                {
-                    await semaphore.WaitAsync();
-                    try
-                    {
-                        using (var decompressor = new Decompressor())
-                        {
-                            await DownloadAndPatchChunksAsync(pair.Key, pair.Value, decompressor);
-                        }
-                    }
-                    finally { semaphore.Release(); }
-                });
-                await Task.WhenAll(downloadTasks);
-            }
-
-            completedFiles++;
-            ProgressChanged?.Invoke(file.Name, completedFiles, totalFiles);
+            await Task.WhenAll(downloadTasks);
         }
     }
 
@@ -175,17 +221,17 @@ public class ManifestDownloader
                     var rangeData = await response.Content.ReadAsByteArrayAsync();
 
                     int internalOffset = 0;
-                    foreach (var task in group)
+                    foreach (var chunkTask in group)
                     {
-                        var compressed = new byte[task.Chunk.CompressedSize];
-                        Array.Copy(rangeData, internalOffset, compressed, 0, (int)task.Chunk.CompressedSize);
+                        var compressed = new byte[chunkTask.Chunk.CompressedSize];
+                        Array.Copy(rangeData, internalOffset, compressed, 0, (int)chunkTask.Chunk.CompressedSize);
                         var uncompressed = decompressor.Unwrap(compressed).ToArray();
 
-                        if (!_hashService.VerifyChunk(uncompressed, task.Chunk.ChunkId, task.FileInfo.HashType))
+                        if (!_hashService.VerifyChunk(uncompressed, chunkTask.Chunk.ChunkId, chunkTask.FileInfo.HashType))
                             throw new Exception("Integrity failure");
 
-                        await WriteChunkToFileAsync(task.FullPath, (long)task.FileOffset, uncompressed);
-                        internalOffset += (int)task.Chunk.CompressedSize;
+                        await WriteChunkToFileAsync(chunkTask.FullPath, (long)chunkTask.FileOffset, uncompressed);
+                        internalOffset += (int)chunkTask.Chunk.CompressedSize;
                     }
                 }
             }
