@@ -11,7 +11,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Views.Models.Versions;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
 using AssetsManager.Services.Manifests;
 using AssetsManager.Services.Downloads;
