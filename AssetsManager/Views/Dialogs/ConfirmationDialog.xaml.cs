@@ -69,19 +69,16 @@ namespace AssetsManager.Views.Dialogs
         private void btnYes_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = true;
-            Close();
         }
 
         private void btnNo_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
-            Close();
         }
 
         private void btnOk_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = true;
-            Close();
         }
 
         private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)

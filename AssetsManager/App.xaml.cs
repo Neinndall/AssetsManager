@@ -26,7 +26,7 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Backup;
-using AssetsManager.Services.Parsers;
+using AssetsManager.Services.Manifests;
 
 namespace AssetsManager
 {
@@ -48,45 +48,53 @@ namespace AssetsManager
           .MinimumLevel.Debug()
           .WriteTo.Debug()
           .WriteTo.Logger(lc => lc
-              // .Filter.ByIncludingOnly(e => e.Level < LogEventLevel.Fatal) // Information, Warning, Error (Original)
-              .Filter.ByIncludingOnly(e => e.Level >= LogEventLevel.Information && e.Level < LogEventLevel.Fatal) // Information, Warning, Error (Excludes Debug)
+              .Filter.ByIncludingOnly(e => e.Level >= LogEventLevel.Information && e.Level < LogEventLevel.Fatal)
               .WriteTo.File("logs/application.log",
                   rollingInterval: RollingInterval.Day,
                   outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}"))
           .WriteTo.Logger(lc => lc
-              .Filter.ByIncludingOnly(e => e.Level >= LogEventLevel.Error && e.Exception != null) // Error, Fatal and with an Exception
+              .Filter.ByIncludingOnly(e => e.Level >= LogEventLevel.Error && e.Exception != null)
               .WriteTo.File("logs/application_errors.log",
                   rollingInterval: RollingInterval.Day,
                   outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}"))
           .CreateLogger();
 
-      Log.Logger = logger; // Assign the logger to the static Log.Logger
+      Log.Logger = logger;
       services.AddSingleton<ILogger>(logger);
 
       // Core Services
       services.AddSingleton<LogService>();
       services.AddSingleton<NotificationService>();
-      services.AddSingleton<TaskCancellationManager>(); // Added for managing task cancellations
+      services.AddSingleton<TaskCancellationManager>();
       services.AddSingleton<DiffViewService>();
       services.AddSingleton<CustomMessageBoxService>();
       services.AddSingleton<ProgressUIManager>();
       services.AddSingleton<UpdateCheckService>();
 
-      // Configure and register HttpClient for LCU API (ignoring self-signed cert for loopback)
+      // High-Performance HttpClient Configuration
       services.AddSingleton<HttpClient>(sp =>
       {
-        var handler = new HttpClientHandler();
-        handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
-          {
-            // Trust the self-signed certificate for the local LCU API
-            if (message.RequestUri.IsLoopback)
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+            MaxConnectionsPerServer = 100, // Desbloquea el límite de hilos concurrentes
+            EnableMultipleHttp2Connections = true,
+            ConnectTimeout = TimeSpan.FromSeconds(15),
+            SslOptions = new System.Net.Security.SslClientAuthenticationOptions
             {
-              return true;
+                RemoteCertificateValidationCallback = (message, cert, chain, errors) =>
+                {
+                    // Mantener compatibilidad con la API local de la LCU
+                    if (message is HttpRequestMessage req && req.RequestUri != null && req.RequestUri.IsLoopback)
+                    {
+                        return true;
+                    }
+                    return errors == System.Net.Security.SslPolicyErrors.None;
+                }
             }
-                // For all other requests, use the default system validation
-            return errors == System.Net.Security.SslPolicyErrors.None;
-          };
-        return new HttpClient(handler);
+        };
+        return new HttpClient(handler) { DefaultRequestVersion = System.Net.HttpVersion.Version20 };
       });
 
       // Utils Services
@@ -118,16 +126,21 @@ namespace AssetsManager
       // Downloads Services
       services.AddSingleton<AssetDownloader>();
       services.AddSingleton<ExtractionService>();
+      services.AddSingleton<ManifestDownloader>();
       services.AddSingleton<Status>();
       services.AddSingleton<Requests>();
        
       // Monitor Services
       services.AddSingleton<MonitorService>();
       services.AddSingleton<PbeStatusService>();
-      services.AddSingleton<RiotApiService>();
+      services.AddSingleton<RiotApiService>(); // LCU Service
       services.AddSingleton<VersionService>();
       services.AddSingleton<JsonDataService>();
       services.AddSingleton<ComparisonHistoryService>();
+      
+      // Manifests Services
+      services.AddSingleton<RmanService>();
+      services.AddSingleton<RmanApiService>();
 
       // Hashes Services
       services.AddSingleton<HashResolverService>();
@@ -150,7 +163,7 @@ namespace AssetsManager
 
       // Windows, Views, and Dialogs
       services.AddTransient<MainWindow>();
-      services.AddTransient<HomeWindow>(); // New Home View
+      services.AddTransient<HomeWindow>();
       services.AddTransient<ExplorerWindow>();
       services.AddTransient<ComparatorWindow>();
       services.AddTransient<ModelWindow>();
@@ -185,7 +198,6 @@ namespace AssetsManager
         return;
       }
 
-      // Pin the application identity for Windows to avoid duplicates in notification settings and registry.
       SingleInstance.SetCurrentProcessExplicitAppUserModelID(SingleInstance.AppId);
 
       base.OnStartup(e);
