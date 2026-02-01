@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 using AssetsManager.Views.Models.Versions;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using AssetsManager.Services.Riot;
+using AssetsManager.Services.Manifests;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Models.Monitor;
 

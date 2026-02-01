@@ -26,7 +26,7 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Backup;
-using AssetsManager.Services.Riot;
+using AssetsManager.Services.Manifests;
 
 namespace AssetsManager
 {
@@ -124,13 +124,9 @@ namespace AssetsManager
       services.AddSingleton<JsonDataService>();
       services.AddSingleton<ComparisonHistoryService>();
 
-      // Riot Native Services (RmanCore)
-      services.AddSingleton<RmanService>();
-      services.AddSingleton<HashService>();
-      services.AddSingleton<RmanApiService>(); // Manifest Service (New name)
-
       // Hashes Services
       services.AddSingleton<HashResolverService>();
+      services.AddSingleton<HashService>();
 
       // Comparator Services
       services.AddSingleton<WadComparatorService>();

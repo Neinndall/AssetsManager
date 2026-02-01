@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using AssetsManager.Views.Models.Monitor;
 
-namespace AssetsManager.Services.Riot;
+namespace AssetsManager.Services.Manifests;
 
 public class RmanApiService
 {

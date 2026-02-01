@@ -6,7 +6,7 @@ using System.Text;
 using AssetsManager.Views.Models.Monitor;
 using ZstdSharp;
 
-namespace AssetsManager.Services.Riot;
+namespace AssetsManager.Services.Manifests;
 
 public class RmanService
 {

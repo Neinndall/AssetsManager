@@ -13,11 +13,13 @@ using ZstdSharp;
 
 namespace AssetsManager.Services.Downloads;
 
+using AssetsManager.Services.Hashes;
+
 public class ManifestDownloader
 {
     private readonly HttpClient _httpClient;
     private readonly string _bundleBaseUrl = "https://lol.dyn.riotcdn.net/channels/public/bundles";
-    private readonly Riot.HashService _hashService = new Riot.HashService();
+    private readonly HashService _hashService = new HashService();
 
     public event Action<string, int, int> ProgressChanged;
 
