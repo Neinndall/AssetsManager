@@ -144,7 +144,7 @@ namespace AssetsManager
 
       // Hashes Services
       services.AddSingleton<HashResolverService>();
-      services.AddSingleton<HashService>();
+      services.AddSingleton<RmanParser>();
 
       // Comparator Services
       services.AddSingleton<WadComparatorService>();
