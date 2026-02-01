@@ -71,16 +71,30 @@ namespace AssetsManager
       services.AddSingleton<ProgressUIManager>();
       services.AddSingleton<UpdateCheckService>();
 
-      // HttpClient
+      // High-Performance HttpClient Configuration
       services.AddSingleton<HttpClient>(sp =>
       {
-        var handler = new HttpClientHandler();
-        handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
-          {
-            if (message.RequestUri.IsLoopback) return true;
-            return errors == System.Net.Security.SslPolicyErrors.None;
-          };
-        return new HttpClient(handler);
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+            MaxConnectionsPerServer = 100, // Desbloquea el límite de hilos concurrentes
+            EnableMultipleHttp2Connections = true,
+            ConnectTimeout = TimeSpan.FromSeconds(15),
+            SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+            {
+                RemoteCertificateValidationCallback = (message, cert, chain, errors) =>
+                {
+                    // Mantener compatibilidad con la API local de la LCU
+                    if (message is HttpRequestMessage req && req.RequestUri != null && req.RequestUri.IsLoopback)
+                    {
+                        return true;
+                    }
+                    return errors == System.Net.Security.SslPolicyErrors.None;
+                }
+            }
+        };
+        return new HttpClient(handler) { DefaultRequestVersion = System.Net.HttpVersion.Version20 };
       });
 
       // Utils Services
@@ -123,6 +137,10 @@ namespace AssetsManager
       services.AddSingleton<VersionService>();
       services.AddSingleton<JsonDataService>();
       services.AddSingleton<ComparisonHistoryService>();
+      
+      // Manifests Services
+      services.AddSingleton<RmanService>();
+      services.AddSingleton<RmanApiService>();
 
       // Hashes Services
       services.AddSingleton<HashResolverService>();
