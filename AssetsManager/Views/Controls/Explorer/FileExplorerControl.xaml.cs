@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media.Imaging;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
@@ -20,6 +21,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -35,6 +37,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewChangesMenuItem");
         public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ExtractMenuItem");
         public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "SaveMenuItem");
+        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "AddToImageMergerMenuItem");
 
         // Injected Services
         public LogService LogService { get; set; }
@@ -728,6 +731,58 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private async void AddToImageMerger_Click(object sender, RoutedEventArgs e)
+        {
+            if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode) return;
+
+            try
+            {
+                byte[] data = null;
+                if (selectedNode.Type == NodeType.VirtualFile)
+                    data = await WadExtractionService.GetVirtualFileBytesAsync(selectedNode);
+                else if (selectedNode.Type == NodeType.RealFile)
+                    data = await File.ReadAllBytesAsync(selectedNode.FullPath);
+
+                if (data == null) return;
+
+                BitmapSource bitmap = null;
+                if (SupportedFileTypes.Textures.Contains(selectedNode.Extension))
+                {
+                    using (var stream = new MemoryStream(data))
+                    {
+                        bitmap = Utils.TextureUtils.LoadTexture(stream, selectedNode.Extension);
+                    }
+                }
+                else
+                {
+                    using (var stream = new MemoryStream(data))
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.StreamSource = stream;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        bitmap = bmp;
+                    }
+                }
+
+                if (bitmap != null)
+                {
+                    ImageMergerService.Instance.AddItem(new ImageMergerItem
+                    {
+                        Name = selectedNode.Name,
+                        Path = selectedNode.FullPath ?? selectedNode.Name,
+                        Image = bitmap
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Failed to add image to merger.");
+            }
+        }
+
         private void RemoveFavorite_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is FavoriteItemModel item)
@@ -786,6 +841,12 @@ namespace AssetsManager.Views.Controls.Explorer
             if (ViewChangesMenuItem is not null)
             {
                 ViewChangesMenuItem.IsEnabled = selectedNode.Status == DiffStatus.Modified;
+            }
+
+            if (AddToImageMergerMenuItem is not null)
+            {
+                AddToImageMergerMenuItem.IsEnabled = (SupportedFileTypes.Images.Contains(selectedNode.Extension) || SupportedFileTypes.Textures.Contains(selectedNode.Extension)) && 
+                                                    (selectedNode.Type == NodeType.VirtualFile || selectedNode.Type == NodeType.RealFile);
             }
         }
 

@@ -98,5 +98,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 SortStateChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
             }
         }
+
+        private void ImageMergerButton_Click(object sender, RoutedEventArgs e)
+        {
+            Services.Explorer.ImageMergerService.Instance.ShowWindow();
+        }
     }
 }

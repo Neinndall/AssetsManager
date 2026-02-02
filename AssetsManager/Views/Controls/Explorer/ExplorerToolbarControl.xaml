@@ -87,6 +87,14 @@
                     </materialIcons:MaterialIcon>
                 </ToggleButton>
 
+                <Button x:Name="ImageMergerButton" 
+                        Style="{StaticResource TransparentIconButton}" 
+                        ToolTip="Open Image Merger" 
+                        Margin="0,0,2,0" 
+                        Click="ImageMergerButton_Click">
+                    <materialIcons:MaterialIcon Kind="ViewGridPlus" Width="18" Height="18"/>
+                </Button>
+
                 <Rectangle Width="1" Height="16" Fill="{StaticResource BorderColor}" Margin="4,0,8,0" VerticalAlignment="Center"/>
 
                 <!-- Search Group -->
