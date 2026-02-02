@@ -181,18 +181,15 @@ public class ManifestDownloader
                 {
                     long bytes = await DownloadAndPatchBundleAsync(bundleEntry.Key, bundleEntry.Value, cpuSem, openHandles, (fileId) =>
                     {
-                        int done = Interlocked.Increment(ref completedChunks);
-                        if ((DateTime.Now - lastUpdateProgressTime).TotalMilliseconds > 100 || done == totalChunks)
-                        {
-                            lastUpdateProgressTime = DateTime.Now;
-                            string detail = $"[{completedFilesCount}/{totalFilesToPatch}] {Path.GetFileName(fileId)}";
-                            ProgressChanged?.Invoke("Updating", detail, done, totalChunks);
-                        }
-
+                        // Registramos que un chunk se ha procesado para el archivo
                         int rem = pendingPerFile.AddOrUpdate(fileId, 0, (k, v) => v - 1);
+                        
+                        // Solo informamos a la UI cuando un archivo se completa totalmente
                         if (rem == 0)
                         {
-                            Interlocked.Increment(ref completedFilesCount);
+                            int doneFiles = Interlocked.Increment(ref completedFilesCount);
+                            ProgressChanged?.Invoke("Updating", Path.GetFileName(fileId), doneFiles, totalFilesToPatch);
+                            
                             if (openHandles.TryRemove(fileId, out var h)) h.Dispose();
                         }
                     });
@@ -268,21 +265,7 @@ public class ManifestDownloader
                     });
 
                     System.IO.RandomAccess.Write(handle, uncomp, (long)t.FileOffset);
-                    
-                    int done = Interlocked.Increment(ref completedChunks);
-                    if ((DateTime.Now - lastUpdateProgressTime).TotalMilliseconds > 100 || done == totalChunks)
-                    {
-                        lastUpdateProgressTime = DateTime.Now;
-                        // Mostramos solo el nombre del archivo
-                        ProgressChanged?.Invoke("Updating", Path.GetFileName(t.FullPath), done, totalChunks);
-                    }
-
-                    int rem = pendingPerFile.AddOrUpdate(t.FullPath, 0, (k, v) => v - 1);
-                    if (rem == 0)
-                    {
-                        Interlocked.Increment(ref completedFilesCount);
-                        if (openHandles.TryRemove(t.FullPath, out var h)) h.Dispose();
-                    }
+                    onChunkDone(t.FullPath);
                 }
             }
             finally { cpuSem.Release(); }
