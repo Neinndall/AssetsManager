@@ -14,21 +14,10 @@
         SnapsToDevicePixels="True"
         UseLayoutRounding="True">
 
-    <Window.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Themes/Colors.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernButton.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernProgressBar.xaml"/>
-            </ResourceDictionary.MergedDictionaries>
-            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        </ResourceDictionary>
-    </Window.Resources>
-
     <Border BorderBrush="{StaticResource BorderColor}" 
+            Background="{StaticResource CardBackground}"
             BorderThickness="1" 
             CornerRadius="12" 
-            Background="{StaticResource CardBackground}"
             Margin="1">
         <Grid>
             <Grid.RowDefinitions>
@@ -182,26 +171,6 @@
                                         <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.5"/>
                                     </Image.Effect>
                                 </Image>
-                                
-                                <!-- Subtle Loading Indicator (Bottom Left) -->
-                                <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" 
-                                        Margin="20" Padding="12,8"
-                                        Background="{StaticResource CardBackground}" 
-                                        CornerRadius="20"
-                                        Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityConverter}}"
-                                        Opacity="0.9">
-                                    <Border.Effect>
-                                        <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.3"/>
-                                    </Border.Effect>
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialIcons:MaterialIcon Kind="Sync" Width="16" Height="16" 
-                                                                    Foreground="{StaticResource AccentBrush}"
-                                                                    Style="{StaticResource SpinningIconStyle}"/>
-                                        <TextBlock Text="Updating preview..." Margin="8,0,0,0" 
-                                                   VerticalAlignment="Center" FontSize="11" 
-                                                   FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
-                                    </StackPanel>
-                                </Border>
                             </Grid>
                         </ScrollViewer>
                     </Border>
