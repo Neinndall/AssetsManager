@@ -159,6 +159,8 @@ public class ManifestDownloader
         var bundlesToProcess = allChunks.GroupBy(c => c.Chunk.BundleId).ToDictionary(g => g.Key, g => g.ToList());
         int totalChunks = allChunks.Count;
         int completedChunks = 0;
+        int completedFilesCount = 0;
+        int totalFilesToPatch = filesToPatch.Count;
         long totalDownloaded = 0;
         long usefulBytes = allChunks.Sum(c => (long)c.Chunk.CompressedSize);
         var updateSw = System.Diagnostics.Stopwatch.StartNew();
@@ -183,12 +185,14 @@ public class ManifestDownloader
                         if ((DateTime.Now - lastUpdateProgressTime).TotalMilliseconds > 100 || done == totalChunks)
                         {
                             lastUpdateProgressTime = DateTime.Now;
-                            ProgressChanged?.Invoke("Updating", Path.GetFileName(fileId), done, totalChunks);
+                            string detail = $"[{completedFilesCount}/{totalFilesToPatch}] {Path.GetFileName(fileId)}";
+                            ProgressChanged?.Invoke("Updating", detail, done, totalChunks);
                         }
 
                         int rem = pendingPerFile.AddOrUpdate(fileId, 0, (k, v) => v - 1);
                         if (rem == 0)
                         {
+                            Interlocked.Increment(ref completedFilesCount);
                             if (openHandles.TryRemove(fileId, out var h)) h.Dispose();
                         }
                     });
@@ -206,8 +210,7 @@ public class ManifestDownloader
         }
 
         double sec = updateSw.Elapsed.TotalSeconds;
-        double eff = totalDownloaded > 0 ? ((double)usefulBytes / totalDownloaded) * 100 : 100;
-        _logService.LogSuccess($"[Phase 2] Completed in {sec:F1}s. Efficiency: {eff:F1}% | Speed: {(totalDownloaded/1024.0/1024.0)/sec:F2} MB/s");
+        _logService.LogSuccess($"[Phase 2] Completed in {sec:F1}s. Useful Speed: {(usefulBytes / 1024.0 / 1024.0) / sec:F2} MB/s");
 
         return filesToPatch.Count;
     }
@@ -218,7 +221,7 @@ public class ManifestDownloader
         var sorted = tasks.OrderBy(t => t.Chunk.BundleOffset).ToList();
         long totalDownloaded = 0;
 
-        // Grouping logic (Gap Filling 128KB)
+        // Grouping logic (Gap Filling 128KB - RESTORED)
         const uint MaxGap = 128 * 1024;
         var groups = new List<List<ChunkDownloadTask>>();
         if (sorted.Count > 0)
@@ -245,7 +248,7 @@ public class ManifestDownloader
             var data = await resp.Content.ReadAsByteArrayAsync();
             totalDownloaded += data.Length;
 
-            await cpuSem.WaitAsync(); // Turno de CPU para procesar este bloque bajado
+                    await cpuSem.WaitAsync(); // Turno de CPU para procesar este bloque bajado
             try
             {
                 using var decompressor = new Decompressor();
@@ -256,8 +259,7 @@ public class ManifestDownloader
                     Array.Copy(data, relOffset, comp, 0, (int)t.Chunk.CompressedSize);
                     var uncomp = decompressor.Unwrap(comp).ToArray();
 
-                    var handle = openHandles.GetOrAdd(t.FullPath, (path) =>
-                    {
+                    var handle = openHandles.GetOrAdd(t.FullPath, (path) => {
                         var dir = Path.GetDirectoryName(path);
                         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                         var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite, 1, FileOptions.Asynchronous);
@@ -266,7 +268,21 @@ public class ManifestDownloader
                     });
 
                     System.IO.RandomAccess.Write(handle, uncomp, (long)t.FileOffset);
-                    onChunkDone(t.FullPath);
+                    
+                    int done = Interlocked.Increment(ref completedChunks);
+                    if ((DateTime.Now - lastUpdateProgressTime).TotalMilliseconds > 100 || done == totalChunks)
+                    {
+                        lastUpdateProgressTime = DateTime.Now;
+                        // Mostramos solo el nombre del archivo
+                        ProgressChanged?.Invoke("Updating", Path.GetFileName(t.FullPath), done, totalChunks);
+                    }
+
+                    int rem = pendingPerFile.AddOrUpdate(t.FullPath, 0, (k, v) => v - 1);
+                    if (rem == 0)
+                    {
+                        Interlocked.Increment(ref completedFilesCount);
+                        if (openHandles.TryRemove(t.FullPath, out var h)) h.Dispose();
+                    }
                 }
             }
             finally { cpuSem.Release(); }
