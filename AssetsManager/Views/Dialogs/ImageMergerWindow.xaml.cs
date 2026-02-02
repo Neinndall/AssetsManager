@@ -1,16 +1,17 @@
 using System;
 using System.Linq;
 using System.Windows;
+
+using System.IO;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
-using AssetsManager.Views.Models.Shared;
 using System.Threading.Tasks;
-using System.IO;
-using AssetsManager.Services.Explorer;
 using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Views.Models.Shared;
 using AssetsManager.Services.Core;
 
 namespace AssetsManager.Views.Dialogs
