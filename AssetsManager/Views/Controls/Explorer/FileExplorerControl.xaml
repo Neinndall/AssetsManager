@@ -35,7 +35,6 @@
                     <materialIcons:MaterialIcon Kind="Pin"/>
                 </MenuItem.Icon>
             </MenuItem>
-            <Separator/>
             <MenuItem Header="Add to Image Merger" x:Name="AddToImageMergerMenuItem" Click="AddToImageMerger_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="ViewGridPlus"/>
