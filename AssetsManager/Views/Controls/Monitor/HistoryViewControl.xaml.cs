@@ -51,13 +51,8 @@ namespace AssetsManager.Views.Controls.Monitor
                     var (data, path) = await ComparisonHistoryService.LoadComparisonAsync(selectedEntry.ReferenceId);
                     if (data != null)
                     {
-                        // Resolve dependencies for the window
-                        var resultWindow = ActivatorUtilities.CreateInstance<WadComparisonResultWindow>(
-                            ServiceProvider, 
-                            data.Diffs, 
-                            data.OldLolPath, 
-                            data.NewLolPath
-                        );
+                        var resultWindow = ServiceProvider.GetRequiredService<WadComparisonResultWindow>();
+                        resultWindow.Initialize(data.Diffs, data.OldLolPath, data.NewLolPath, path);
                         resultWindow.Owner = Window.GetWindow(this);
                         resultWindow.Show();
                     }

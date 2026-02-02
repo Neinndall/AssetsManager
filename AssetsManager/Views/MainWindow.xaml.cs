@@ -33,12 +33,9 @@ namespace AssetsManager.Views
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
         private readonly UpdateManager _updateManager;
-        private readonly AssetDownloader _assetDownloader;
         private readonly WadComparatorService _wadComparatorService;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly WadDifferenceService _wadDifferenceService;
-        private readonly WadPackagingService _wadPackagingService;
         private readonly BackupManager _backupManager;
         private readonly HashResolverService _hashResolverService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
@@ -71,12 +68,9 @@ namespace AssetsManager.Views
             LogService logService,
             AppSettings appSettings,
             UpdateManager updateManager,
-            AssetDownloader assetDownloader,
             WadComparatorService wadComparatorService,
             DirectoriesCreator directoriesCreator,
             CustomMessageBoxService customMessageBoxService,
-            WadDifferenceService wadDifferenceService,
-            WadPackagingService wadPackagingService,
             BackupManager backupManager,
             HashResolverService hashResolverService,
             WadNodeLoaderService wadNodeLoaderService,
@@ -98,12 +92,9 @@ namespace AssetsManager.Views
             _logService = logService;
             _appSettings = appSettings;
             _updateManager = updateManager;
-            _assetDownloader = assetDownloader;
             _wadComparatorService = wadComparatorService;
             _customMessageBoxService = customMessageBoxService;
             _directoriesCreator = directoriesCreator;
-            _wadDifferenceService = wadDifferenceService;
-            _wadPackagingService = wadPackagingService;
             _backupManager = backupManager;
             _hashResolverService = hashResolverService;
             _wadNodeLoaderService = wadNodeLoaderService;
@@ -333,7 +324,8 @@ namespace AssetsManager.Views
 
         private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
         {
-            var resultWindow = new WadComparisonResultWindow(diffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, _appSettings, oldPath, newPath);
+            var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
+            resultWindow.Initialize(diffs, oldPath, newPath);
             resultWindow.Owner = this;
             resultWindow.Show();
         }

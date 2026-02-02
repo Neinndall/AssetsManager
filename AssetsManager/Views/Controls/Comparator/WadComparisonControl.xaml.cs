@@ -176,7 +176,5 @@ namespace AssetsManager.Views.Controls.Comparator
                 compareWadButton.IsEnabled = true;
             }
         }
-
-
     }
 }
