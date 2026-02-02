@@ -26,7 +26,7 @@
             </Grid.RowDefinitions>
 
             <!-- Title Bar -->
-            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" 
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" 
                     CornerRadius="11,11,0,0" 
                     BorderBrush="{StaticResource BorderColor}" 
                     BorderThickness="0,0,0,1"
