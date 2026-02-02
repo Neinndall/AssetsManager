@@ -33,7 +33,8 @@
                 <ControlTemplate TargetType="{x:Type Thumb}">
                     <Border Background="{StaticResource ScrollBarThumbBackground}" 
                             CornerRadius="3"
-                            Width="6"/> <ControlTemplate.Triggers>
+                            Width="6"
+                            HorizontalAlignment="Center"/> <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="Background" Value="{StaticResource ScrollBarThumbHoverBackground}"/>
                         </Trigger>
@@ -53,7 +54,8 @@
                 <ControlTemplate TargetType="{x:Type Thumb}">
                     <Border Background="{StaticResource ScrollBarThumbBackground}" 
                             CornerRadius="3"
-                            Height="6"/>
+                            Height="6"
+                            VerticalAlignment="Center"/>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="Background" Value="{StaticResource ScrollBarThumbHoverBackground}"/>
@@ -118,10 +120,14 @@
         <Style.Triggers>
             <Trigger Property="Orientation" Value="Vertical">
                 <Setter Property="Width" Value="8"/>
+                <Setter Property="MinWidth" Value="8"/>
+                <Setter Property="MaxWidth" Value="8"/>
                 <Setter Property="Template" Value="{StaticResource VerticalScrollBarTemplate}"/>
             </Trigger>
             <Trigger Property="Orientation" Value="Horizontal">
                 <Setter Property="Height" Value="8"/>
+                <Setter Property="MinHeight" Value="8"/>
+                <Setter Property="MaxHeight" Value="8"/>
                 <Setter Property="Template" Value="{StaticResource HorizontalScrollBarTemplate}"/>
             </Trigger>
         </Style.Triggers>
