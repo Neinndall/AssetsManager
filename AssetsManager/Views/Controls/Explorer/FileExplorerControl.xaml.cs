@@ -802,11 +802,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     LogService.LogError(ex, $"Failed to add image '{node.Name}' to merger.");
                 }
             }
-
-            if (addedCount > 1)
-            {
-                LogService.LogSuccess($"Added {addedCount} images to the Image Merger.");
-            }
         }
 
         private void RemoveFavorite_Click(object sender, RoutedEventArgs e)

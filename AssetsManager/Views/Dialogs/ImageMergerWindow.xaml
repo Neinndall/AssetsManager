@@ -26,7 +26,11 @@
             </Grid.RowDefinitions>
 
             <!-- Title Bar -->
-            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="11,11,0,0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" 
+                    CornerRadius="11,11,0,0" 
+                    BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
                         <materialIcons:MaterialIcon Kind="ViewGridPlus" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
@@ -60,7 +64,10 @@
                         </Grid.RowDefinitions>
 
                         <StackPanel Grid.Row="0" Margin="0,0,0,15">
-                            <TextBlock Text="IMAGE LIST" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <materialIcons:MaterialIcon Kind="FormatListBulleted" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Opacity="0.7" VerticalAlignment="Center"/>
+                                <TextBlock Text="IMAGE LIST" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                            </StackPanel>
                             <Grid Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -120,7 +127,10 @@
 
                         <!-- Controls Footer -->
                         <StackPanel Grid.Row="2" Margin="0,15,0,0">
-                            <TextBlock Text="SETTINGS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,10"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <materialIcons:MaterialIcon Kind="Cog" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Opacity="0.7" VerticalAlignment="Center"/>
+                                <TextBlock Text="SETTINGS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                            </StackPanel>
                             
                             <TextBlock Text="Columns" Margin="0,0,0,5"/>
                             <Slider Value="{Binding Columns}" Minimum="1" Maximum="20" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,0,15"/>
@@ -145,7 +155,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="{StaticResource CardBackground}" Padding="15,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,1">
+                    <Border Grid.Row="0" Background="{StaticResource CardBackground}" Padding="15,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
                         <Grid>
                             <StackPanel Orientation="Horizontal">
                                 <materialIcons:MaterialIcon Kind="InformationOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Opacity="0.7"/>
