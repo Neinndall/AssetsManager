@@ -160,7 +160,7 @@ namespace AssetsManager
       services.AddSingleton<AudioBankService>();
       services.AddSingleton<AudioBankLinkerService>();
 
-      // Windows, Views, and Dialogs
+      // Views
       services.AddTransient<MainWindow>();
       services.AddTransient<HomeWindow>();
       services.AddTransient<ExplorerWindow>();
@@ -168,26 +168,35 @@ namespace AssetsManager
       services.AddTransient<ModelWindow>();
       services.AddTransient<MonitorWindow>();
       services.AddTransient<HelpWindow>();
-      services.AddTransient<JsonDiffWindow>();
-      services.AddTransient<ImageMergerWindow>();
-      services.AddTransient<NotificationHubWindow>();
       services.AddTransient<SettingsWindow>();
-      services.AddTransient<ProgressDetailsWindow>();
-      services.AddTransient<UpdateProgressWindow>();
-      services.AddTransient<UpdateModeDialog>();
-      services.AddTransient<InputDialog>();
-      services.AddTransient<ConfirmationDialog>();
-
-      // Secondary Views
+            
+      // Views/Controls
       services.AddTransient<LogView>();
+      
+      // Views/Settings
       services.AddTransient<GeneralSettingsView>();
       services.AddTransient<AdvancedSettingsView>();
       services.AddTransient<DefaultPathsSettingsView>();
+      
+      // Views/Help
       services.AddTransient<AboutView>();
       services.AddTransient<DocumentationView>();
       services.AddTransient<BugReportsView>();
       services.AddTransient<ChangelogsView>();
       services.AddTransient<UpdatesView>();
+            
+      // Views/Dialogs/Controls
+      services.AddTransient<JsonDiffWindow>();
+      
+      // Views/Dialogs/
+      services.AddTransient<ImageMergerWindow>();
+      services.AddTransient<NotificationHubWindow>();
+      services.AddTransient<ProgressDetailsWindow>();
+      services.AddTransient<UpdateProgressWindow>();
+      services.AddTransient<UpdateModeDialog>();
+      services.AddTransient<InputDialog>();
+      services.AddTransient<ConfirmationDialog>();
+      services.AddTransient<WadComparisonResultWindow>();
     }
 
     protected override void OnStartup(StartupEventArgs e)
