@@ -96,19 +96,23 @@ public class ManifestDownloader
 
         await Task.Run(async () =>
         {
-            // Hilos usados para verificacion: 2 (óptimo para I/O de disco)
+            // Hilos usados para verificacion: 2 (equilibrio óptimo para SSDs modernos)
             var scanSemaphore = new SemaphoreSlim(2);
+            var pool = System.Buffers.ArrayPool<byte>.Shared;
+
             var scanTasks = filteredFiles.Select(async file =>
             {
                 await scanSemaphore.WaitAsync();
                 try 
                 {
                     var fullPath = Path.Combine(outputPath, file.Name.Replace("/", Path.DirectorySeparatorChar.ToString()));
-                    bool fileExists = File.Exists(fullPath);
+                    var fileInfo = new FileInfo(fullPath);
+                    bool fileExists = fileInfo.Exists;
                     var chunksByBundle = new Dictionary<ulong, List<ChunkDownloadTask>>();
                     ulong currentFileOffset = 0;
+                    ulong currentFileLength = fileExists ? (ulong)fileInfo.Length : 0;
 
-                    if (!fileExists || (ulong)new FileInfo(fullPath).Length < file.FileSize)
+                    if (!fileExists || currentFileLength < file.FileSize)
                     {
                         foreach (var chunkId in file.ChunkIds)
                         {
@@ -123,28 +127,30 @@ public class ManifestDownloader
                     }
                     else
                     {
-                        using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 256 * 1024))
+                        using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 256 * 1024, FileOptions.SequentialScan | FileOptions.Asynchronous))
                         {
                             foreach (var chunkId in file.ChunkIds)
                             {
                                 var chunk = manifest.GetChunk(chunkId);
                                 if (chunk == null) continue;
                                 bool needsUpdate = true;
-                                if ((ulong)fs.Length >= currentFileOffset + chunk.UncompressedSize)
+                                if (currentFileLength >= currentFileOffset + chunk.UncompressedSize)
                                 {
-                                    var localData = new byte[chunk.UncompressedSize];
-                                    fs.Position = (long)currentFileOffset;
-                                    
-                                    int totalRead = 0;
-                                    while (totalRead < (int)chunk.UncompressedSize)
+                                    byte[] localData = pool.Rent((int)chunk.UncompressedSize);
+                                    try
                                     {
-                                        int read = await fs.ReadAsync(localData, totalRead, (int)chunk.UncompressedSize - totalRead);
-                                        if (read == 0) break;
-                                        totalRead += read;
+                                        int totalRead = 0;
+                                        while (totalRead < (int)chunk.UncompressedSize)
+                                        {
+                                            int read = await fs.ReadAsync(localData, totalRead, (int)chunk.UncompressedSize - totalRead);
+                                            if (read == 0) break;
+                                            totalRead += read;
+                                        }
+                                        
+                                        if (totalRead == (int)chunk.UncompressedSize && _hashService.VerifyChunk(localData.AsSpan(0, totalRead), chunk.ChunkId, file.HashType)) 
+                                            needsUpdate = false;
                                     }
-                                    
-                                    if (totalRead == (int)chunk.UncompressedSize && _hashService.VerifyChunk(localData, chunk.ChunkId, file.HashType)) 
-                                        needsUpdate = false;
+                                    finally { pool.Return(localData); }
                                 }
                                 if (needsUpdate)
                                 {
