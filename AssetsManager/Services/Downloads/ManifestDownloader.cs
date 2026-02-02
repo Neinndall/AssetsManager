@@ -174,8 +174,11 @@ public class ManifestDownloader
 
         var globalStopwatch = System.Diagnostics.Stopwatch.StartNew();
         long totalBytesDownloaded = 0;
+        long lastLoggedBytes = 0;
         int completedFilesCount = 0;
         int totalFilesToPatch = filesToPatch.Count;
+        int activeThreads = 0;
+        var lastLogTime = DateTime.Now;
 
         // Atomic dictionary for thread-safe progress tracking
         var pendingChunksPerFile = new ConcurrentDictionary<string, int>(filesToPatch.ToDictionary(f => f.FullPath, f => f.ChunksByBundle.Values.Sum(l => l.Count)));
@@ -184,31 +187,57 @@ public class ManifestDownloader
 
         try
         {
-            // Limitamos a maxThreads (8) las peticiones simultáneas de red
-            var networkSemaphore = new SemaphoreSlim(maxThreads);
+            // Limitamos las peticiones de red (16)
+            var networkSemaphore = new SemaphoreSlim(16);
+            // Limitamos estrictamente el procesado de CPU (Threads 4)
+            var cpuSemaphore = new SemaphoreSlim(4);
+
             var bundleTasks = allChunksByBundle.Select(async bundleGroup =>
             {
                 await networkSemaphore.WaitAsync();
                 try
                 {
-                    using (var decompressor = new Decompressor())
+                    // Una vez descargado (o para descargar), esperamos turno de CPU
+                    await cpuSemaphore.WaitAsync();
+                    Interlocked.Increment(ref activeThreads);
+                    try
                     {
-                        long bytes = await DownloadAndPatchBundleGroupAsync(bundleGroup.Key, bundleGroup.Value, decompressor, openHandles, (fileId) =>
+                        // Monitor dinámico cada 3 segundos
+                        if ((DateTime.Now - lastLogTime).TotalSeconds >= 3)
                         {
-                            int remaining = pendingChunksPerFile.AddOrUpdate(fileId, 0, (key, oldVal) => oldVal - 1);
-                            if (remaining == 0)
+                            lastLogTime = DateTime.Now;
+                            long currentTotal = Interlocked.Read(ref totalBytesDownloaded);
+                            double diffMB = (currentTotal - lastLoggedBytes) / 1024.0 / 1024.0;
+                            lastLoggedBytes = currentTotal;
+                            _logService.Log($"[Monitor] Active CPU Threads: {activeThreads} | Speed: {diffMB / 3.0:F2} MB/s | Patched: {completedFilesCount}/{totalFilesToPatch} files");
+                        }
+
+                        using (var decompressor = new Decompressor())
+                        {
+                            long bytes = await DownloadAndPatchBundleGroupAsync(bundleGroup.Key, bundleGroup.Value, decompressor, openHandles, (fileId) =>
                             {
-                                int done = Interlocked.Increment(ref completedFilesCount);
-                                ProgressChanged?.Invoke("Updating", Path.GetFileName(fileId), done, totalFilesToPatch);
-                                
-                                if (openHandles.TryRemove(fileId, out var handle)) handle.Dispose();
-                            }
-                        });
-                        Interlocked.Add(ref totalBytesDownloaded, bytes);
+                                int remaining = pendingChunksPerFile.AddOrUpdate(fileId, 0, (key, oldVal) => oldVal - 1);
+                                if (remaining == 0)
+                                {
+                                    int done = Interlocked.Increment(ref completedFilesCount);
+                                    ProgressChanged?.Invoke("Updating", Path.GetFileName(fileId), done, totalFilesToPatch);
+                                    if (openHandles.TryRemove(fileId, out var handle)) handle.Dispose();
+                                }
+                            });
+                            Interlocked.Add(ref totalBytesDownloaded, bytes);
+                        }
+                    }
+                    finally 
+                    { 
+                        Interlocked.Decrement(ref activeThreads);
+                        cpuSemaphore.Release(); 
                     }
                 }
                 catch (Exception ex) { _logService.LogWarning($"Bundle {bundleGroup.Key:X16} error: {ex.Message}"); }
-                finally { networkSemaphore.Release(); }
+                finally 
+                { 
+                    networkSemaphore.Release(); 
+                }
             });
 
             await Task.WhenAll(bundleTasks);

@@ -100,7 +100,7 @@ namespace AssetsManager.Services.Monitor
                     var manifestBytes = await _httpClient.GetByteArrayAsync(url);
                     var manifest = _rmanService.Parse(manifestBytes);
 
-                    await _manifestDownloader.DownloadManifestAsync(manifest, tempDir, 8, "LeagueClient.exe");
+                    await _manifestDownloader.DownloadManifestAsync(manifest, tempDir, 16, "LeagueClient.exe");
 
                     string exePath = Path.Combine(tempDir, "LeagueClient.exe");
                     if (File.Exists(exePath))
@@ -155,7 +155,7 @@ namespace AssetsManager.Services.Monitor
                 var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl);
                 var manifest = _rmanService.Parse(manifestBytes);
 
-                int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, 8, null, locales);
+                int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, 16, null, locales);
 
                 if (updatedCount > 0)
                 {
