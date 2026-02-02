@@ -2,9 +2,9 @@ using System.Windows.Controls;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
-    public partial class DetailsTabView : UserControl
+    public partial class DetailsTabControl : UserControl
     {
-        public DetailsTabView()
+        public DetailsTabControl()
         {
             InitializeComponent();
         }

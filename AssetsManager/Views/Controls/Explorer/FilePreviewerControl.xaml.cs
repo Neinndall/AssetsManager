@@ -242,7 +242,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 );
 
                 Breadcrumbs.NodeClicked += Breadcrumbs_NodeClicked;
-                FileGridView.NodeClicked += FileGridView_NodeClicked;
+                FileGridControl.NodeClicked += FileGridControl_NodeClicked;
                 UpdateScrollButtonsVisibility();
 
                 _isLoaded = true;
@@ -267,7 +267,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
                 
                 Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
-                FileGridView.NodeClicked -= FileGridView_NodeClicked;
+                FileGridControl.NodeClicked -= FileGridControl_NodeClicked;
             }
             catch (Exception ex)
             {
@@ -343,7 +343,7 @@ namespace AssetsManager.Views.Controls.Explorer
                         : node.Children)
                     .Select(n => new FileGridViewModel(n)));
 
-                FileGridView.ItemsSource = gridItems;
+                FileGridControl.ItemsSource = gridItems;
 
                 if (!ViewModel.IsGridMode)
                 {
@@ -383,7 +383,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private void FileGridView_NodeClicked(object sender, NodeClickedEventArgs e)
+        private void FileGridControl_NodeClicked(object sender, NodeClickedEventArgs e)
         {
             BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(e.Node));
         }
