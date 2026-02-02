@@ -32,7 +32,8 @@ namespace AssetsManager.Views
             WadSavingService wadSavingService,
             HashResolverService hashResolverService,
             TaskCancellationManager taskCancellationManager,
-            FavoritesManager favoritesManager
+            FavoritesManager favoritesManager,
+            ImageMergerService imageMergerService
         )
         {
             InitializeComponent();
@@ -53,6 +54,7 @@ namespace AssetsManager.Views
             FileExplorer.HashResolverService = hashResolverService;
             FileExplorer.TaskCancellationManager = taskCancellationManager; // Added this line
             FileExplorer.FavoritesManager = favoritesManager;
+            FileExplorer.ImageMergerService = imageMergerService;
 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;

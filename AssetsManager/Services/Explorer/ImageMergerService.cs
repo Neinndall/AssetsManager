@@ -4,19 +4,21 @@ using System.Windows;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Dialogs;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AssetsManager.Services.Explorer
 {
     public class ImageMergerService
     {
-        private static ImageMergerService _instance;
-        public static ImageMergerService Instance => _instance ?? (_instance = new ImageMergerService());
+        private readonly IServiceProvider _serviceProvider;
+        private ImageMergerWindow _activeWindow;
 
         public ObservableCollection<ImageMergerItem> Items { get; } = new ObservableCollection<ImageMergerItem>();
 
-        private ImageMergerWindow _activeWindow;
-
-        private ImageMergerService() { }
+        public ImageMergerService(IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider;
+        }
 
         public void AddItem(ImageMergerItem item)
         {
@@ -38,7 +40,7 @@ namespace AssetsManager.Services.Explorer
                 return;
             }
 
-            _activeWindow = new ImageMergerWindow();
+            _activeWindow = _serviceProvider.GetRequiredService<ImageMergerWindow>();
             _activeWindow.Owner = Application.Current.MainWindow;
             _activeWindow.Show();
         }

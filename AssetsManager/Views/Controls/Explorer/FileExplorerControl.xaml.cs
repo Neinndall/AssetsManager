@@ -55,6 +55,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
         public HashResolverService HashResolverService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
+        public ImageMergerService ImageMergerService { get; set; }
 
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
@@ -103,6 +104,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.FavoritesVisibilityChanged -= Toolbar_FavoritesVisibilityChanged;
                 Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
                 Toolbar.ViewModeChanged -= Toolbar_ViewModeChanged;
+                Toolbar.ImageMergerClicked -= Toolbar_ImageMergerClicked;
             }
 
             // 3. Desuscribir eventos propios
@@ -177,6 +179,7 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.FavoritesVisibilityChanged += Toolbar_FavoritesVisibilityChanged;
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
             Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
+            Toolbar.ImageMergerClicked += Toolbar_ImageMergerClicked;
 
             Toolbar.SetWadMode(_viewModel.IsWadMode);
             
@@ -239,6 +242,11 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 await BuildTreeFromBackupAsync(_backupJsonPath);
             }
+        }
+
+        private void Toolbar_ImageMergerClicked(object sender, RoutedEventArgs e)
+        {
+            ImageMergerService.ShowWindow();
         }
 
         public async Task ReloadTreeAsync()
@@ -769,7 +777,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 if (bitmap != null)
                 {
-                    ImageMergerService.Instance.AddItem(new ImageMergerItem
+                    ImageMergerService.AddItem(new ImageMergerItem
                     {
                         Name = selectedNode.Name,
                         Path = selectedNode.FullPath ?? selectedNode.Name,

@@ -101,4 +101,52 @@
             <Setter Property="ItemContainerStyle" Value="{StaticResource ListBoxItemStyle}"/>
         </Style>
 
+    <!-- ESTILO MAESTRO PARA TARJETAS SELECCIONABLES (Usado en Models, Animations e Image Merger) -->
+    <Style x:Key="ModernSelectableCardItemStyle" TargetType="ListBoxItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid x:Name="RootGrid" SnapsToDevicePixels="True">
+                        <!-- 1. Background Layer -->
+                        <Border x:Name="BackgroundBorder" Background="{StaticResource CardBackground}" CornerRadius="8"/>
+
+                        <!-- 2. Content Layer -->
+                        <Grid Margin="1">
+                            <Grid Margin="12,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter Grid.Column="0" />
+                                <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="1" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="8,0,0,0" Visibility="Hidden"/>
+                            </Grid>
+                        </Grid>
+
+                        <!-- 3. Border Overlay -->
+                        <Border x:Name="SelectionBorder" 
+                                BorderBrush="{StaticResource BorderColor}" 
+                                BorderThickness="1" 
+                                CornerRadius="8" 
+                                IsHitTestVisible="False"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
