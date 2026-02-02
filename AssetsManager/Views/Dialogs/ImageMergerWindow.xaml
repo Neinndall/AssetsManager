@@ -7,10 +7,12 @@
         mc:Ignorable="d"
         Title="Image Merger" Height="700" Width="1100"
         WindowStartupLocation="CenterOwner"
-        Background="{StaticResource CardBackground}"
+        Background="Transparent"
         Foreground="{StaticResource TextPrimary}"
         WindowStyle="None"
-        AllowsTransparency="True">
+        AllowsTransparency="True"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
 
     <Window.Resources>
         <ResourceDictionary>
@@ -20,58 +22,14 @@
                 <ResourceDictionary Source="/Themes/ModernProgressBar.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-
-            <!-- Official ListBoxItem Style (From ModelPanelControl) -->
-            <Style x:Key="MergerListBoxItemStyle" TargetType="ListBoxItem">
-                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                <Setter Property="Background" Value="Transparent"/>
-                <Setter Property="Padding" Value="0"/>
-                <Setter Property="Margin" Value="0,0,0,8"/>
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="ListBoxItem">
-                            <Grid x:Name="RootGrid" SnapsToDevicePixels="True">
-                                <!-- 1. Background Layer -->
-                                <Border x:Name="BackgroundBorder" Background="{StaticResource CardBackground}" CornerRadius="8"/>
-
-                                <!-- 2. Content Layer -->
-                                <Grid Margin="1">
-                                    <Grid Margin="12,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <ContentPresenter Grid.Column="0" />
-                                        <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="1" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="8,0,0,0" Visibility="Hidden"/>
-                                    </Grid>
-                                </Grid>
-
-                                <!-- 3. Border Overlay -->
-                                <Border x:Name="SelectionBorder" 
-                                        BorderBrush="{StaticResource BorderColor}" 
-                                        BorderThickness="1" 
-                                        CornerRadius="8" 
-                                        IsHitTestVisible="False"/>
-                            </Grid>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                    <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
-                                    <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                    <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
-                                </Trigger>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
-    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="12" Background="{StaticResource CardBackground}">
+    <Border BorderBrush="{StaticResource BorderColor}" 
+            BorderThickness="1" 
+            CornerRadius="12" 
+            Background="{StaticResource CardBackground}"
+            Margin="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="40"/>
@@ -132,7 +90,7 @@
                                  ItemsSource="{Binding Items}" 
                                  Background="Transparent" BorderThickness="0"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 ItemContainerStyle="{StaticResource MergerListBoxItemStyle}">
+                                 ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid>
@@ -196,7 +154,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="{StaticResource CardBackground}" Padding="15,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                    <Border Grid.Row="0" Background="{StaticResource CardBackground}" Padding="15,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,1">
                         <Grid>
                             <StackPanel Orientation="Horizontal">
                                 <materialIcons:MaterialIcon Kind="InformationOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Opacity="0.7"/>

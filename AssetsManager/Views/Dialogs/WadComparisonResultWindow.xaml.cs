@@ -1,12 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using AssetsManager.Services.Comparator;
-using AssetsManager.Views.Models.Dialogs;
-using AssetsManager.Views.Models.Wad;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Services;
-using AssetsManager.Services.Core;
-using AssetsManager.Utils;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,6 +15,13 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Views.Models.Dialogs;
+using AssetsManager.Views.Models.Wad;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Services;
+using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Views.Dialogs

@@ -122,6 +122,7 @@ namespace AssetsManager
       services.AddTransient<TreeBuilderService>();
       services.AddTransient<TreeUIManager>();
       services.AddSingleton<FavoritesManager>();
+      services.AddSingleton<ImageMergerService>();
     
       // Downloads Services
       services.AddSingleton<AssetDownloader>();
@@ -170,6 +171,7 @@ namespace AssetsManager
       services.AddTransient<MonitorWindow>();
       services.AddTransient<HelpWindow>();
       services.AddTransient<JsonDiffWindow>();
+      services.AddTransient<ImageMergerWindow>();
       services.AddTransient<NotificationHubWindow>();
       services.AddTransient<SettingsWindow>();
       services.AddTransient<ProgressDetailsWindow>();

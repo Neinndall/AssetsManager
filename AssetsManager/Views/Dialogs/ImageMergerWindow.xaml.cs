@@ -10,23 +10,30 @@ using System.Threading.Tasks;
 using System.IO;
 using AssetsManager.Services.Explorer;
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class ImageMergerWindow : Window
     {
         public ImageMergerModel ViewModel { get; set; }
+        private readonly CustomMessageBoxService _customMessageBox;
+        private readonly ImageMergerService _imageMergerService;
 
-        public ImageMergerWindow()
+        public ImageMergerWindow(CustomMessageBoxService customMessageBoxService, ImageMergerService imageMergerService)
         {
             InitializeComponent();
-            ViewModel = new ImageMergerModel();
+            _customMessageBox = customMessageBoxService;
+            _imageMergerService = imageMergerService;
+            
+            ViewModel = new ImageMergerModel(_imageMergerService.Items);
             this.DataContext = ViewModel;
 
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
             
             // Suscribirse a la colección del servicio directamente para asegurar que los cambios se detecten siempre
-            ImageMergerService.Instance.Items.CollectionChanged += (s, e) => RequestRender();
+            _imageMergerService.Items.CollectionChanged += (s, e) => RequestRender();
             
             RequestRender();
         }
@@ -154,7 +161,7 @@ namespace AssetsManager.Views.Dialogs
 
                         if (bitmap != null)
                         {
-                            ImageMergerService.Instance.Items.Add(new ImageMergerItem
+                            _imageMergerService.Items.Add(new ImageMergerItem
                             {
                                 Name = System.IO.Path.GetFileName(filePath),
                                 Path = filePath,
@@ -169,7 +176,7 @@ namespace AssetsManager.Views.Dialogs
 
         private void ClearAll_Click(object sender, RoutedEventArgs e)
         {
-            ImageMergerService.Instance.Clear();
+            _imageMergerService.Clear();
         }
 
         private void MoveUp_Click(object sender, RoutedEventArgs e)
@@ -180,7 +187,7 @@ namespace AssetsManager.Views.Dialogs
             int index = ViewModel.Items.IndexOf(item);
             if (index > 0)
             {
-                ImageMergerService.Instance.Items.Move(index, index - 1);
+                _imageMergerService.Items.Move(index, index - 1);
             }
         }
 
@@ -192,7 +199,7 @@ namespace AssetsManager.Views.Dialogs
             int index = ViewModel.Items.IndexOf(item);
             if (index < ViewModel.Items.Count - 1)
             {
-                ImageMergerService.Instance.Items.Move(index, index + 1);
+                _imageMergerService.Items.Move(index, index + 1);
             }
         }
 
@@ -201,7 +208,7 @@ namespace AssetsManager.Views.Dialogs
             var item = (sender as Button)?.Tag as ImageMergerItem;
             if (item != null)
             {
-                ImageMergerService.Instance.Items.Remove(item);
+                _imageMergerService.Items.Remove(item);
             }
         }
 
@@ -225,11 +232,11 @@ namespace AssetsManager.Views.Dialogs
                         encoder.Frames.Add(BitmapFrame.Create(ViewModel.PreviewImage));
                         encoder.Save(fileStream);
                     }
-                    MessageBox.Show("Image exported successfully!", "Export", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _customMessageBox.ShowSuccess("Success", "Image exported successfully!", this);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to export image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _customMessageBox.ShowError("Error", $"Failed to export image: {ex.Message}", this);
                 }
             }
         }

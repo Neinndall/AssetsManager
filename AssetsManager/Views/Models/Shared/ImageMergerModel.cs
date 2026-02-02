@@ -51,8 +51,13 @@ namespace AssetsManager.Views.Models.Shared
         private BitmapSource _previewImage;
         private bool _isProcessing;
 
-        // Utilizamos la instancia del servicio para que la lista sea persistente durante la sesión
-        public ObservableCollection<ImageMergerItem> Items => ImageMergerService.Instance.Items;
+        // La colección se pasa ahora por el constructor
+        public ObservableCollection<ImageMergerItem> Items { get; }
+
+        public ImageMergerModel(ObservableCollection<ImageMergerItem> items)
+        {
+            Items = items;
+        }
 
         public int Columns
         {
