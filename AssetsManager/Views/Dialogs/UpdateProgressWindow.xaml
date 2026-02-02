@@ -9,7 +9,9 @@
         ResizeMode="NoResize" WindowStyle="None"
         AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen"
-        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+        TextOptions.TextFormattingMode="Display" 
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
 
     <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="12">
         <Border.Effect>

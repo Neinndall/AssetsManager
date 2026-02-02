@@ -13,7 +13,9 @@
         Background="Transparent"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
-        FontFamily="{StaticResource AppFontFamily}">
+        FontFamily="{StaticResource AppFontFamily}"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
 
     <Window.Resources>
         <!-- DataTemplate for Notifications -->

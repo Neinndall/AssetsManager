@@ -7,7 +7,9 @@
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Difference Viewer" Height="900" Width="1400" MinHeight="900" MinWidth="1400"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
     <Grid>
         <controls:JsonDiffControl x:Name="JsonDiffControl"/>
     </Grid>

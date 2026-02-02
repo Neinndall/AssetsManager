@@ -10,7 +10,9 @@
         SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True"
         WindowStartupLocation="CenterOwner"
-        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+        TextOptions.TextFormattingMode="Display" 
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
         
     <Border Background="{StaticResource CardBackground}"
             BorderBrush="{StaticResource BorderColor}"

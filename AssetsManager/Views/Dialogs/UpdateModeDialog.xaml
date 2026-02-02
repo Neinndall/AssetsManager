@@ -8,7 +8,9 @@
         Title="Update Mode" Height="Auto" Width="540"
         SizeToContent="Height" WindowStyle="None" AllowsTransparency="True"
         WindowStartupLocation="CenterOwner" Background="Transparent"
-        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+        TextOptions.TextFormattingMode="Display" 
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
         
     <Border CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Background="{StaticResource CardBackground}" Margin="12">
         <Border.Effect>
