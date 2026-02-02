@@ -37,21 +37,23 @@
             </Grid.RowDefinitions>
 
             <!-- Title Bar -->
-            <Grid Grid.Row="0" Background="{StaticResource SidebarBackground}" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
-                    <materialIcons:MaterialIcon Kind="ViewGridPlus" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
-                    <TextBlock Text="Image Merger" Margin="10,0,0,0" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-                </StackPanel>
+            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="11,11,0,0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
+                        <materialIcons:MaterialIcon Kind="ViewGridPlus" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                        <TextBlock Text="Image Merger" Margin="10,0,0,0" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+                    </StackPanel>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="5,0">
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click">
-                        <materialIcons:MaterialIcon Kind="Minus" Width="18" Height="18"/>
-                    </Button>
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click">
-                        <materialIcons:MaterialIcon Kind="Close" Width="18" Height="18"/>
-                    </Button>
-                </StackPanel>
-            </Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="5,0">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click">
+                            <materialIcons:MaterialIcon Kind="Minus" Width="18" Height="18"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click">
+                            <materialIcons:MaterialIcon Kind="Close" Width="18" Height="18"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
@@ -60,7 +62,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Left Panel: Management -->
-                <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0">
+                <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0" CornerRadius="0,0,0,11">
                     <Grid Margin="15">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -169,38 +171,40 @@
                     </Border>
 
                     <!-- Preview Area -->
-                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="{StaticResource SidebarBackground}">
-                        <Grid Margin="40">
-                            <Image Source="{Binding PreviewImage}" Stretch="None" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <Image.LayoutTransform>
-                                    <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}"/>
-                                </Image.LayoutTransform>
-                                <Image.Effect>
-                                    <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.5"/>
-                                </Image.Effect>
-                            </Image>
-                            
-                            <!-- Subtle Loading Indicator (Bottom Left) -->
-                            <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" 
-                                    Margin="20" Padding="12,8"
-                                    Background="{StaticResource CardBackground}" 
-                                    CornerRadius="20"
-                                    Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityConverter}}"
-                                    Opacity="0.9">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.3"/>
-                                </Border.Effect>
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="Sync" Width="16" Height="16" 
-                                                                Foreground="{StaticResource AccentBrush}"
-                                                                Style="{StaticResource SpinningIconStyle}"/>
-                                    <TextBlock Text="Updating preview..." Margin="8,0,0,0" 
-                                               VerticalAlignment="Center" FontSize="11" 
-                                               FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </ScrollViewer>
+                    <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,0">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="Transparent">
+                            <Grid Margin="40">
+                                <Image Source="{Binding PreviewImage}" Stretch="None" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <Image.LayoutTransform>
+                                        <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}"/>
+                                    </Image.LayoutTransform>
+                                    <Image.Effect>
+                                        <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.5"/>
+                                    </Image.Effect>
+                                </Image>
+                                
+                                <!-- Subtle Loading Indicator (Bottom Left) -->
+                                <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" 
+                                        Margin="20" Padding="12,8"
+                                        Background="{StaticResource CardBackground}" 
+                                        CornerRadius="20"
+                                        Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        Opacity="0.9">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.3"/>
+                                    </Border.Effect>
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialIcons:MaterialIcon Kind="Sync" Width="16" Height="16" 
+                                                                    Foreground="{StaticResource AccentBrush}"
+                                                                    Style="{StaticResource SpinningIconStyle}"/>
+                                        <TextBlock Text="Updating preview..." Margin="8,0,0,0" 
+                                                   VerticalAlignment="Center" FontSize="11" 
+                                                   FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </ScrollViewer>
+                    </Border>
                 </Grid>
             </Grid>
         </Grid>
