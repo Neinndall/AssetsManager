@@ -741,53 +741,71 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void AddToImageMerger_Click(object sender, RoutedEventArgs e)
         {
-            if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode) return;
+            var selectedNodes = GetSelectedNodes();
+            if (selectedNodes.Count == 0) return;
 
-            try
+            int addedCount = 0;
+            foreach (var node in selectedNodes)
             {
-                byte[] data = null;
-                if (selectedNode.Type == NodeType.VirtualFile)
-                    data = await WadExtractionService.GetVirtualFileBytesAsync(selectedNode);
-                else if (selectedNode.Type == NodeType.RealFile)
-                    data = await File.ReadAllBytesAsync(selectedNode.FullPath);
-
-                if (data == null) return;
-
-                BitmapSource bitmap = null;
-                if (SupportedFileTypes.Textures.Contains(selectedNode.Extension))
+                // Only process files that are supported images or textures
+                if (!(SupportedFileTypes.Images.Contains(node.Extension) || SupportedFileTypes.Textures.Contains(node.Extension)) ||
+                    !(node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile))
                 {
-                    using (var stream = new MemoryStream(data))
-                    {
-                        bitmap = Utils.TextureUtils.LoadTexture(stream, selectedNode.Extension);
-                    }
-                }
-                else
-                {
-                    using (var stream = new MemoryStream(data))
-                    {
-                        var bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.StreamSource = stream;
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.EndInit();
-                        bmp.Freeze();
-                        bitmap = bmp;
-                    }
+                    continue;
                 }
 
-                if (bitmap != null)
+                try
                 {
-                    ImageMergerService.AddItem(new ImageMergerItem
+                    byte[] data = null;
+                    if (node.Type == NodeType.VirtualFile)
+                        data = await WadExtractionService.GetVirtualFileBytesAsync(node);
+                    else if (node.Type == NodeType.RealFile)
+                        data = await File.ReadAllBytesAsync(node.FullPath);
+
+                    if (data == null) continue;
+
+                    BitmapSource bitmap = null;
+                    if (SupportedFileTypes.Textures.Contains(node.Extension))
                     {
-                        Name = selectedNode.Name,
-                        Path = selectedNode.FullPath ?? selectedNode.Name,
-                        Image = bitmap
-                    });
+                        using (var stream = new MemoryStream(data))
+                        {
+                            bitmap = Utils.TextureUtils.LoadTexture(stream, node.Extension);
+                        }
+                    }
+                    else
+                    {
+                        using (var stream = new MemoryStream(data))
+                        {
+                            var bmp = new BitmapImage();
+                            bmp.BeginInit();
+                            bmp.StreamSource = stream;
+                            bmp.CacheOption = BitmapCacheOption.OnLoad;
+                            bmp.EndInit();
+                            bmp.Freeze();
+                            bitmap = bmp;
+                        }
+                    }
+
+                    if (bitmap != null)
+                    {
+                        ImageMergerService.AddItem(new ImageMergerItem
+                        {
+                            Name = node.Name,
+                            Path = node.FullPath ?? node.Name,
+                            Image = bitmap
+                        });
+                        addedCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, $"Failed to add image '{node.Name}' to merger.");
                 }
             }
-            catch (Exception ex)
+
+            if (addedCount > 1)
             {
-                LogService.LogError(ex, "Failed to add image to merger.");
+                LogService.LogSuccess($"Added {addedCount} images to the Image Merger.");
             }
         }
 
