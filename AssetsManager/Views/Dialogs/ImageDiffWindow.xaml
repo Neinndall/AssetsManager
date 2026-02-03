@@ -6,10 +6,21 @@
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Image Comparison" Height="850" Width="1200"
-        Background="{StaticResource SidebarBackground}"
+        Background="Transparent"
         WindowStartupLocation="CenterScreen"
         SnapsToDevicePixels="True"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="True">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40"  
+                      ResizeBorderThickness="5"
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" 
+                      UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
 
     <Window.Resources>
         <!-- Checkerboard Pattern for transparency visualization -->
@@ -47,86 +58,110 @@
         </Style>
     </Window.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <Border BorderBrush="{StaticResource BorderColor}" 
+            Background="{StaticResource SidebarBackground}"
+            BorderThickness="1" 
+            CornerRadius="12" 
+            Margin="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
+                <RowDefinition Height="Auto"/> <!-- 1: Professional Toolbar Area -->
+                <RowDefinition Height="*"/>    <!-- 2: Main Content Area -->
+            </Grid.RowDefinitions>
 
-        <!-- Header Section -->
-        <Border Grid.Row="0"
-                Background="{StaticResource CardBackground}"
-                BorderThickness="0,0,0,1"
-                BorderBrush="{StaticResource BorderColor}"
-                Padding="24,18">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <!-- 1. Custom Title Bar -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- Icon/Title -->
+                        <ColumnDefinition Width="*"/>    <!-- Spacer (Drag Area) -->
+                        <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
+                    </Grid.ColumnDefinitions>
 
-                <!-- Title & Icon -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                         <icons:MaterialIcon Kind="ImageMultipleOutline" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Image Comparison" 
-                                   FontSize="18" 
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Advanced visual analysis suite" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextSecondary}"
-                                   Margin="0,1,0,0"/>
-                    </StackPanel>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
+                    <icons:MaterialIcon Kind="ImageMultipleOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
+                    <TextBlock Text="Image Comparison" 
+                               FontSize="12" 
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- UNIFIED TOOLBAR AREA -->
-                <Border Grid.Column="1" 
-                        Background="{StaticResource SidebarBackground}"
-                        BorderBrush="{StaticResource BorderColor}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="4,2"
-                        VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        
-                        <!-- MODES SECTION -->
-                        <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}"/>
-                        <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
-                                     IsChecked="True" Checked="Mode_Checked" ToolTip="Side by Side View">
-                            <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
-                        </RadioButton>
-                        <RadioButton x:Name="SliderBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
-                                     Checked="Mode_Checked" ToolTip="Slider Overlay Mode">
-                            <icons:MaterialIcon Kind="Compare" Width="18" Height="18"/>
-                        </RadioButton>
-                        <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
-                                     Checked="Mode_Checked" ToolTip="Onion Skin Mode">
-                            <icons:MaterialIcon Kind="Opacity" Width="18" Height="18"/>
-                        </RadioButton>
-                        <RadioButton x:Name="DiffBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
-                                     Checked="Mode_Checked" ToolTip="Mathematical Difference Map">
-                            <icons:MaterialIcon Kind="Contrast" Width="18" Height="18"/>
-                        </RadioButton>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="40" Height="40">
+                            <icons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Maximize_Click" Width="40" Height="40">
+                            <icons:MaterialIcon Kind="WindowMaximize" Width="16" Height="16"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="40" Height="40" Margin="0,0,2,0">
+                            <icons:MaterialIcon Kind="WindowClose" Width="16" Height="16"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
-                        <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,6" CornerRadius="1"/>
+            <!-- 2. Professional Toolbar Area -->
+            <Border Grid.Row="1" 
+                    Background="{StaticResource CardBackground}" 
+                    BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="0,0,0,1" 
+                    Padding="24,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <!-- MODES SECTION -->
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="ANALYSIS MODES" Style="{StaticResource ToolSectionLabel}"/>
+                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="4,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                                 IsChecked="True" Checked="Mode_Checked" ToolTip="Side by Side View">
+                                        <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
+                                    </RadioButton>
+                                    <RadioButton x:Name="SliderBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                                 Checked="Mode_Checked" ToolTip="Slider Overlay Mode">
+                                        <icons:MaterialIcon Kind="Compare" Width="18" Height="18"/>
+                                    </RadioButton>
+                                    <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                                 Checked="Mode_Checked" ToolTip="Onion Skin Mode">
+                                        <icons:MaterialIcon Kind="Opacity" Width="18" Height="18"/>
+                                    </RadioButton>
+                                    <RadioButton x:Name="DiffBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                                 Checked="Mode_Checked" ToolTip="Mathematical Difference Map">
+                                        <icons:MaterialIcon Kind="Contrast" Width="18" Height="18"/>
+                                    </RadioButton>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <Border Width="1" Height="24" Background="{StaticResource BorderColor}" Margin="12,0"/>
 
                         <!-- VIEW SECTION -->
-                        <TextBlock Text="VIEW" Style="{StaticResource ToolSectionLabel}"/>
-                        <RadioButton x:Name="BgDarkBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
-                                     IsChecked="True" Checked="Background_Checked" ToolTip="Dark Background">
-                            <icons:MaterialIcon Kind="Brightness2" Width="18" Height="18"/>
-                        </RadioButton>
-                        <RadioButton x:Name="BgGridBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
-                                     Checked="Background_Checked" ToolTip="Transparency">
-                            <icons:MaterialIcon Kind="Grid" Width="18" Height="18"/>
-                        </RadioButton>
-                        <RadioButton x:Name="BgLightBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
-                                     Checked="Background_Checked" ToolTip="Light Background">
-                            <icons:MaterialIcon Kind="Brightness5" Width="18" Height="18"/>
-                        </RadioButton>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="VIEWPORT" Style="{StaticResource ToolSectionLabel}"/>
+                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="4,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="BgDarkBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
+                                                 IsChecked="True" Checked="Background_Checked" ToolTip="Dark Background">
+                                        <icons:MaterialIcon Kind="Brightness2" Width="18" Height="18"/>
+                                    </RadioButton>
+                                    <RadioButton x:Name="BgGridBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
+                                                 Checked="Background_Checked" ToolTip="Transparency">
+                                        <icons:MaterialIcon Kind="Grid" Width="18" Height="18"/>
+                                    </RadioButton>
+                                    <RadioButton x:Name="BgLightBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
+                                                 Checked="Background_Checked" ToolTip="Light Background">
+                                        <icons:MaterialIcon Kind="Brightness5" Width="18" Height="18"/>
+                                    </RadioButton>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
 
                         <!-- ADJUST SECTION (Dynamic) -->
                         <StackPanel x:Name="ToolsContainer" Orientation="Horizontal">
@@ -143,262 +178,276 @@
                                     </Style.Triggers>
                                 </Style>
                             </StackPanel.Style>
-                            <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,4" CornerRadius="1"/>
-                            <TextBlock Text="ADJUST" Style="{StaticResource ToolSectionLabel}"/>
                             
-                            <TextBlock Text="OLD" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="8,0,4,0" Opacity="0.8"/>
-                            <Slider x:Name="OverlaySlider" Width="120" Minimum="0" Maximum="100" Value="50" 
-                                    VerticalAlignment="Center" Margin="0"
-                                    ValueChanged="OverlaySlider_ValueChanged"/>
-                            <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="4,0,8,0" Opacity="0.8"/>
-
-                            <TextBlock Text="{Binding Value, ElementName=OverlaySlider, StringFormat={}{0:0}%}" 
-                                       Foreground="{StaticResource AccentBrush}" FontWeight="Bold" VerticalAlignment="Center" FontSize="11" Width="30" Margin="0,0,8,0"/>
+                            <Border Width="1" Height="24" Background="{StaticResource BorderColor}" Margin="12,0"/>
+                            <TextBlock Text="ADJUSTMENT" Style="{StaticResource ToolSectionLabel}"/>
+                            
+                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="OLD" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.8"/>
+                                    <Slider x:Name="OverlaySlider" Width="140" Minimum="0" Maximum="100" Value="50" 
+                                            VerticalAlignment="Center" Margin="0"
+                                            ValueChanged="OverlaySlider_ValueChanged"
+                                            IsMoveToPointEnabled="True"/>
+                                    <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="10,0,10,0" Opacity="0.8"/>
+                                    
+                                    <TextBlock Text="{Binding Value, ElementName=OverlaySlider, StringFormat={}{0:0}%}" 
+                                               Foreground="White" FontSize="10" FontWeight="Bold" Width="28" TextAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </StackPanel>
-                </Border>
-            </Grid>
-        </Border>
 
-        <!-- Main Content Area -->
-        <Grid Grid.Row="1" Margin="24">
-            
-            <!-- MODE 1: Side by Side -->
-            <Grid x:Name="SideBySidePanel" 
-                  Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+                    <!-- Info Tag -->
+                    <Border Grid.Column="1" VerticalAlignment="Center" Background="{StaticResource HoverColor}" CornerRadius="6" Padding="12,6">
+                        <StackPanel Orientation="Horizontal">
+                            <icons:MaterialIcon Kind="InfoOutline" Width="14" Height="14" Foreground="{StaticResource TextSecondary}" Margin="0,0,8,0"/>
+                            <TextBlock Text="Use Mouse Wheel to Zoom • Drag to Pan" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
 
-                <!-- Old Image Card -->
-                <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
+            <!-- Main Content Area -->
+            <Grid Grid.Row="2" Margin="24">
+                
+                <!-- MODE 1: Side by Side -->
+                <Grid x:Name="SideBySidePanel" 
+                      Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-                        <!-- Sub-Header: OLD VERSION -->
-                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
-                            <Border Padding="12,12,12,10">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
+                    <!-- Old Image Card -->
+                    <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                                    <Border Background="#1AFF9100" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
-                                        <icons:MaterialIcon Kind="History" Width="18" Height="18" Foreground="{StaticResource AccentOrange}"/>
-                                    </Border>
+                            <!-- Sub-Header: OLD VERSION -->
+                            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                                <Border Padding="12,12,12,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
 
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="OLD VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>
-                                        <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                </Grid>
+                                        <Border Background="#1AFF9100" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                            <icons:MaterialIcon Kind="History" Width="18" Height="18" Foreground="{StaticResource AccentOrange}"/>
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="OLD VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>
+                                            <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </Border>
-                        </Border>
 
-                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,12,12" Padding="16" x:Name="OldImageBorder" ClipToBounds="True">
-                            <Image x:Name="OldImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
-                                <Image.RenderTransform>
-                                    <TransformGroup>
-                                        <ScaleTransform x:Name="OldScale"/>
-                                        <TranslateTransform x:Name="OldTranslate"/>
-                                    </TransformGroup>
-                                </Image.RenderTransform>
-                            </Image>
-                        </Border>
-                    </Grid>
-                </Border>
-
-                <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext"/>
-
-                <!-- New Image Card -->
-                <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Sub-Header: NEW VERSION -->
-                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
-                            <Border Padding="12,12,12,10">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <Border Background="#1A00E676" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
-                                        <icons:MaterialIcon Kind="FlashOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
-                                    </Border>
-
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="NEW VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>
-                                        <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                </Grid>
+                            <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,12,12" Padding="16" x:Name="OldImageBorder" ClipToBounds="True">
+                                <Image x:Name="OldImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                    <Image.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform x:Name="OldScale"/>
+                                            <TranslateTransform x:Name="OldTranslate"/>
+                                        </TransformGroup>
+                                    </Image.RenderTransform>
+                                </Image>
                             </Border>
-                        </Border>
+                        </Grid>
+                    </Border>
 
-                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,12,12" Padding="16" x:Name="NewImageBorder" ClipToBounds="True">
-                            <Image x:Name="NewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
-                                <Image.RenderTransform>
-                                    <TransformGroup>
-                                        <ScaleTransform x:Name="NewScale"/>
-                                        <TranslateTransform x:Name="NewTranslate"/>
-                                    </TransformGroup>
-                                </Image.RenderTransform>
-                            </Image>
-                        </Border>
-                    </Grid>
-                </Border>
-            </Grid>
+                    <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext"/>
 
-            <!-- MODE 2: Overlay (Slider / Onion Skin / Diff) -->
-            <Grid x:Name="OverlayPanel" 
-                  Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                <Border Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
+                    <!-- New Image Card -->
+                    <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                        <!-- Sub-Header: OVERLAY MODE -->
-                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
-                            <Border Padding="12,12,12,10">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
+                            <!-- Sub-Header: NEW VERSION -->
+                            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                                <Border Padding="12,12,12,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
 
-                                    <Border Background="#1A5C85FF" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
-                                        <icons:MaterialIcon Kind="LayersOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
-                                    </Border>
+                                        <Border Background="#1A00E676" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                            <icons:MaterialIcon Kind="FlashOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
+                                        </Border>
 
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="OVERLAY MODE" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentBrush}" Opacity="0.8"/>
-                                        <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Analysis" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0">
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="NEW VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>
+                                            <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Border>
+
+                            <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,12,12" Padding="16" x:Name="NewImageBorder" ClipToBounds="True">
+                                <Image x:Name="NewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                    <Image.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform x:Name="NewScale"/>
+                                            <TranslateTransform x:Name="NewTranslate"/>
+                                        </TransformGroup>
+                                    </Image.RenderTransform>
+                                </Image>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- MODE 2: Overlay (Slider / Onion Skin / Diff) -->
+                <Grid x:Name="OverlayPanel" 
+                      Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                    <Border Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Sub-Header: OVERLAY MODE -->
+                            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                                <Border Padding="12,12,12,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Background="#1A5C85FF" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                            <icons:MaterialIcon Kind="LayersOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="OVERLAY MODE" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentBrush}" Opacity="0.8"/>
+                                            <TextBlock x:Name="OverlayInfoLabel" Text="Overlay Analysis" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
+                                                                <Setter Property="Text" Value="Slider Overlay View"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
+                                                                <Setter Property="Text" Value="Onion Skin Transparency"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsChecked, ElementName=DiffBtn}" Value="True">
+                                                                <Setter Property="Text" Value="Mathematical Difference Map"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+
+                                        <TextBlock Grid.Column="2" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.6">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                    <Setter Property="Text" Value="OLD vs NEW"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
-                                                            <Setter Property="Text" Value="Slider Overlay View"/>
+                                                            <Setter Property="Text" Value="OLD (Left) | NEW (Right)"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
-                                                            <Setter Property="Text" Value="Onion Skin Transparency"/>
+                                                            <Setter Property="Text" Value="OLD → NEW (Opacity Transition)"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsChecked, ElementName=DiffBtn}" Value="True">
-                                                            <Setter Property="Text" Value="Mathematical Difference Map"/>
+                                                            <Setter Property="Text" Value="OLD ↔ NEW (Diff Map)"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                    </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Border>
 
-                                    <TextBlock Grid.Column="2" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.6">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                                                <Setter Property="Text" Value="OLD vs NEW"/>
+                            <!-- Interactive Image Container -->
+                            <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,12,12" Padding="16" x:Name="ImageContainer" ClipToBounds="True">
+                                <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <!-- Base Image (OLD) -->
+                                    <Image x:Name="OldImageOverlay" Stretch="Uniform" Opacity="1" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                        <Image.RenderTransform>
+                                            <TransformGroup>
+                                                <ScaleTransform x:Name="OldOverlayScale"/>
+                                                <TranslateTransform x:Name="OldOverlayTranslate"/>
+                                            </TransformGroup>
+                                        </Image.RenderTransform>
+                                    </Image>
+                                    
+                                    <!-- Top Image (NEW) -->
+                                    <Image x:Name="NewImageOverlay" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                           Visibility="{Binding IsChecked, ElementName=DiffBtn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                        <Image.Style>
+                                            <Style TargetType="Image">
+                                                <Setter Property="Opacity" Value="1.0"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
-                                                        <Setter Property="Text" Value="OLD (Left) | NEW (Right)"/>
-                                                    </DataTrigger>
                                                     <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
-                                                        <Setter Property="Text" Value="OLD → NEW (Opacity Transition)"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=DiffBtn}" Value="True">
-                                                        <Setter Property="Text" Value="OLD ↔ NEW (Diff Map)"/>
+                                                        <Setter Property="Opacity" Value="{Binding Value, ElementName=OverlaySlider, Converter={StaticResource ValueMultiplierConverter}, ConverterParameter=0.01}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                        </Image.Style>
+                                        <Image.RenderTransform>
+                                            <TransformGroup>
+                                                <ScaleTransform x:Name="NewOverlayScale"/>
+                                                <TranslateTransform x:Name="NewOverlayTranslate"/>
+                                            </TransformGroup>
+                                        </Image.RenderTransform>
+                                        <Image.Clip>
+                                            <RectangleGeometry x:Name="SliderClip" Rect="0,0,9999,9999"/>
+                                        </Image.Clip>
+                                    </Image>
+
+                                    <!-- Difference Map Image (Heatmap) -->
+                                    <Image x:Name="DiffImageOverlay" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                           Visibility="{Binding IsChecked, ElementName=DiffBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <Image.RenderTransform>
+                                            <TransformGroup>
+                                                <ScaleTransform x:Name="DiffOverlayScale"/>
+                                                <TranslateTransform x:Name="DiffOverlayTranslate"/>
+                                            </TransformGroup>
+                                        </Image.RenderTransform>
+                                    </Image>
+
+                                    <!-- Slider Visual Separator Line -->
+                                    <Border x:Name="SliderSeparatorLine" 
+                                            Width="2" 
+                                            Background="{StaticResource AccentBrush}" 
+                                            HorizontalAlignment="Left" 
+                                            VerticalAlignment="Stretch"
+                                            IsHitTestVisible="False"
+                                            Opacity="0.9"
+                                            Visibility="{Binding IsChecked, ElementName=SliderBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="Black" Opacity="0.8"/>
+                                        </Border.Effect>
+                                        <Border.RenderTransform>
+                                            <TransformGroup>
+                                                <TranslateTransform x:Name="SliderOffsetTranslate"/>
+                                                <ScaleTransform x:Name="SliderSeparatorScale"/>
+                                                <TranslateTransform x:Name="SliderSeparatorTranslate"/>
+                                            </TransformGroup>
+                                        </Border.RenderTransform>
+                                    </Border>
                                 </Grid>
                             </Border>
-                        </Border>
-
-                        <!-- Interactive Image Container -->
-                        <Border Grid.Row="1" Style="{StaticResource ImageContainerStyle}" CornerRadius="0,0,12,12" Padding="16" x:Name="ImageContainer" ClipToBounds="True">
-                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <!-- Base Image (OLD) -->
-                                <Image x:Name="OldImageOverlay" Stretch="Uniform" Opacity="1" RenderOptions.BitmapScalingMode="NearestNeighbor">
-                                    <Image.RenderTransform>
-                                        <TransformGroup>
-                                            <ScaleTransform x:Name="OldOverlayScale"/>
-                                            <TranslateTransform x:Name="OldOverlayTranslate"/>
-                                        </TransformGroup>
-                                    </Image.RenderTransform>
-                                </Image>
-                                
-                                <!-- Top Image (NEW) -->
-                                <Image x:Name="NewImageOverlay" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
-                                       Visibility="{Binding IsChecked, ElementName=DiffBtn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                                    <Image.Style>
-                                        <Style TargetType="Image">
-                                            <Setter Property="Opacity" Value="1.0"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
-                                                    <Setter Property="Opacity" Value="{Binding Value, ElementName=OverlaySlider, Converter={StaticResource ValueMultiplierConverter}, ConverterParameter=0.01}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Image.Style>
-                                    <Image.RenderTransform>
-                                        <TransformGroup>
-                                            <ScaleTransform x:Name="NewOverlayScale"/>
-                                            <TranslateTransform x:Name="NewOverlayTranslate"/>
-                                        </TransformGroup>
-                                    </Image.RenderTransform>
-                                    <Image.Clip>
-                                        <RectangleGeometry x:Name="SliderClip" Rect="0,0,9999,9999"/>
-                                    </Image.Clip>
-                                </Image>
-
-                                <!-- Difference Map Image (Heatmap) -->
-                                <Image x:Name="DiffImageOverlay" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
-                                       Visibility="{Binding IsChecked, ElementName=DiffBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Image.RenderTransform>
-                                        <TransformGroup>
-                                            <ScaleTransform x:Name="DiffOverlayScale"/>
-                                            <TranslateTransform x:Name="DiffOverlayTranslate"/>
-                                        </TransformGroup>
-                                    </Image.RenderTransform>
-                                </Image>
-
-                                <!-- Slider Visual Separator Line -->
-                                <Border x:Name="SliderSeparatorLine" 
-                                        Width="2" 
-                                        Background="{StaticResource AccentBrush}" 
-                                        HorizontalAlignment="Left" 
-                                        VerticalAlignment="Stretch"
-                                        IsHitTestVisible="False"
-                                        Opacity="0.9"
-                                        Visibility="{Binding IsChecked, ElementName=SliderBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Border.Effect>
-                                        <DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="Black" Opacity="0.8"/>
-                                    </Border.Effect>
-                                    <Border.RenderTransform>
-                                        <TransformGroup>
-                                            <TranslateTransform x:Name="SliderOffsetTranslate"/>
-                                            <ScaleTransform x:Name="SliderSeparatorScale"/>
-                                            <TranslateTransform x:Name="SliderSeparatorTranslate"/>
-                                        </TransformGroup>
-                                    </Border.RenderTransform>
-                                </Border>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
         </Grid>
-    </Grid>
+    </Border>
 </Window>

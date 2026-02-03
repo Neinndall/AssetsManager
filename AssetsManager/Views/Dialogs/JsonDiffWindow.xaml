@@ -9,8 +9,67 @@
         Title="Difference Viewer" Height="900" Width="1400" MinHeight="900" MinWidth="1400"
         WindowStartupLocation="CenterScreen"
         SnapsToDevicePixels="True"
-        UseLayoutRounding="True">
-    <Grid>
-        <controls:JsonDiffControl x:Name="JsonDiffControl"/>
-    </Grid>
+        UseLayoutRounding="True"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="True"
+        Background="Transparent">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40"  
+                      ResizeBorderThickness="5"
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" 
+                      UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Border BorderBrush="{StaticResource BorderColor}" 
+            Background="{StaticResource SidebarBackground}"
+            BorderThickness="1" 
+            CornerRadius="12" 
+            Margin="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Custom Title Bar -->
+                <RowDefinition Height="*"/>    <!-- Main Content -->
+            </Grid.RowDefinitions>
+
+            <!-- 1. Custom Title Bar -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- Icon/Title -->
+                        <ColumnDefinition Width="*"/>    <!-- Spacer (Drag Area) -->
+                        <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
+                        <icons:MaterialIcon Kind="FileDocumentEditOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
+                        <TextBlock Text="Text Comparison" 
+                                   FontSize="12" 
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="40" Height="40">
+                            <icons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Maximize_Click" Width="40" Height="40">
+                            <icons:MaterialIcon Kind="WindowMaximize" Width="16" Height="16"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="40" Height="40" Margin="0,0,2,0">
+                            <icons:MaterialIcon Kind="WindowClose" Width="16" Height="16"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Main Content Area -->
+            <Grid Grid.Row="1">
+                <controls:JsonDiffControl x:Name="JsonDiffControl"/>
+            </Grid>
+        </Grid>
+    </Border>
 </Window>

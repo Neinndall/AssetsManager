@@ -23,7 +23,7 @@
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <Grid Grid.Row="0" Margin="16,10,16,10" MouseDown="TitleBar_MouseDown" Background="Transparent">
+            <Grid Grid.Row="0" Height="40" Margin="16,0,10,0" MouseDown="TitleBar_MouseDown" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -35,17 +35,17 @@
                                                 Width="16" Height="16" Margin="0,0,10,0"
                                                 VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" 
-                               FontWeight="SemiBold" FontSize="14" 
+                               FontWeight="SemiBold" FontSize="12" 
                                Foreground="{StaticResource TextPrimary}" 
                                VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click">
-                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="12" Height="12"/>
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click" Width="34" Height="40">
+                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
                     </Button>
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="btnCancel_Click" Margin="6,0,0,0">
-                        <materialIcons:MaterialIcon Kind="WindowClose" Width="12" Height="12"/>
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="btnCancel_Click" Width="34" Height="40">
+                        <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
                     </Button>
                 </StackPanel>
             </Grid>

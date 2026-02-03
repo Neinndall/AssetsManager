@@ -5,125 +5,172 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:AssetsManager.Views.Dialogs"
         xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
-        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Comparison Results" Height="800" Width="1400"
-        Background="{StaticResource SidebarBackground}"
+        Background="Transparent"
         WindowStartupLocation="CenterScreen"
         SnapsToDevicePixels="True"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="True">
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40"  
+                      ResizeBorderThickness="5"
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" 
+                      UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
 
-        <!-- Header Section -->
-        <Border Grid.Row="0" 
-                Background="{StaticResource CardBackground}"
-                BorderBrush="{StaticResource BorderColor}"
-                BorderThickness="0,0,0,1"
-                Padding="24,20">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                
-                <!-- Title -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                        <materialIcons:MaterialIcon Kind="Compare" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </Border>
-                    <StackPanel VerticalAlignment="Center">
+    <Border BorderBrush="{StaticResource BorderColor}" 
+            Background="{StaticResource SidebarBackground}"
+            BorderThickness="1" 
+            CornerRadius="12" 
+            Margin="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
+                <RowDefinition Height="Auto"/> <!-- 1: Stats & Actions Toolbar -->
+                <RowDefinition Height="*"/>    <!-- 2: Main Content Area -->
+            </Grid.RowDefinitions>
+
+            <!-- 1. Custom Title Bar -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- Icon/Title -->
+                        <ColumnDefinition Width="*"/>    <!-- Spacer (Drag Area) -->
+                        <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
+                        <icons:MaterialIcon Kind="Compare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
                         <TextBlock Text="Comparison Results" 
-                                   FontSize="20" 
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource TextPrimary}"/>
+                                   FontSize="12" 
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="40" Height="40">
+                            <icons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Maximize_Click" Width="40" Height="40">
+                            <icons:MaterialIcon Kind="WindowMaximize" Width="16" Height="16"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="40" Height="40" Margin="0,0,2,0">
+                            <icons:MaterialIcon Kind="WindowClose" Width="16" Height="16"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 2. Professional Toolbar Area (Stats & Actions) -->
+            <Border Grid.Row="1" 
+                    Background="{StaticResource CardBackground}" 
+                    BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="0,0,0,1" 
+                    Padding="24,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- 0: Summary -->
+                        <ColumnDefinition Width="*"/>    <!-- 1: Stats (Centered) -->
+                        <ColumnDefinition Width="Auto"/> <!-- 2: Actions (Right) -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Summary -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="WAD ANALYSIS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
                         <TextBlock x:Name="summaryTextBlock"
                                    Text="{Binding SummaryText}" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextSecondary}"
-                                   Margin="0,2,0,0"/>
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- Compact Stats Dashboard -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <!-- New Files -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
-                        <Border Background="#1A00E676" CornerRadius="6" Width="28" Height="28" Margin="0,0,8,0">
-                            <materialIcons:MaterialIcon Kind="Plus" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="New:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="CountNewText" Text="{Binding CountNew}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                   FontSize="11" 
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"
+                                   Opacity="0.9"/>
                     </StackPanel>
 
-                    <!-- Modified Files -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
-                        <Border Background="#1AFF9100" CornerRadius="6" Width="28" Height="28" Margin="0,0,8,0">
-                            <materialIcons:MaterialIcon Kind="Pencil" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <!-- Center: Stats Dashboard -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <!-- New -->
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,4" Margin="0,0,8,0">
+                            <StackPanel Orientation="Horizontal">
+                                <icons:MaterialIcon Kind="Plus" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0"/>
+                                <TextBlock Text="NEW:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0" Opacity="0.8"/>
+                                <TextBlock x:Name="CountNewText" Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Border>
-                        <TextBlock Text="Modified:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="CountModifiedText" Text="{Binding CountModified}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+
+                        <!-- Modified -->
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,4" Margin="0,0,8,0">
+                            <StackPanel Orientation="Horizontal">
+                                <icons:MaterialIcon Kind="Pencil" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,8,0"/>
+                                <TextBlock Text="MODIFIED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0" Opacity="0.8"/>
+                                <TextBlock x:Name="CountModifiedText" Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Removed -->
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,4" Margin="0,0,8,0">
+                            <StackPanel Orientation="Horizontal">
+                                <icons:MaterialIcon Kind="Minus" Width="14" Height="14" Foreground="{StaticResource AccentRed}" Margin="0,0,8,0"/>
+                                <TextBlock Text="REMOVED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0" Opacity="0.8"/>
+                                <TextBlock x:Name="CountRemovedText" Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Renamed -->
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,4">
+                            <StackPanel Orientation="Horizontal">
+                                <icons:MaterialIcon Kind="Rename" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0"/>
+                                <TextBlock Text="RENAMED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0" Opacity="0.8"/>
+                                <TextBlock x:Name="CountRenamedText" Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
-                    <!-- Removed Files -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
-                        <Border Background="#1AFF5252" CornerRadius="6" Width="28" Height="28" Margin="0,0,8,0">
-                            <materialIcons:MaterialIcon Kind="Minus" Width="14" Height="14" Foreground="{StaticResource AccentRed}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Removed:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="CountRemovedText" Text="{Binding CountRemoved}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    <!-- Right: Actions -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Border Width="1" Height="24" Background="{StaticResource BorderColor}" Margin="8,0,20,0"/>
+                        
+                        <Button x:Name="reloadHashesButton"
+                                Content="Reload Hashes" 
+                                Style="{StaticResource SecondaryButton}"
+                                Height="30" Padding="12,0"
+                                Margin="0,0,8,0"
+                                Click="ReloadHashesButton_Click"
+                                ToolTip="Reloads hashes from the default application path"/>
+                        <Button x:Name="saveButton"
+                                Content="Save Report" 
+                                Style="{StaticResource PrimaryButton}"
+                                Height="30" Padding="16,0"
+                                Click="SaveButton_Click"
+                                ToolTip="Save the full list of differences to a JSON file"/>
                     </StackPanel>
+                </Grid>
+            </Border>
 
-                    <!-- Renamed Files -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
-                        <Border Background="#1A00D1FF" CornerRadius="6" Width="28" Height="28" Margin="0,0,8,0">
-                            <materialIcons:MaterialIcon Kind="Rename" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Renamed:" FontSize="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="CountRenamedText" Text="{Binding CountRenamed}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </StackPanel>
+            <!-- 3. Main Content Area -->
+            <Grid Grid.Row="2" Margin="24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="3*"/>
+                </Grid.ColumnDefinitions>
+                <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0"
+                                                DataContext="{Binding TreeModel}"
+                                                SelectedItemChanged="ResultsTree_SelectedItemChanged"
+                                                SearchTextChanged="SearchTextBox_TextChanged"
+                                                WadContextMenuOpening="ResultsTree_ContextMenuOpening"
+                                                ViewDifferencesClick="ViewDifferences_Click"/>
                 
-                <!-- Buttons -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="reloadHashesButton"
-                            Content="Reload Hashes" 
-                            Style="{StaticResource SecondaryButton}"
-                            HorizontalContentAlignment="Center"
-                            Margin="0,0,8,0"
-                            Click="ReloadHashesButton_Click"
-                            ToolTip="Reloads hashes from the default application path"/>
-                    <Button x:Name="saveButton"
-                            Content="Save Report" 
-                            Style="{StaticResource PrimaryButton}"
-                            HorizontalContentAlignment="Center"
-                            Click="SaveButton_Click"
-                            ToolTip="Save the full list of differences to a JSON file"/>
-                </StackPanel>
-            </Grid>
-        </Border>
+                <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
 
-        <!-- Main Content -->
-        <Grid Grid.Row="1" Margin="24,24,24,24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="3*"/>
-            </Grid.ColumnDefinitions>
-            <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0"
-                                            DataContext="{Binding TreeModel}"
-                                            SelectedItemChanged="ResultsTree_SelectedItemChanged"
-                                            SearchTextChanged="SearchTextBox_TextChanged"
-                                            WadContextMenuOpening="ResultsTree_ContextMenuOpening"
-                                            ViewDifferencesClick="ViewDifferences_Click"/>
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
-            <controls:WadDiffDetailsControl x:Name="DiffDetails" Grid.Column="2" 
-                                            DataContext="{Binding SelectedDiff}"/>
+                <controls:WadDiffDetailsControl x:Name="DiffDetails" Grid.Column="2" 
+                                                DataContext="{Binding SelectedDiff}"/>
+            </Grid>
         </Grid>
-    </Grid>
+    </Border>
 </Window>

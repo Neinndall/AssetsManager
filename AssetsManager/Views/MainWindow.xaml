@@ -6,110 +6,159 @@
         xmlns:local="clr-namespace:AssetsManager.Views"
         xmlns:controls="clr-namespace:AssetsManager.Views.Controls"
         xmlns:dialogControls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
-        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d"
         Title="AssetsManager"
         Width="1000" Height="850"
         MinWidth="1000" MinHeight="850"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource SidebarBackground}"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="True"
+        Background="Transparent"
         FontFamily="{StaticResource AppFontFamily}">
 
-    <Grid>
-        <!-- Taskbar Icon -->
-        <tb:TaskbarIcon x:Name="TrayIcon"
-                        Visibility="Collapsed"
-                        ToolTipText="AssetsManager"
-                        IconSource="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico"
-                        TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
-            <tb:TaskbarIcon.ContextMenu>
-                <ContextMenu>
-                    <MenuItem Header="Show" Click="MenuItem_Show_Click">
-                        <MenuItem.Icon>
-                            <materialIcons:MaterialIcon Kind="Eye"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    
-                    <MenuItem Header="Exit" Click="MenuItem_Exit_Click">
-                        <MenuItem.Icon>
-                            <materialIcons:MaterialIcon Kind="Power"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                </ContextMenu>
-            </tb:TaskbarIcon.ContextMenu>
-        </tb:TaskbarIcon>
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40" 
+                      ResizeBorderThickness="5" 
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" 
+                      UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
 
-        <!-- Main Layout Grid -->
+    <Border BorderBrush="{StaticResource BorderColor}" 
+            Background="{StaticResource SidebarBackground}"
+            BorderThickness="1" 
+            CornerRadius="12" 
+            Margin="1">
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="SidebarColumn" Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
+                <RowDefinition Height="*"/>    <!-- 1: Main Content Area -->
+            </Grid.RowDefinitions>
 
-            <!-- Sidebar -->
-            <controls:SidebarView x:Name="Sidebar"
-                                  Grid.Column="0"/>
+            <!-- 1. Custom Title Bar -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- App Icon -->
+                        <ColumnDefinition Width="Auto"/> <!-- Title -->
+                        <ColumnDefinition Width="*"/>    <!-- Drag Area -->
+                        <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
+                    </Grid.ColumnDefinitions>
 
-            <!-- Main Content Area, Logger and Status Bar -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/> <!-- GridSplitter -->
-                    <RowDefinition x:Name="LogRowDefinition" Height="175" MinHeight="38"/> <!-- LogView Height -->
-                    <RowDefinition Height="Auto"/> <!-- StatusBar -->
-                </Grid.RowDefinitions>
-                <Border Grid.Row="0"
-                        Background="Transparent"
-                        BorderBrush="{StaticResource BorderColor}"
-                        BorderThickness="0,0,0,1"
-                        Padding="0">
-                    <ContentControl x:Name="MainContentArea"
-                                    Background="Transparent"/>
-                </Border>
+                    <Image Grid.Column="0" Source="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" Width="18" Height="18" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="AssetsManager" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
 
-                <GridSplitter Grid.Row="1"
-                              Height="8" HorizontalAlignment="Stretch"
-                              VerticalAlignment="Center"
-                              Background="Transparent"
-                              Cursor="SizeNS"
-                              ResizeDirection="Rows"
-                              ResizeBehavior="PreviousAndNext">
-                    <GridSplitter.Template>
-                        <ControlTemplate TargetType="GridSplitter">
-                            <Border Background="Transparent" x:Name="RootBorder">
-                                <Border x:Name="Handle" 
-                                        Width="36" Height="4" 
-                                        Background="{StaticResource BorderColor}" 
-                                        CornerRadius="2" 
-                                        VerticalAlignment="Center" 
-                                        HorizontalAlignment="Center"
-                                        Opacity="0.6"/>
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Handle" Property="Background" Value="{StaticResource AccentBrush}"/>
-                                    <Setter TargetName="Handle" Property="Opacity" Value="1"/>
-                                    <Setter TargetName="Handle" Property="Width" Value="48"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </GridSplitter.Template>
-                </GridSplitter>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="40" Height="40">
+                            <icons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Maximize_Click" Width="40" Height="40">
+                            <icons:MaterialIcon Kind="WindowMaximize" Width="16" Height="16"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="40" Height="40" Margin="0,0,2,0">
+                            <icons:MaterialIcon Kind="WindowClose" Width="16" Height="16"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
-                <!-- LogView -->
-                <Border Grid.Row="2"
-                        Background="{StaticResource SidebarBackground}"
-                        BorderBrush="{StaticResource BorderColor}"
-                        BorderThickness="0,1,0,0"
-                        Padding="0">
-                    <controls:LogView x:Name="LogView" 
-                                      StatusText="{Binding ViewModel.StatusText, ElementName=StatusBar}"/>
-                </Border>
+            <!-- Taskbar Icon -->
+            <tb:TaskbarIcon x:Name="TrayIcon"
+                            Visibility="Collapsed"
+                            ToolTipText="AssetsManager"
+                            IconSource="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico"
+                            TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
+                <tb:TaskbarIcon.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Show" Click="MenuItem_Show_Click">
+                            <MenuItem.Icon>
+                                <icons:MaterialIcon Kind="Eye"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        
+                        <MenuItem Header="Exit" Click="MenuItem_Exit_Click">
+                            <MenuItem.Icon>
+                                <icons:MaterialIcon Kind="Power"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </tb:TaskbarIcon.ContextMenu>
+            </tb:TaskbarIcon>
 
-                <!-- MODERN STATUS BAR -->
-                <controls:StatusBarView x:Name="StatusBar" Grid.Row="3"/>
+            <!-- Main Layout Grid -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="SidebarColumn" Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Sidebar -->
+                <controls:SidebarView x:Name="Sidebar"
+                                      Grid.Column="0"/>
+
+                <!-- Main Content Area, Logger and Status Bar -->
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/> <!-- GridSplitter -->
+                        <RowDefinition x:Name="LogRowDefinition" Height="175" MinHeight="38"/> <!-- LogView Height -->
+                        <RowDefinition Height="Auto"/> <!-- StatusBar -->
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0"
+                            Background="Transparent"
+                            BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="0,0,0,1"
+                            Padding="0">
+                        <ContentControl x:Name="MainContentArea"
+                                        Background="Transparent"/>
+                    </Border>
+
+                    <GridSplitter Grid.Row="1"
+                                  Height="8" HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Center"
+                                  Background="Transparent"
+                                  Cursor="SizeNS"
+                                  ResizeDirection="Rows"
+                                  ResizeBehavior="PreviousAndNext">
+                        <GridSplitter.Template>
+                            <ControlTemplate TargetType="GridSplitter">
+                                <Border Background="Transparent" x:Name="RootBorder">
+                                    <Border x:Name="Handle" 
+                                            Width="36" Height="4" 
+                                            Background="{StaticResource BorderColor}" 
+                                            CornerRadius="2" 
+                                            VerticalAlignment="Center" 
+                                            HorizontalAlignment="Center"
+                                            Opacity="0.6"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Handle" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                        <Setter TargetName="Handle" Property="Opacity" Value="1"/>
+                                        <Setter TargetName="Handle" Property="Width" Value="48"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </GridSplitter.Template>
+                    </GridSplitter>
+
+                    <!-- LogView -->
+                    <Border Grid.Row="2"
+                            Background="{StaticResource SidebarBackground}"
+                            BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="0,1,0,0"
+                            CornerRadius="0,0,11,0"
+                            Padding="0">
+                        <controls:LogView x:Name="LogView" 
+                                          StatusText="{Binding ViewModel.StatusText, ElementName=StatusBar}"/>
+                    </Border>
+                    <!-- MODERN STATUS BAR -->
+                    <controls:StatusBarView x:Name="StatusBar" Grid.Row="3"/>
+                </Grid>
             </Grid>
         </Grid>
-    </Grid>
+    </Border>
 </Window>

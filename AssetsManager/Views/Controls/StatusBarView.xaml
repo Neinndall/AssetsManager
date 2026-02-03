@@ -10,7 +10,8 @@
     <Border Background="{StaticResource SidebarBackground}" 
             BorderBrush="{StaticResource BorderColor}" 
             Height="32"
-            Padding="16,0">
+            Padding="16,0"
+            CornerRadius="0,0,11,0">
         <Border.Style>
             <Style TargetType="Border">
                 <Setter Property="Visibility" Value="Visible"/>
