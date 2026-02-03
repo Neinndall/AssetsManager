@@ -12,14 +12,14 @@
         WindowStartupLocation="CenterScreen"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True"
-        WindowStyle="None"
+        WindowStyle="SingleBorderWindow"
         ResizeMode="CanResize"
-        AllowsTransparency="True">
+        AllowsTransparency="False">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="40"  
                       ResizeBorderThickness="5"
-                      GlassFrameThickness="0" 
+                      GlassFrameThickness="1" 
                       CornerRadius="0" 
                       UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
@@ -27,8 +27,8 @@
     <Border BorderBrush="{StaticResource BorderColor}" 
             Background="{StaticResource SidebarBackground}"
             BorderThickness="1" 
-            CornerRadius="12" 
-            Margin="1">
+            CornerRadius="0" 
+            Margin="0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
@@ -37,7 +37,7 @@
             </Grid.RowDefinitions>
 
             <!-- 1. Custom Title Bar -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="Black" Opacity="0.15" Direction="270"/>
                 </Border.Effect>

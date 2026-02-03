@@ -10,14 +10,14 @@
         WindowStartupLocation="CenterScreen"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True"
-        WindowStyle="None"
+        WindowStyle="SingleBorderWindow"
         ResizeMode="CanResize"
-        AllowsTransparency="True">
+        AllowsTransparency="False">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="40"  
                       ResizeBorderThickness="5"
-                      GlassFrameThickness="0" 
+                      GlassFrameThickness="1" 
                       CornerRadius="0" 
                       UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
@@ -61,8 +61,8 @@
     <Border BorderBrush="{StaticResource BorderColor}" 
             Background="{StaticResource SidebarBackground}"
             BorderThickness="1" 
-            CornerRadius="12" 
-            Margin="1">
+            CornerRadius="0" 
+            Margin="0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
@@ -457,7 +457,7 @@
             </Grid>
 
             <!-- 4. Slim Status Bar -->
-            <Border Grid.Row="3" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,6" CornerRadius="0,0,11,11">
+            <Border Grid.Row="3" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,6" CornerRadius="0">
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <icons:MaterialIcon Kind="GestureTap" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
