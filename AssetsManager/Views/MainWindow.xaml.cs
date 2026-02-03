@@ -355,7 +355,7 @@ namespace AssetsManager.Views
                 // If the last height was too small (due to manual resize), use a default height
                 if (!_lastLogHeight.IsAbsolute || _lastLogHeight.Value <= 45)
                 {
-                    _lastLogHeight = new GridLength(185);
+                    _lastLogHeight = new GridLength(180);
                 }
 
                 LogRowDefinition.Height = _lastLogHeight;
@@ -405,9 +405,7 @@ namespace AssetsManager.Views
 
             switch (viewTag)
             {
-                case "Home": 
-                    LoadHomeWindow(); 
-                    break;
+                case "Home": LoadHomeWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Models": LoadModelWindow(); break;

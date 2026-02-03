@@ -104,7 +104,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/> <!-- GridSplitter -->
-                        <RowDefinition x:Name="LogRowDefinition" Height="175" MinHeight="38"/> <!-- LogView Height -->
+                        <RowDefinition x:Name="LogRowDefinition" Height="180" MinHeight="38"/> <!-- LogView Height -->
                         <RowDefinition Height="Auto"/> <!-- StatusBar -->
                     </Grid.RowDefinitions>
                     <Border Grid.Row="0"
