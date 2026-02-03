@@ -405,7 +405,9 @@ namespace AssetsManager.Views
 
             switch (viewTag)
             {
-                case "Home": LoadHomeWindow(); break;
+                case "Home": 
+                    LoadHomeWindow(); 
+                    break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Models": LoadModelWindow(); break;

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views.Models.Home;
 using AssetsManager.Utils;
+using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views
 {
@@ -33,6 +34,13 @@ namespace AssetsManager.Views
             {
                 NavigationRequested?.Invoke(destination);
             }
+        }
+
+        private void Notepad_Click(object sender, RoutedEventArgs e)
+        {
+            var notepadWindow = App.ServiceProvider.GetRequiredService<NotepadWindow>();
+            notepadWindow.Owner = Window.GetWindow(this);
+            notepadWindow.Show();
         }
     }
 }
