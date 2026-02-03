@@ -13,6 +13,7 @@ namespace AssetsManager.Views.Models.Dialogs
     {
         Idle,
         ResolvingHashes,
+        ReloadingHashes,
         Ready
     }
 
@@ -83,6 +84,11 @@ namespace AssetsManager.Views.Models.Dialogs
                     TreeModel.IsBusy = true;
                     TreeModel.LoadingText = "BUILDING TREE & DATA";
                     SummaryText = "Resolving hashes and building result tree...";
+                    break;
+                case ComparisonLoadingState.ReloadingHashes:
+                    TreeModel.IsBusy = true;
+                    TreeModel.LoadingText = "RELOADING HASHES";
+                    SummaryText = "Force reloading hash databases...";
                     break;
                 case ComparisonLoadingState.Ready:
                     TreeModel.IsBusy = false;

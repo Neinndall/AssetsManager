@@ -322,25 +322,31 @@ namespace AssetsManager.Views.Dialogs
         {
             try
             {
-                await _hashResolverService.ForceReloadHashesAsync();
+                _viewModel.SetLoadingState(ComparisonLoadingState.ReloadingHashes);
 
-                foreach (var diff in _serializableDiffs)
+                await Task.Run(async () =>
                 {
-                    if (diff.OldPathHash != 0)
+                    await _hashResolverService.ForceReloadHashesAsync();
+
+                    foreach (var diff in _serializableDiffs)
                     {
-                        diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
+                        if (diff.OldPathHash != 0)
+                        {
+                            diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
+                        }
+                        if (diff.NewPathHash != 0)
+                        {
+                            diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
+                        }
                     }
-                    if (diff.NewPathHash != 0)
-                    {
-                        diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
-                    }
-                }
+                });
 
                 PopulateResults(_serializableDiffs);
                 _customMessageBoxService.ShowSuccess("Success", "Hashes have been reloaded and the result tree has been refreshed.", this);
             }
             catch (Exception ex)
             {
+                _viewModel.SetLoadingState(ComparisonLoadingState.Ready);
                 _customMessageBoxService.ShowError("Error", $"Failed to reload hashes: {ex.Message}", this);
                 _logService.LogError(ex, "Failed to reload hashes.");
             }
