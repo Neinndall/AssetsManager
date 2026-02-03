@@ -257,11 +257,7 @@ namespace AssetsManager.Services.Comparator
                     cancellationToken.ThrowIfCancellationRequested();
 
                     using var decompressedChunk = wadFile.LoadChunkDecompressed(chunk);
-                    // Use Blake3 (Pure C#) for high-performance and secure hashing
-                    var hash = Blake3.Hasher.Hash(decompressedChunk.Span);
-                    
-                    // Convert the first 8 bytes of the hash to ulong for comparison
-                    ulong checksum = BitConverter.ToUInt64(hash.AsSpan().Slice(0, 8));
+                    var checksum = System.IO.Hashing.XxHash64.HashToUInt64(decompressedChunk.Span);
                     checksums[chunk.PathHash] = checksum;
                 }
             });
