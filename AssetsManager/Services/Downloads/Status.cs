@@ -278,7 +278,7 @@ namespace AssetsManager.Services.Downloads
             }
             catch (HttpRequestException httpEx)
             {
-                _logService.LogError(httpEx, $"HTTP request failed for '{STATUS_URL}'.");
+                _logService.LogWarning($"Unable to connect to CommunityDragon. Server might be down or busy. ({httpEx.Message})");
                 return result;
             }
             catch (Exception ex)
