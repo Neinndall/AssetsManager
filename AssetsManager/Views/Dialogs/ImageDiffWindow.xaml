@@ -68,10 +68,14 @@
                 <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
                 <RowDefinition Height="Auto"/> <!-- 1: Professional Toolbar Area -->
                 <RowDefinition Height="*"/>    <!-- 2: Main Content Area -->
+                <RowDefinition Height="Auto"/> <!-- 3: Status Bar -->
             </Grid.RowDefinitions>
 
             <!-- 1. Custom Title Bar -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="Black" Opacity="0.15" Direction="270"/>
+                </Border.Effect>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/> <!-- Icon/Title -->
@@ -79,16 +83,16 @@
                         <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
                     </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
-                    <icons:MaterialIcon Kind="ImageMultipleOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
-                    <TextBlock Text="Image Comparison" 
-                               FontSize="12" 
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
+                        <icons:MaterialIcon Kind="ImageMultipleOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
+                        <TextBlock Text="Image Comparison" 
+                                   FontSize="12" 
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="40" Height="40">
                             <icons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16"/>
                         </Button>
@@ -107,108 +111,113 @@
                     Background="{StaticResource CardBackground}" 
                     BorderBrush="{StaticResource BorderColor}" 
                     BorderThickness="0,0,0,1" 
-                    Padding="24,12">
+                    Padding="24,10">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/> <!-- Status (Left) -->
+                        <ColumnDefinition Width="*"/>    <!-- Spacer -->
+                        <ColumnDefinition Width="Auto"/> <!-- All Tools (Right) -->
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <!-- MODES SECTION -->
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="ANALYSIS MODES" Style="{StaticResource ToolSectionLabel}"/>
-                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="4,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                <StackPanel Orientation="Horizontal">
-                                    <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
-                                                 IsChecked="True" Checked="Mode_Checked" ToolTip="Side by Side View">
-                                        <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
-                                    </RadioButton>
-                                    <RadioButton x:Name="SliderBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
-                                                 Checked="Mode_Checked" ToolTip="Slider Overlay Mode">
-                                        <icons:MaterialIcon Kind="Compare" Width="18" Height="18"/>
-                                    </RadioButton>
-                                    <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
-                                                 Checked="Mode_Checked" ToolTip="Onion Skin Mode">
-                                        <icons:MaterialIcon Kind="Opacity" Width="18" Height="18"/>
-                                    </RadioButton>
-                                    <RadioButton x:Name="DiffBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
-                                                 Checked="Mode_Checked" ToolTip="Mathematical Difference Map">
-                                        <icons:MaterialIcon Kind="Contrast" Width="18" Height="18"/>
-                                    </RadioButton>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                    <!-- Left: Metadata -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="IMAGE ANALYSIS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                        <TextBlock Text="Pixel &amp; Texture Validation" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
+                    </StackPanel>
 
-                        <Border Width="1" Height="24" Background="{StaticResource BorderColor}" Margin="12,0"/>
+                    <!-- Right: Tools Capsules -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
+                        
+                        <!-- MODES CAPSULE -->
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}" Margin="4,0,10,0"/>
+                                <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                             IsChecked="True" Checked="Mode_Checked" ToolTip="Side by Side View" Width="30" Height="30">
+                                    <icons:MaterialIcon Kind="DockWindow" Width="16" Height="16"/>
+                                </RadioButton>
+                                <RadioButton x:Name="SliderBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                             Checked="Mode_Checked" ToolTip="Slider Overlay Mode" Width="30" Height="30">
+                                    <icons:MaterialIcon Kind="Compare" Width="16" Height="16"/>
+                                </RadioButton>
+                                <RadioButton x:Name="OnionSkinBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                             Checked="Mode_Checked" ToolTip="Onion Skin Mode" Width="30" Height="30">
+                                    <icons:MaterialIcon Kind="Opacity" Width="16" Height="16"/>
+                                </RadioButton>
+                                <RadioButton x:Name="DiffBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                             Checked="Mode_Checked" ToolTip="Mathematical Difference Map" Width="30" Height="30">
+                                    <icons:MaterialIcon Kind="Contrast" Width="16" Height="16"/>
+                                </RadioButton>
+                            </StackPanel>
+                        </Border>
 
-                        <!-- VIEW SECTION -->
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="VIEWPORT" Style="{StaticResource ToolSectionLabel}"/>
-                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="4,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                <StackPanel Orientation="Horizontal">
-                                    <RadioButton x:Name="BgDarkBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
-                                                 IsChecked="True" Checked="Background_Checked" ToolTip="Dark Background">
-                                        <icons:MaterialIcon Kind="Brightness2" Width="18" Height="18"/>
-                                    </RadioButton>
-                                    <RadioButton x:Name="BgGridBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
-                                                 Checked="Background_Checked" ToolTip="Transparency">
-                                        <icons:MaterialIcon Kind="Grid" Width="18" Height="18"/>
-                                    </RadioButton>
-                                    <RadioButton x:Name="BgLightBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
-                                                 Checked="Background_Checked" ToolTip="Light Background">
-                                        <icons:MaterialIcon Kind="Brightness5" Width="18" Height="18"/>
-                                    </RadioButton>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                        <!-- VIEW & ADJUST CAPSULE -->
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="VIEW" Style="{StaticResource ToolSectionLabel}" Margin="4,0,10,0"/>
+                                <RadioButton x:Name="BgDarkBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
+                                             IsChecked="True" Checked="Background_Checked" ToolTip="Dark Background" Width="30" Height="30">
+                                    <icons:MaterialIcon Kind="Brightness2" Width="16" Height="16"/>
+                                </RadioButton>
+                                <RadioButton x:Name="BgGridBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
+                                             Checked="Background_Checked" ToolTip="Transparency" Width="30" Height="30">
+                                    <icons:MaterialIcon Kind="Grid" Width="16" Height="16"/>
+                                </RadioButton>
+                                <RadioButton x:Name="BgLightBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="BackgroundMode"
+                                             Checked="Background_Checked" ToolTip="Light Background" Width="30" Height="30">
+                                    <icons:MaterialIcon Kind="Brightness5" Width="16" Height="16"/>
+                                </RadioButton>
 
-                        <!-- ADJUST SECTION (Dynamic) -->
-                        <StackPanel x:Name="ToolsContainer" Orientation="Horizontal">
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </StackPanel.Style>
-                            
-                            <Border Width="1" Height="24" Background="{StaticResource BorderColor}" Margin="12,0"/>
-                            <TextBlock Text="ADJUSTMENT" Style="{StaticResource ToolSectionLabel}"/>
-                            
-                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="OLD" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.8"/>
-                                    <Slider x:Name="OverlaySlider" Width="140" Minimum="0" Maximum="100" Value="50" 
+                                <!-- INTERNAL SEPARATOR -->
+                                <Border x:Name="InternalSeparator" Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="10,0" VerticalAlignment="Center">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                </Border>
+
+                                <!-- ADJUST PART -->
+                                <StackPanel x:Name="ToolsContainer" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <TextBlock Text="ADJUST" Style="{StaticResource ToolSectionLabel}" Margin="0,0,10,0"/>
+                                    <TextBlock Text="OLD" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                    <Slider x:Name="OverlaySlider" Width="120" Minimum="0" Maximum="100" Value="50" 
                                             VerticalAlignment="Center" Margin="0"
                                             ValueChanged="OverlaySlider_ValueChanged"
                                             IsMoveToPointEnabled="True"/>
-                                    <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="10,0,10,0" Opacity="0.8"/>
-                                    
+                                    <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="8,0,8,0" Opacity="0.8"/>
                                     <TextBlock Text="{Binding Value, ElementName=OverlaySlider, StringFormat={}{0:0}%}" 
                                                Foreground="White" FontSize="10" FontWeight="Bold" Width="28" TextAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                                 </StackPanel>
-                            </Border>
-                        </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-
-                    <!-- Info Tag -->
-                    <Border Grid.Column="1" VerticalAlignment="Center" Background="{StaticResource HoverColor}" CornerRadius="6" Padding="12,6">
-                        <StackPanel Orientation="Horizontal">
-                            <icons:MaterialIcon Kind="InfoOutline" Width="14" Height="14" Foreground="{StaticResource TextSecondary}" Margin="0,0,8,0"/>
-                            <TextBlock Text="Use Mouse Wheel to Zoom • Drag to Pan" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
-                        </StackPanel>
-                    </Border>
                 </Grid>
             </Border>
 
-            <!-- Main Content Area -->
+            <!-- 3. Main Content Area -->
             <Grid Grid.Row="2" Margin="24">
                 
                 <!-- MODE 1: Side by Side -->
@@ -448,6 +457,23 @@
                     </Border>
                 </Grid>
             </Grid>
+
+            <!-- 4. Slim Status Bar -->
+            <Border Grid.Row="3" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,6" CornerRadius="0,0,11,11">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <icons:MaterialIcon Kind="GestureTap" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
+                        <TextBlock Text="Wheel: Zoom Centered" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                        
+                        <icons:MaterialIcon Kind="GestureSwipe" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
+                        <TextBlock Text="Drag: Pan Viewport" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="10" Foreground="{StaticResource TextMuted}" Opacity="0.6">
+                        <Run Text="Resolution: "/><Run Text="{Binding Source.PixelWidth, ElementName=NewImage, Mode=OneWay}"/><Run Text="x"/><Run Text="{Binding Source.PixelHeight, ElementName=NewImage, Mode=OneWay}"/>
+                    </TextBlock>
+                </Grid>
+            </Border>
         </Grid>
     </Border>
 </Window>

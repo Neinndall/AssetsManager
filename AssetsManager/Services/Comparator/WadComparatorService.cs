@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using AssetsManager.Services.Hashes;
-using System.IO.Hashing;
 using System.Linq;
 using Serilog;
 using System.Threading; // Added for CancellationToken and OperationCanceledException
@@ -255,10 +254,14 @@ namespace AssetsManager.Services.Comparator
             {
                 foreach (var chunk in chunks)
                 {
-                    cancellationToken.ThrowIfCancellationRequested(); // Check for cancellation in loop
+                    cancellationToken.ThrowIfCancellationRequested();
 
                     using var decompressedChunk = wadFile.LoadChunkDecompressed(chunk);
-                    var checksum = System.IO.Hashing.XxHash64.HashToUInt64(decompressedChunk.Span);
+                    // Use Blake3 (Pure C#) for high-performance and secure hashing
+                    var hash = Blake3.Hasher.Hash(decompressedChunk.Span);
+                    
+                    // Convert the first 8 bytes of the hash to ulong for comparison
+                    ulong checksum = BitConverter.ToUInt64(hash.AsSpan().Slice(0, 8));
                     checksums[chunk.PathHash] = checksum;
                 }
             });

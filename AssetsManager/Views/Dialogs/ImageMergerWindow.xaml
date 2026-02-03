@@ -34,7 +34,10 @@
             </Grid.RowDefinitions>
 
             <!-- 1. Custom Title Bar -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="Black" Opacity="0.15" Direction="270"/>
+                </Border.Effect>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/> <!-- Icon/Title -->

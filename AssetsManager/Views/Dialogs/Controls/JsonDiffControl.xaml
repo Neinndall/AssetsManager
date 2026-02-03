@@ -23,17 +23,24 @@
                 Padding="24,10">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/> <!-- Modes (Left) -->
+                    <ColumnDefinition Width="Auto"/> <!-- Status (Left) -->
                     <ColumnDefinition Width="*"/>    <!-- Spacer -->
-                    <ColumnDefinition Width="Auto"/> <!-- Nav & Tools (Right) -->
+                    <ColumnDefinition Width="Auto"/> <!-- All Tools (Right) -->
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: MODES -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                <!-- Left: Metadata -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="TEXT ANALYSIS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                    <TextBlock Text="Structure &amp; Syntax Analysis" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
+                </StackPanel>
+
+                <!-- Right: Tools Capsules -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    
+                    <!-- MODES CAPSULE -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}" Margin="4,0,10,0"/>
-                            <Border Width="1" Height="16" Background="{StaticResource BorderColor}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                             
                             <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}"
                                          IsChecked="{Binding IsInlineMode, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}" 
@@ -47,16 +54,12 @@
                             </RadioButton>
                         </StackPanel>
                     </Border>
-                </StackPanel>
 
-                <!-- Right: NAV & TOOLS -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    
-                    <!-- NAVIGATION SECTION -->
+                    <!-- NAV & TOOLS CAPSULE -->
                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="NAV" Style="{StaticResource ToolSectionLabel}" Margin="4,0,10,0"/>
-                            <Border Width="1" Height="16" Background="{StaticResource BorderColor}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <!-- NAV PART -->
+                            <TextBlock Text="NAV" Style="{StaticResource ToolSectionLabel}" Margin="4,0,8,0"/>
                             
                             <Button x:Name="PreviousDiffButton" 
                                     Click="PreviousDiffButton_Click" 
@@ -72,16 +75,12 @@
                                     ToolTip="Next Difference">
                                  <icons:MaterialIcon Kind="ChevronDown" Width="18" Height="18"/>
                             </Button>
-                        </StackPanel>
-                    </Border>
 
-                    <Border Width="1" Height="24" Background="{StaticResource BorderColor}" Margin="16,0"/>
+                            <!-- INTERNAL SEPARATOR -->
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="10,0" VerticalAlignment="Center"/>
 
-                    <!-- TOOLS SECTION -->
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="TOOLS" Style="{StaticResource ToolSectionLabel}" Margin="4,0,10,0"/>
-                            <Border Width="1" Height="16" Background="{StaticResource BorderColor}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <!-- TOOLS PART -->
+                            <TextBlock Text="TOOLS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0"/>
                             
                             <ToggleButton x:Name="WordWrapButton"
                                           IsChecked="{Binding IsWordWrapEnabled}"
