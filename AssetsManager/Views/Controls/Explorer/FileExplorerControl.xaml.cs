@@ -56,6 +56,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public HashResolverService HashResolverService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
         public ImageMergerService ImageMergerService { get; set; }
+        public ProgressUIManager ProgressUIManager { get; set; }
 
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
@@ -487,6 +488,28 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private int CountFilesToProcess(IEnumerable<FileSystemNodeModel> nodes)
+        {
+            int count = 0;
+            foreach (var node in nodes)
+            {
+                if (node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile || node.Type == NodeType.WemFile || node.Type == NodeType.SoundBank)
+                {
+                    count++;
+                }
+                else
+                {
+                    // For directories and audio events, we count their loaded children
+                    // Note: This only counts already loaded/expanded children. 
+                    // For unloaded WAD directories, we might need a more complex scan, 
+                    // but since extraction handles loading, we'll estimate or just count top-level for now
+                    // OR better: if it's a directory, we recursively count its children.
+                    count += CountFilesToProcess(node.Children);
+                }
+            }
+            return count;
+        }
+
         private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
         {
             if (WadExtractionService == null)
@@ -525,18 +548,20 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    if (selectedNodes.Count == 1)
-                    {
-                        LogService.Log($"Extracting {selectedNodes[0].Name}...");
-                    }
-                    else
-                    {
-                        LogService.Log($"Extracting {selectedNodes.Count} selected items...");
-                    }
+                    // Calculate total files for accurate progress
+                    int totalFiles = CountFilesToProcess(selectedNodes);
+                    ProgressUIManager?.OnExtractionStarted(this, ("Extracting selected assets...", totalFiles));
 
+                    int processedCount = 0;
                     foreach (var node in selectedNodes)
                     {
-                        await WadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        
+                        await WadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken, (fileName) => 
+                        {
+                            processedCount++;
+                            ProgressUIManager?.OnExtractionProgressChanged(processedCount, totalFiles, fileName);
+                        });
                     }
 
                     if (selectedNodes.Count == 1)
@@ -560,7 +585,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 catch (OperationCanceledException)
                 {
                     LogService.LogWarning("Extraction was cancelled by the user.");
-                    CustomMessageBoxService.ShowInfo("Cancelled", "Extraction was cancelled.", Window.GetWindow(this));
                 }
                 catch (Exception ex)
                 {
@@ -569,6 +593,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 finally
                 {
+                    ProgressUIManager?.OnExtractionCompleted();
                     // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;
@@ -614,22 +639,24 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    if (selectedNodes.Count == 1)
-                    {
-                        LogService.Log($"Processing and saving {selectedNodes[0].Name}...");
-                    }
-                    else
-                    {
-                        LogService.Log($"Processing and saving {selectedNodes.Count} selected items...");
-                    }
+                    int totalFiles = CountFilesToProcess(selectedNodes);
+                    ProgressUIManager?.OnSavingStarted(totalFiles);
 
                     string singleSavedPath = null;
                     string singleDisplayName = null;
 
+                    int processedCount = 0;
                     foreach (var node in selectedNodes)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+
                         var savedFiles = new List<string>();
-                        await WadSavingService.ProcessAndSaveAsync(node, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => savedFiles.Add(path));
+                        await WadSavingService.ProcessAndSaveAsync(node, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => 
+                        {
+                            processedCount++;
+                            ProgressUIManager?.OnSavingProgressChanged(processedCount, totalFiles, Path.GetFileName(path));
+                            savedFiles.Add(path);
+                        });
 
                         if (selectedNodes.Count == 1 && savedFiles.Count > 0)
                         {
@@ -671,7 +698,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 catch (OperationCanceledException)
                 {
                     LogService.LogWarning("Save operation was cancelled by the user.");
-                    CustomMessageBoxService.ShowInfo("Cancelled", "Save operation was cancelled.", Window.GetWindow(this));
                 }
                 catch (Exception ex)
                 {
@@ -680,6 +706,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 finally
                 {
+                    ProgressUIManager?.OnSavingCompleted();
                     // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;

@@ -212,6 +212,20 @@ namespace AssetsManager.Services.Core
 
         public void OnExtractionCompleted() => FinishOperation();
 
+        // --- Saving ---
+
+        public void OnSavingStarted(int totalFiles)
+        {
+            StartOperation("Saving Assets", "Saving", "ContentSave", totalFiles, "Saving assets...");
+        }
+
+        public void OnSavingProgressChanged(int completedFiles, int totalFiles, string currentFile)
+        {
+            UpdateOperation($"Saving: {currentFile}", completedFiles, totalFiles, currentFile);
+        }
+
+        public void OnSavingCompleted() => FinishOperation();
+
         // --- Versions (Update) ---
 
         public void OnVersionDownloadStarted(object sender, string taskName)

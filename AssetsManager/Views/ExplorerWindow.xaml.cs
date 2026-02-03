@@ -33,7 +33,8 @@ namespace AssetsManager.Views
             HashResolverService hashResolverService,
             TaskCancellationManager taskCancellationManager,
             FavoritesManager favoritesManager,
-            ImageMergerService imageMergerService
+            ImageMergerService imageMergerService,
+            ProgressUIManager progressUIManager
         )
         {
             InitializeComponent();
@@ -55,6 +56,7 @@ namespace AssetsManager.Views
             FileExplorer.TaskCancellationManager = taskCancellationManager; // Added this line
             FileExplorer.FavoritesManager = favoritesManager;
             FileExplorer.ImageMergerService = imageMergerService;
+            FileExplorer.ProgressUIManager = progressUIManager;
 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;

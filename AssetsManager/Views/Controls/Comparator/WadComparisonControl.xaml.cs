@@ -164,7 +164,6 @@ namespace AssetsManager.Views.Controls.Comparator
             catch (OperationCanceledException)
             {
                 LogService.LogWarning("WAD comparison was cancelled by the user.");
-                CustomMessageBoxService.ShowInfo("Cancelled", "WAD comparison was cancelled.", Window.GetWindow(this));
             }
             catch (Exception ex)
             {
