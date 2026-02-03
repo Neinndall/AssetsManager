@@ -197,6 +197,7 @@ namespace AssetsManager
       services.AddTransient<InputDialog>();
       services.AddTransient<ConfirmationDialog>();
       services.AddTransient<WadComparisonResultWindow>();
+      services.AddTransient<NotepadWindow>();
     }
 
     protected override void OnStartup(StartupEventArgs e)
