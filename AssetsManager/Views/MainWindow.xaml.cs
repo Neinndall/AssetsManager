@@ -27,7 +27,7 @@ using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly LogService _logService;

@@ -13,16 +13,16 @@
         Width="1000" Height="850"
         MinWidth="1000" MinHeight="850"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="None"
+        WindowStyle="SingleBorderWindow"
         ResizeMode="CanResize"
-        AllowsTransparency="True"
+        AllowsTransparency="False"
         Background="Transparent"
         FontFamily="{StaticResource AppFontFamily}">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="40" 
                       ResizeBorderThickness="5" 
-                      GlassFrameThickness="0" 
+                      GlassFrameThickness="1" 
                       CornerRadius="0" 
                       UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
@@ -30,8 +30,8 @@
     <Border BorderBrush="{StaticResource BorderColor}" 
             Background="{StaticResource SidebarBackground}"
             BorderThickness="1" 
-            CornerRadius="12" 
-            Margin="1">
+            CornerRadius="0" 
+            Margin="0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
