@@ -29,7 +29,7 @@
 
     <Border BorderBrush="{StaticResource BorderColor}" 
             Background="{StaticResource SidebarBackground}"
-            BorderThickness="1" 
+            BorderThickness="0" 
             CornerRadius="0" 
             Margin="0">
         <Grid>
