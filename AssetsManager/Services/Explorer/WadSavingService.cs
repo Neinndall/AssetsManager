@@ -234,7 +234,6 @@ namespace AssetsManager.Services.Explorer
             string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
             string audioBankPath = Path.Combine(destinationPath, PathUtils.SanitizeName(audioBankName));
             Directory.CreateDirectory(audioBankPath);
-            onFileSavedCallback?.Invoke(audioBankPath);
 
             cancellationToken.ThrowIfCancellationRequested();
             var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;

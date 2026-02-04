@@ -488,24 +488,57 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private int CountFilesToProcess(IEnumerable<FileSystemNodeModel> nodes)
+        private async Task<int> CalculateTotalFilesToProcessAsync(IEnumerable<FileSystemNodeModel> nodes, CancellationToken cancellationToken)
         {
             int count = 0;
             foreach (var node in nodes)
             {
-                if (node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile || node.Type == NodeType.WemFile || node.Type == NodeType.SoundBank)
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile || node.Type == NodeType.WemFile)
                 {
                     count++;
                 }
-                else
+                else if (node.Type == NodeType.SoundBank)
                 {
-                    // For directories and audio events, we count their loaded children
-                    // Note: This only counts already loaded/expanded children. 
-                    // For unloaded WAD directories, we might need a more complex scan, 
-                    // but since extraction handles loading, we'll estimate or just count top-level for now
-                    // OR better: if it's a directory, we recursively count its children.
-                    count += CountFilesToProcess(node.Children);
+                    if (node.Children.Count > 1 || (node.Children.Count == 1 && node.Children[0].Name != "Loading..."))
+                    {
+                        count += CountSoundsInAudioTree(node.Children);
+                    }
+                    else
+                    {
+                        var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(node, _viewModel.RootNodes, _currentRootPath);
+                        if (linkedBank != null)
+                        {
+                            byte[] wpkData = linkedBank.WpkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode, cancellationToken) : null;
+                            byte[] audioBnkData = linkedBank.AudioBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode, cancellationToken) : null;
+                            
+                            int sounds = AudioBankService.GetSoundCount(wpkData, audioBnkData);
+                            count += (sounds > 0) ? sounds : 1;
+                        }
+                        else count++;
+                    }
                 }
+                else if (node.Type == NodeType.AudioEvent || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
+                {
+                    if ((node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile) && 
+                        node.Children.Count == 1 && node.Children[0].Name == "Loading...")
+                    {
+                        await LoadAllChildrenForSearch(node);
+                    }
+                    count += await CalculateTotalFilesToProcessAsync(node.Children, cancellationToken);
+                }
+            }
+            return count;
+        }
+
+        private int CountSoundsInAudioTree(IEnumerable<FileSystemNodeModel> nodes)
+        {
+            int count = 0;
+            foreach (var node in nodes)
+            {
+                if (node.Type == NodeType.WemFile) count++;
+                else count += CountSoundsInAudioTree(node.Children);
             }
             return count;
         }
@@ -549,7 +582,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 try
                 {
                     // Calculate total files for accurate progress
-                    int totalFiles = CountFilesToProcess(selectedNodes);
+                    int totalFiles = await CalculateTotalFilesToProcessAsync(selectedNodes, cancellationToken);
                     ProgressUIManager?.OnExtractionStarted(this, ("Extracting selected assets...", totalFiles));
 
                     int processedCount = 0;
@@ -639,7 +672,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    int totalFiles = CountFilesToProcess(selectedNodes);
+                    int totalFiles = await CalculateTotalFilesToProcessAsync(selectedNodes, cancellationToken);
                     ProgressUIManager?.OnSavingStarted(totalFiles);
 
                     string singleSavedPath = null;
