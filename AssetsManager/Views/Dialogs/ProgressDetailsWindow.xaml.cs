@@ -55,14 +55,58 @@ namespace AssetsManager.Views.Dialogs
             _completedFiles = completedFiles;
             _totalFiles = totalFiles;
 
-            ProgressSummaryTextBlock.Text = $"{OperationVerb}: {completedFiles} of {totalFiles}";
-            CurrentFileTextBlock.Text = $"Current file: {currentFileName}";
-            UpdateEstimatedTime(completedFiles, totalFiles); // Update once immediately for responsiveness
+            // Determine unit based on operation
+            string unit = OperationVerb switch
+            {
+                "Comparing" => "Chunks",
+                "Saving" => "Assets",
+                "Extracting" => "Assets",
+                "Downloading" => "Files",
+                "Backing up" => "Files",
+                _ => "Items"
+            };
+
+            // Intelligent parsing for technical messages (e.g. "1 of 30 files: Aatrox.wad.client")
+            if (!string.IsNullOrEmpty(currentFileName) && currentFileName.Contains(" of ") && currentFileName.Contains(" files: "))
+            {
+                var parts = currentFileName.Split(new[] { " files: " }, 2, StringSplitOptions.None);
+                if (parts.Length == 2)
+                {
+                    // parts[0] is "1 of 30" -> we format it as "File 1 / 30"
+                    ItemProgressTextBlock.Text = $"File {parts[0].Replace("of", "/")}";
+                    CurrentFileTextBlock.Text = parts[1];
+                }
+                else
+                {
+                    ItemProgressTextBlock.Text = "File 0 / 0";
+                    CurrentFileTextBlock.Text = currentFileName;
+                }
+            }
+            else
+            {
+                ItemProgressTextBlock.Text = "File 0 / 0";
+                CurrentFileTextBlock.Text = currentFileName;
+            }
+
+            // Sub-progress text
+            if (totalFiles > 0)
+            {
+                SubProgressTextBlock.Text = $"{unit}: {completedFiles} of {totalFiles}";
+                MainProgressBar.Value = (double)completedFiles / totalFiles * 100;
+            }
+            else
+            {
+                SubProgressTextBlock.Text = "0 of 0";
+                MainProgressBar.Value = 0;
+            }
+
+            UpdateEstimatedTime(completedFiles, totalFiles);
 
             if (completedFiles >= totalFiles && totalFiles > 0)
             {
                 _timer.Stop();
                 EstimatedTimeTextBlock.Text = "Estimated time remaining: 00:00:00";
+                MainProgressBar.Value = 100;
             }
         }
 

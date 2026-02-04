@@ -6,7 +6,7 @@
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Background="Transparent"
-        Height="Auto" Width="550" 
+        Height="Auto" Width="600" 
         SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True"
         WindowStartupLocation="CenterOwner"
@@ -72,30 +72,61 @@
                     <!-- Content -->
                     <Grid Grid.Row="0" Margin="24">
                         <StackPanel>
-                                                        <TextBlock x:Name="ProgressSummaryTextBlock"
-                                                                   Text="{Binding OperationVerb}"
-                                                                   FontWeight="SemiBold" FontSize="14"                                       Foreground="{StaticResource TextPrimary}" 
-                                       Margin="0,0,0,16"/>
-                            
-                            <!-- Status Card (Uses CardBackground for contrast on Dark Body) -->
-                            <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                            <!-- Technical Status Card -->
+                            <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                 <StackPanel>
-                                    <Grid Margin="0,0,0,10">
-                                        <TextBlock x:Name="CurrentFileTextBlock" 
-                                                   Text="" 
-                                                   FontSize="13" 
+                                    <!-- 1. Item Progress (e.g. 1 / 30) -->
+                                    <Grid Margin="0,0,0,4">
+                                        <TextBlock x:Name="ItemProgressTextBlock" 
+                                                   Text="Initializing..." 
+                                                   FontSize="15" 
                                                    Foreground="{StaticResource TextPrimary}" 
-                                                   TextTrimming="CharacterEllipsis" 
+                                                   FontWeight="Bold"
+                                                   FontFamily="Consolas"/>
+                                    </Grid>
+
+                                    <!-- 2. Current File Name (Standalone and small) -->
+                                    <Grid Margin="0,0,0,16">
+                                        <TextBlock x:Name="CurrentFileTextBlock" 
+                                                   Text="..." 
+                                                   FontSize="12" 
+                                                   Foreground="{StaticResource TextSecondary}" 
+                                                   TextTrimming="CharacterEllipsis"
                                                    FontWeight="Medium"/>
                                     </Grid>
+
+                                    <!-- 3. Visual Progress Bar (HUD Style) -->
+                                    <Grid Margin="0,0,0,20">
+                                        <ProgressBar x:Name="MainProgressBar" 
+                                                     Height="8" 
+                                                     Minimum="0" Maximum="100" 
+                                                     Value="0"
+                                                     Style="{StaticResource ModernProgressBar}"/>
+                                    </Grid>
                                     
-                                    <StackPanel Orientation="Horizontal">
-                                         <materialIcons:MaterialIcon Kind="ClockTimeFourOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                         <TextBlock x:Name="EstimatedTimeTextBlock" 
-                                                    Text="Calculating..." 
-                                                    FontSize="12" 
-                                                    Foreground="{StaticResource TextSecondary}" 
-                                                    VerticalAlignment="Center"/>
+                                    <!-- 4. technical Data Area -->
+                                    <StackPanel>
+                                        <!-- Sub-progress Row (Chunks/Assets) -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <materialIcons:MaterialIcon Kind="ChartBubble" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="SubProgressTextBlock" 
+                                                       Text="0 of 0" 
+                                                       FontSize="12" 
+                                                       Foreground="{StaticResource TextSecondary}" 
+                                                       VerticalAlignment="Center"
+                                                       FontFamily="Consolas"/>
+                                        </StackPanel>
+
+                                        <!-- Estimated Time Row -->
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialIcons:MaterialIcon Kind="ClockTimeFourOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="EstimatedTimeTextBlock" 
+                                                       Text="Calculating..." 
+                                                       FontSize="12" 
+                                                       Foreground="{StaticResource TextSecondary}" 
+                                                       VerticalAlignment="Center"
+                                                       FontFamily="Consolas"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>

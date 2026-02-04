@@ -193,7 +193,7 @@ namespace AssetsManager.Services.Core
 
         public void OnComparisonProgressChanged(int completedFiles, string currentFile, bool isSuccess, string errorMessage)
         {
-            UpdateOperation($"Comparing: {currentFile}", completedFiles, _totalFiles, currentFile, isSuccess, errorMessage);
+            UpdateOperation($"Comparing {currentFile}", completedFiles, _totalFiles, currentFile, isSuccess, errorMessage);
         }
 
         public void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath) => FinishOperation();
