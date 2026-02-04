@@ -49,7 +49,7 @@ namespace AssetsManager.Services.Monitor
             _riotApiService = riotApiService;
 
             _manifestDownloader.ProgressChanged += (taskName, fileName, current, total) => {
-                VersionDownloadProgressChanged?.Invoke(this, (taskName, current, total, Path.GetFileName(fileName)));
+                VersionDownloadProgressChanged?.Invoke(this, (taskName, current, total, fileName));
             };
         }
 
@@ -149,8 +149,10 @@ namespace AssetsManager.Services.Monitor
         {
             try
             {
-                _logService.Log($"Verifying/Updating {taskName}...");
+                // Instant notification to UI: This triggers "Verifying Files..." in ProgressUIManager
                 VersionDownloadStarted?.Invoke(this, taskName);
+                
+                _logService.Log($"Verifying/Updating {taskName}...");
 
                 var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl);
                 var manifest = _rmanService.Parse(manifestBytes);

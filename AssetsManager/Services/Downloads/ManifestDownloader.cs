@@ -203,6 +203,7 @@ public class ManifestDownloader
         });
 
         verifyStopwatch.Stop();
+        
         double verifyMB = totalMBToDownload / 1024.0 / 1024.0;
         _logService.Log($"[Verification] Finished in {verifyStopwatch.Elapsed.TotalSeconds:F1}s.");
         _logService.Log($"  • Files OK: {alreadyCorrect}");

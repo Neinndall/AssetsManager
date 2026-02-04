@@ -66,7 +66,13 @@ namespace AssetsManager.Views.Dialogs
                     
                     // Intelligent offset: skip the first word if it's not a digit (the verb)
                     int startIdx = 0;
-                    if (countParts.Length > 0 && !char.IsDigit(countParts[0][0])) startIdx = 1;
+                    if (countParts.Length > 0 && !char.IsDigit(countParts[0][0])) 
+                    {
+                        startIdx = 1;
+                        // Update verb dynamically from the status string
+                        VerbTextBlock.Text = countParts[0];
+                        OperationVerb = countParts[0];
+                    }
 
                     if (countParts.Length >= startIdx + 3)
                     {
@@ -92,13 +98,14 @@ namespace AssetsManager.Views.Dialogs
                 CurrentFileTextBlock.Text = currentFileName ?? "...";
             }
 
-            // 2. Technical Sub-progress (Show for Comparing, Verifying, and Updating)
-            bool isTechnicalTask = OperationVerb == "Comparing" || OperationVerb == "Verifying" || OperationVerb == "Updating";
+            // 2. Technical Sub-progress (Visibility Logic)
+            // - Comparing/Updating: Show Chunks (Deep technical progress)
+            // - Verifying: Hide Chunks (Simple file count progress)
+            bool showChunks = OperationVerb == "Comparing" || OperationVerb == "Updating";
             
-            if (isTechnicalTask)
+            if (showChunks)
             {
                 SubProgressRow.Visibility = Visibility.Visible;
-                // Use "of" for Chunks readability as requested
                 SubProgressTextBlock.Text = $"Chunks: {completedFiles} of {totalFiles}";
             }
             else

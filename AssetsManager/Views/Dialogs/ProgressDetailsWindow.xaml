@@ -77,7 +77,8 @@
                                 <StackPanel>
                                     <!-- 1. Operation and Progress (e.g. Comparing: 1 of 30) -->
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                        <TextBlock Text="{Binding OperationVerb}" 
+                                        <TextBlock x:Name="VerbTextBlock" 
+                                                   Text="{Binding OperationVerb}" 
                                                    FontWeight="SemiBold" FontSize="15" 
                                                    Foreground="{StaticResource TextPrimary}"/>
                                         <TextBlock Text=":" 

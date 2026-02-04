@@ -278,7 +278,8 @@ namespace AssetsManager.Services.Core
                     _progressDetailsWindow.OperationVerb = data.TaskName; // Cambia dinámicamente entre Verifying y Updating
                 }
             });
-            UpdateOperation($"{data.TaskName} {data.CurrentValue} of {data.TotalValue} items: {data.CurrentFile}", data.CurrentValue, data.TotalValue, data.CurrentFile);
+            // data.CurrentFile already contains "X of Y files: name", so we just prepend the TaskName
+            UpdateOperation($"{data.TaskName} {data.CurrentFile}", data.CurrentValue, data.TotalValue, data.CurrentFile);
         }
 
         public async void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
