@@ -28,6 +28,7 @@ namespace AssetsManager.Services.Explorer
         private readonly AudioBankLinkerService _audioBankLinkerService;
         private readonly AudioConversionService _audioConversionService;
         private readonly AppSettings _appSettings;
+        private readonly WadNodeLoaderService _wadNodeLoaderService;
 
         public WadSavingService(
             LogService logService,
@@ -36,7 +37,8 @@ namespace AssetsManager.Services.Explorer
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
             AudioConversionService audioConversionService,
-            AppSettings appSettings)
+            AppSettings appSettings,
+            WadNodeLoaderService wadNodeLoaderService)
         {
             _logService = logService;
             _wadExtractionService = wadExtractionService;
@@ -45,6 +47,64 @@ namespace AssetsManager.Services.Explorer
             _audioBankLinkerService = audioBankLinkerService;
             _audioConversionService = audioConversionService;
             _appSettings = appSettings;
+            _wadNodeLoaderService = wadNodeLoaderService;
+        }
+
+        public async Task<int> CalculateTotalAsync(IEnumerable<FileSystemNodeModel> nodes, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
+        {
+            int count = 0;
+            foreach (var node in nodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile || node.Type == NodeType.WemFile)
+                {
+                    count++;
+                }
+                else if (node.Type == NodeType.SoundBank)
+                {
+                    if (node.Children.Count > 1 || (node.Children.Count == 1 && node.Children[0].Name != "Loading..."))
+                    {
+                        count += CountSoundsInAudioTree(node.Children);
+                    }
+                    else
+                    {
+                        var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
+                        if (linkedBank != null)
+                        {
+                            byte[] wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode, cancellationToken) : null;
+                            byte[] audioBnkData = linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode, cancellationToken) : null;
+
+                            int soundsCount = _audioBankService.GetSoundCount(wpkData, audioBnkData);
+                            count += (soundsCount > 0) ? soundsCount : 1;
+                        }
+                        else count++;
+                    }
+                }
+                else if (node.Type == NodeType.AudioEvent || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
+                {
+                    if ((node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile) &&
+                        node.Children.Count == 1 && node.Children[0].Name == "Loading...")
+                    {
+                        var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(node, cancellationToken);
+                        node.Children.Clear();
+                        foreach (var child in loadedChildren) node.Children.Add(child);
+                    }
+                    count += await CalculateTotalAsync(node.Children, rootNodes, currentRootPath, cancellationToken);
+                }
+            }
+            return count;
+        }
+
+        private int CountSoundsInAudioTree(IEnumerable<FileSystemNodeModel> nodes)
+        {
+            int count = 0;
+            foreach (var node in nodes)
+            {
+                if (node.Type == NodeType.WemFile) count++;
+                else count += CountSoundsInAudioTree(node.Children);
+            }
+            return count;
         }
 
         public async Task ProcessAndSaveDiffAsync(SerializableChunkDiff diff, string destinationPath, string oldLolPath, string newLolPath, CancellationToken cancellationToken)

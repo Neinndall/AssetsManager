@@ -29,6 +29,32 @@ namespace AssetsManager.Services.Explorer
             _wadNodeLoaderService = wadNodeLoaderService;
         }
 
+        public async Task<int> CalculateTotalAsync(IEnumerable<FileSystemNodeModel> nodes, CancellationToken cancellationToken)
+        {
+            int count = 0;
+            foreach (var node in nodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile || node.Type == NodeType.WemFile || node.Type == NodeType.SoundBank)
+                {
+                    count++;
+                }
+                else
+                {
+                    if ((node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile) && 
+                        node.Children.Count == 1 && node.Children[0].Name == "Loading...")
+                    {
+                        var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(node, cancellationToken);
+                        node.Children.Clear();
+                        foreach (var child in loadedChildren) node.Children.Add(child);
+                    }
+                    count += await CalculateTotalAsync(node.Children, cancellationToken);
+                }
+            }
+            return count;
+        }
+
         // Dirige el proceso de extracción al método adecuado según el tipo de nodo.
         public async Task ExtractNodeAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileExtracted = null)
         {
