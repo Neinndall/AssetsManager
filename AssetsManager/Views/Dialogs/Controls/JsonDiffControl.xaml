@@ -7,8 +7,14 @@
              xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
              xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:jsonDiff="clr-namespace:AssetsManager.Views.Dialogs.Controls"
+             xmlns:localUtils="clr-namespace:AssetsManager.Utils"
              mc:Ignorable="d" Background="{StaticResource SidebarBackground}">
-    
+
+    <UserControl.CommandBindings>
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.NextDifference}" Executed="NextDifference_Executed" />
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Executed="PreviousDifference_Executed" />
+    </UserControl.CommandBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

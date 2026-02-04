@@ -287,6 +287,18 @@ namespace AssetsManager.Views.Dialogs.Controls
         }
         #endregion
 
+        #region Shortcut Commands Handlers
+        private void NextDifference_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+        {
+            NextDiffButton_Click(null, null);
+        }
+
+        private void PreviousDifference_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+        {
+            PreviousDiffButton_Click(null, null);
+        }
+        #endregion
+
         #region Event Handlers
         private async void ComparisonInlineMode_Checked(object sender, RoutedEventArgs e)
         {
