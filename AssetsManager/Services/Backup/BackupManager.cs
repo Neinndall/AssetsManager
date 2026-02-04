@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
@@ -30,12 +31,17 @@ namespace AssetsManager.Services.Backup
         }
 
 
-        public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath)
+        public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath, CancellationToken cancellationToken)
         {
+            // Notify UI immediately to show activity (Indeterminate spinner)
+            BackupStarted?.Invoke(this, 0);
+
             await Task.Run(() =>
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     if (Directory.Exists(destinationBackupPath))
                     {
                         Directory.Delete(destinationBackupPath, true);
@@ -54,25 +60,38 @@ namespace AssetsManager.Services.Backup
                         _logService.LogWarning($"Could not count files for progress: {ex.Message}");
                     }
 
+                    // Update UI with the real total discovered
                     BackupStarted?.Invoke(this, totalFiles);
 
                     int processedFiles = 0;
-                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, totalFiles);
+                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
                     
                     _currentSessionBackups.Add(destinationBackupPath);
                     BackupCompleted?.Invoke(this, true);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logService.LogWarning("Backup operation was cancelled by the user.");
+                    BackupCompleted?.Invoke(this, false);
+                    // Clean up partially created backup if cancelled
+                    if (Directory.Exists(destinationBackupPath))
+                    {
+                        try { Directory.Delete(destinationBackupPath, true); } catch { }
+                    }
                 }
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"AssetsManager.Services.Backup.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
                     BackupCompleted?.Invoke(this, false);
-                    throw; // Re-throw the exception after logging
+                    throw; 
                 }
-            });
+            }, cancellationToken);
         }
 
-        private void CopyDirectoryRecursive(string sourceDir, string destinationDir, ref int processedFiles, int totalFiles)
+        private void CopyDirectoryRecursive(string sourceDir, string destinationDir, ref int processedFiles, int totalFiles, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var dir = new DirectoryInfo(sourceDir);
             if (!dir.Exists)
                 throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
@@ -81,6 +100,7 @@ namespace AssetsManager.Services.Backup
 
             foreach (FileInfo file in dir.GetFiles())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 file.CopyTo(Path.Combine(destinationDir, file.Name), true);
                 processedFiles++;
                 BackupProgressChanged?.Invoke(this, (processedFiles, totalFiles, file.Name));
@@ -88,7 +108,7 @@ namespace AssetsManager.Services.Backup
 
             foreach (DirectoryInfo subDir in dir.GetDirectories())
             {
-                CopyDirectoryRecursive(subDir.FullName, Path.Combine(destinationDir, subDir.Name), ref processedFiles, totalFiles);
+                CopyDirectoryRecursive(subDir.FullName, Path.Combine(destinationDir, subDir.Name), ref processedFiles, totalFiles, cancellationToken);
             }
         }
         

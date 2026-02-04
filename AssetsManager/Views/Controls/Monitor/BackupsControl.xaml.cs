@@ -20,6 +20,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public TaskCancellationManager TaskCancellationManager { get; set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -133,10 +134,19 @@ namespace AssetsManager.Views.Controls.Monitor
             createBackupButton.IsEnabled = false;
             try
             {
-                await BackupManager.CreateLolPbeDirectoryBackupAsync(sourceLolPath, destinationBackupPath);
-                LogService.LogSuccess($"LoL backup completed successfully.");
-                CustomMessageBoxService.ShowInfo("Info", "LoL backup completed successfully.", Window.GetWindow(this));
+                var cancellationToken = TaskCancellationManager.PrepareNewOperation();
+                await BackupManager.CreateLolPbeDirectoryBackupAsync(sourceLolPath, destinationBackupPath, cancellationToken);
+                
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    LogService.LogSuccess($"LoL backup completed successfully.");
+                    CustomMessageBoxService.ShowInfo("Backup System", "LoL backup completed successfully.", Window.GetWindow(this));
+                }
                 await LoadBackupsAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                LogService.LogWarning("LoL backup was cancelled.");
             }
             catch (System.IO.DirectoryNotFoundException ex)
             {

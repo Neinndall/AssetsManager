@@ -77,6 +77,7 @@ namespace AssetsManager.Views
             BackupsControl.LogService = logService;
             BackupsControl.AppSettings = appSettings;
             BackupsControl.CustomMessageBoxService = customMessageBoxService;
+            BackupsControl.TaskCancellationManager = taskCancellationManager;
 
             // Setup and inject dependencies for ApiControl
             ApiControl.LogService = logService;

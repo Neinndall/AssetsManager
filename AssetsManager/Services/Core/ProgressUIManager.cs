@@ -188,7 +188,19 @@ namespace AssetsManager.Services.Core
 
         public void OnComparisonStarted(int totalFiles)
         {
-            StartOperation("Comparing WADs", "Comparing", "Compare", totalFiles, "Comparing WADs...");
+            _owner.Dispatcher.Invoke(() =>
+            {
+                // If the operation is already active (indeterminate start), just update the total
+                if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)
+                {
+                    _totalFiles = totalFiles;
+                    UpdateStatusBar("Comparing WADs...", 0, totalFiles);
+                    _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
+                    return;
+                }
+                
+                StartOperation("Comparing WADs", "Comparing", "Compare", totalFiles, "Comparing WADs...");
+            });
         }
 
         public void OnComparisonProgressChanged(int completedFiles, string currentFile, bool isSuccess, string errorMessage)
@@ -203,7 +215,18 @@ namespace AssetsManager.Services.Core
 
         public void OnExtractionStarted(object sender, (string message, int totalFiles) data)
         {
-            StartOperation("Extracting Assets", "Extracting", "PackageDown", data.totalFiles, "Extracting assets...");
+            _owner.Dispatcher.Invoke(() =>
+            {
+                if (_progressDetailsWindow != null && _totalFiles == 0 && data.totalFiles > 0)
+                {
+                    _totalFiles = data.totalFiles;
+                    UpdateStatusBar("Extracting Assets...", 0, data.totalFiles);
+                    _progressDetailsWindow.UpdateProgress(0, data.totalFiles, "Initializing...", true, null);
+                    return;
+                }
+
+                StartOperation("Extracting Assets", "Extracting", "PackageDown", data.totalFiles, "Extracting Assets...");
+            });
         }
 
         public void OnExtractionProgressChanged(int completedFiles, int totalFiles, string currentFile)
@@ -217,7 +240,18 @@ namespace AssetsManager.Services.Core
 
         public void OnSavingStarted(int totalFiles)
         {
-            StartOperation("Saving Assets", "Saving", "ContentSave", totalFiles, "Saving assets...");
+            _owner.Dispatcher.Invoke(() =>
+            {
+                if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)
+                {
+                    _totalFiles = totalFiles;
+                    UpdateStatusBar("Saving Assets...", 0, totalFiles);
+                    _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
+                    return;
+                }
+
+                StartOperation("Saving Assets", "Saving", "ContentSave", totalFiles, "Saving Assets...");
+            });
         }
 
         public void OnSavingProgressChanged(int completedFiles, int totalFiles, string currentFile)
@@ -267,7 +301,19 @@ namespace AssetsManager.Services.Core
 
         public void OnBackupStarted(object sender, int totalFiles)
         {
-            StartOperation("Creating Backup", "Backing up", "ContentSave", totalFiles, "Creating backup...");
+            _owner.Dispatcher.Invoke(() =>
+            {
+                // If already active (indeterminate start), update the total
+                if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)
+                {
+                    _totalFiles = totalFiles;
+                    UpdateStatusBar("Creating backup...", 0, totalFiles);
+                    _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
+                    return;
+                }
+
+                StartOperation("Creating Backup", "Backing up", "ContentSave", totalFiles, "Creating backup...");
+            });
         }
 
         public void OnBackupProgressChanged(object sender, (int Processed, int Total, string CurrentFile) data)

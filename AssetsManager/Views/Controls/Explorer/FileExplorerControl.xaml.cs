@@ -526,9 +526,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
+                    // Show immediate activity
+                    ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", 0));
+
                     // Calculate total files for accurate progress
                     int totalFiles = await WadExtractionService.CalculateTotalAsync(selectedNodes, cancellationToken);
-                    ProgressUIManager?.OnExtractionStarted(this, ("Extracting selected assets...", totalFiles));
+                    
+                    // Update with real total
+                    ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", totalFiles));
 
                     int processedCount = 0;
                     foreach (var node in selectedNodes)
@@ -617,7 +622,12 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
+                    // Show immediate activity
+                    ProgressUIManager?.OnSavingStarted(0);
+
                     int totalFiles = await WadSavingService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, cancellationToken);
+                    
+                    // Update with real total
                     ProgressUIManager?.OnSavingStarted(totalFiles);
 
                     string singleSavedPath = null;

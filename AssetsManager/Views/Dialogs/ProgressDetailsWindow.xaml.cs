@@ -70,6 +70,7 @@ namespace AssetsManager.Views.Dialogs
 
                     if (countParts.Length >= startIdx + 3)
                     {
+                        // Use "of" for natural readability as requested
                         ItemProgressTextBlock.Text = $"{countParts[startIdx]} of {countParts[startIdx + 2]}";
                     }
                     else
@@ -87,7 +88,7 @@ namespace AssetsManager.Views.Dialogs
             }
             else
             {
-                ItemProgressTextBlock.Text = $"{completedFiles} / {totalFiles}";
+                ItemProgressTextBlock.Text = $"{completedFiles} of {totalFiles}";
                 CurrentFileTextBlock.Text = currentFileName ?? "...";
             }
 

@@ -128,42 +128,53 @@ namespace AssetsManager.Services.Comparator
                 cancellationToken.ThrowIfCancellationRequested();
 
                 _logService.Log("Starting WADs comparison...");
-                var searchPatterns = new[] { "*.wad.client", "*.wad" };
-                var oldWadFiles = searchPatterns
-                    .SelectMany(pattern => Directory.GetFiles(oldDir, pattern, SearchOption.AllDirectories))
-                    .ToList();
+                
+                // Notify UI immediately to show activity (Indeterminate spinner)
+                NotifyComparisonStarted(0);
 
-                // Phase 1: Rapid scan to count total chunks for high-fidelity progress
-                int totalChunks = 0;
-                var validFiles = new List<(string OldPath, string NewPath, string RelativePath)>();
-
-                foreach (var oldWadFile in oldWadFiles)
+                // Run heavy scanning in a background task to keep UI responsive
+                var scanResult = await Task.Run(() =>
                 {
-                    var relativePath = Path.GetRelativePath(oldDir, oldWadFile);
-                    var newWadFileFullPath = Path.Combine(newDir, relativePath);
-                    if (File.Exists(newWadFileFullPath))
-                    {
-                        using var oldWad = new WadFile(oldWadFile);
-                        using var newWad = new WadFile(newWadFileFullPath);
-                        // We count both because we hash both
-                        totalChunks += oldWad.Chunks.Count + newWad.Chunks.Count;
-                        validFiles.Add((oldWadFile, newWadFileFullPath, relativePath));
-                    }
-                }
+                    var searchPatterns = new[] { "*.wad.client", "*.wad" };
+                    var files = searchPatterns
+                        .SelectMany(pattern => Directory.GetFiles(oldDir, pattern, SearchOption.AllDirectories))
+                        .ToList();
 
-                _totalChunksGlobal = totalChunks;
+                    int total = 0;
+                    var valid = new List<(string OldPath, string NewPath, string RelativePath)>();
+
+                    foreach (var oldWadFile in files)
+                    {
+                        if (cancellationToken.IsCancellationRequested) break;
+
+                        var relativePath = Path.GetRelativePath(oldDir, oldWadFile);
+                        var newWadFileFullPath = Path.Combine(newDir, relativePath);
+                        if (File.Exists(newWadFileFullPath))
+                        {
+                            using var oldWad = new WadFile(oldWadFile);
+                            using var newWad = new WadFile(newWadFileFullPath);
+                            total += oldWad.Chunks.Count + newWad.Chunks.Count;
+                            valid.Add((oldWadFile, newWadFileFullPath, relativePath));
+                        }
+                    }
+                    return (TotalChunks: total, ValidFiles: valid);
+                }, cancellationToken);
+
+                _totalChunksGlobal = scanResult.TotalChunks;
                 _completedChunksGlobal = 0;
+                
+                // Update UI with the real total discovered
                 NotifyComparisonStarted(_totalChunksGlobal);
 
                 // Phase 2: Compare
                 int fileIndex = 0;
-                foreach (var file in validFiles)
+                foreach (var file in scanResult.ValidFiles)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     fileIndex++;
 
                     string wadDisplayName = Path.GetFileName(file.RelativePath);
-                    string statusMsg = $"{fileIndex} of {validFiles.Count} files: {wadDisplayName}";
+                    string statusMsg = $"{fileIndex} of {scanResult.ValidFiles.Count} files: {wadDisplayName}";
 
                     using var oldWad = new WadFile(file.OldPath);
                     using var newWad = new WadFile(file.NewPath);
