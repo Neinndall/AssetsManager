@@ -17,8 +17,8 @@
         Background="Transparent">
 
     <Window.InputBindings>
-        <KeyBinding Command="{x:Static localUtils:ShortKeys.NextDifference}" Key="Down" Modifiers="Shift" />
-        <KeyBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Key="Up" Modifiers="Shift" />
+        <KeyBinding Command="{x:Static localUtils:ShortKeys.NextDifference}" Key="NumPad2" Modifiers="Shift" />
+        <KeyBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Key="NumPad8" Modifiers="Shift" />
     </Window.InputBindings>
 
     <WindowChrome.WindowChrome>
@@ -86,7 +86,7 @@
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <icons:MaterialIcon Kind="KeyboardOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
-                        <TextBlock Text="Shift + Up/Down: Prev/Next Difference" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                        <TextBlock Text="Shift + Num 8/2: Prev/Next Difference" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
                         
                         <icons:MaterialIcon Kind="MouseOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
                         <TextBlock Text="Sync Scroll: Locked" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
