@@ -275,12 +275,6 @@ namespace AssetsManager.Views.Dialogs
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_sourceJsonPath != null)
-            {
-                _customMessageBoxService.ShowInfo("Info", "This result is already saved.", this);
-                return;
-            }
-
             try
             {
                 _directoriesCreator.GenerateNewWadComparisonPaths();
