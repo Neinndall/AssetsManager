@@ -55,48 +55,63 @@ namespace AssetsManager.Views.Dialogs
             _completedFiles = completedFiles;
             _totalFiles = totalFiles;
 
-            // Determine unit based on operation
-            string unit = OperationVerb switch
+            // 1. Universal Parser for formatted strings (e.g. "1 of 30 assets: audio.ogg")
+            if (!string.IsNullOrEmpty(currentFileName) && currentFileName.Contains(" of ") && currentFileName.Contains(": "))
             {
-                "Comparing" => "Chunks",
-                "Saving" => "Assets",
-                "Extracting" => "Assets",
-                "Downloading" => "Files",
-                "Backing up" => "Files",
-                _ => "Items"
-            };
-
-            // Intelligent parsing for technical messages (e.g. "1 of 30 files: Aatrox.wad.client")
-            if (!string.IsNullOrEmpty(currentFileName) && currentFileName.Contains(" of ") && currentFileName.Contains(" files: "))
-            {
-                var parts = currentFileName.Split(new[] { " files: " }, 2, StringSplitOptions.None);
-                if (parts.Length == 2)
+                var mainParts = currentFileName.Split(new[] { ": " }, 2, StringSplitOptions.None);
+                if (mainParts.Length == 2)
                 {
-                    // parts[0] is "1 of 30" -> we format it as "File 1 / 30"
-                    ItemProgressTextBlock.Text = $"File {parts[0].Replace("of", "/")}";
-                    CurrentFileTextBlock.Text = parts[1];
+                    // mainParts[0] is "1 of 30 assets" OR "Verifying 10 of 100 items"
+                    var countParts = mainParts[0].Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+                    
+                    // Intelligent offset: skip the first word if it's not a digit (the verb)
+                    int startIdx = 0;
+                    if (countParts.Length > 0 && !char.IsDigit(countParts[0][0])) startIdx = 1;
+
+                    if (countParts.Length >= startIdx + 3)
+                    {
+                        ItemProgressTextBlock.Text = $"{countParts[startIdx]} of {countParts[startIdx + 2]}";
+                    }
+                    else
+                    {
+                        ItemProgressTextBlock.Text = mainParts[0];
+                    }
+                    
+                    CurrentFileTextBlock.Text = mainParts[1];
                 }
                 else
                 {
-                    ItemProgressTextBlock.Text = "File 0 / 0";
+                    ItemProgressTextBlock.Text = "0 / 0";
                     CurrentFileTextBlock.Text = currentFileName;
                 }
             }
             else
             {
-                ItemProgressTextBlock.Text = "File 0 / 0";
-                CurrentFileTextBlock.Text = currentFileName;
+                ItemProgressTextBlock.Text = $"{completedFiles} / {totalFiles}";
+                CurrentFileTextBlock.Text = currentFileName ?? "...";
             }
 
-            // Sub-progress text
+            // 2. Technical Sub-progress (Show for Comparing, Verifying, and Updating)
+            bool isTechnicalTask = OperationVerb == "Comparing" || OperationVerb == "Verifying" || OperationVerb == "Updating";
+            
+            if (isTechnicalTask)
+            {
+                SubProgressRow.Visibility = Visibility.Visible;
+                // Use "of" for Chunks readability as requested
+                SubProgressTextBlock.Text = $"Chunks: {completedFiles} of {totalFiles}";
+            }
+            else
+            {
+                SubProgressRow.Visibility = Visibility.Collapsed;
+            }
+
+            // 3. Main Progress Bar
             if (totalFiles > 0)
             {
-                SubProgressTextBlock.Text = $"{unit}: {completedFiles} of {totalFiles}";
                 MainProgressBar.Value = (double)completedFiles / totalFiles * 100;
             }
             else
             {
-                SubProgressTextBlock.Text = "0 of 0";
                 MainProgressBar.Value = 0;
             }
 

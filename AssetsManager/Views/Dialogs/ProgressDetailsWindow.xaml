@@ -75,15 +75,19 @@
                             <!-- Technical Status Card -->
                             <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                 <StackPanel>
-                                    <!-- 1. Item Progress (e.g. 1 / 30) -->
-                                    <Grid Margin="0,0,0,4">
+                                    <!-- 1. Operation and Progress (e.g. Comparing 1 / 30) -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <TextBlock Text="{Binding OperationVerb}" 
+                                                   FontWeight="SemiBold" FontSize="15" 
+                                                   Foreground="{StaticResource TextPrimary}" 
+                                                   Margin="0,0,10,0"/>
                                         <TextBlock x:Name="ItemProgressTextBlock" 
-                                                   Text="Initializing..." 
+                                                   Text="0 / 0" 
                                                    FontSize="15" 
                                                    Foreground="{StaticResource TextPrimary}" 
-                                                   FontWeight="Bold"
+                                                   FontWeight="SemiBold"
                                                    FontFamily="Consolas"/>
-                                    </Grid>
+                                    </StackPanel>
 
                                     <!-- 2. Current File Name (Standalone and small) -->
                                     <Grid Margin="0,0,0,16">
@@ -107,7 +111,7 @@
                                     <!-- 4. technical Data Area -->
                                     <StackPanel>
                                         <!-- Sub-progress Row (Chunks/Assets) -->
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <StackPanel x:Name="SubProgressRow" Orientation="Horizontal" Margin="0,0,0,8">
                                             <materialIcons:MaterialIcon Kind="ChartBubble" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                             <TextBlock x:Name="SubProgressTextBlock" 
                                                        Text="0 of 0" 

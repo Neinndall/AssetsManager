@@ -179,7 +179,7 @@ namespace AssetsManager.Services.Core
 
         public void OnDownloadProgressChanged(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage)
         {
-            UpdateOperation($"Downloading: {currentFileName}", completedFiles, totalFiles, currentFileName, isSuccess, errorMessage);
+            UpdateOperation($"Downloading {completedFiles} of {totalFiles} files: {currentFileName}", completedFiles, totalFiles, currentFileName, isSuccess, errorMessage);
         }
 
         public void OnDownloadCompleted() => FinishOperation();
@@ -193,6 +193,7 @@ namespace AssetsManager.Services.Core
 
         public void OnComparisonProgressChanged(int completedFiles, string currentFile, bool isSuccess, string errorMessage)
         {
+            // Note: currentFile already comes formatted as "{fileIndex} of {total} files: {wadName}" from WadComparatorService
             UpdateOperation($"Comparing {currentFile}", completedFiles, _totalFiles, currentFile, isSuccess, errorMessage);
         }
 
@@ -207,7 +208,7 @@ namespace AssetsManager.Services.Core
 
         public void OnExtractionProgressChanged(int completedFiles, int totalFiles, string currentFile)
         {
-            UpdateOperation($"Extracting: {currentFile}", completedFiles, totalFiles, currentFile);
+            UpdateOperation($"Extracting {completedFiles} of {totalFiles} assets: {currentFile}", completedFiles, totalFiles, currentFile);
         }
 
         public void OnExtractionCompleted() => FinishOperation();
@@ -221,7 +222,7 @@ namespace AssetsManager.Services.Core
 
         public void OnSavingProgressChanged(int completedFiles, int totalFiles, string currentFile)
         {
-            UpdateOperation($"Saving: {currentFile}", completedFiles, totalFiles, currentFile);
+            UpdateOperation($"Saving {completedFiles} of {totalFiles} assets: {currentFile}", completedFiles, totalFiles, currentFile);
         }
 
         public void OnSavingCompleted() => FinishOperation();
@@ -243,7 +244,7 @@ namespace AssetsManager.Services.Core
                     _progressDetailsWindow.OperationVerb = data.TaskName; // Cambia dinámicamente entre Verifying y Updating
                 }
             });
-            UpdateOperation($"{data.TaskName}: {data.CurrentFile}", data.CurrentValue, data.TotalValue, data.CurrentFile);
+            UpdateOperation($"{data.TaskName} {data.CurrentValue} of {data.TotalValue} items: {data.CurrentFile}", data.CurrentValue, data.TotalValue, data.CurrentFile);
         }
 
         public async void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
@@ -271,7 +272,7 @@ namespace AssetsManager.Services.Core
 
         public void OnBackupProgressChanged(object sender, (int Processed, int Total, string CurrentFile) data)
         {
-            UpdateOperation($"Backing up: {data.CurrentFile}", data.Processed, data.Total, data.CurrentFile);
+            UpdateOperation($"Backing up {data.Processed} of {data.Total} files: {data.CurrentFile}", data.Processed, data.Total, data.CurrentFile);
         }
 
         public void OnBackupCompleted(object sender, bool success)

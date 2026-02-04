@@ -193,7 +193,8 @@ public class ManifestDownloader
                     if ((now - lastProgressTime).TotalMilliseconds >= 100 || completed == totalToVerify)
                     {
                         lastProgressTime = now;
-                        ProgressChanged?.Invoke("Verifying", file.Name, completed, totalToVerify);
+                        // Use the professional format "File X of Y: filename" to enable dual-progress view
+                        ProgressChanged?.Invoke("Verifying", $"{completed} of {totalToVerify} files: {file.Name}", completed, totalToVerify);
                     }
                 }
                 finally { scanSemaphore.Release(); }
@@ -330,7 +331,8 @@ public class ManifestDownloader
                                             Interlocked.Increment(ref completedFilesCount);
                                             if (openHandles.TryRemove(target.FullPath, out var hnd)) hnd.Dispose();
                                         }
-                                        ProgressChanged?.Invoke("Updating", Path.GetFileName(target.FullPath), (int)(((double)doneChunks / totalChunks) * totalFilesToPatch), totalFilesToPatch);
+                                        // Use the professional format "File X of Y: filename"
+                                        ProgressChanged?.Invoke("Updating", $"{completedFilesCount} of {totalFilesToPatch} files: {Path.GetFileName(target.FullPath)}", doneChunks, totalChunks);
                                     }
                                 } finally { _decompressorPool.Push(decompressor); }
                             } finally { cpuSem.Release(); }
