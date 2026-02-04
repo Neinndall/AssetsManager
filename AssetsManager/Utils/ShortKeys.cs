@@ -10,11 +10,11 @@ namespace AssetsManager.Utils
         // Text Comparison / Diff Navigation
         public static readonly RoutedUICommand NextDifference = new RoutedUICommand(
             "Next Difference", "NextDifference", typeof(ShortKeys), 
-            new InputGestureCollection { new KeyGesture(Key.NumPad2, ModifierKeys.Shift) });
+            new InputGestureCollection { new KeyGesture(Key.Down, ModifierKeys.Alt) });
 
         public static readonly RoutedUICommand PreviousDifference = new RoutedUICommand(
             "Previous Difference", "PreviousDifference", typeof(ShortKeys), 
-            new InputGestureCollection { new KeyGesture(Key.NumPad8, ModifierKeys.Shift) });
+            new InputGestureCollection { new KeyGesture(Key.Up, ModifierKeys.Alt) });
 
         // Future shortcuts can be added here (e.g., Search, Refresh, etc.)
     }
