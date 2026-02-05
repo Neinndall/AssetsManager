@@ -326,8 +326,7 @@
                                         HorizontalAlignment="Center"
                                         Foreground="{StaticResource TextMuted}"
                                         Opacity="0.5"/>
-            <TextBlock x:Name="StatusTitle"
-                       Text="No Directory Selected"
+            <TextBlock Text="{Binding StatusTitle}"
                        FontSize="20"
                        FontWeight="SemiBold"
                        Foreground="{StaticResource TextPrimary}"
@@ -335,8 +334,7 @@
                        TextWrapping="Wrap"
                        TextAlignment="Center"
                        Margin="0,16,0,0"/>
-            <TextBlock x:Name="StatusDescription"
-                       Text="Please select your League of Legends installation folder to start exploring."
+            <TextBlock Text="{Binding StatusDescription}"
                        TextWrapping="Wrap"
                        FontSize="14"
                        Foreground="{StaticResource TextSecondary}"
@@ -347,6 +345,7 @@
                     Content="Open Folder"
                     Style="{StaticResource SecondaryButton}"
                     Click="SelectLolDirButton_Click"
+                    Visibility="{Binding IsSelectDirectoryActionVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                     Padding="24,8"
                     HorizontalAlignment="Center"
                     Margin="0,24,0,0"/>
