@@ -31,12 +31,55 @@ namespace AssetsManager.Views.Models.Explorer
         private string _loadingDetail = "Preparing the file explorer";
         private ObservableCollection<FileSystemNodeModel> _rootNodes;
 
+        private string _statusTitle;
+        private string _statusDescription;
+        private bool _isSelectDirectoryActionVisible;
+
         public FileExplorerModel()
         {
             RootNodes = new ObservableCollection<FileSystemNodeModel>();
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true; // Start empty
+        }
+
+        public void UpdateEmptyState(bool isWadMode)
+        {
+            if (isWadMode)
+            {
+                StatusTitle = "Select a LoL Directory";
+                StatusDescription = "Choose the root folder where you installed League of Legends to browse its WAD files.";
+                IsSelectDirectoryActionVisible = true;
+            }
+            else
+            {
+                StatusTitle = "Assets Directory Not Found";
+                StatusDescription = "The application could not find the directory for downloaded assets.";
+                IsSelectDirectoryActionVisible = false;
+            }
+
+            RootNodes.Clear();
+            IsBusy = false;
+            IsTreeReady = false;
+            IsEmptyState = true;
+        }
+
+        public string StatusTitle
+        {
+            get => _statusTitle;
+            set { if (_statusTitle != value) { _statusTitle = value; OnPropertyChanged(); } }
+        }
+
+        public string StatusDescription
+        {
+            get => _statusDescription;
+            set { if (_statusDescription != value) { _statusDescription = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsSelectDirectoryActionVisible
+        {
+            get => _isSelectDirectoryActionVisible;
+            set { if (_isSelectDirectoryActionVisible != value) { _isSelectDirectoryActionVisible = value; OnPropertyChanged(); } }
         }
 
         public void SetLoadingState(ExplorerLoadingState state)
