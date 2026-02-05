@@ -63,11 +63,19 @@ namespace AssetsManager.Services.Explorer
                 }
                 else if (node.Type == NodeType.SoundBank)
                 {
+                    // --- SMART REDUNDANCY CHECK ---
+                    // If it's an expandable bank name but has NO children, 
+                    // the Loader marked it as redundant. Skip it.
+                    if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && node.Children.Count == 0)
+                    {
+                        continue;
+                    }
+
                     if (node.Children.Count > 1 || (node.Children.Count == 1 && node.Children[0].Name != "Loading..."))
                     {
                         count += CountSoundsInAudioTree(node.Children);
                     }
-                    else
+                    else if (SupportedFileTypes.IsExpandableAudioBank(node.Name))
                     {
                         var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
                         if (linkedBank != null)
@@ -80,6 +88,7 @@ namespace AssetsManager.Services.Explorer
                         }
                         else count++;
                     }
+                    // Else: It's a metadata bank (like _events.bnk). Skip from total count in SAVE mode.
                 }
                 else if (node.Type == NodeType.AudioEvent || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
                 {
@@ -164,7 +173,12 @@ namespace AssetsManager.Services.Explorer
             {
                 case ".wpk":
                 case ".bnk":
-                    await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
+                    // Only process as expandable bank if the Loader marked it as such (has children)
+                    if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && node.Children.Count > 0)
+                    {
+                        await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
+                    }
+                    // Else: Redundant sibling or metadata bank (like _events.bnk). Skip in SAVE mode.
                     break;
 
                 case ".tex":
