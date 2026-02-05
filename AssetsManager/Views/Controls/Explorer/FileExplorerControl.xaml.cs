@@ -444,32 +444,6 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private List<FileSystemNodeModel> GetSelectedNodes()
-        {
-            var selected = new List<FileSystemNodeModel>();
-            FindMultiSelectedNodes(_viewModel.RootNodes, selected);
-
-            if (selected.Count == 0 && FileTreeView.SelectedItem is FileSystemNodeModel singleSelected)
-            {
-                selected.Add(singleSelected);
-            }
-
-            return selected;
-        }
-
-        private void FindMultiSelectedNodes(IEnumerable<FileSystemNodeModel> nodes, List<FileSystemNodeModel> result)
-        {
-            if (nodes == null) return;
-            foreach (var node in nodes)
-            {
-                if (node.IsMultiSelected)
-                {
-                    result.Add(node);
-                }
-                FindMultiSelectedNodes(node.Children, result);
-            }
-        }
-
         private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
         {
             if (WadExtractionService == null)
@@ -478,7 +452,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
-            var selectedNodes = GetSelectedNodes();
+            var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
             if (selectedNodes.Count == 0)
             {
                 CustomMessageBoxService.ShowInfo("Info", "Please select one or more files or folders to extract.", Window.GetWindow(this));
@@ -574,7 +548,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
-            var selectedNodes = GetSelectedNodes();
+            var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
             if (selectedNodes.Count == 0)
             {
                 CustomMessageBoxService.ShowInfo("Info", "Please select one or more files or folders to save.", Window.GetWindow(this));
@@ -738,7 +712,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void AddToImageMerger_Click(object sender, RoutedEventArgs e)
         {
-            var selectedNodes = GetSelectedNodes();
+            var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
             if (selectedNodes.Count == 0) return;
 
             int addedCount = 0;

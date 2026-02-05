@@ -105,5 +105,31 @@ namespace AssetsManager.Services.Explorer.Tree
             }
             return source as TreeViewItem;
         }
+
+        public List<FileSystemNodeModel> GetSelectedNodes(IEnumerable<FileSystemNodeModel> rootNodes, FileSystemNodeModel currentSelectedItem)
+        {
+            var selected = new List<FileSystemNodeModel>();
+            FindMultiSelectedNodes(rootNodes, selected);
+
+            if (selected.Count == 0 && currentSelectedItem != null)
+            {
+                selected.Add(currentSelectedItem);
+            }
+
+            return selected;
+        }
+
+        private void FindMultiSelectedNodes(IEnumerable<FileSystemNodeModel> nodes, List<FileSystemNodeModel> result)
+        {
+            if (nodes == null) return;
+            foreach (var node in nodes)
+            {
+                if (node.IsMultiSelected)
+                {
+                    result.Add(node);
+                }
+                FindMultiSelectedNodes(node.Children, result);
+            }
+        }
     }
 }
