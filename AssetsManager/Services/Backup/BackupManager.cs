@@ -121,9 +121,6 @@ namespace AssetsManager.Services.Backup
 
                 if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory)) 
                     pathsToScan.Add(_appSettings.LolPbeDirectory);
-                
-                if (!string.IsNullOrEmpty(_appSettings.LolLiveDirectory)) 
-                    pathsToScan.Add(_appSettings.LolLiveDirectory);
 
                 foreach (var baseDir in pathsToScan)
                 {
