@@ -46,7 +46,7 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
                         <icons:MaterialIcon Kind="CogOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
                         <TextBlock Text="Settings" 
-                                   FontSize="12" 
+                                   FontSize="13" 
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimary}"
                                    VerticalAlignment="Center"/>

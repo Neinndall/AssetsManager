@@ -43,7 +43,7 @@
                     </Grid.ColumnDefinitions>
 
                     <icons:MaterialIcon Grid.Column="0" Kind="NoteTextOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="15,0,0,0" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Text="Notepad" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    <TextBlock Grid.Column="1" Text="Notepad" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="40" Height="40">
