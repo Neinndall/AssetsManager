@@ -210,6 +210,9 @@ namespace AssetsManager.Services.Monitor
 
             foreach (long id in failedIds.OrderBy(i => i))
             {
+                // We only show failed IDs that are equal to or greater than the Start ID
+                if (category.Start > 0 && id < category.Start) continue;
+
                 string url = $"{category.BaseUrl}{id}.{category.Extension}";
                 try
                 {
@@ -229,27 +232,27 @@ namespace AssetsManager.Services.Monitor
             int needed = 10 - checkableAssets.Count;
             if (needed > 0)
             {
+                // We start looking for new IDs from the custom Start point or the last known overall ID
                 long lastKnownId = 0;
-                var allKnownIds = new HashSet<long>(foundIds);
-                allKnownIds.UnionWith(failedIds);
-                allKnownIds.UnionWith(category.UserRemovedUrls);
-
-                if (allKnownIds.Any())
-                {
-                    lastKnownId = allKnownIds.Max();
-                }
-                
-                // If the user has set a custom Start ID that is higher than what we found, use that.
-                if (category.Start > 0 && (category.Start - 1) > lastKnownId)
+                if (category.Start > 0)
                 {
                     lastKnownId = category.Start - 1;
+                }
+                else
+                {
+                    var allKnownIds = new HashSet<long>(foundIds);
+                    allKnownIds.UnionWith(failedIds);
+                    allKnownIds.UnionWith(category.UserRemovedUrls);
+                    if (allKnownIds.Any()) lastKnownId = allKnownIds.Max();
                 }
 
                 int count = 0;
                 while (count < needed)
                 {
                     lastKnownId++;
-                    if (allKnownIds.Contains(lastKnownId)) continue;
+                    // We skip if it's already found, already in the failed list (because it's already added as Not Found), 
+                    // or removed by the user.
+                    if (foundIds.Contains(lastKnownId) || failedIds.Contains(lastKnownId) || category.UserRemovedUrls.Contains(lastKnownId)) continue;
 
                     string url = $"{category.BaseUrl}{lastKnownId}.{category.Extension}";
                     try
