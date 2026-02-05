@@ -178,12 +178,7 @@ namespace AssetsManager.Services.Backup
 
         private string GetBackupDisplayName(string folderName)
         {
-            string cleanName = folderName.Replace("_old", "", StringComparison.OrdinalIgnoreCase);
-            if (cleanName.Contains("PBE", StringComparison.OrdinalIgnoreCase))
-            {
-                return "League of Legends PBE";
-            }
-            return "League of Legends LIVE";
+            return "League of Legends PBE";
         }
         
         private long GetDirectorySize(string path)
