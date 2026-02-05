@@ -140,7 +140,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 if (!cancellationToken.IsCancellationRequested)
                 {
                     LogService.LogSuccess($"LoL backup completed successfully.");
-                    CustomMessageBoxService.ShowInfo("Backup System", "LoL backup completed successfully.", Window.GetWindow(this));
+                    CustomMessageBoxService.ShowInfo("Backup", "LoL backup completed successfully.", Window.GetWindow(this));
                 }
                 await LoadBackupsAsync();
             }
