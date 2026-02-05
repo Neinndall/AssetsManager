@@ -295,22 +295,22 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async Task BuildWadTreeAsync(string rootPath)
+        private async Task ExecuteTreeBuildInternalAsync(
+            Func<CancellationToken, Task<IEnumerable<FileSystemNodeModel>>> buildFunc, 
+            ExplorerLoadingState loadingState, 
+            string errorMsg, 
+            bool isBackupMode,
+            Action<IEnumerable<FileSystemNodeModel>> onSuccess = null)
         {
-            _viewModel.IsBackupMode = false;
-            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
+            _viewModel.IsBackupMode = isBackupMode;
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation();
 
-            _currentRootPath = rootPath;
-            NewLolPath = null;
-            OldLolPath = null;
-            
-            _viewModel.SetLoadingState(ExplorerLoadingState.LoadingWads);
-
-            Toolbar.IsSortButtonVisible = false;
+            _viewModel.SetLoadingState(loadingState);
+            Toolbar.IsSortButtonVisible = isBackupMode;
 
             try
             {
-                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, cancellationToken);
+                var newNodes = await buildFunc(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 _viewModel.RootNodes.Clear();
@@ -319,9 +319,11 @@ namespace AssetsManager.Views.Controls.Explorer
                     _viewModel.RootNodes.Add(node);
                 }
 
-                if (_viewModel.RootNodes.Count == 0)
+                onSuccess?.Invoke(newNodes);
+
+                if (_viewModel.RootNodes.Count == 0 && !isBackupMode)
                 {
-                    CustomMessageBoxService.ShowError("Error", "Could not find any WAD files in 'Game' or 'Plugins' subdirectories.", Window.GetWindow(this));
+                    CustomMessageBoxService.ShowError("Error", "No items found in the selected location.", Window.GetWindow(this));
                     _viewModel.IsEmptyState = true;
                 }
 
@@ -329,14 +331,14 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             catch (OperationCanceledException)
             {
-                LogService.LogWarning("WAD tree building was cancelled.");
+                LogService.LogWarning("The tree build was cancelled.");
                 await Task.Delay(1500);
                 TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, "Failed to build initial tree.");
-                CustomMessageBoxService.ShowError("Error", "Could not load the directory. Please check the logs.", Window.GetWindow(this));
+                LogService.LogError(ex, errorMsg);
+                CustomMessageBoxService.ShowError("Error", $"{errorMsg} Please check the logs.", Window.GetWindow(this));
                 _viewModel.IsEmptyState = true;
             }
             finally
@@ -347,101 +349,49 @@ namespace AssetsManager.Views.Controls.Explorer
                     _viewModel.IsTreeReady = true;
                 }
             }
+        }
+
+        private async Task BuildWadTreeAsync(string rootPath)
+        {
+            _currentRootPath = rootPath;
+            NewLolPath = null;
+            OldLolPath = null;
+
+            await ExecuteTreeBuildInternalAsync(
+                async ct => (IEnumerable<FileSystemNodeModel>)await TreeBuilderService.BuildWadTreeAsync(rootPath, ct),
+                ExplorerLoadingState.LoadingWads,
+                "Failed to build WAD tree.",
+                false);
         }
 
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
-            _viewModel.IsBackupMode = false;
-            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
-
             _currentRootPath = rootPath;
             NewLolPath = null;
             OldLolPath = null;
-            
-            _viewModel.SetLoadingState(ExplorerLoadingState.ExploringDirectory);
 
-            Toolbar.IsSortButtonVisible = false;
-
-            try
-            {
-                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                _viewModel.RootNodes.Clear();
-                foreach (var node in newNodes)
-                {
-                    _viewModel.RootNodes.Add(node);
-                }
-
-                TaskCancellationManager.CompleteCurrentOperation();
-            }
-            catch (OperationCanceledException)
-            {
-                LogService.LogWarning("Directory tree building was cancelled.");
-                await Task.Delay(1500);
-                TaskCancellationManager.CompleteCurrentOperation();
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "Failed to build directory tree.");
-                CustomMessageBoxService.ShowError("Error", "Could not load the directory. Please check the logs.", Window.GetWindow(this));
-                _viewModel.IsEmptyState = true;
-            }
-            finally
-            {
-                _viewModel.IsBusy = false;
-                if (!_viewModel.IsEmptyState)
-                {
-                    _viewModel.IsTreeReady = true;
-                }
-            }
+            await ExecuteTreeBuildInternalAsync(
+                async ct => (IEnumerable<FileSystemNodeModel>)await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct),
+                ExplorerLoadingState.ExploringDirectory,
+                "Failed to build directory tree.",
+                false);
         }
 
         private async Task BuildTreeFromBackupAsync(string jsonPath)
         {
-            _viewModel.IsBackupMode = true;
             _backupJsonPath = jsonPath;
-            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
-            _viewModel.SetLoadingState(ExplorerLoadingState.LoadingBackup);
-
-            Toolbar.IsSortButtonVisible = true;
-
-            try
-            {
-                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _viewModel.IsSortingEnabled, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                _viewModel.RootNodes.Clear();
-                NewLolPath = newLolPath;
-                OldLolPath = oldLolPath;
-                foreach (var node in backupNodes)
+            await ExecuteTreeBuildInternalAsync(
+                async ct => 
                 {
-                    _viewModel.RootNodes.Add(node);
-                }
-
-                TaskCancellationManager.CompleteCurrentOperation();
-            }
-            catch (OperationCanceledException)
-            {
-                LogService.LogWarning("Backup tree building was cancelled.");
-                await Task.Delay(1500);
-                TaskCancellationManager.CompleteCurrentOperation();
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "Failed to build tree from backup.");
-                CustomMessageBoxService.ShowError("Error", "Could not load the backup file. Please check the logs.", Window.GetWindow(this));
-                _viewModel.IsEmptyState = true;
-            }
-            finally
-            {
-                _viewModel.IsBusy = false;
-                if (!_viewModel.IsEmptyState)
-                {
-                    _viewModel.IsTreeReady = true;
-                }
-            }
+                    var (nodes, newPath, oldPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _viewModel.IsSortingEnabled, ct);
+                    NewLolPath = newPath;
+                    OldLolPath = oldPath;
+                    return (IEnumerable<FileSystemNodeModel>)nodes;
+                },
+                ExplorerLoadingState.LoadingBackup,
+                "Failed to build tree from backup.",
+                true);
         }
 
         private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
