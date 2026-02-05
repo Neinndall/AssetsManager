@@ -25,7 +25,6 @@ namespace AssetsManager.Services.Audio
         private readonly WadSearchBoxService _wadSearchBoxService;
         private readonly LogService _logService;
         private readonly TreeUIManager _treeUIManager;
-        private readonly TreeBuilderService _treeBuilderService;
         private readonly HashResolverService _hashResolverService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
 
@@ -34,7 +33,6 @@ namespace AssetsManager.Services.Audio
             WadSearchBoxService wadSearchBoxService,
             LogService logService,
             TreeUIManager treeUIManager,
-            TreeBuilderService treeBuilderService,
             HashResolverService hashResolverService,
             WadNodeLoaderService wadNodeLoaderService)
         {
@@ -42,7 +40,6 @@ namespace AssetsManager.Services.Audio
             _wadSearchBoxService = wadSearchBoxService;
             _logService = logService;
             _treeUIManager = treeUIManager;
-            _treeBuilderService = treeBuilderService;
             _hashResolverService = hashResolverService;
             _wadNodeLoaderService = wadNodeLoaderService;
         }
@@ -640,7 +637,7 @@ namespace AssetsManager.Services.Audio
             // Normal Mode
             else
             {
-                Func<FileSystemNodeModel, Task> loader = async (node) => await LoadAllChildrenForSearch(node, currentRootPath);
+                Func<FileSystemNodeModel, Task> loader = async (node) => await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath);
 
                 var targetWadNode = FindNodeByName(rootNodes, strategy.TargetWadName);
                 if (targetWadNode != null)
@@ -678,11 +675,6 @@ namespace AssetsManager.Services.Audio
         }
 
 
-
-        private async Task LoadAllChildrenForSearch(FileSystemNodeModel node, string rootPath)
-        {
-            await _treeBuilderService.LoadAllChildren(node, rootPath);
-        }
 
         private void FindAllNodesByNameRecursive(IEnumerable<FileSystemNodeModel> nodes, List<string> namesToFind, List<FileSystemNodeModel> foundNodes)
         {

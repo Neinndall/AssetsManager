@@ -825,96 +825,11 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
-                    await HandleAudioBankExpansion(selectedNode);
+                    await TreeBuilderService.ExpandAudioBankAsync(selectedNode, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
                 }
                 
                 FileSelected?.Invoke(this, e);
             }
-        }
-
-        private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
-        {
-            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, _viewModel.RootNodes, _currentRootPath);
-            if (linkedBank == null)
-            {
-                return; // Errors are logged by the service
-            }
-
-            // Read other file data from the WAD.
-            var eventsData = linkedBank.EventsBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
-            byte[] wpkData = linkedBank.WpkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
-
-            List<AudioEventNode> audioTree;
-            if (linkedBank.BinData != null)
-            {
-                // BIN-based parsing (Champions, Maps)
-                if (wpkData != null)
-                {
-                    audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
-                }
-                else
-                {
-                    audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
-                }
-            }
-            else
-            {
-                // Generic parsing (no BIN file)
-                audioTree = AudioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
-            }
-
-            // 5. Populate the tree view with the results.
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                clickedNode.Children.Clear();
-
-                // Determine the absolute source WAD path for the child sound nodes.
-                string absoluteSourceWadPath;
-                if (clickedNode.ChunkDiff != null && (!string.IsNullOrEmpty(NewLolPath) || !string.IsNullOrEmpty(OldLolPath)))
-                {
-                    // Backup mode: construct the absolute path from the base LoL directory and the relative WAD path.
-                    string basePath = clickedNode.ChunkDiff.Type == ChunkDiffType.Removed ? OldLolPath : NewLolPath;
-                    absoluteSourceWadPath = Path.Combine(basePath, clickedNode.SourceWadPath);
-                }
-                else
-                {
-                    // Normal mode: the SourceWadPath should already be absolute.
-                    absoluteSourceWadPath = clickedNode.SourceWadPath;
-                }
-
-                foreach (var eventNode in audioTree)
-                {
-                    var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
-                    foreach (var soundNode in eventNode.Sounds)
-                    {
-                        // Determine the correct source file (WPK or BNK) for the sound.
-                        // This is crucial for the previewer to know where to extract the WEM data from.
-                        AudioSourceType sourceType;
-                        ulong sourceHash;
-                        if (linkedBank.WpkNode != null)
-                        {
-                            sourceType = AudioSourceType.Wpk;
-                            sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
-                        }
-                        else
-                        {
-                            sourceType = AudioSourceType.Bnk;
-                            sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
-                        }
-
-                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
-                        {
-                            SourceWadPath = absoluteSourceWadPath, // Use the resolved absolute path
-                            SourceChunkPathHash = sourceHash,
-                            AudioSource = sourceType
-                        };
-                        newEventNode.Children.Add(newSoundNode);
-                    }
-                    clickedNode.Children.Add(newEventNode);
-                }
-                clickedNode.IsExpanded = true;
-            });
         }
 
         private void Toolbar_SearchTextChanged(object sender, RoutedEventArgs e)
@@ -1000,7 +915,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
         {
-            await TreeBuilderService.LoadAllChildren(node, _currentRootPath);
+            await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
         }
 
         public void SelectNode(FileSystemNodeModel node)

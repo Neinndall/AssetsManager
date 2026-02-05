@@ -9,6 +9,12 @@ using AssetsManager.Views.Models.Explorer;
 
 using System.Threading;
 
+using AssetsManager.Services.Audio;
+using AssetsManager.Views.Models.Audio;
+using AssetsManager.Views.Models.Wad;
+using System.Collections.Generic;
+using System.Windows;
+
 namespace AssetsManager.Services.Explorer.Tree
 {
     public class TreeBuilderService
@@ -16,12 +22,24 @@ namespace AssetsManager.Services.Explorer.Tree
         private readonly WadNodeLoaderService _wadNodeLoaderService;
         private readonly HashResolverService _hashResolverService;
         private readonly LogService _logService;
+        private readonly AudioBankLinkerService _audioBankLinkerService;
+        private readonly WadExtractionService _wadExtractionService;
+        private readonly AudioBankService _audioBankService;
 
-        public TreeBuilderService(WadNodeLoaderService wadNodeLoaderService, HashResolverService hashResolverService, LogService logService)
+        public TreeBuilderService(
+            WadNodeLoaderService wadNodeLoaderService, 
+            HashResolverService hashResolverService, 
+            LogService logService,
+            AudioBankLinkerService audioBankLinkerService,
+            WadExtractionService wadExtractionService,
+            AudioBankService audioBankService)
         {
             _wadNodeLoaderService = wadNodeLoaderService;
             _hashResolverService = hashResolverService;
             _logService = logService;
+            _audioBankLinkerService = audioBankLinkerService;
+            _wadExtractionService = wadExtractionService;
+            _audioBankService = audioBankService;
         }
 
         public async Task<ObservableCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken)
@@ -34,7 +52,7 @@ namespace AssetsManager.Services.Explorer.Tree
                 cancellationToken.ThrowIfCancellationRequested();
                 var gameNode = new FileSystemNodeModel(gamePath);
                 rootNodes.Add(gameNode);
-                await LoadAllChildren(gameNode, rootPath, cancellationToken);
+                await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(gameNode, rootPath, cancellationToken);
             }
 
             string pluginsPath = Path.Combine(rootPath, "Plugins");
@@ -43,7 +61,7 @@ namespace AssetsManager.Services.Explorer.Tree
                 cancellationToken.ThrowIfCancellationRequested();
                 var pluginsNode = new FileSystemNodeModel(pluginsPath);
                 rootNodes.Add(pluginsNode);
-                await LoadAllChildren(pluginsNode, rootPath, cancellationToken);
+                await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(pluginsNode, rootPath, cancellationToken);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -70,69 +88,94 @@ namespace AssetsManager.Services.Explorer.Tree
             return (new ObservableCollection<FileSystemNodeModel>(nodes), newLolPath, oldLolPath);
         }
 
-        public async Task LoadAllChildren(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
+        public async Task ExpandAudioBankAsync(FileSystemNodeModel clickedNode, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (node.Children.Count == 1 && node.Children[0].Name == "Loading...")
+            var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(clickedNode, rootNodes, currentRootPath, newLolPath, oldLolPath);
+            if (linkedBank == null)
             {
-                node.Children.Clear();
+                return; // Errors are logged by the service
             }
 
-            if (node.Type == NodeType.WadFile)
+            // Read other file data from the WAD.
+            var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
+            byte[] wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
+            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
+
+            List<AudioEventNode> audioTree;
+            if (linkedBank.BinData != null)
             {
-                var children = await _wadNodeLoaderService.LoadChildrenAsync(node, cancellationToken);
-                foreach (var child in children)
+                // BIN-based parsing (Champions, Maps)
+                if (wpkData != null)
                 {
-                    node.Children.Add(child);
+                    audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
                 }
-                return;
+                else
+                {
+                    audioTree = _audioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                }
+            }
+            else
+            {
+                // Generic parsing (no BIN file)
+                audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
             }
 
-            if (node.Type == NodeType.RealDirectory)
+            // 5. Populate the tree view with the results.
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                try
+                clickedNode.Children.Clear();
+
+                // Determine the absolute source WAD path for the child sound nodes.
+                string absoluteSourceWadPath;
+                if (clickedNode.ChunkDiff != null && (!string.IsNullOrEmpty(newLolPath) || !string.IsNullOrEmpty(oldLolPath)))
                 {
-                    var directories = Directory.GetDirectories(node.FullPath);
-                    foreach (var dir in directories.OrderBy(d => d))
+                    // Backup mode: construct the absolute path from the base LoL directory and the relative WAD path.
+                    string basePath = clickedNode.ChunkDiff.Type == ChunkDiffType.Removed ? oldLolPath : newLolPath;
+                    absoluteSourceWadPath = Path.Combine(basePath, clickedNode.SourceWadPath);
+                }
+                else
+                {
+                    // Normal mode: the SourceWadPath should already be absolute.
+                    absoluteSourceWadPath = clickedNode.SourceWadPath;
+                }
+
+                foreach (var eventNode in audioTree)
+                {
+                    var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
+                    foreach (var soundNode in eventNode.Sounds)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var childNode = new FileSystemNodeModel(dir);
-                        node.Children.Add(childNode);
-                        await LoadAllChildren(childNode, currentRootPath, cancellationToken);
+                        // Determine the correct source file (WPK or BNK) for the sound.
+                        // This is crucial for the previewer to know where to extract the WEM data from.
+                        AudioSourceType sourceType;
+                        ulong sourceHash;
+                        if (linkedBank.WpkNode != null)
+                        {
+                            sourceType = AudioSourceType.Wpk;
+                            sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
+                        }
+                        else
+                        {
+                            sourceType = AudioSourceType.Bnk;
+                            sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
+                        }
+
+                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
+                        {
+                            SourceWadPath = absoluteSourceWadPath, // Use the resolved absolute path
+                            SourceChunkPathHash = sourceHash,
+                            AudioSource = sourceType
+                        };
+                        newEventNode.Children.Add(newSoundNode);
                     }
-
-                    var files = Directory.GetFiles(node.FullPath);
-                    foreach (var file in files.OrderBy(f => f))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        string lowerFile = file.ToLowerInvariant();
-
-                        bool keepFile = false;
-                        if (lowerFile.EndsWith(".wad.client"))
-                        {
-                            if (node.FullPath.StartsWith(Path.Combine(currentRootPath, "Game")))
-                                keepFile = true;
-                        }
-                        else if (lowerFile.EndsWith(".wad"))
-                        {
-                            if (node.FullPath.StartsWith(Path.Combine(currentRootPath, "Plugins")))
-                                keepFile = true;
-                        }
-
-                        if (keepFile)
-                        {
-                            var childNode = new FileSystemNodeModel(file);
-                            node.Children.Add(childNode);
-                            await LoadAllChildren(childNode, currentRootPath, cancellationToken); // Eager load WAD content
-                        }
-                    }
+                    clickedNode.Children.Add(newEventNode);
                 }
-                catch (UnauthorizedAccessException)
-                {
-                    _logService.LogWarning($"Access denied to: {node.FullPath}");
-                }
-            }
+                clickedNode.IsExpanded = true;
+            });
+        }
+
+        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
+        {
+            await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath, cancellationToken);
         }
 
         private bool PruneEmptyDirectories(FileSystemNodeModel node)

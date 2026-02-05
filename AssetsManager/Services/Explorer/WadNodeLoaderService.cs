@@ -340,6 +340,71 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (node.Children.Count == 1 && node.Children[0].Name == "Loading...")
+            {
+                node.Children.Clear();
+            }
+
+            if (node.Type == NodeType.WadFile)
+            {
+                var children = await LoadChildrenAsync(node, cancellationToken);
+                foreach (var child in children)
+                {
+                    node.Children.Add(child);
+                }
+                return;
+            }
+
+            if (node.Type == NodeType.RealDirectory)
+            {
+                try
+                {
+                    var directories = Directory.GetDirectories(node.FullPath);
+                    foreach (var dir in directories.OrderBy(d => d))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var childNode = new FileSystemNodeModel(dir);
+                        node.Children.Add(childNode);
+                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken);
+                    }
+
+                    var files = Directory.GetFiles(node.FullPath);
+                    foreach (var file in files.OrderBy(f => f))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        string lowerFile = file.ToLowerInvariant();
+
+                        bool keepFile = false;
+                        if (lowerFile.EndsWith(".wad.client"))
+                        {
+                            if (node.FullPath.StartsWith(Path.Combine(currentRootPath, "Game")))
+                                keepFile = true;
+                        }
+                        else if (lowerFile.EndsWith(".wad"))
+                        {
+                            if (node.FullPath.StartsWith(Path.Combine(currentRootPath, "Plugins")))
+                                keepFile = true;
+                        }
+
+                        if (keepFile)
+                        {
+                            var childNode = new FileSystemNodeModel(file);
+                            node.Children.Add(childNode);
+                            await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken); // Eager load WAD content
+                        }
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    _logService.LogWarning($"Access denied to: {node.FullPath}");
+                }
+            }
+        }
+
         public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken cancellationToken)
         {
             var childrenToAdd = await Task.Run(() =>
