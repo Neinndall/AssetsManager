@@ -173,8 +173,8 @@ namespace AssetsManager.Services.Comparator
                     cancellationToken.ThrowIfCancellationRequested();
                     fileIndex++;
 
-                    string wadDisplayName = Path.GetFileName(file.RelativePath);
-                    string statusMsg = $"{fileIndex} of {scanResult.ValidFiles.Count} files: {wadDisplayName}";
+                    // Use the full RelativePath for consistent technical context
+                    string statusMsg = $"{fileIndex} of {scanResult.ValidFiles.Count} files: {file.RelativePath}";
 
                     using var oldWad = new WadFile(file.OldPath);
                     using var newWad = new WadFile(file.NewPath);

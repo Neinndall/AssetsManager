@@ -332,8 +332,8 @@ public class ManifestDownloader
                                             Interlocked.Increment(ref completedFilesCount);
                                             if (openHandles.TryRemove(target.FullPath, out var hnd)) hnd.Dispose();
                                         }
-                                        // Use the professional format "File X of Y: filename"
-                                        ProgressChanged?.Invoke("Updating", $"{completedFilesCount} of {totalFilesToPatch} files: {Path.GetFileName(target.FullPath)}", doneChunks, totalChunks);
+                                        // Use the full relative path (FileInfo.Name) for consistent technical context
+                                        ProgressChanged?.Invoke("Updating", $"{completedFilesCount} of {totalFilesToPatch} files: {target.FileInfo.Name}", doneChunks, totalChunks);
                                     }
                                 } finally { _decompressorPool.Push(decompressor); }
                             } finally { cpuSem.Release(); }
