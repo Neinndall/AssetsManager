@@ -265,8 +265,8 @@ namespace AssetsManager.Services.Core
 
         public void OnVersionDownloadStarted(object sender, string taskName)
         {
-            // Version download is a bit specific, starts indeterminate
-            StartOperation("Versions Update", "Updating", "Download", 0, "Verifying Files...");
+            // Version download always starts with verification
+            StartOperation("Versions Update", "Verifying", "Download", 0, "Verifying Files...");
         }
 
         public void OnVersionDownloadProgressChanged(object sender, (string TaskName, int CurrentValue, int TotalValue, string CurrentFile) data)
