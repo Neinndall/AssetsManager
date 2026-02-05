@@ -55,6 +55,9 @@ namespace AssetsManager.Views.Dialogs
             _completedFiles = completedFiles;
             _totalFiles = totalFiles;
 
+            // Sync the verb textblock with the property (since it might have changed in ProgressUIManager)
+            if (!string.IsNullOrEmpty(OperationVerb)) VerbTextBlock.Text = OperationVerb;
+
             // 1. Universal Parser for formatted strings (e.g. "1 of 30 assets: audio.ogg")
             if (!string.IsNullOrEmpty(currentFileName) && currentFileName.Contains(" of ") && currentFileName.Contains(": "))
             {
