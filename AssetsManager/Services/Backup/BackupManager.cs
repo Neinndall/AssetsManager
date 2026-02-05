@@ -117,62 +117,65 @@ namespace AssetsManager.Services.Backup
             return await Task.Run(() =>
             {
                 var backups = new List<BackupModel>();
-                var lolPbeDirectory = _appSettings.LolPbeDirectory;
+                var pathsToScan = new List<string>();
+
+                if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory)) 
+                    pathsToScan.Add(_appSettings.LolPbeDirectory);
                 
-                if (!string.IsNullOrEmpty(lolPbeDirectory))
+                if (!string.IsNullOrEmpty(_appSettings.LolLiveDirectory)) 
+                    pathsToScan.Add(_appSettings.LolLiveDirectory);
+
+                foreach (var baseDir in pathsToScan)
                 {
-                    var specificBackupPath = lolPbeDirectory + "_old";
+                    // Clean trailing slashes to avoid "Path\_old"
+                    string cleanBaseDir = baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    var specificBackupPath = cleanBaseDir + "_old";
+
                     if (Directory.Exists(specificBackupPath))
                     {
-                        var directoryInfo = new DirectoryInfo(specificBackupPath);
-                        backups.Add(new BackupModel
-                        {
-                            Name = directoryInfo.Name,
-                            DisplayName = GetBackupDisplayName(directoryInfo.Name),
-                            Path = directoryInfo.FullName,
-                            CreationDate = directoryInfo.CreationTime,
-                            Size = FormatBytes(GetDirectorySize(directoryInfo.FullName)),
-                            IsSelected = false,
-                            IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
-                        });
+                        AddBackupToList(backups, specificBackupPath);
                     }
-                }
 
-                if (string.IsNullOrEmpty(lolPbeDirectory))
-                {
-                    return backups;
-                }
-                
-                var parentDirectory = Directory.GetParent(lolPbeDirectory)?.FullName;
-
-                if (string.IsNullOrEmpty(parentDirectory) || !Directory.Exists(parentDirectory))
-                {
-                    return backups;
-                }
-
-                foreach (var dir in Directory.EnumerateDirectories(parentDirectory))
-                {
-                    if (dir.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
+                    // Scan parent directory for other "_old" folders
+                    try
                     {
-                        if (backups.Any(b => b.Path.Equals(dir, StringComparison.OrdinalIgnoreCase)))
+                        var parentDirectory = Directory.GetParent(cleanBaseDir)?.FullName;
+                        if (!string.IsNullOrEmpty(parentDirectory) && Directory.Exists(parentDirectory))
                         {
-                            continue;
+                            foreach (var dir in Directory.EnumerateDirectories(parentDirectory))
+                            {
+                                if (dir.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    AddBackupToList(backups, dir);
+                                }
+                            }
                         }
-                        
-                        var directoryInfo = new DirectoryInfo(dir);
-                        backups.Add(new BackupModel
-                        {
-                            Name = directoryInfo.Name,
-                            DisplayName = GetBackupDisplayName(directoryInfo.Name),
-                            Path = directoryInfo.FullName,
-                            CreationDate = directoryInfo.CreationTime,
-                            Size = FormatBytes(GetDirectorySize(directoryInfo.FullName)),
-                            IsSelected = false,
-                            IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
-                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogWarning($"Error scanning parent directory for backups: {ex.Message}");
                     }
                 }
+
                 return backups.OrderByDescending(b => b.CreationDate).ToList();
+            });
+        }
+
+        private void AddBackupToList(List<BackupModel> backups, string path)
+        {
+            if (backups.Any(b => b.Path.Equals(path, StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            var directoryInfo = new DirectoryInfo(path);
+            backups.Add(new BackupModel
+            {
+                Name = directoryInfo.Name,
+                DisplayName = GetBackupDisplayName(directoryInfo.Name),
+                Path = directoryInfo.FullName,
+                CreationDate = directoryInfo.CreationTime,
+                Size = FormatBytes(GetDirectorySize(directoryInfo.FullName)),
+                IsSelected = false,
+                IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
             });
         }
 
