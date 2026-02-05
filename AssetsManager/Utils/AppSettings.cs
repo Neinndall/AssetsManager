@@ -54,7 +54,15 @@ namespace AssetsManager.Utils
 
         public ApiSettings ApiSettings { get; set; }
 
+        public event EventHandler ConfigurationSaved;
+
         private const string ConfigFilePath = "config.json";
+
+        public void Save()
+        {
+            SaveSettings(this);
+            ConfigurationSaved?.Invoke(this, EventArgs.Empty);
+        }
 
         public static AppSettings LoadSettings()
         {

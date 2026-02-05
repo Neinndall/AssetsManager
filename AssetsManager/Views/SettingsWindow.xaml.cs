@@ -92,7 +92,7 @@ namespace AssetsManager.Views
             {
                 _appSettings.ResetToDefaults();
 
-                AppSettings.SaveSettings(_appSettings);
+                _appSettings.Save();
                 _customMessageBoxService.ShowInfo("Info", "Settings have been reset to default values.", this);
 
                 _settingsModel.Settings = _appSettings;
@@ -105,7 +105,7 @@ namespace AssetsManager.Views
         {
             _advancedSettingsView.SaveSettings();
 
-            AppSettings.SaveSettings(_settingsModel.Settings);
+            _appSettings.Save();
 
             _customMessageBoxService.ShowSuccess("Success", "Settings have been saved successfully.", this);
 

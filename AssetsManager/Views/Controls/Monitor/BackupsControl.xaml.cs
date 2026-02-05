@@ -37,6 +37,10 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void BackupsControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
             try
             {
                 await LoadBackupsAsync();
@@ -49,7 +53,15 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void BackupsControl_Unloaded(object sender, RoutedEventArgs e)
         {
-            // Unsubscribe from events if any
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+        }
+
+        private async void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            await Dispatcher.InvokeAsync(async () => await LoadBackupsAsync());
         }
 
         private async Task LoadBackupsAsync()
