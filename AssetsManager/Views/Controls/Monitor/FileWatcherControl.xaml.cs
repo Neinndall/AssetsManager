@@ -38,12 +38,28 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void FileWatcherControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
+
             if (MonitorService != null)
             {
                 _allMonitoredUrls = MonitorService.MonitoredItems.ToList();
                 MonitoredItemsListView.ItemsSource = _allMonitoredUrls;
                 MonitorService.MonitoredItems.CollectionChanged += MonitoredItems_CollectionChanged;
             }
+        }
+
+        private void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (MonitorService != null)
+                {
+                    MonitorService.LoadMonitoredUrls();
+                }
+            });
         }
 
         private void MonitoredItems_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -100,7 +116,7 @@ namespace AssetsManager.Views.Controls.Monitor
                         MonitorService.MonitoredItems.Remove(item);
                         AppSettings.MonitoredJsonFiles.Remove(item.Url);
                         AppSettings.JsonDataModificationDates.Remove(item.Url);
-                        AppSettings.SaveSettings(AppSettings);
+                        AppSettings.Save();
                     }
                 }
             }
@@ -115,7 +131,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     MonitorService.MonitoredItems.Clear();
                     AppSettings.MonitoredJsonFiles.Clear();
                     AppSettings.JsonDataModificationDates.Clear();
-                    AppSettings.SaveSettings(AppSettings);
+                    AppSettings.Save();
                     LogService.Log("All file monitors have been cleared.");
                 }
             }
@@ -174,7 +190,7 @@ namespace AssetsManager.Views.Controls.Monitor
             if (addedCount > 0)
             {
                 CustomMessageBoxService.ShowInfo("URLs Added", $"Added {addedCount} new URL(s) to be monitored.", Window.GetWindow(this));
-                AppSettings.SaveSettings(AppSettings);
+                AppSettings.Save();
                 MonitorService.LoadMonitoredUrls();
             }
             else
@@ -199,6 +215,11 @@ namespace AssetsManager.Views.Controls.Monitor
             if (MonitorService != null)
             {
                 MonitorService.MonitoredItems.CollectionChanged -= MonitoredItems_CollectionChanged;
+            }
+
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
         }
     }

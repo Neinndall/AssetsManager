@@ -13,6 +13,7 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Views.Controls.Monitor
@@ -24,6 +25,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public AssetDownloader AssetDownloader { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public AppSettings AppSettings { get; set; }
 
         // Internal state properties
         public ObservableCollection<AssetCategory> Categories { get; set; }
@@ -43,9 +45,24 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (MonitorService == null) return;
 
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
+
             MonitorService.CategoryCheckStarted += OnCategoryCheckStarted;
             MonitorService.CategoryCheckCompleted += OnCategoryCheckCompleted;
 
+            LoadTrackerData();
+        }
+
+        private void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            Dispatcher.InvokeAsync(() => LoadTrackerData());
+        }
+
+        private void LoadTrackerData()
+        {
             MonitorService.LoadAssetCategories();
 
             Categories.Clear();
@@ -232,6 +249,11 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 MonitorService.CategoryCheckStarted -= OnCategoryCheckStarted;
                 MonitorService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
+            }
+
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
         }
 

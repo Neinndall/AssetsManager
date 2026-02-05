@@ -64,6 +64,7 @@ namespace AssetsManager.Views
             AssetTrackerControl.AssetDownloader = assetDownloader;
             AssetTrackerControl.LogService = logService;
             AssetTrackerControl.CustomMessageBoxService = customMessageBoxService;
+            AssetTrackerControl.AppSettings = appSettings;
 
             // Setup and inject dependencies for ManageVersionsControl
             ManageVersionsControl.VersionService = versionService;
