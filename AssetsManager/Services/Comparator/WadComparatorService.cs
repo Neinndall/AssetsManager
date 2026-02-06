@@ -76,10 +76,7 @@ namespace AssetsManager.Services.Comparator
                 if (totalChunks > 0)
                 {
                     var relativePath = Path.GetFileName(oldWadFile);
-                    using var oldWad = new WadFile(oldWadFile);
-                    using var newWad = new WadFile(newWadFile);
-
-                    var diffs = await CollectDiffsAsync(oldWad, newWad, relativePath, cancellationToken);
+                    var diffs = await CollectDiffsAsync(oldWadFile, newWadFile, relativePath, cancellationToken);
                     allDiffs.AddRange(diffs);
                 }
                 else
@@ -176,10 +173,7 @@ namespace AssetsManager.Services.Comparator
                     // Use the full RelativePath for consistent technical context
                     string statusMsg = $"{fileIndex} of {scanResult.ValidFiles.Count} files: {file.RelativePath}";
 
-                    using var oldWad = new WadFile(file.OldPath);
-                    using var newWad = new WadFile(file.NewPath);
-
-                    var diffs = await CollectDiffsAsync(oldWad, newWad, file.RelativePath, cancellationToken, statusMsg);
+                    var diffs = await CollectDiffsAsync(file.OldPath, file.NewPath, file.RelativePath, cancellationToken, statusMsg);
                     allDiffs.AddRange(diffs);
                 }
             }
@@ -213,16 +207,23 @@ namespace AssetsManager.Services.Comparator
             }
         }
 
-        private async Task<List<ChunkDiff>> CollectDiffsAsync(WadFile oldWad, WadFile newWad, string sourceWadFile, CancellationToken cancellationToken, string statusMsg = "")
+        private async Task<List<ChunkDiff>> CollectDiffsAsync(string oldWadPath, string newWadPath, string sourceWadFile, CancellationToken cancellationToken, string statusMsg = "")
         {
             var diffs = new List<ChunkDiff>();
 
-            var oldChunks = oldWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
-            var newChunks = newWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
+            Dictionary<ulong, WadChunk> oldChunks;
+            Dictionary<ulong, WadChunk> newChunks;
+
+            using (var oldWad = new WadFile(oldWadPath))
+            using (var newWad = new WadFile(newWadPath))
+            {
+                oldChunks = oldWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
+                newChunks = newWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
+            }
 
             // We report progress during hashing, which is the slow part
-            var oldChunkChecksums = await GetChunkChecksumsAsync(oldWad, oldChunks.Values, cancellationToken, statusMsg);
-            var newChunkChecksums = await GetChunkChecksumsAsync(newWad, newChunks.Values, cancellationToken, statusMsg);
+            var oldChunkChecksums = await GetChunkChecksumsAsync(oldWadPath, oldChunks.Values, cancellationToken, statusMsg);
+            var newChunkChecksums = await GetChunkChecksumsAsync(newWadPath, newChunks.Values, cancellationToken, statusMsg);
 
             // Comparison logic (fast)
             foreach (var oldChunk in oldChunks.Values)
@@ -266,31 +267,47 @@ namespace AssetsManager.Services.Comparator
             return diffs;
         }
 
-        private async Task<Dictionary<ulong, ulong>> GetChunkChecksumsAsync(WadFile wadFile, IEnumerable<WadChunk> chunks, CancellationToken cancellationToken, string statusMsg)
+        private async Task<Dictionary<ulong, ulong>> GetChunkChecksumsAsync(string wadPath, IEnumerable<WadChunk> chunks, CancellationToken cancellationToken, string statusMsg)
         {
-            var checksums = new Dictionary<ulong, ulong>();
+            var checksums = new System.Collections.Concurrent.ConcurrentDictionary<ulong, ulong>();
+            var chunkList = chunks.ToList();
+            int totalInWad = chunkList.Count;
+
+            // Fixed threading (Max 4 threads for stability and performance)
+            int threadCount = Math.Clamp(Environment.ProcessorCount, 1, 4);
+            
+            _logService.Log($"[Thread Audit] Comparing {Path.GetFileName(wadPath)} using {threadCount} threads (Total chunks: {totalInWad})");
+
+            var parallelOptions = new ParallelOptions 
+            { 
+                MaxDegreeOfParallelism = threadCount, 
+                CancellationToken = cancellationToken 
+            };
 
             await Task.Run(() =>
             {
-                foreach (var chunk in chunks)
+                Parallel.ForEach(chunkList, parallelOptions, 
+                () => new WadFile(wadPath), // Thread Local Init: Open a new WadFile for this thread
+                (chunk, state, localWad) =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    using var decompressedChunk = wadFile.LoadChunkDecompressed(chunk);
+                    using var decompressedChunk = localWad.LoadChunkDecompressed(chunk);
                     var checksum = System.IO.Hashing.XxHash64.HashToUInt64(decompressedChunk.Span);
                     checksums[chunk.PathHash] = checksum;
 
-                    // Increment and notify for every chunk hashed
-                    _completedChunksGlobal++;
-                    // We only notify every N chunks to avoid UI saturation if hashing is too fast
-                    if (_completedChunksGlobal % 10 == 0 || _completedChunksGlobal == _totalChunksGlobal)
+                    int completed = Interlocked.Increment(ref _completedChunksGlobal);
+                    if (completed % 20 == 0 || completed == _totalChunksGlobal)
                     {
-                        NotifyComparisonProgressChanged(_completedChunksGlobal, statusMsg, true, null);
+                        NotifyComparisonProgressChanged(completed, statusMsg, true, null);
                     }
-                }
+                    return localWad;
+                },
+                localWad => localWad.Dispose() // Thread Local Cleanup
+                );
             });
 
-            return checksums;
+            return checksums.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         }
     }
 }

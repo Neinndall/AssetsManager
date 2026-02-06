@@ -116,7 +116,7 @@ public class ManifestDownloader
 
         await Task.Run(async () =>
         {
-            var scanSemaphore = new SemaphoreSlim(2);
+            var scanSemaphore = new SemaphoreSlim(Math.Clamp(Environment.ProcessorCount, 1, 4));
             var pool = System.Buffers.ArrayPool<byte>.Shared;
 
             var scanTasks = filteredFiles.Select(async file =>
@@ -242,7 +242,7 @@ public class ManifestDownloader
         try
         {
             var netSem = new SemaphoreSlim(8); 
-            var cpuSem = new SemaphoreSlim(Environment.ProcessorCount);
+            var cpuSem = new SemaphoreSlim(Math.Clamp(Environment.ProcessorCount, 1, 4));
 
             var tasks = bundlesToProcess.Select(async bundleEntry =>
             {
