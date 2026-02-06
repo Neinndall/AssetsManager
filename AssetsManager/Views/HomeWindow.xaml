@@ -249,6 +249,21 @@
                                 </StackPanel>
                             </Grid>
                         </Button>
+
+                        <!-- Audio Player -->
+                        <Button Grid.Column="1" Width="200" Height="100" Style="{StaticResource DashboardTileStyle}" Click="AudioPlayer_Click" Tag="{StaticResource AccentBlue}" Margin="16,8,8,8">
+                            <Grid Margin="16">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="36" Height="36" CornerRadius="10" Background="#1A4FC1FF" Margin="0,0,12,0">
+                                        <materialIcons:MaterialIcon Kind="Waveform" Width="20" Height="20" Foreground="{StaticResource AccentBlue}"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Audio Player" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="Session playlist" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
                     </Grid>
                 </StackPanel>
             </Grid>

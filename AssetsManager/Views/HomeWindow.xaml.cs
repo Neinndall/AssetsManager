@@ -42,5 +42,12 @@ namespace AssetsManager.Views
             notepadWindow.Owner = Window.GetWindow(this);
             notepadWindow.Show();
         }
+
+        private void AudioPlayer_Click(object sender, RoutedEventArgs e)
+        {
+            var audioPlayerWindow = App.ServiceProvider.GetRequiredService<AudioPlayerWindow>();
+            audioPlayerWindow.Owner = Window.GetWindow(this);
+            audioPlayerWindow.Show();
+        }
     }
 }

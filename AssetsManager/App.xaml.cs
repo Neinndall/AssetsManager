@@ -159,6 +159,7 @@ namespace AssetsManager
       // Audio Services
       services.AddSingleton<AudioBankService>();
       services.AddSingleton<AudioBankLinkerService>();
+      services.AddSingleton<AudioPlayerService>();
 
       // Views
       services.AddTransient<MainWindow>();
@@ -198,6 +199,7 @@ namespace AssetsManager
       services.AddTransient<ConfirmationDialog>();
       services.AddTransient<WadComparisonResultWindow>();
       services.AddTransient<NotepadWindow>();
+      services.AddTransient<AudioPlayerWindow>();
     }
 
     protected override void OnStartup(StartupEventArgs e)
