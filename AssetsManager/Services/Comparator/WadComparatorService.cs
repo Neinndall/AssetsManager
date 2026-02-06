@@ -207,23 +207,23 @@ namespace AssetsManager.Services.Comparator
             }
         }
 
-        private async Task<List<ChunkDiff>> CollectDiffsAsync(string oldWadPath, string newWadPath, string sourceWadFile, CancellationToken cancellationToken, string statusMsg = "")
+        private async Task<List<ChunkDiff>> CollectDiffsAsync(string oldWadFile, string newWadFile, string sourceWadFile, CancellationToken cancellationToken, string statusMsg = "")
         {
             var diffs = new List<ChunkDiff>();
 
             Dictionary<ulong, WadChunk> oldChunks;
             Dictionary<ulong, WadChunk> newChunks;
 
-            using (var oldWad = new WadFile(oldWadPath))
-            using (var newWad = new WadFile(newWadPath))
+            using (var oldWad = new WadFile(oldWadFile))
+            using (var newWad = new WadFile(newWadFile))
             {
                 oldChunks = oldWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
                 newChunks = newWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
             }
 
             // We report progress during hashing, which is the slow part
-            var oldChunkChecksums = await GetChunkChecksumsAsync(oldWadPath, oldChunks.Values, cancellationToken, statusMsg);
-            var newChunkChecksums = await GetChunkChecksumsAsync(newWadPath, newChunks.Values, cancellationToken, statusMsg);
+            var oldChunkChecksums = await GetChunkChecksumsAsync(oldWadFile, oldChunks.Values, cancellationToken, statusMsg);
+            var newChunkChecksums = await GetChunkChecksumsAsync(newWadFile, newChunks.Values, cancellationToken, statusMsg);
 
             // Comparison logic (fast)
             foreach (var oldChunk in oldChunks.Values)
@@ -288,11 +288,11 @@ namespace AssetsManager.Services.Comparator
             {
                 Parallel.ForEach(chunkList, parallelOptions, 
                 () => new WadFile(wadPath), // Thread Local Init: Open a new WadFile for this thread
-                (chunk, state, localWad) =>
+                (chunk, state, wadFile) =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    using var decompressedChunk = localWad.LoadChunkDecompressed(chunk);
+                    using var decompressedChunk = wadFile.LoadChunkDecompressed(chunk);
                     var checksum = System.IO.Hashing.XxHash64.HashToUInt64(decompressedChunk.Span);
                     checksums[chunk.PathHash] = checksum;
 
@@ -301,9 +301,9 @@ namespace AssetsManager.Services.Comparator
                     {
                         NotifyComparisonProgressChanged(completed, statusMsg, true, null);
                     }
-                    return localWad;
+                    return wadFile;
                 },
-                localWad => localWad.Dispose() // Thread Local Cleanup
+                wadFile => wadFile.Dispose() // Thread Local Cleanup
                 );
             });
 
