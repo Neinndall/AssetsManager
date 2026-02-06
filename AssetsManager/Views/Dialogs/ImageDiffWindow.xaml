@@ -86,7 +86,7 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
                         <icons:MaterialIcon Kind="ImageMultipleOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
                         <TextBlock Text="Image Comparison" 
-                                   FontSize="13" 
+                                   FontSize="12" 
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimary}"
                                    VerticalAlignment="Center"/>

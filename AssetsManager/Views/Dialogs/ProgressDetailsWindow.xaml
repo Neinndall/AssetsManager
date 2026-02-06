@@ -43,7 +43,7 @@
                                                 VerticalAlignment="Center" 
                                                 Margin="0,0,10,0"/>
                     <TextBlock Text="{Binding HeaderText}" 
-                               FontWeight="SemiBold" FontSize="13" 
+                               FontWeight="SemiBold" FontSize="12" 
                                Foreground="{StaticResource TextPrimary}" 
                                VerticalAlignment="Center"/>
                 </StackPanel>
