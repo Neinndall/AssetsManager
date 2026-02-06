@@ -275,8 +275,6 @@ namespace AssetsManager.Services.Comparator
 
             // Fixed threading (Max 4 threads for stability and performance)
             int threadCount = Math.Clamp(Environment.ProcessorCount, 1, 4);
-            
-            _logService.Log($"[Thread Audit] Comparing {Path.GetFileName(wadPath)} using {threadCount} threads (Total chunks: {totalInWad})");
 
             var parallelOptions = new ParallelOptions 
             { 
