@@ -118,7 +118,7 @@
                     <!-- Main Buttons -->
                     <Grid>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Button Style="{StaticResource IconButton}" Width="40" Height="40" Margin="5">
+                            <Button Style="{StaticResource IconButton}" Width="40" Height="40" Margin="5" Click="SkipBackward_Click">
                                 <icons:MaterialIcon Kind="SkipPrevious" Width="20" Height="20"/>
                             </Button>
                             
@@ -126,7 +126,7 @@
                                 <icons:MaterialIcon x:Name="PlayIcon" Kind="Play" Width="24" Height="24"/>
                             </Button>
                             
-                            <Button Style="{StaticResource IconButton}" Width="40" Height="40" Margin="5">
+                            <Button Style="{StaticResource IconButton}" Width="40" Height="40" Margin="5" Click="SkipForward_Click">
                                 <icons:MaterialIcon Kind="SkipNext" Width="20" Height="20"/>
                             </Button>
                         </StackPanel>

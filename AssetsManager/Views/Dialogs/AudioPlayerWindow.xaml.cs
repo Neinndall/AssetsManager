@@ -77,6 +77,25 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
+        private void SkipForward_Click(object sender, RoutedEventArgs e)
+        {
+            if (_mediaPlayer.NaturalDuration.HasTimeSpan)
+            {
+                var newPos = _mediaPlayer.Position.Add(TimeSpan.FromSeconds(10));
+                if (newPos > _mediaPlayer.NaturalDuration.TimeSpan)
+                    newPos = _mediaPlayer.NaturalDuration.TimeSpan;
+                _mediaPlayer.Position = newPos;
+            }
+        }
+
+        private void SkipBackward_Click(object sender, RoutedEventArgs e)
+        {
+            var newPos = _mediaPlayer.Position.Subtract(TimeSpan.FromSeconds(10));
+            if (newPos < TimeSpan.Zero)
+                newPos = TimeSpan.Zero;
+            _mediaPlayer.Position = newPos;
+        }
+
         private string FormatTime(TimeSpan time)
         {
             return $"{(int)time.TotalMinutes}:{time.Seconds:D2}";
