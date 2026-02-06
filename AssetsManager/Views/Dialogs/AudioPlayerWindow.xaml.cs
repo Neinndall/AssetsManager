@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -145,10 +146,10 @@ namespace AssetsManager.Views.Dialogs
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                 foreach (string file in files)
                 {
-                    string ext = System.IO.Path.GetExtension(file).ToLower();
+                    string ext = Path.GetExtension(file).ToLower();
                     if (ext == ".mp3" || ext == ".wav" || ext == ".ogg")
                     {
-                        _audioPlayerService.AddToPlaylist(System.IO.Path.GetFileName(file), file);
+                        _audioPlayerService.AddToPlaylist(Path.GetFileName(file), file);
                     }
                 }
             }
