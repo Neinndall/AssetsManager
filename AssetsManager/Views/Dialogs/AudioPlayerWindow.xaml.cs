@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using AssetsManager.Services.Audio;
 using System.Windows.Threading;
+using System.Windows.Controls.Primitives;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -32,6 +33,7 @@ namespace AssetsManager.Views.Dialogs
             if (!_isDragging && _mediaPlayer.NaturalDuration.HasTimeSpan)
             {
                 AudioSlider.Value = _mediaPlayer.Position.TotalSeconds;
+                CurrentTimeText.Text = FormatTime(_mediaPlayer.Position);
             }
         }
 
@@ -40,6 +42,7 @@ namespace AssetsManager.Views.Dialogs
             if (_mediaPlayer.NaturalDuration.HasTimeSpan)
             {
                 AudioSlider.Maximum = _mediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
+                TotalTimeText.Text = FormatTime(_mediaPlayer.NaturalDuration.TimeSpan);
             }
             _timer.Start();
         }
@@ -48,6 +51,7 @@ namespace AssetsManager.Views.Dialogs
         {
             _timer.Stop();
             AudioSlider.Value = 0;
+            CurrentTimeText.Text = "0:00";
             PlayIcon.Kind = Material.Icons.MaterialIconKind.Play;
         }
 
@@ -58,15 +62,42 @@ namespace AssetsManager.Views.Dialogs
 
             if (PlayIcon.Kind == Material.Icons.MaterialIconKind.Play)
             {
-                _mediaPlayer.Open(new Uri(selectedItem.Url));
+                if (CurrentTrackName.Text != selectedItem.Name)
+                {
+                    _mediaPlayer.Open(new Uri(selectedItem.Url));
+                    CurrentTrackName.Text = selectedItem.Name;
+                }
                 _mediaPlayer.Play();
                 PlayIcon.Kind = Material.Icons.MaterialIconKind.Pause;
-                CurrentTrackName.Text = selectedItem.Name;
             }
             else
             {
                 _mediaPlayer.Pause();
                 PlayIcon.Kind = Material.Icons.MaterialIconKind.Play;
+            }
+        }
+
+        private string FormatTime(TimeSpan time)
+        {
+            return $"{(int)time.TotalMinutes}:{time.Seconds:D2}";
+        }
+
+        private void AudioSlider_DragStarted(object sender, DragStartedEventArgs e)
+        {
+            _isDragging = true;
+        }
+
+        private void AudioSlider_DragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            _isDragging = false;
+            _mediaPlayer.Position = TimeSpan.FromSeconds(AudioSlider.Value);
+        }
+
+        private void AudioSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isDragging)
+            {
+                CurrentTimeText.Text = FormatTime(TimeSpan.FromSeconds(AudioSlider.Value));
             }
         }
 
@@ -83,6 +114,8 @@ namespace AssetsManager.Views.Dialogs
             _audioPlayerService.ClearPlaylist();
             _mediaPlayer.Stop();
             CurrentTrackName.Text = "No track selected";
+            CurrentTimeText.Text = "0:00";
+            TotalTimeText.Text = "0:00";
             PlayIcon.Kind = Material.Icons.MaterialIconKind.Play;
         }
 

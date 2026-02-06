@@ -109,9 +109,10 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="0:00" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <Slider x:Name="AudioSlider" Grid.Column="1" Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center"/>
-                        <TextBlock Text="0:00" Grid.Column="2" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        <TextBlock x:Name="CurrentTimeText" Text="0:00" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Slider x:Name="AudioSlider" Grid.Column="1" Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center" 
+                                Thumb.DragStarted="AudioSlider_DragStarted" Thumb.DragCompleted="AudioSlider_DragCompleted" ValueChanged="AudioSlider_ValueChanged"/>
+                        <TextBlock x:Name="TotalTimeText" Text="0:00" Grid.Column="2" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     </Grid>
 
                     <!-- Main Buttons -->
