@@ -69,7 +69,7 @@ public class ManifestDownloader
         public RmanFile FileInfo { get; set; }
     }
 
-    public async Task<int> DownloadManifestAsync(RmanManifest manifest, string outputPath, int maxThreads, string filter = null, List<string> langs = null)
+    public async Task<int> DownloadManifestAsync(RmanManifest manifest, string outputPath, string filter = null, List<string> langs = null)
     {
         var regex = !string.IsNullOrEmpty(filter) ? new Regex(filter, RegexOptions.IgnoreCase) : null;
         var selectedLangIds = new HashSet<byte>();
@@ -116,7 +116,7 @@ public class ManifestDownloader
 
         await Task.Run(async () =>
         {
-            var scanSemaphore = new SemaphoreSlim(Math.Clamp(Environment.ProcessorCount, 1, 4));
+            var scanSemaphore = new SemaphoreSlim(Math.Clamp(Environment.ProcessorCount, 1, 2));
             var pool = System.Buffers.ArrayPool<byte>.Shared;
 
             var scanTasks = filteredFiles.Select(async file =>
