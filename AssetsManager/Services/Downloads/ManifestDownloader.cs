@@ -277,6 +277,7 @@ public class ManifestDownloader
                         
                         using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
                         resp.EnsureSuccessStatusCode();
+
                         using var responseStream = await resp.Content.ReadAsStreamAsync();
                         long currentStreamPos = start;
 
