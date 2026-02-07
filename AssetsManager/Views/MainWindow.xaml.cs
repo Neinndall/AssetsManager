@@ -19,7 +19,6 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
-using AssetsManager.Services.Backup;
 using AssetsManager.Views.Controls;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;

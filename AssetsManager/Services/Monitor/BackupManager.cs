@@ -9,7 +9,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
 
-namespace AssetsManager.Services.Backup
+namespace AssetsManager.Services.Monitor
 {
     public class BackupManager
     {
@@ -81,7 +81,7 @@ namespace AssetsManager.Services.Backup
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, $"AssetsManager.Services.Backup.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
+                    _logService.LogError(ex, $"AssetsManager.Services.Monitor.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
                     BackupCompleted?.Invoke(this, false);
                     throw; 
                 }
