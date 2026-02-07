@@ -6,20 +6,33 @@ using System.Windows.Media;
 using AssetsManager.Services.Audio;
 using System.Windows.Threading;
 using System.Windows.Controls.Primitives;
+using Microsoft.Extensions.DependencyInjection;
+using System.Threading.Tasks;
+using System.Net.Http;
+using System.Linq;
+using VideoLibrary;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class AudioPlayerWindow : Window
     {
         private readonly AudioPlayerService _audioPlayerService;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly MediaPlayer _mediaPlayer = new MediaPlayer();
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private bool _isDragging = false;
 
-        public AudioPlayerWindow(AudioPlayerService audioPlayerService)
+        public AudioPlayerWindow(
+            AudioPlayerService audioPlayerService, 
+            IServiceProvider serviceProvider,
+            CustomMessageBoxService customMessageBoxService)
         {
             InitializeComponent();
             _audioPlayerService = audioPlayerService;
+            _serviceProvider = serviceProvider;
+            _customMessageBoxService = customMessageBoxService;
             this.DataContext = _audioPlayerService;
 
             _timer.Interval = TimeSpan.FromMilliseconds(500);
@@ -27,6 +40,50 @@ namespace AssetsManager.Views.Dialogs
 
             _mediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
             _mediaPlayer.MediaEnded += MediaPlayer_MediaEnded;
+        }
+
+        private async void AddUrl_Click(object sender, RoutedEventArgs e)
+        {
+            var inputDialog = _serviceProvider.GetRequiredService<InputDialog>();
+            inputDialog.Owner = this;
+            inputDialog.Initialize("Add Audio URL", "Enter a direct audio link or a YouTube URL:", "");
+
+            if (inputDialog.ShowDialog() == true)
+            {
+                string url = inputDialog.InputText?.Trim();
+                if (string.IsNullOrEmpty(url)) return;
+
+                try
+                {
+                    // Check if it's a YouTube URL
+                    if (url.Contains("youtube.com") || url.Contains("youtu.be"))
+                    {
+                        var youtube = YouTube.Default;
+                        // VideoLibrary handles the 403 bypass internally in v3.3.1
+                        var video = await youtube.GetVideoAsync(url);
+                        
+                        if (video != null)
+                        {
+                            _audioPlayerService.AddToPlaylist(video.FullName, video.Uri);
+                        }
+                    }
+                    else
+                    {
+                        // Direct URL
+                        string name = "Remote Audio";
+                        if (Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
+                        {
+                            name = Path.GetFileName(uri.LocalPath);
+                            if (string.IsNullOrEmpty(name)) name = uri.Host;
+                        }
+                        _audioPlayerService.AddToPlaylist(name, url);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _customMessageBoxService.ShowError("Error", $"Error processing URL: {ex.Message}\n\nNote: YouTube's protection is very strict. If this persists, the video might be region-locked or protected.", this);
+                }
+            }
         }
 
         private void Timer_Tick(object sender, EventArgs e)

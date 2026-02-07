@@ -120,6 +120,10 @@
 
                     <!-- Main Buttons -->
                     <Grid>
+                        <Button HorizontalAlignment="Left" Style="{StaticResource TransparentIconButton}" Click="AddUrl_Click" ToolTip="Add Audio from URL">
+                            <icons:MaterialIcon Kind="Youtube" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                        </Button>
+
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <Button Style="{StaticResource IconButton}" Width="40" Height="40" Margin="5" Click="SkipBackward_Click">
                                 <icons:MaterialIcon Kind="SkipPrevious" Width="20" Height="20"/>
