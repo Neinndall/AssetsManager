@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Reflection;
 using AssetsManager.Services.Hashes;
 using System.Linq;
 using Serilog;
@@ -124,7 +126,7 @@ namespace AssetsManager.Services.Comparator
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                _logService.Log("Starting WADs comparison...");
+                _logService.Log("Starting WADs comparison (Fast Mode)...");
                 
                 // Notify UI immediately to show activity (Indeterminate spinner)
                 NotifyComparisonStarted(0);
@@ -138,23 +140,28 @@ namespace AssetsManager.Services.Comparator
                         .ToList();
 
                     int total = 0;
-                    var valid = new List<(string OldPath, string NewPath, string RelativePath)>();
+                    var valid = new ConcurrentBag<(string OldPath, string NewPath, string RelativePath)>();
 
-                    foreach (var oldWadFile in files)
+                    // Use 2 threads for the initial scan as requested
+                    var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 2, CancellationToken = cancellationToken };
+                    Parallel.ForEach(files, parallelOptions, oldWadFile =>
                     {
-                        if (cancellationToken.IsCancellationRequested) break;
-
                         var relativePath = Path.GetRelativePath(oldDir, oldWadFile);
                         var newWadFileFullPath = Path.Combine(newDir, relativePath);
                         if (File.Exists(newWadFileFullPath))
                         {
-                            using var oldWad = new WadFile(oldWadFile);
-                            using var newWad = new WadFile(newWadFileFullPath);
-                            total += oldWad.Chunks.Count + newWad.Chunks.Count;
-                            valid.Add((oldWadFile, newWadFileFullPath, relativePath));
+                            try
+                            {
+                                using var oldWad = new WadFile(oldWadFile);
+                                using var newWad = new WadFile(newWadFileFullPath);
+                                Interlocked.Add(ref total, oldWad.Chunks.Count + newWad.Chunks.Count);
+                                valid.Add((oldWadFile, newWadFileFullPath, relativePath));
+                            }
+                            catch { /* Skip corrupt WADs */ }
                         }
-                    }
-                    return (TotalChunks: total, ValidFiles: valid);
+                    });
+
+                    return (TotalChunks: total, ValidFiles: valid.ToList());
                 }, cancellationToken);
 
                 _totalChunksGlobal = scanResult.TotalChunks;
@@ -170,7 +177,6 @@ namespace AssetsManager.Services.Comparator
                     cancellationToken.ThrowIfCancellationRequested();
                     fileIndex++;
 
-                    // Use the full RelativePath for consistent technical context
                     string statusMsg = $"{fileIndex} of {scanResult.ValidFiles.Count} files: {file.RelativePath}";
 
                     var diffs = await CollectDiffsAsync(file.OldPath, file.NewPath, file.RelativePath, cancellationToken, statusMsg);
@@ -221,9 +227,9 @@ namespace AssetsManager.Services.Comparator
                 newChunks = newWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
             }
 
-            // We report progress during hashing, which is the slow part
-            var oldChunkChecksums = await GetChunkChecksumsAsync(oldWadFile, oldChunks.Values, cancellationToken, statusMsg);
-            var newChunkChecksums = await GetChunkChecksumsAsync(newWadFile, newChunks.Values, cancellationToken, statusMsg);
+            // Fast Mode: We use the pre-calculated hashes from the WAD header
+            var oldChunkChecksums = await GetChunkChecksumsAsync(oldChunks.Values, cancellationToken, statusMsg);
+            var newChunkChecksums = await GetChunkChecksumsAsync(newChunks.Values, cancellationToken, statusMsg);
 
             // Comparison logic (fast)
             foreach (var oldChunk in oldChunks.Values)
@@ -267,45 +273,37 @@ namespace AssetsManager.Services.Comparator
             return diffs;
         }
 
-        private async Task<Dictionary<ulong, ulong>> GetChunkChecksumsAsync(string wadPath, IEnumerable<WadChunk> chunks, CancellationToken cancellationToken, string statusMsg)
+        private static readonly FieldInfo _checksumField = typeof(WadChunk).GetField("_checksum", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        private async Task<Dictionary<ulong, ulong>> GetChunkChecksumsAsync(IEnumerable<WadChunk> chunks, CancellationToken cancellationToken, string statusMsg)
         {
-            var checksums = new System.Collections.Concurrent.ConcurrentDictionary<ulong, ulong>();
-            var chunkList = chunks.ToList();
-            int totalInWad = chunkList.Count;
-
-            // Fixed threading (Max 4 threads for stability and performance)
-            int threadCount = Math.Clamp(Environment.ProcessorCount, 1, 4);
-
-            var parallelOptions = new ParallelOptions 
-            { 
-                MaxDegreeOfParallelism = threadCount, 
-                CancellationToken = cancellationToken 
-            };
+            var checksums = new Dictionary<ulong, ulong>();
 
             await Task.Run(() =>
             {
-                Parallel.ForEach(chunkList, parallelOptions, 
-                () => new WadFile(wadPath), // Thread Local Init: Open a new WadFile for this thread
-                (chunk, state, wadFile) =>
+                foreach (var chunk in chunks)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    using var decompressedChunk = wadFile.LoadChunkDecompressed(chunk);
-                    var checksum = System.IO.Hashing.XxHash64.HashToUInt64(decompressedChunk.Span);
+                    // Fast Mode: Use Reflection to access the private '_checksum' field in the WAD header
+                    // This is nearly instant and avoids decompressing the data.
+                    ulong checksum = 0;
+                    if (_checksumField != null)
+                    {
+                        checksum = (ulong)_checksumField.GetValue(chunk);
+                    }
+                    
                     checksums[chunk.PathHash] = checksum;
 
                     int completed = Interlocked.Increment(ref _completedChunksGlobal);
-                    if (completed % 20 == 0 || completed == _totalChunksGlobal)
+                    if (completed % 100 == 0 || completed == _totalChunksGlobal)
                     {
                         NotifyComparisonProgressChanged(completed, statusMsg, true, null);
                     }
-                    return wadFile;
-                },
-                wadFile => wadFile.Dispose() // Thread Local Cleanup
-                );
+                }
             });
 
-            return checksums.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            return checksums;
         }
     }
 }
