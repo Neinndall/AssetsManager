@@ -140,12 +140,12 @@ namespace AssetsManager.Services.Comparator
                         .ToList();
 
                     int total = 0;
-                    var valid = new ConcurrentBag<(string OldPath, string NewPath, string RelativePath)>();
+                    var valid = new List<(string OldPath, string NewPath, string RelativePath)>();
 
-                    // Use 2 threads for the initial scan as requested
-                    var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 2, CancellationToken = cancellationToken };
-                    Parallel.ForEach(files, parallelOptions, oldWadFile =>
+                    foreach (var oldWadFile in files)
                     {
+                        if (cancellationToken.IsCancellationRequested) break;
+
                         var relativePath = Path.GetRelativePath(oldDir, oldWadFile);
                         var newWadFileFullPath = Path.Combine(newDir, relativePath);
                         if (File.Exists(newWadFileFullPath))
@@ -154,14 +154,14 @@ namespace AssetsManager.Services.Comparator
                             {
                                 using var oldWad = new WadFile(oldWadFile);
                                 using var newWad = new WadFile(newWadFileFullPath);
-                                Interlocked.Add(ref total, oldWad.Chunks.Count + newWad.Chunks.Count);
+                                total += oldWad.Chunks.Count + newWad.Chunks.Count;
                                 valid.Add((oldWadFile, newWadFileFullPath, relativePath));
                             }
                             catch { /* Skip corrupt WADs */ }
                         }
-                    });
+                    }
 
-                    return (TotalChunks: total, ValidFiles: valid.ToList());
+                    return (TotalChunks: total, ValidFiles: valid);
                 }, cancellationToken);
 
                 _totalChunksGlobal = scanResult.TotalChunks;
