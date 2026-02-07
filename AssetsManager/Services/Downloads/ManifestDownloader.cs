@@ -146,45 +146,36 @@ public class ManifestDownloader
                     }
                     else
                     {
-                        // Fast Mode: If file size matches exactly, we assume it's correct and skip reading (0% Disk Usage)
-                        if (currentFileLength == file.FileSize)
+                        using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 256 * 1024, FileOptions.SequentialScan | FileOptions.Asynchronous))
                         {
-                            // Implicitly correct, do nothing. Logic below will increment 'alreadyCorrect'.
-                        }
-                        else
-                        {
-                            using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 256 * 1024, FileOptions.SequentialScan | FileOptions.Asynchronous))
+                            foreach (var chunkId in file.ChunkIds)
                             {
-                                foreach (var chunkId in file.ChunkIds)
+                                var chunk = manifest.GetChunk(chunkId);
+                                if (chunk == null) continue;
+                                bool needsUpdate = true;
+                                if (currentFileLength >= currentFileOffset + chunk.UncompressedSize)
                                 {
-                                    var chunk = manifest.GetChunk(chunkId);
-                                    if (chunk == null) continue;
-                                    bool needsUpdate = true;
-                                    if (currentFileLength >= currentFileOffset + chunk.UncompressedSize)
+                                    byte[] localData = pool.Rent((int)chunk.UncompressedSize);
+                                    try
                                     {
-                                        byte[] localData = pool.Rent((int)chunk.UncompressedSize);
-                                        try
+                                        int totalRead = 0;
+                                        while (totalRead < (int)chunk.UncompressedSize)
                                         {
-                                            int totalRead = 0;
-                                            while (totalRead < (int)chunk.UncompressedSize)
-                                            {
-                                                int read = await fs.ReadAsync(localData, totalRead, (int)chunk.UncompressedSize - totalRead);
-                                                if (read == 0) break;
-                                                totalRead += read;
-                                            }
-                                            // Only verify hash if size matched for this chunk (which implies we read enough data)
-                                            if (totalRead == (int)chunk.UncompressedSize && _hashService.VerifyChunk(localData.AsSpan(0, totalRead), chunk.ChunkId, file.HashType)) 
-                                                needsUpdate = false;
+                                            int read = await fs.ReadAsync(localData, totalRead, (int)chunk.UncompressedSize - totalRead);
+                                            if (read == 0) break;
+                                            totalRead += read;
                                         }
-                                        finally { pool.Return(localData); }
+                                        if (totalRead == (int)chunk.UncompressedSize && _hashService.VerifyChunk(localData.AsSpan(0, totalRead), chunk.ChunkId, file.HashType)) 
+                                            needsUpdate = false;
                                     }
-                                    if (needsUpdate)
-                                    {
-                                        if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
-                                        chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, FullPath = fullPath });
-                                    }
-                                    currentFileOffset += chunk.UncompressedSize;
+                                    finally { pool.Return(localData); }
                                 }
+                                if (needsUpdate)
+                                {
+                                    if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
+                                    chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, FullPath = fullPath });
+                                }
+                                currentFileOffset += chunk.UncompressedSize;
                             }
                         }
                     }
