@@ -38,7 +38,7 @@
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" 
-                                                Width="16" Height="16" 
+                                                Width="18" Height="18" 
                                                 Foreground="{StaticResource AccentBrush}" 
                                                 VerticalAlignment="Center" 
                                                 Margin="0,0,10,0"/>
