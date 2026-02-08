@@ -199,6 +199,7 @@ namespace AssetsManager
       services.AddTransient<WadComparisonResultWindow>();
       services.AddTransient<NotepadWindow>();
       services.AddTransient<AudioPlayerWindow>();
+      services.AddTransient<TextureConverterWindow>();
     }
 
     protected override void OnStartup(StartupEventArgs e)

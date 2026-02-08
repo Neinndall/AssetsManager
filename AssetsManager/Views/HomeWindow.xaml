@@ -259,6 +259,21 @@
                                 </StackPanel>
                             </Grid>
                         </Button>
+
+                        <!-- Texture Converter -->
+                        <Button Width="200" Height="100" Style="{StaticResource DashboardTileStyle}" Click="TextureConverter_Click" Tag="{StaticResource AccentTeal}" Margin="8,0,8,0">
+                            <Grid Margin="16">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="36" Height="36" CornerRadius="10" Background="#1A00BFA5" Margin="0,0,12,0">
+                                        <materialIcons:MaterialIcon Kind="AutoFix" Width="20" Height="20" Foreground="{StaticResource AccentTeal}"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Tex Converter" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="DDS/TEX to PNG" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
                     </StackPanel>
                 </StackPanel>
             </Grid>

@@ -1,0 +1,140 @@
+<Window x:Class="AssetsManager.Views.Dialogs.TextureConverterWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
+        mc:Ignorable="d"
+        Title="Texture Converter" Height="500" Width="700"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="True"
+        AllowDrop="True" Drop="Window_Drop">
+    
+    <Window.Resources>
+        <converters:ChunkDiffTypeToBrushConverter x:Key="StatusToBrushConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Background="{StaticResource SidebarBackground}" CornerRadius="12">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/> <!-- Custom Title Bar -->
+                <RowDefinition Height="*"/>    <!-- Content -->
+                <RowDefinition Height="60"/>   <!-- Footer -->
+            </Grid.RowDefinitions>
+
+            <!-- Custom Title Bar -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="11,11,0,0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid Margin="15,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentTeal}" Width="20" Height="20" Margin="0,0,10,0"/>
+                        <TextBlock Text="Mini Texture Converter" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="12"/>
+                    </StackPanel>
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="40" Height="40">
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="40" Height="40">
+                            <materialIcons:MaterialIcon Kind="WindowClose" Width="16" Height="16"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Main Content -->
+            <Grid Grid.Row="1" Margin="20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Drop Area -->
+                <Grid Grid.Row="0" Height="120">
+                    <Rectangle x:Name="DropAreaUI" Stroke="{StaticResource BorderColor}" StrokeThickness="2" 
+                               Fill="{StaticResource SidebarBackground}" RadiusX="10" RadiusY="10" 
+                               StrokeDashArray="4 2"/>
+                    <Border x:Name="DropArea" Background="Transparent" CornerRadius="10"
+                            DragEnter="DropArea_DragEnter" DragLeave="DropArea_DragLeave">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="FileImportOutline" Width="40" Height="40" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                            <TextBlock Text="Drag and drop .dds or .tex files here" Foreground="{StaticResource TextMuted}" FontSize="14"/>
+                            <TextBlock Text="Multiple files supported" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Files List -->
+                <Border Grid.Row="1" Margin="0,15,0,0" Background="{StaticResource SidebarBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Grid>
+                        <ListView ItemsSource="{Binding Items}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextPrimary}">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListViewItem">
+                                                <Border Background="Transparent" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="10,8">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="100"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="{Binding FileName}" FontWeight="Medium" Foreground="{StaticResource TextPrimary}"/>
+                                                            <TextBlock Text="{Binding FilePath}" FontSize="10" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        
+                                                        <TextBlock Grid.Column="1" Text="{Binding Status}" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" FontWeight="Bold"/>
+                                                        
+                                                        <Button Grid.Column="2" Style="{StaticResource TransparentIconButton}" Click="RemoveItem_Click" Tag="{Binding}">
+                                                            <materialIcons:MaterialIcon Kind="DeleteOutline" Width="16"/>
+                                                        </Button>
+                                                    </Grid>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                        </ListView>
+                        
+                        <!-- Empty State -->
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="{Binding Items.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Inverse}">
+                            <TextBlock Text="No files added yet" Foreground="{StaticResource TextMuted}" FontStyle="Italic"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Footer -->
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" Padding="20,0">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Output Format:" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" Margin="0,0,10,0"/>
+                        <RadioButton Content="PNG" IsChecked="True" Style="{StaticResource SegmentedRadioButtonStyle}" Margin="0,0,15,0" Checked="Format_Checked" Tag="Png"/>
+                        <RadioButton Content="JPG" Style="{StaticResource SegmentedRadioButtonStyle}" Checked="Format_Checked" Tag="Jpeg"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Content="Clear All" Style="{StaticResource SecondaryButton}" Width="100" Margin="0,0,10,0" Click="ClearAll_Click" IsEnabled="{Binding IsProcessing, Converter={StaticResource InverseBooleanConverter}}"/>
+                        <Button Content="Convert" Width="120" Click="Convert_Click" IsEnabled="{Binding Items.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsProcessing}" Value="True">
+                                            <Setter Property="Content" Value="Processing..."/>
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
