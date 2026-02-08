@@ -162,6 +162,7 @@ namespace AssetsManager.Services.Explorer
                             statusNode.Status = GetDiffStatus(statusType);
                             wadNode.Children.Add(statusNode);
 
+                            var nodesToAdd = new List<FileSystemNodeModel>();
                             foreach (var file in filesInStatus.OrderBy(f => f.Path))
                             {
                                 string chunkPath = GetBackupChunkPath(backupRoot, file);
@@ -177,22 +178,15 @@ namespace AssetsManager.Services.Explorer
                                     OldPath = file.Type == ChunkDiffType.Renamed ? file.OldPath : null
                                 };
 
-                                statusNode.Children.Add(node);
-
                                 if (file.Dependencies != null)
                                 {
-                                    _logService.LogDebug($"[LoadFromBackupAsync] Processing audio bank '{file.Path}' dependencies (isSortingEnabled=false). Count: {file.Dependencies.Count}");
+                                    var depNodesToAdd = new List<FileSystemNodeModel>();
                                     foreach (var dep in file.Dependencies)
                                     {
-                                        _logService.LogDebug($"[LoadFromBackupAsync] Dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
                                         if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                         {
-                                            _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions. Adding as child node.");
-                                            // New format: Create a visible child node with status
                                             string depStatusPrefix = GetStatusPrefix(dep.Type.Value);
                                             string depFileName = Path.GetFileName(dep.Path);
-                                            
-                                            // The FullPath must also contain the prefix for the search to work correctly
                                             string prefixedFullPath = $"{depStatusPrefix}/{dep.Path}";
 
                                             var depNode = new FileSystemNodeModel($"{depStatusPrefix} {depFileName}", false, prefixedFullPath, wadGroup.Key)
@@ -212,12 +206,10 @@ namespace AssetsManager.Services.Explorer
                                                 },
                                                 BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
                                             };
-                                            node.Children.Add(depNode);
+                                            depNodesToAdd.Add(depNode);
                                         }
                                         else
                                         {
-                                            _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Adding as fallback.");
-                                            // Fallback for old backups or unchanged dependencies
                                             string depFileName = Path.GetFileName(dep.Path);
                                             var depNode = new FileSystemNodeModel(depFileName, false, dep.Path, wadGroup.Key)
                                             {
@@ -230,17 +222,20 @@ namespace AssetsManager.Services.Explorer
                                                     NewPath = dep.Path,
                                                     OldPathHash = dep.OldPathHash,
                                                     NewPathHash = dep.NewPathHash,
-                                            OldCompressionType = dep.CompressionType,
+                                                    OldCompressionType = dep.CompressionType,
                                                     NewCompressionType = dep.CompressionType,
                                                     BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified })
                                                 },
                                                 BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified })
                                             };
-                                            node.Children.Add(depNode);
+                                            depNodesToAdd.Add(depNode);
                                         }
                                     }
+                                    node.Children.AddRange(depNodesToAdd);
                                 }
+                                nodesToAdd.Add(node);
                             }
+                            statusNode.Children.AddRange(nodesToAdd);
                         }
                     }
                 }

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models.Dialogs
 {
@@ -101,7 +102,7 @@ namespace AssetsManager.Views.Models.Dialogs
             SetLoadingState(ComparisonLoadingState.Ready);
             
             if (TreeModel.WadGroups == null)
-                TreeModel.WadGroups = new Utils.ObservableRangeCollection<WadGroupViewModel>();
+                TreeModel.WadGroups = new ObservableRangeCollection<WadGroupViewModel>();
                 
             TreeModel.WadGroups.ReplaceRange(groups);
             
@@ -122,7 +123,7 @@ namespace AssetsManager.Views.Models.Dialogs
         public string WadName { get; set; }
         public int DiffCount { get; set; }
         public string WadNameWithCount => $"{WadName} ({DiffCount})";
-        public List<DiffTypeGroupViewModel> Types { get; set; }
+        public ObservableRangeCollection<DiffTypeGroupViewModel> Types { get; set; }
     }
 
     public class DiffTypeGroupViewModel
@@ -130,6 +131,6 @@ namespace AssetsManager.Views.Models.Dialogs
         public ChunkDiffType Type { get; set; }
         public int DiffCount { get; set; }
         public string TypeNameWithCount => $"{Type} ({DiffCount})";
-        public List<SerializableChunkDiff> Diffs { get; set; }
+        public ObservableRangeCollection<SerializableChunkDiff> Diffs { get; set; }
     }
 }

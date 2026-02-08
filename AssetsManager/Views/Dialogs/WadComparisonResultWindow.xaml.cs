@@ -251,14 +251,14 @@ namespace AssetsManager.Views.Dialogs
             {
                 WadName = wadGroup.Key,
                 DiffCount = wadGroup.Count(),
-                Types = wadGroup.GroupBy(d => d.Type)
+                Types = new ObservableRangeCollection<DiffTypeGroupViewModel>(wadGroup.GroupBy(d => d.Type)
                                   .OrderBy(g => g.Key.ToString())
                                   .Select(typeGroup => new DiffTypeGroupViewModel
                                   {
                                       Type = typeGroup.Key,
                                       DiffCount = typeGroup.Count(),
-                                      Diffs = typeGroup.OrderBy(d => d.NewPath ?? d.OldPath).ToList()
-                                  }).ToList()
+                                      Diffs = new ObservableRangeCollection<SerializableChunkDiff>(typeGroup.OrderBy(d => d.NewPath ?? d.OldPath))
+                                  }))
             }).ToList();
         }
 
