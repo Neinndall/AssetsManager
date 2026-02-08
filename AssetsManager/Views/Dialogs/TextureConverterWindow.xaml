@@ -29,7 +29,7 @@
                 <Grid Margin="15,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentTeal}" Width="20" Height="20" Margin="0,0,10,0"/>
-                        <TextBlock Text="Mini Texture Converter" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="12"/>
+                        <TextBlock Text="Texture Converter" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="12"/>
                     </StackPanel>
                     
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" WindowChrome.IsHitTestVisibleInChrome="True">
