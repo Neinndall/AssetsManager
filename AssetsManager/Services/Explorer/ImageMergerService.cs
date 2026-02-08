@@ -5,6 +5,7 @@ using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Dialogs;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -13,7 +14,7 @@ namespace AssetsManager.Services.Explorer
         private readonly IServiceProvider _serviceProvider;
         private ImageMergerWindow _activeWindow;
 
-        public ObservableCollection<ImageMergerItem> Items { get; } = new ObservableCollection<ImageMergerItem>();
+        public ObservableRangeCollection<ImageMergerItem> Items { get; } = new ObservableRangeCollection<ImageMergerItem>();
 
         public ImageMergerService(IServiceProvider serviceProvider)
         {

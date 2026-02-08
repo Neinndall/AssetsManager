@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models.Shared
 {
@@ -52,9 +53,9 @@ namespace AssetsManager.Views.Models.Shared
         private bool _isProcessing;
 
         // La colección se pasa ahora por el constructor
-        public ObservableCollection<ImageMergerItem> Items { get; }
+        public ObservableRangeCollection<ImageMergerItem> Items { get; }
 
-        public ImageMergerModel(ObservableCollection<ImageMergerItem> items)
+        public ImageMergerModel(ObservableRangeCollection<ImageMergerItem> items)
         {
             Items = items;
         }
