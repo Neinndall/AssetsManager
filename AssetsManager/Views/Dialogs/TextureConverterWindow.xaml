@@ -28,7 +28,7 @@
             <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="11,11,0,0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid Margin="15,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentTeal}" Width="20" Height="20" Margin="0,0,10,0"/>
+                        <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentTeal}" Width="18" Height="18" Margin="0,0,10,0"/>
                         <TextBlock Text="Texture Converter" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="12"/>
                     </StackPanel>
                     
@@ -109,9 +109,17 @@
             <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" Padding="20,0">
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Output Format:" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" Margin="0,0,10,0"/>
-                        <RadioButton Content="PNG" IsChecked="True" Style="{StaticResource SegmentedRadioButtonStyle}" Margin="0,0,15,0" Checked="Format_Checked" Tag="Png"/>
-                        <RadioButton Content="JPG" Style="{StaticResource SegmentedRadioButtonStyle}" Checked="Format_Checked" Tag="Jpeg"/>
+                        <TextBlock Text="OUTPUT FORMAT" Style="{StaticResource ToolSectionLabel}" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                        <Border Background="{StaticResource SidebarBackground}" 
+                                BorderBrush="{StaticResource BorderColor}" 
+                                BorderThickness="1" 
+                                CornerRadius="8" 
+                                Padding="2">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Content="PNG" IsChecked="True" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="60" Checked="Format_Checked" Tag="Png"/>
+                                <RadioButton Content="JPG" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="60" Checked="Format_Checked" Tag="Jpeg"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
