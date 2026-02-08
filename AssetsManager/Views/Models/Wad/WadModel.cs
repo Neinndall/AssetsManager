@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using LeagueToolkit.Core.Wad;
@@ -71,8 +72,14 @@ namespace AssetsManager.Views.Models.Wad
                 long diff = (long)NewUncompressedSize - (long)OldUncompressedSize;
                 if (diff == 0) return "N/A";
                 
-                double diffKB = diff / 1024.0;
                 string sign = diff > 0 ? "+" : "";
+                
+                if (Math.Abs(diff) < 1024)
+                {
+                    return $"{sign}{diff} Bytes";
+                }
+
+                double diffKB = diff / 1024.0;
                 return $"{sign}{diffKB:F2} KB";
             }
         }
@@ -80,8 +87,20 @@ namespace AssetsManager.Views.Models.Wad
         private string FormatSize(ulong? sizeInBytes)
         {
             if (sizeInBytes == null) return "N/A";
+            
+            if (sizeInBytes < 1024)
+            {
+                return $"{sizeInBytes} Bytes";
+            }
+
             double sizeInKB = (double)sizeInBytes / 1024.0;
-            return $"{sizeInKB:F2} KB";
+            if (sizeInKB < 1024)
+            {
+                return $"{sizeInKB:F2} KB";
+            }
+
+            double sizeInMB = sizeInKB / 1024.0;
+            return $"{sizeInMB:F2} MB";
         }
 
         public WadChunkCompression? OldCompressionType { get; set; }
