@@ -27,7 +27,7 @@ namespace AssetsManager.Views.Models.Explorer
         public bool IsEnabled { get; set; } = true;
         public AudioSourceType AudioSource { get; set; } // Only for WemFile
 
-        public ObservableCollection<FileSystemNodeModel> Children { get; set; }
+        public ObservableRangeCollection<FileSystemNodeModel> Children { get; set; }
 
         // --- Data for WADs and Chunks ---
         public string SourceWadPath { get; set; } // Only for VirtualFile/VirtualDirectory
@@ -91,6 +91,20 @@ namespace AssetsManager.Views.Models.Explorer
                 {
                     _isExpanded = value;
                     OnPropertyChanged(nameof(IsExpanded));
+                }
+            }
+        }
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get { return _isSelected; }
+            set
+            {
+                if (_isSelected != value)
+                {
+                    _isSelected = value;
+                    OnPropertyChanged(nameof(IsSelected));
                 }
             }
         }
@@ -184,7 +198,7 @@ namespace AssetsManager.Views.Models.Explorer
         {
             FullPath = path;
             Name = Path.GetFileName(path);
-            Children = new ObservableCollection<FileSystemNodeModel>();
+            Children = new ObservableRangeCollection<FileSystemNodeModel>();
 
             if (Directory.Exists(path))
             {
@@ -217,7 +231,7 @@ namespace AssetsManager.Views.Models.Explorer
             Name = name;
             FullPath = virtualPath;
             SourceWadPath = sourceWad;
-            Children = new ObservableCollection<FileSystemNodeModel>();
+            Children = new ObservableRangeCollection<FileSystemNodeModel>();
 
             if (isDirectory)
             {
@@ -242,7 +256,7 @@ namespace AssetsManager.Views.Models.Explorer
         internal FileSystemNodeModel()
         {
             Name = "Loading...";
-            Children = new ObservableCollection<FileSystemNodeModel>();
+            Children = new ObservableRangeCollection<FileSystemNodeModel>();
         }
 
         // Constructor for custom UI nodes like Audio Events
@@ -251,7 +265,7 @@ namespace AssetsManager.Views.Models.Explorer
             Name = name;
             Type = type;
             FullPath = name; // Path is not relevant for these nodes
-            Children = new ObservableCollection<FileSystemNodeModel>();
+            Children = new ObservableRangeCollection<FileSystemNodeModel>();
         }
 
         // Constructor for WemFile nodes
@@ -263,7 +277,7 @@ namespace AssetsManager.Views.Models.Explorer
             WemOffset = wemOffset;
             WemSize = wemSize;
             FullPath = name; // Path is not relevant for these nodes
-            Children = new ObservableCollection<FileSystemNodeModel>();
+            Children = new ObservableRangeCollection<FileSystemNodeModel>();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
