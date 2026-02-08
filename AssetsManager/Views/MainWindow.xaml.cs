@@ -274,46 +274,42 @@ namespace AssetsManager.Views
                 return;
             }
 
-            if (_appSettings.ReportGeneration.Enabled) // Prioritize report generation
+            // 1. ALWAYS Save to History if enabled (Independent of other actions)
+            if (_appSettings.SaveWadComparisonHistory)
+            {
+                string displayName = "Unknown";
+                var uniqueWads = serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
+
+                if (uniqueWads.Count == 1)
+                {
+                    string wadFileName = System.IO.Path.GetFileName(uniqueWads[0]);
+                    displayName = wadFileName.Split('.')[0];
+                }
+                else
+                {
+                    displayName = System.IO.Path.GetFileName(newLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+                    if (string.IsNullOrEmpty(displayName)) displayName = "Root";
+                }
+
+                _ = _comparisonHistoryService.SaveComparisonAsync(serializableDiffs, oldLolPath, newLolPath, $"Comparison from {displayName}");
+            }
+
+            // 2. Handle follow-up actions (Report, Extraction, or View)
+            if (_appSettings.ReportGeneration.Enabled)
             {
                 await _reportGenerationService.GenerateReportAsync(serializableDiffs, oldLolPath, newLolPath);
             }
-            else if (_appSettings.EnableExtraction) // Only extract if report generation is NOT enabled
+            else if (_appSettings.EnableExtraction)
             {
                 _isExtractingAfterComparison = true;
                 _diffsForExtraction = serializableDiffs;
                 _extractionOldLolPath = oldLolPath;
                 _extractionNewLolPath = newLolPath;
-                
+
                 Dispatcher.Invoke(StartExtractionAsync);
             }
             else
             {
-                if (_appSettings.SaveWadComparisonHistory)
-                {
-                    string displayName = "Unknown";
-                    
-                    // Logic to determine a better display name
-                    var uniqueWads = serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
-                    
-                    if (uniqueWads.Count == 1)
-                    {
-                        // Single WAD comparison: Use the WAD name without extensions
-                        string wadFileName = System.IO.Path.GetFileName(uniqueWads[0]);
-                        // Strip common extensions: .wad.client, .wad, .es_ES, .en_US, etc.
-                        displayName = wadFileName.Split('.')[0]; 
-                    }
-                    else
-                    {
-                        // Directory comparison: Use the folder name
-                        displayName = System.IO.Path.GetFileName(newLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
-                        if (string.IsNullOrEmpty(displayName)) displayName = "Root";
-                    }
-
-                    // Fire and forget (or await if we want to ensure it's saved before showing result, but fire and forget is better for UX here)
-                    _ = _comparisonHistoryService.SaveComparisonAsync(serializableDiffs, oldLolPath, newLolPath, $"Comparison from {displayName}");
-                }
-
                 Dispatcher.Invoke(() =>
                 {
                     ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
