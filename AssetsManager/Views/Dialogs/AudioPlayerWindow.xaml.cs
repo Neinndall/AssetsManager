@@ -196,8 +196,26 @@ namespace AssetsManager.Views.Dialogs
             PlayIcon.Kind = Material.Icons.MaterialIconKind.Play;
         }
 
+        private void DropArea_DragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                DropAreaUI.Stroke = (Brush)FindResource("AccentBrush");
+                DropAreaUI.Fill = (Brush)FindResource("HoverColor");
+            }
+        }
+
+        private void DropArea_DragLeave(object sender, DragEventArgs e)
+        {
+            DropAreaUI.Stroke = (Brush)FindResource("BorderColor");
+            DropAreaUI.Fill = (Brush)FindResource("SidebarBackground");
+        }
+
         private void Window_Drop(object sender, DragEventArgs e)
         {
+            DropAreaUI.Stroke = (Brush)FindResource("BorderColor");
+            DropAreaUI.Fill = (Brush)FindResource("SidebarBackground");
+
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);

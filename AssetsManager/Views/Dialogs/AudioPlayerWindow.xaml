@@ -58,45 +58,53 @@
                 </Grid>
             </Border>
 
-            <!-- 2. Playlist Area -->
-            <Grid Grid.Row="1" Margin="10">
-                <ListBox x:Name="PlaylistListBox" 
-                         ItemsSource="{Binding Playlist}"
-                         Background="Transparent" BorderThickness="0"
-                         ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="5">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <icons:MaterialIcon Kind="MusicNote" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Opacity="0.7" Margin="0,0,10,0"/>
-                                
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding AddedAt, StringFormat='Added: {0:HH:mm}'}" Foreground="{StaticResource TextMuted}" FontSize="10"/>
-                                </StackPanel>
-
-                                <Button Grid.Column="2" Style="{StaticResource TransparentIconButton}" Click="RemoveItem_Click" Tag="{Binding}">
-                                    <icons:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14" Foreground="{StaticResource AccentRed}"/>
-                                </Button>
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-                
-                <!-- Empty State -->
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="{Binding Playlist.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}" Opacity="0.8">
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="40" Width="80" Height="80" Margin="0,0,0,20">
-                        <icons:MaterialIcon Kind="MusicNotePlus" Width="32" Height="32" Foreground="{StaticResource TextMuted}" Opacity="0.4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- 2. Content Area -->
+            <Grid Grid.Row="1" Margin="15">
+                <!-- Empty State: Full Drop Area -->
+                <Grid Visibility="{Binding Playlist.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}">
+                    <Rectangle x:Name="DropAreaUI" Stroke="{StaticResource BorderColor}" StrokeThickness="2" 
+                               Fill="{StaticResource SidebarBackground}" RadiusX="10" RadiusY="10" 
+                               StrokeDashArray="4 2"/>
+                    <Border Background="Transparent" CornerRadius="10"
+                            DragEnter="DropArea_DragEnter" DragLeave="DropArea_DragLeave">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <icons:MaterialIcon Kind="Waveform" Width="60" Height="60" Foreground="{StaticResource TextMuted}" Margin="0,0,0,15"/>
+                            <TextBlock Text="Drag and drop audio files" Foreground="{StaticResource TextPrimary}" FontSize="16" FontWeight="Medium" HorizontalAlignment="Center"/>
+                            <TextBlock Text="MP3 • WAV • OGG • YouTube URLs" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                        </StackPanel>
                     </Border>
-                    <TextBlock Text="NO MEDIA LOADED" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="Black" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Drag audio files here to start your session" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center"/>
-                    <TextBlock Text="SUPPORTED: MP3 • WAV • OGG" Foreground="{StaticResource TextMuted}" FontSize="9" FontWeight="Bold" Opacity="0.5" HorizontalAlignment="Center" Margin="0,12,0,0"/>
-                </StackPanel>
+                </Grid>
+
+                <!-- Populated State: Playlist Area -->
+                <Grid Visibility="{Binding Playlist.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                    <ListBox x:Name="PlaylistListBox" 
+                             ItemsSource="{Binding Playlist}"
+                             Background="Transparent" BorderThickness="0"
+                             ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <icons:MaterialIcon Kind="MusicNote" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Opacity="0.7" Margin="0,0,10,0"/>
+                                    
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding AddedAt, StringFormat='Added: {0:HH:mm}'}" Foreground="{StaticResource TextMuted}" FontSize="10"/>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="2" Style="{StaticResource TransparentIconButton}" Click="RemoveItem_Click" Tag="{Binding}">
+                                        <icons:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14" Foreground="{StaticResource AccentRed}"/>
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
             </Grid>
 
             <!-- 3. Player Controls Area -->
