@@ -1,6 +1,7 @@
 
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Utils;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -13,7 +14,7 @@ namespace AssetsManager.Services.Explorer
     {
         public async Task<FileSystemNodeModel> PerformSearchAsync(
             string searchText,
-            ObservableCollection<FileSystemNodeModel> rootNodes,
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
             Func<FileSystemNodeModel, Task> loadChildrenFunc)
         {
             if (string.IsNullOrEmpty(searchText))
@@ -37,7 +38,7 @@ namespace AssetsManager.Services.Explorer
 
         public async Task<FileSystemNodeModel> NavigateToPathAsync(
             string path,
-            ObservableCollection<FileSystemNodeModel> rootNodes,
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
             Func<FileSystemNodeModel, Task> loadChildrenFunc)
         {
             if (string.IsNullOrEmpty(path)) return null;
@@ -48,7 +49,7 @@ namespace AssetsManager.Services.Explorer
             return await ExpandToPathAsync(path, rootNodes, loadChildrenFunc);
         }
 
-        public async Task FilterTreeAsync(ObservableCollection<FileSystemNodeModel> nodes, string searchText)
+        public async Task FilterTreeAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, string searchText)
         {
             await Task.Run(() =>
             {
@@ -64,7 +65,7 @@ namespace AssetsManager.Services.Explorer
 
         private async Task<FileSystemNodeModel> ExpandToPathAsync(
             string path,
-            ObservableCollection<FileSystemNodeModel> rootNodes,
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
             Func<FileSystemNodeModel, Task> loadChildrenFunc)
         {
             path = path.Replace("\\", "/").Trim('/');

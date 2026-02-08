@@ -99,7 +99,12 @@ namespace AssetsManager.Views.Models.Dialogs
         public void SetResults(List<SerializableChunkDiff> diffs, List<WadGroupViewModel> groups)
         {
             SetLoadingState(ComparisonLoadingState.Ready);
-            TreeModel.WadGroups = new ObservableCollection<WadGroupViewModel>(groups);
+            
+            if (TreeModel.WadGroups == null)
+                TreeModel.WadGroups = new Utils.ObservableRangeCollection<WadGroupViewModel>();
+                
+            TreeModel.WadGroups.ReplaceRange(groups);
+            
             SummaryText = $"Found {diffs.Count} differences across {groups.Count} WAD files.";
             
             CountNew = diffs.Count(d => d.Type == ChunkDiffType.New).ToString();

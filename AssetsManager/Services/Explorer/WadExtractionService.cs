@@ -46,8 +46,7 @@ namespace AssetsManager.Services.Explorer
                         node.Children.Count == 1 && node.Children[0].Name == "Loading...")
                     {
                         var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(node, cancellationToken);
-                        node.Children.Clear();
-                        foreach (var child in loadedChildren) node.Children.Add(child);
+                        node.Children.ReplaceRange(loadedChildren);
                     }
                     count += await CalculateTotalAsync(node.Children, cancellationToken);
                 }
@@ -125,11 +124,7 @@ namespace AssetsManager.Services.Explorer
             if (dirNode.Children.Count == 1 && dirNode.Children[0].Name == "Loading...")
             {
                 var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(dirNode, cancellationToken);
-                dirNode.Children.Clear(); // Remove dummy node
-                foreach (var child in loadedChildren)
-                {
-                    dirNode.Children.Add(child);
-                }
+                dirNode.Children.ReplaceRange(loadedChildren);
             }
 
             // Now, recursively call ExtractNodeAsync on the actual children.

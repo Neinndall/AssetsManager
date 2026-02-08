@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -24,17 +25,17 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             InitializeComponent();
             DataContext = this;
-            Nodes = new ObservableCollection<FileSystemNodeModel>();
+            Nodes = new ObservableRangeCollection<FileSystemNodeModel>();
         }
 
-        public ObservableCollection<FileSystemNodeModel> Nodes
+        public ObservableRangeCollection<FileSystemNodeModel> Nodes
         {
-            get { return (ObservableCollection<FileSystemNodeModel>)GetValue(NodesProperty); }
+            get { return (ObservableRangeCollection<FileSystemNodeModel>)GetValue(NodesProperty); }
             set { SetValue(NodesProperty, value); }
         }
 
         public static readonly DependencyProperty NodesProperty =
-            DependencyProperty.Register("Nodes", typeof(ObservableCollection<FileSystemNodeModel>), typeof(BreadcrumbControl), new PropertyMetadata(new ObservableCollection<FileSystemNodeModel>()));
+            DependencyProperty.Register("Nodes", typeof(ObservableRangeCollection<FileSystemNodeModel>), typeof(BreadcrumbControl), new PropertyMetadata(new ObservableRangeCollection<FileSystemNodeModel>()));
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {

@@ -26,7 +26,7 @@ namespace AssetsManager.Services.Explorer
             _logService = logService;
         }
 
-        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
+        public async Task<(ObservableRangeCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
         {
             var options = new JsonSerializerOptions
             {
@@ -39,7 +39,7 @@ namespace AssetsManager.Services.Explorer
 
             var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
 
-            var rootNodes = new List<FileSystemNodeModel>();
+            var rootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
             if (comparisonData?.Diffs == null || !comparisonData.Diffs.Any())
             {
                 return (rootNodes, null, null);
@@ -298,12 +298,12 @@ namespace AssetsManager.Services.Explorer
                 .ThenBy(c => c.Name)
                 .ToList();
 
-            node.Children.Clear();
             foreach (var child in sortedChildren)
             {
-                node.Children.Add(child);
                 SortChildrenRecursively(child);
             }
+
+            node.Children.ReplaceRange(sortedChildren);
 
             // Post-process to remove expander from redundant BNK files when a WPK exists
             var wpkFiles = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith(".wpk")).Select(c => Path.GetFileNameWithoutExtension(c.Name)).ToHashSet();
@@ -352,10 +352,7 @@ namespace AssetsManager.Services.Explorer
             if (node.Type == NodeType.WadFile)
             {
                 var children = await LoadChildrenAsync(node, cancellationToken);
-                foreach (var child in children)
-                {
-                    node.Children.Add(child);
-                }
+                node.Children.AddRange(children);
                 return;
             }
 
@@ -364,15 +361,16 @@ namespace AssetsManager.Services.Explorer
                 try
                 {
                     var directories = Directory.GetDirectories(node.FullPath);
-                    foreach (var dir in directories.OrderBy(d => d))
+                    var childDirs = directories.OrderBy(d => d).Select(dir => new FileSystemNodeModel(dir)).ToList();
+                    node.Children.AddRange(childDirs);
+                    
+                    foreach(var childNode in childDirs)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var childNode = new FileSystemNodeModel(dir);
-                        node.Children.Add(childNode);
                         await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken);
                     }
 
                     var files = Directory.GetFiles(node.FullPath);
+                    var childFiles = new List<FileSystemNodeModel>();
                     foreach (var file in files.OrderBy(f => f))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -393,9 +391,14 @@ namespace AssetsManager.Services.Explorer
                         if (keepFile)
                         {
                             var childNode = new FileSystemNodeModel(file);
-                            node.Children.Add(childNode);
-                            await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken); // Eager load WAD content
+                            childFiles.Add(childNode);
                         }
+                    }
+                    
+                    node.Children.AddRange(childFiles);
+                    foreach(var childNode in childFiles)
+                    {
+                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken); // Eager load WAD content
                     }
                 }
                 catch (UnauthorizedAccessException)
@@ -405,7 +408,7 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken cancellationToken)
         {
             var childrenToAdd = await Task.Run(() =>
             {
@@ -454,17 +457,17 @@ namespace AssetsManager.Services.Explorer
                 }
 
                 SortChildrenRecursively(rootVirtualNode);
-                return rootVirtualNode.Children.ToList();
+                return rootVirtualNode.Children; // Already an ObservableRangeCollection
             }, cancellationToken);
 
             return childrenToAdd;
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadWadContentAsync(string wadPath)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadWadContentAsync(string wadPath)
         {
             var nodes = await Task.Run(() =>
             {
-                var fileNodes = new List<FileSystemNodeModel>();
+                var fileNodes = new ObservableRangeCollection<FileSystemNodeModel>();
                 if (!File.Exists(wadPath))
                 {
                     return fileNodes; // Return empty list if WAD file doesn't exist
@@ -538,7 +541,7 @@ namespace AssetsManager.Services.Explorer
             return fileNode;
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
         {
             return await Task.Run(() =>
             {
@@ -546,7 +549,7 @@ namespace AssetsManager.Services.Explorer
                 var rootNode = new FileSystemNodeModel(rootPath);
                 rootNode.Children.Clear(); // Clear dummy node
                 AddNodeToRealTree(rootNode, rootPath, cancellationToken);
-                return rootNode.Children.ToList();
+                return rootNode.Children;
             }, cancellationToken);
         }
 

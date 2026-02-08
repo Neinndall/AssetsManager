@@ -61,7 +61,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
 
-        public ObservableCollection<FileSystemNodeModel> RootNodes => _viewModel.RootNodes;
+        public ObservableRangeCollection<FileSystemNodeModel> RootNodes => _viewModel.RootNodes;
 
         private readonly FileExplorerModel _viewModel;
         
@@ -296,11 +296,11 @@ namespace AssetsManager.Views.Controls.Explorer
         }
 
         private async Task ExecuteTreeBuildInternalAsync(
-            Func<CancellationToken, Task<IEnumerable<FileSystemNodeModel>>> buildFunc, 
+            Func<CancellationToken, Task<ObservableRangeCollection<FileSystemNodeModel>>> buildFunc, 
             ExplorerLoadingState loadingState, 
             string errorMsg, 
             bool isBackupMode,
-            Action<IEnumerable<FileSystemNodeModel>> onSuccess = null)
+            Action<ObservableRangeCollection<FileSystemNodeModel>> onSuccess = null)
         {
             _viewModel.IsBackupMode = isBackupMode;
             var cancellationToken = TaskCancellationManager.PrepareNewOperation();
@@ -313,11 +313,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 var newNodes = await buildFunc(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                _viewModel.RootNodes.Clear();
-                foreach (var node in newNodes)
-                {
-                    _viewModel.RootNodes.Add(node);
-                }
+                _viewModel.RootNodes.ReplaceRange(newNodes);
 
                 onSuccess?.Invoke(newNodes);
 
@@ -358,7 +354,7 @@ namespace AssetsManager.Views.Controls.Explorer
             OldLolPath = null;
 
             await ExecuteTreeBuildInternalAsync(
-                async ct => (IEnumerable<FileSystemNodeModel>)await TreeBuilderService.BuildWadTreeAsync(rootPath, ct),
+                async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct),
                 ExplorerLoadingState.LoadingWads,
                 "Failed to build WAD tree.",
                 false);
@@ -371,7 +367,7 @@ namespace AssetsManager.Views.Controls.Explorer
             OldLolPath = null;
 
             await ExecuteTreeBuildInternalAsync(
-                async ct => (IEnumerable<FileSystemNodeModel>)await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct),
+                async ct => await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct),
                 ExplorerLoadingState.ExploringDirectory,
                 "Failed to build directory tree.",
                 false);
@@ -387,7 +383,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     var (nodes, newPath, oldPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _viewModel.IsSortingEnabled, ct);
                     NewLolPath = newPath;
                     OldLolPath = oldPath;
-                    return (IEnumerable<FileSystemNodeModel>)nodes;
+                    return nodes;
                 },
                 ExplorerLoadingState.LoadingBackup,
                 "Failed to build tree from backup.",

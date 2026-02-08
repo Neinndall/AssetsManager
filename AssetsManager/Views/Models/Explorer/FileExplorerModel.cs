@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models.Explorer
 {
@@ -29,7 +30,7 @@ namespace AssetsManager.Views.Models.Explorer
         private string _loadingStatus = "Loading assets...";
         private string _loadingOperation = "LOADING";
         private string _loadingDetail = "Preparing the file explorer";
-        private ObservableCollection<FileSystemNodeModel> _rootNodes;
+        private ObservableRangeCollection<FileSystemNodeModel> _rootNodes;
 
         private string _statusTitle;
         private string _statusDescription;
@@ -37,7 +38,7 @@ namespace AssetsManager.Views.Models.Explorer
 
         public FileExplorerModel()
         {
-            RootNodes = new ObservableCollection<FileSystemNodeModel>();
+            RootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true; // Start empty
@@ -148,7 +149,7 @@ namespace AssetsManager.Views.Models.Explorer
             set { if (_loadingDetail != value) { _loadingDetail = value; OnPropertyChanged(); } }
         }
 
-        public ObservableCollection<FileSystemNodeModel> RootNodes
+        public ObservableRangeCollection<FileSystemNodeModel> RootNodes
         {
             get => _rootNodes;
             set { _rootNodes = value; OnPropertyChanged(); }

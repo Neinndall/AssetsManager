@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Utils;
 
 using System.Threading;
 
@@ -42,9 +43,9 @@ namespace AssetsManager.Services.Explorer.Tree
             _audioBankService = audioBankService;
         }
 
-        public async Task<ObservableCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken)
         {
-            var rootNodes = new ObservableCollection<FileSystemNodeModel>();
+            var rootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
 
             string gamePath = Path.Combine(rootPath, "Game");
             if (Directory.Exists(gamePath))
@@ -76,19 +77,19 @@ namespace AssetsManager.Services.Explorer.Tree
             return rootNodes;
         }
 
-        public async Task<ObservableCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken cancellationToken)
         {
             var nodes = await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, cancellationToken);
-            return new ObservableCollection<FileSystemNodeModel>(nodes);
+            return new ObservableRangeCollection<FileSystemNodeModel>(nodes);
         }
 
-        public async Task<(ObservableCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
+        public async Task<(ObservableRangeCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
         {
             var (nodes, newLolPath, oldLolPath) = await _wadNodeLoaderService.LoadFromBackupAsync(jsonPath, isSortingEnabled, cancellationToken);
-            return (new ObservableCollection<FileSystemNodeModel>(nodes), newLolPath, oldLolPath);
+            return (new ObservableRangeCollection<FileSystemNodeModel>(nodes), newLolPath, oldLolPath);
         }
 
-        public async Task ExpandAudioBankAsync(FileSystemNodeModel clickedNode, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
+        public async Task ExpandAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
         {
             var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(clickedNode, rootNodes, currentRootPath, newLolPath, oldLolPath);
             if (linkedBank == null)
@@ -139,13 +140,14 @@ namespace AssetsManager.Services.Explorer.Tree
                     absoluteSourceWadPath = clickedNode.SourceWadPath;
                 }
 
+                var eventNodesToAdd = new List<FileSystemNodeModel>();
                 foreach (var eventNode in audioTree)
                 {
                     var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
+                    var soundNodesToAdd = new List<FileSystemNodeModel>();
                     foreach (var soundNode in eventNode.Sounds)
                     {
                         // Determine the correct source file (WPK or BNK) for the sound.
-                        // This is crucial for the previewer to know where to extract the WEM data from.
                         AudioSourceType sourceType;
                         ulong sourceHash;
                         if (linkedBank.WpkNode != null)
@@ -161,14 +163,16 @@ namespace AssetsManager.Services.Explorer.Tree
 
                         var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
                         {
-                            SourceWadPath = absoluteSourceWadPath, // Use the resolved absolute path
+                            SourceWadPath = absoluteSourceWadPath,
                             SourceChunkPathHash = sourceHash,
                             AudioSource = sourceType
                         };
-                        newEventNode.Children.Add(newSoundNode);
+                        soundNodesToAdd.Add(newSoundNode);
                     }
-                    clickedNode.Children.Add(newEventNode);
+                    newEventNode.Children.AddRange(soundNodesToAdd);
+                    eventNodesToAdd.Add(newEventNode);
                 }
+                clickedNode.Children.AddRange(eventNodesToAdd);
                 clickedNode.IsExpanded = true;
             });
         }

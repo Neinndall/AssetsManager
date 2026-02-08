@@ -50,7 +50,7 @@ namespace AssetsManager.Services.Explorer
             _wadNodeLoaderService = wadNodeLoaderService;
         }
 
-        public async Task<int> CalculateTotalAsync(IEnumerable<FileSystemNodeModel> nodes, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
+        public async Task<int> CalculateTotalAsync(IEnumerable<FileSystemNodeModel> nodes, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
         {
             int count = 0;
             foreach (var node in nodes)
@@ -133,7 +133,7 @@ namespace AssetsManager.Services.Explorer
             await ProcessAndSaveAsync(node, destinationPath, null, basePath, cancellationToken);
         }
 
-        public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback = null)
+        public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -290,7 +290,7 @@ namespace AssetsManager.Services.Explorer
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             if (!SupportedFileTypes.IsExpandableAudioBank(node.Name))
             {

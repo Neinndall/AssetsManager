@@ -3,12 +3,13 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models.Explorer
 {
     public class PinnedFilesManager : INotifyPropertyChanged
     {
-        public ObservableCollection<PinnedFileModel> PinnedFiles { get; set; }
+        public ObservableRangeCollection<PinnedFileModel> PinnedFiles { get; set; }
 
         private PinnedFileModel _selectedFile;
         public PinnedFileModel SelectedFile
@@ -28,7 +29,7 @@ namespace AssetsManager.Views.Models.Explorer
 
         public PinnedFilesManager()
         {
-            PinnedFiles = new ObservableCollection<PinnedFileModel>();
+            PinnedFiles = new ObservableRangeCollection<PinnedFileModel>();
         }
 
         public void PinFile(FileSystemNodeModel node)

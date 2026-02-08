@@ -4,17 +4,18 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
     public partial class FileGridControl : UserControl
     {
         public static readonly DependencyProperty ItemsSourceProperty =
-            DependencyProperty.Register("ItemsSource", typeof(ObservableCollection<FileGridViewModel>), typeof(FileGridControl), new PropertyMetadata(null, OnItemsSourceChanged));
+            DependencyProperty.Register("ItemsSource", typeof(ObservableRangeCollection<FileGridViewModel>), typeof(FileGridControl), new PropertyMetadata(null, OnItemsSourceChanged));
 
-        public ObservableCollection<FileGridViewModel> ItemsSource
+        public ObservableRangeCollection<FileGridViewModel> ItemsSource
         {
-            get { return (ObservableCollection<FileGridViewModel>)GetValue(ItemsSourceProperty); }
+            get { return (ObservableRangeCollection<FileGridViewModel>)GetValue(ItemsSourceProperty); }
             set { SetValue(ItemsSourceProperty, value); }
         }
 
@@ -29,7 +30,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (d is FileGridControl control)
             {
-                control.FileGridViewItemsControl.ItemsSource = (ObservableCollection<FileGridViewModel>)e.NewValue;
+                control.FileGridViewItemsControl.ItemsSource = (ObservableRangeCollection<FileGridViewModel>)e.NewValue;
             }
         }
 
