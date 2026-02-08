@@ -347,23 +347,32 @@ namespace AssetsManager.Services.Comparator
             try
             {
                 using var sourceWad = new WadFile(sourceWadPath);
-                await using var fs = new FileStream(sourceWadPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
+                
+                // Get valid chunks and ORDER BY OFFSET for high-performance sequential reading
+                var chunksToProcess = chunkHashes
+                    .Select(h => sourceWad.Chunks.TryGetValue(h, out var c) ? c : (WadChunk?)null)
+                    .Where(c => c.HasValue)
+                    .Select(c => c.Value)
+                    .OrderBy(c => c.DataOffset)
+                    .ToList();
 
-                foreach (var hash in chunkHashes)
+                if (chunksToProcess.Count == 0) return;
+
+                Directory.CreateDirectory(targetChunkPath);
+                
+                // Open the stream ONCE for the entire WAD file processing
+                await using var fs = new FileStream(sourceWadPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 65536, useAsync: true);
+
+                foreach (var chunk in chunksToProcess)
                 {
-                    if (sourceWad.Chunks.TryGetValue(hash, out var chunk))
-                    {
-                        fs.Seek(chunk.DataOffset, SeekOrigin.Begin);
-                        byte[] rawChunkData = new byte[chunk.CompressedSize];
-                        await fs.ReadExactlyAsync(rawChunkData, 0, rawChunkData.Length);
+                    fs.Seek(chunk.DataOffset, SeekOrigin.Begin);
+                    byte[] rawChunkData = new byte[chunk.CompressedSize];
+                    await fs.ReadExactlyAsync(rawChunkData, 0, rawChunkData.Length);
 
-                        string chunkFileName = $"{chunk.PathHash:X16}.chunk";
-                        string destChunkPath = Path.Combine(targetChunkPath, chunkFileName);
+                    string chunkFileName = $"{chunk.PathHash:X16}.chunk";
+                    string destChunkPath = Path.Combine(targetChunkPath, chunkFileName);
 
-                        Directory.CreateDirectory(targetChunkPath);
-                        await File.WriteAllBytesAsync(destChunkPath, rawChunkData);
-                    }
-
+                    await File.WriteAllBytesAsync(destChunkPath, rawChunkData);
                 }
             }
             catch (System.Exception ex)
