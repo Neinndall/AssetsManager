@@ -63,14 +63,14 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="40" Height="40">
-                            <icons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16"/>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="34" Height="40">
+                            <icons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
                         </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Maximize_Click" Width="40" Height="40">
-                            <icons:MaterialIcon Kind="WindowMaximize" Width="16" Height="16"/>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Maximize_Click" Width="34" Height="40">
+                            <icons:MaterialIcon Kind="WindowMaximize" Width="15" Height="15"/>
                         </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="40" Height="40" Margin="0,0,2,0">
-                            <icons:MaterialIcon Kind="WindowClose" Width="16" Height="16"/>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="34" Height="40" Margin="0,0,2,0">
+                            <icons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
                         </Button>
                     </StackPanel>
                 </Grid>

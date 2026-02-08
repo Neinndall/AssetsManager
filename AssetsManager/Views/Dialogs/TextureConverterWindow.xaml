@@ -33,11 +33,11 @@
                     </StackPanel>
                     
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="40" Height="40">
-                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16"/>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="34" Height="40">
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
                         </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="40" Height="40">
-                            <materialIcons:MaterialIcon Kind="WindowClose" Width="16" Height="16"/>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="34" Height="40">
+                            <materialIcons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
                         </Button>
                     </StackPanel>
                 </Grid>

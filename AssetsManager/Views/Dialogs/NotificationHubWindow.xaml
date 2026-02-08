@@ -145,13 +145,13 @@
                         <TextBlock Text="{Binding UnreadCount, StringFormat='\{0\} NEW'}" Foreground="White" FontSize="10" FontWeight="Bold"/>
                     </Border>
                     
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="34" Height="40">
-                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
                         </Button>
 
                         <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="34" Height="40">
-                            <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
+                            <materialIcons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
                         </Button>
                     </StackPanel>
                 </Grid>

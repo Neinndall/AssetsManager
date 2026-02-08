@@ -40,12 +40,12 @@
                                VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click" Width="34" Height="40">
-                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
+                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
                     </Button>
                     <Button Style="{StaticResource TitleBarButtonStyle}" Click="btnCancel_Click" Width="34" Height="40">
-                        <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
+                        <materialIcons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
                     </Button>
                 </StackPanel>
             </Grid>
