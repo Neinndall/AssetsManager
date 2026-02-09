@@ -55,38 +55,21 @@ namespace AssetsManager.Services.Explorer
                 // Ensure paths are updated with the latest hash resolutions
                 foreach (var file in wadGroup)
                 {
-                    // Attempt to resolve both Old and New hashes if they exist.
-                    // This handles New, Removed, Modified, and Renamed automatically without complex switching.
                     if (file.OldPathHash != 0)
-                    {
-                        string resolved = _hashResolverService.ResolveHash(file.OldPathHash);
-                        if (resolved != file.OldPathHash.ToString("x16")) file.OldPath = resolved;
-                    }
+                        file.OldPath = RestoreExtension(file.OldPath, _hashResolverService.ResolveHash(file.OldPathHash), file.OldPathHash);
 
                     if (file.NewPathHash != 0)
-                    {
-                        string resolved = _hashResolverService.ResolveHash(file.NewPathHash);
-                        if (resolved != file.NewPathHash.ToString("x16")) file.NewPath = resolved;
-                    }
+                        file.NewPath = RestoreExtension(file.NewPath, _hashResolverService.ResolveHash(file.NewPathHash), file.NewPathHash);
 
-                    // [TEST] Commented out to verify if dependency resolution is redundant
-                    /*
                     if (file.Dependencies != null)
                     {
                         foreach (var dep in file.Dependencies)
                         {
                             ulong depHash = dep.NewPathHash != 0 ? dep.NewPathHash : dep.OldPathHash;
                             if (depHash != 0)
-                            {
-                                string depResolved = _hashResolverService.ResolveHash(depHash);
-                                if (depResolved != depHash.ToString("x16"))
-                                {
-                                    dep.Path = depResolved;
-                                }
-                            }
+                                dep.Path = RestoreExtension(dep.Path, _hashResolverService.ResolveHash(depHash), depHash);
                         }
                     }
-                    */
                 }
 
                 var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
@@ -254,6 +237,21 @@ namespace AssetsManager.Services.Explorer
             ChunkDiffType.Dependency => "[=] Dependency",
             _ => "[?] Unknown"
         };
+
+        private string RestoreExtension(string original, string resolved, ulong hash)
+        {
+            // If DB gives a path with extension, we trust it
+            if (Path.HasExtension(resolved)) return resolved;
+            // If the JSON (original) had an extension, we keep it
+            if (!string.IsNullOrEmpty(original) && Path.HasExtension(original))
+            {
+                // If resolved is just the raw hash, use the full original path
+                if (resolved == hash.ToString("x16")) return original;
+                // Otherwise, append the extension to the resolved name
+                return resolved + Path.GetExtension(original);
+            }
+            return resolved;
+        }
 
         private string GetBackupChunkPath(string backupRoot, SerializableChunkDiff diff)
         {
