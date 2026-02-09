@@ -269,7 +269,7 @@
                                     </Border>
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="Converter" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="DDS/TEX/WEM conversion" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                        <TextBlock Text="Image &amp; Audio tool" FontSize="11" Foreground="{StaticResource TextMuted}"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Grid>

@@ -8,9 +8,18 @@
         xmlns:models="clr-namespace:AssetsManager.Views.Models.Home"
         mc:Ignorable="d"
         Title="Universal Converter" Height="550" Width="750"
+        MinWidth="600" MinHeight="500"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="True"
         AllowDrop="True" Drop="Window_Drop">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40" 
+                      ResizeBorderThickness="5" 
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" 
+                      UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
     
     <Window.Resources>
         <converters:ChunkDiffTypeToBrushConverter x:Key="StatusToBrushConverter"/>

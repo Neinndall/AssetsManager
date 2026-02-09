@@ -7,6 +7,7 @@
         xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Notepad" Height="500" Width="400"
+        MinWidth="400" MinHeight="300"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         AllowsTransparency="True"
