@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -80,12 +81,18 @@ namespace AssetsManager.Services.Hashes
                 return;
             }
 
-            _hashToPathMap.Clear();
             var newHashesDir = _directoriesCreator.HashesNewPath;
             var gameHashesFile = Path.Combine(newHashesDir, "hashes.game.txt");
             var lcuHashesFile = Path.Combine(newHashesDir, "hashes.lcu.txt");
-            await LoadHashesFromFile(gameHashesFile, _hashToPathMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
-            await LoadHashesFromFile(lcuHashesFile, _hashToPathMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
+
+            long totalSize = 0;
+            if (File.Exists(gameHashesFile)) totalSize += new FileInfo(gameHashesFile).Length;
+            if (File.Exists(lcuHashesFile)) totalSize += new FileInfo(lcuHashesFile).Length;
+
+            _hashToPathMap.Clear();
+
+            await LoadHashesFromFile(gameHashesFile, _hashToPathMap, text => (ulong.TryParse(text, NumberStyles.HexNumber, null, out ulong hash), hash));
+            await LoadHashesFromFile(lcuHashesFile, _hashToPathMap, text => (ulong.TryParse(text, NumberStyles.HexNumber, null, out ulong hash), hash));
             _gameLcuHashesLoaded = true;
         }
 
@@ -100,15 +107,22 @@ namespace AssetsManager.Services.Hashes
             _binEntriesMap.Clear();
             _binFieldsMap.Clear();
             _binTypesMap.Clear();
+
             var binHashesDir = _directoriesCreator.HashesNewPath;
-            var binHashesFile = Path.Combine(binHashesDir, "hashes.binhashes.txt");
-            var binEntriesFile = Path.Combine(binHashesDir, "hashes.binentries.txt");
-            var binFieldsFile = Path.Combine(binHashesDir, "hashes.binfields.txt");
-            var binTypesFile = Path.Combine(binHashesDir, "hashes.bintypes.txt");
-            await LoadHashesFromFile(binHashesFile, _binHashesMap, text => (uint.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out uint hash), hash));
-            await LoadHashesFromFile(binEntriesFile, _binEntriesMap, text => (uint.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out uint hash), hash));
-            await LoadHashesFromFile(binFieldsFile, _binFieldsMap, text => (uint.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out uint hash), hash));
-            await LoadHashesFromFile(binTypesFile, _binTypesMap, text => (uint.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out uint hash), hash));
+            var files = new[]
+            {
+                Path.Combine(binHashesDir, "hashes.binhashes.txt"),
+                Path.Combine(binHashesDir, "hashes.binentries.txt"),
+                Path.Combine(binHashesDir, "hashes.binfields.txt"),
+                Path.Combine(binHashesDir, "hashes.bintypes.txt")
+            };
+
+            await Task.WhenAll(
+                LoadHashesFromFile(files[0], _binHashesMap, text => (uint.TryParse(text, NumberStyles.HexNumber, null, out uint hash), hash)),
+                LoadHashesFromFile(files[1], _binEntriesMap, text => (uint.TryParse(text, NumberStyles.HexNumber, null, out uint hash), hash)),
+                LoadHashesFromFile(files[2], _binFieldsMap, text => (uint.TryParse(text, NumberStyles.HexNumber, null, out uint hash), hash)),
+                LoadHashesFromFile(files[3], _binTypesMap, text => (uint.TryParse(text, NumberStyles.HexNumber, null, out uint hash), hash))
+            );
             _binHashesLoaded = true;
         }
 
@@ -122,17 +136,28 @@ namespace AssetsManager.Services.Hashes
 
             await Task.Run(() =>
             {
-                var lines = File.ReadLines(filePath);
-                foreach (var line in lines)
+                using var reader = new StreamReader(filePath);
+                string line;
+                while ((line = reader.ReadLine()) != null)
                 {
-                    var parts = line.Trim().Split(' ');
-                    if (parts.Length == 2)
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    // The pattern is: [HASH][SPACE][ASSET_PATH]
+                    int spaceIndex = line.IndexOf(' ');
+                    
+                    // Original behavior: Only accept if there is a hash AND a value after the space
+                    if (spaceIndex > 0 && spaceIndex < line.Length - 1)
                     {
-                        var (success, hash) = parser(parts[0]);
-                        if (success)
+                        var hashPart = line.Substring(0, spaceIndex);
+                        var valuePart = line.Substring(spaceIndex + 1);
+
+                        if (!string.IsNullOrWhiteSpace(valuePart))
                         {
-                            var path = parts[1];
-                            map[hash] = path;
+                            var (success, hash) = parser(hashPart);
+                            if (success)
+                            {
+                                map[hash] = valuePart;
+                            }
                         }
                     }
                 }
@@ -182,8 +207,12 @@ namespace AssetsManager.Services.Hashes
                 return;
             }
 
-            await LoadRstXxh3HashesAsync();
-            await LoadRstXxh64HashesAsync();
+            // Parallel loading for RST hashes
+            await Task.WhenAll(
+                LoadRstXxh3HashesAsync(),
+                LoadRstXxh64HashesAsync()
+            );
+
             _rstHashesLoaded = true;
         }
 
@@ -191,16 +220,22 @@ namespace AssetsManager.Services.Hashes
         {
             _rstXxh3HashesMap.Clear();
             var rstHashesDir = _directoriesCreator.HashesNewPath;
-            var rstXxh3HashesFile = Path.Combine(rstHashesDir, "hashes.rst.xxh3.txt");
-            await LoadHashesFromFile(rstXxh3HashesFile, _rstXxh3HashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
+            var file = Path.Combine(rstHashesDir, "hashes.rst.xxh3.txt");
+            if (File.Exists(file)) 
+            {
+                await LoadHashesFromFile(file, _rstXxh3HashesMap, text => (ulong.TryParse(text, NumberStyles.HexNumber, null, out ulong hash), hash));
+            }
         }
 
         public async Task LoadRstXxh64HashesAsync()
         {
             _rstXxh64HashesMap.Clear();
             var rstHashesDir = _directoriesCreator.HashesNewPath;
-            var rstXxh64HashesFile = Path.Combine(rstHashesDir, "hashes.rst.xxh64.txt");
-            await LoadHashesFromFile(rstXxh64HashesFile, _rstXxh64HashesMap, text => (ulong.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out ulong hash), hash));
+            var file = Path.Combine(rstHashesDir, "hashes.rst.xxh64.txt");
+            if (File.Exists(file)) 
+            {
+                await LoadHashesFromFile(file, _rstXxh64HashesMap, text => (ulong.TryParse(text, NumberStyles.HexNumber, null, out ulong hash), hash));
+            }
         }
         public Task ForceReloadHashesAsync()
         {
