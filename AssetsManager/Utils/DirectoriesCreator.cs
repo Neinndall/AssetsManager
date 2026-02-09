@@ -10,14 +10,12 @@ namespace AssetsManager.Utils
     {
         private readonly LogService _logService;
 
-        public string HashesNewPath { get; private set; }
-        public string HashesOldPath { get; private set; }
+        public string HashesPath { get; private set; }
         public string JsonCacheNewPath { get; private set; }
         public string JsonCacheOldPath { get; private set; }
         public string JsonCacheHistoryPath { get; private set; }
         public string AssetsDownloadedPath { get; private set; }
         public string SubAssetsDownloadedPath { get; private set; }
-        public string BackUpOldHashesPath { get; private set; }
         public string WadComparisonSavePath { get; private set; }
         public string VersionsPath { get; private set; }
         public string AppDirectory { get; private set; }
@@ -26,11 +24,6 @@ namespace AssetsManager.Utils
         public string UpdateLogFilePath { get; private set; }
         public string UpdaterDirectoryPath { get; private set; }
         public string UpdaterExePath { get; private set; }
-
-        public string WadNewAssetsPath { get; private set; }
-        public string WadModifiedAssetsPath { get; private set; }
-        public string WadRenamedAssetsPath { get; private set; }
-        public string WadRemovedAssetsPath { get; private set; }
 
         public string WebView2DataPath { get; private set; }
         public string TempPreviewPath { get; private set; }
@@ -49,8 +42,7 @@ namespace AssetsManager.Utils
 
             AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
-            HashesNewPath = Path.Combine(AppDirectory, "hashes", "new");
-            HashesOldPath = Path.Combine(AppDirectory, "hashes", "olds");
+            HashesPath = Path.Combine(AppDirectory, "hashes");
 
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
@@ -78,13 +70,6 @@ namespace AssetsManager.Utils
             string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
             SubAssetsDownloadedPath = Path.Combine(AssetsDownloadedPath, date);
             CreateDirectoryInternal(SubAssetsDownloadedPath, false);
-        }
-
-        public void GenerateNewBackUpOldHashesPath()
-        {
-            string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
-            BackUpOldHashesPath = Path.Combine("hashes", "olds", "BackUp", date);
-            CreateDirectoryInternal(BackUpOldHashesPath, false);
         }
 
         public void GenerateNewWadComparisonPaths()
@@ -116,45 +101,8 @@ namespace AssetsManager.Utils
 
         public Task CreateHashesDirectories()
         {
-            CreateDirectoryInternal(HashesNewPath, false);
-            CreateDirectoryInternal(HashesOldPath, false);
+            CreateDirectoryInternal(HashesPath, false);
             return Task.CompletedTask;
-        }
-
-        public string CreateAssetDirectoryPath(string url, string downloadDirectory)
-        {
-            string path = new Uri(url).AbsolutePath;
-
-            if (path.StartsWith("/pbe/"))
-            {
-                path = path.Substring(5); // Eliminar "/pbe/"
-            }
-
-            // Reemplazar "rcp-be-lol-game-data/global/" por "rcp-be-lol-game-data/"
-            string patternToReplace = "rcp-be-lol-game-data/global/default/";
-            if (path.Contains(patternToReplace))
-            {
-                path = path.Replace(patternToReplace, "rcp-be-lol-game-data/");
-            }
-
-            // Mantener la estructura de carpetas en Windows
-            string safePath = path.Replace("/", "\\");
-
-            foreach (char invalidChar in Path.GetInvalidPathChars())
-            {
-                safePath = safePath.Replace(invalidChar.ToString(), "_");
-            }
-
-            string fullDirectoryPath = Path.Combine(downloadDirectory, safePath);
-            string directory = Path.GetDirectoryName(fullDirectoryPath);
-
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-                // Opcional: _logService.LogDebug($"Created directory for asset: {directory}");
-            }
-
-            return directory;
         }
 
         private Task CreateDirectoryInternal(string path, bool withLogging)
