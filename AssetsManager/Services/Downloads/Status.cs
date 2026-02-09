@@ -13,9 +13,6 @@ namespace AssetsManager.Services.Downloads
 {
     public class Status
     {
-        // URL Server where obtain the info for the hashes
-        private const string STATUS_URL = "https://raw.communitydragon.org/data/hashes/lol/";
-		
         // Game Hashes
         private const string GAME_HASHES_FILENAME = "hashes.game.txt";
         private const string LCU_HASHES_FILENAME = "hashes.lcu.txt";
@@ -217,7 +214,7 @@ namespace AssetsManager.Services.Downloads
                         {
                             onUpdateFound?.Invoke();
                             IsSyncing = true;
-                            HashSyncStarted?.Invoke(); // Disparar evento para desincronización remota
+                            HashSyncStarted?.Invoke();
                             notificationSent = true;
                         }
                     }
@@ -246,7 +243,9 @@ namespace AssetsManager.Services.Downloads
             long serverSize = serverSizes.GetValueOrDefault(filename, 0);
             long localSize = localSizes.GetValueOrDefault(filename, 0);
 
-            if (serverSize != localSize)
+            // Only sync if server has a LARGER file (more hashes).
+            // If server is smaller or equal, we assume we are up to date or have a better local version.
+            if (serverSize > localSize)
             {
                 localSizes[filename] = serverSize;
                 return true;
@@ -265,16 +264,10 @@ namespace AssetsManager.Services.Downloads
                 return result;
             }
 
-            if (string.IsNullOrEmpty(STATUS_URL))
-            {
-                _logService.LogError("statusUrl is null or empty. Cannot fetch remote sizes.");
-                return result;
-            }
-
             string html;
             try
             {
-                html = await _httpClient.GetStringAsync(STATUS_URL);
+                html = await _httpClient.GetStringAsync(Requests.BaseUrl);
             }
             catch (HttpRequestException httpEx)
             {
@@ -283,7 +276,7 @@ namespace AssetsManager.Services.Downloads
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"An unexpected exception occurred fetching URL '{STATUS_URL}'.");
+                _logService.LogError(ex, $"An unexpected exception occurred fetching URL '{Requests.BaseUrl}'.");
                 return result;
             }
 
@@ -293,6 +286,7 @@ namespace AssetsManager.Services.Downloads
                 return result;
             }
 
+            // Regex optimized to capture filename and size from HTML directory listing
             var regex = new Regex(@"href=\""(?<filename>hashes\..*?\.txt)\"".*?\s+(?<size>\d+)\s*$", RegexOptions.Multiline);
 
             foreach (Match match in regex.Matches(html))
@@ -304,14 +298,11 @@ namespace AssetsManager.Services.Downloads
                 {
                     result[filename] = size;
                 }
-                else
-                {
-                    _logService.LogError($"Invalid size format '{sizeStr}' for file '{filename}'.");
-                }
             }
+
             if (result.Count == 0)
             {
-                _logService.LogWarning("No hash files hashes.game or hashes.lcu found in the remote directory listing.");
+                _logService.LogWarning("No hash files metadata could be retrieved from the HTML listing.");
             }
             return result;
         }

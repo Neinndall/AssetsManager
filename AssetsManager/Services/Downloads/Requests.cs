@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
@@ -14,7 +15,7 @@ namespace AssetsManager.Services.Downloads
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
 
-        private const string BaseUrl = "https://raw.communitydragon.org/data/hashes/lol/";
+        public const string BaseUrl = "https://raw.communitydragon.org/data/hashes/lol/";
 
         public Requests(HttpClient httpClient, DirectoriesCreator directoriesCreator, LogService logService)
         {
@@ -25,17 +26,23 @@ namespace AssetsManager.Services.Downloads
 
         public async Task DownloadHashesAsync(string fileName, string downloadDirectory)
         {
-            var url = $"{BaseUrl}/{fileName}";
+            var url = $"{BaseUrl.TrimEnd('/')}/{fileName}";
 
             try
             {
                 var filePath = Path.Combine(downloadDirectory, fileName);
-                var response = await _httpClient.GetAsync(url);
+                var tempPath = filePath + ".tmp";
+                var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    await using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
-                    await response.Content.CopyToAsync(fileStream);
+                    await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                    {
+                        await response.Content.CopyToAsync(fileStream);
+                    }
+
+                    if (File.Exists(filePath)) File.Delete(filePath);
+                    File.Move(tempPath, filePath);
                 }
                 else
                 {
@@ -50,30 +57,31 @@ namespace AssetsManager.Services.Downloads
 
         public async Task DownloadGameHashesFilesAsync(string downloadDirectory)
         {
-            await DownloadHashesAsync("hashes.game.txt", downloadDirectory);
-            await DownloadHashesAsync("hashes.lcu.txt", downloadDirectory);
+            await DownloadSpecificHashesAsync(new List<string> { "hashes.game.txt", "hashes.lcu.txt" });
         }
 
         public async Task DownloadBinHashesFilesAsync(string downloadDirectory)
         {
-            await DownloadHashesAsync("hashes.binentries.txt", downloadDirectory);
-            await DownloadHashesAsync("hashes.binfields.txt", downloadDirectory);
-            await DownloadHashesAsync("hashes.binhashes.txt", downloadDirectory);
-            await DownloadHashesAsync("hashes.bintypes.txt", downloadDirectory);
+            await DownloadSpecificHashesAsync(new List<string>
+            {
+                "hashes.binentries.txt", "hashes.binfields.txt",
+                "hashes.binhashes.txt", "hashes.bintypes.txt"
+            });
         }
 
         public async Task DownloadRstHashesFilesAsync(string downloadDirectory)
         {
-            await DownloadHashesAsync("hashes.rst.xxh3.txt", downloadDirectory);
-            await DownloadHashesAsync("hashes.rst.xxh64.txt", downloadDirectory);
+            await DownloadSpecificHashesAsync(new List<string> { "hashes.rst.xxh3.txt", "hashes.rst.xxh64.txt" });
         }
 
         public async Task DownloadSpecificHashesAsync(List<string> filesToDownload)
         {
+            var tasks = new List<Task>();
             foreach (var fileName in filesToDownload)
             {
-                await DownloadHashesAsync(fileName, _directoriesCreator.HashesNewPath);
+                tasks.Add(DownloadHashesAsync(fileName, _directoriesCreator.HashesNewPath));
             }
+            await Task.WhenAll(tasks);
         }
 
         public async Task<string> DownloadJsonContentAsync(string url)
