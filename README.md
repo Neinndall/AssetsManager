@@ -6,71 +6,62 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/Neinndall/AssetsManager?color=yellow&logo=github&logoColor=white&label=Release&style=flat)](https://github.com/Neinndall/AssetsManager/releases)
 [![Downloads](https://img.shields.io/github/downloads/Neinndall/AssetsManager/total?color=blue&logo=github&logoColor=white&label=Downloads&style=flat)](https://github.com/Neinndall/AssetsManager/releases)
-[![VirusTotal](https://img.shields.io/badge/VirusTotal-0/72-brightgreen?logo=virustotal&logoColor=white&style=flat)]()
+[![License](https://img.shields.io/github/license/Neinndall/AssetsManager)](https://github.com/Neinndall/AssetsManager/blob/main/LICENSE)
 
 AssetsManager is a powerful tool designed for League of Legends enthusiasts who need to analyze, manage, and track changes to game assets from PBE updates. It offers a comprehensive suite of features for deep asset inspection, 3D model visualization, archive exploration, and real-time monitoring.
 
-## ✨ Key Features
+## 🏛️ Core Modules
 
-*   **Advanced WAD Comparator**: Compares WAD files between different versions to identify new, modified, or deleted assets with automated extraction and smart data conversion.
-*   **Powerful Archive Explorer**: Navigate game files with a modern tree interface or a **Premium Gallery (Grid View)** featuring floating cards, hero thumbnails, and rich metadata indicators.
-*   **3D Model Viewer**: Fully integrated viewport to visualize champion models (`.skn`), animations (`.anm`), and MapGeometry environments (`.mapgeo`) with real-time skinning support.
-*   **Real-time Monitoring**: Automated suite to track remote JSON files, CDN changes, and PBE server status with instant system notifications.
-*   **Version Management**: Natively integrates with Riot APIs to manage manifests, plugins, and full game client downloads for specific patches.
-*   **Documentation Center**: A built-in, professionally designed guide featuring module overviews and pro tips to master the application.
-*   **Audio Bank Center**: Explore audio banks (`.wpk`, `.bnk`), visualize complex event hierarchies with resolved names, and play associated sounds.
+*   **Advanced WAD Comparator**: A high-speed comparison engine featuring **Fast Mode** (Reflection-based) to identify new, modified, or deleted assets in seconds.
+*   **Archive Explorer**: A professional navigation suite for the WAD game files with advanced toolbar tools:
+    *   **Premium Gallery (Grid View)**: High-performance visual explorer with asynchronous thumbnail generation and rich metadata badges.
+    *    **Load Backups**: Ability to load your previous comparison backups from WAD Explorer.
+    *   **Image Merger**: Specialized tray to "collect" and composite multiple textures into professional contact sheets.
+    *   **Quick Access (Favorites)**: Persistent system to pin frequently used assets for instant cross-session navigation.
+    *   **Intelligent Search**: Deep-seek engine with real-time filtering and asynchronous "Go To" capabilities.
+*   **3D Workspace**: Fully integrated HelixToolkit viewport for visualizing champion models (`.skn`), animations (`.anm`), and environment MapGeometry (`.mapgeo`).
+*   **Version Management**: Native integration with Riot APIs to manage manifests, plugins, and full game client downloads via a parallel RMAN engine.
+*   **Audio Bank Center**: Deep inspection of Wwise audio banks (`.wpk`, `.bnk`), supporting event hierarchy resolution and direct media access.
 
-## 🦾 Advanced Functionality
+## 🧰 Integrated Utility Suite (Home Apps)
 
-### Monitoring Suite (`MonitorWindow`)
+*   **Universal Converter**: A unified multi-threaded engine for batch processing.
+    *   **Images**: `.dds`, `.tex` → PNG/JPG.
+    *   **Audio**: `.wem`, `.ogg`, `.mp3`, `.wav` → OGG/WAV/MP3.
+*   **Professional Audio Player**: Advanced session-based player featuring playlist management, real-time volume control, and YouTube streaming integration.
+*   **Smart Notepad**: Integrated technical editor powered by AvalonEdit for quick note-taking during asset analysis.
 
-AssetsManager includes a professional suite of tools to automatically track changes in game assets without manual intervention.
+## 🦾 High-Performance Architecture
 
-*   **Monitor Dashboard:** A central hub providing a real-time status overview of all background services, PBE status, and system health.
-*   **File Watcher:** Monitors remote JSON files for updates. When a change is detected, the app automatically saves versions and logs the difference for comparison.
-*   **Asset Tracker:** Keeps a persistent list of specific assets to track, checking their status periodically with intelligent fallback logic for extensions.
-*   **History View:** All detected changes are saved in a persistent history where you can browse past updates and view detailed diffs.
-*   **Backups:** Section to manage and control local backups of your League of Legends PBE file system.
-*   **API Center:** Powerful utility to query League of Legends APIs for real-time sales, Mythic Shop items, and player information.
+*   **Parallel Sync Engine**: Simultaneous multi-file acquisition with atomic `.tmp` protection to guarantee local database integrity.
+*   **Optimized Hash Engine**: Re-engineered startup sequence with linear-seek parsing and proactive memory allocation for near-instant hash loading.
+*   **Blake3 Cryptography**: Implementation of Pure C# Blake3 for high-speed integrity verification across massive asset sets.
+*   **Chromeless HUD Design**: A hardware-accelerated UI with a 40px HUD title bar and professional technical aesthetics.
 
-### 3D Visualization & Extraction
+## 📡 Monitoring Engine (`MonitorWindow`)
 
-*   **Animation Playback:** Apply `.anm` files to loaded skeletons to see models in motion with high-performance skinning.
-*   **Smart Saving:** Automatically converts raw game formats (like textures to `.png` or binary data to `.json`) while preserving the original folder structure during extraction.
-*   **3D Models & MapGeometry:** Inspect 3D models of champions `.skn` with their animations `.anm` and MapGeometry Environments `.mapgeo`.
-*   **Animation Playback:** Apply `.anm` (animation) files to a loaded skeleton to see the model come to life with full skinning support.
-*   **Scene Control:** Manipulate the 3D camera, manage loaded parts, and inspect model geometry.
+*   **Live Dashboard**: Real-time telemetry for background services, PBE server status, and global system health.
+*   **File Watcher**: Automated tracking of remote JSON updates with version history and granular diff logging.
+*   **Asset Tracker**: Persistent monitoring of specific assets with intelligent sequence management and extension fallback.
+*   **Comparison History**: Persistent registry of all past WAD comparisons, allowing instant access to cached results and differential data.
+*   **Backup Manager**: Specialized tool to create and manage local snapshots of the PBE file system, ensuring data safety across patches.
+*   **API Center**: Technical utility for querying official Riot APIs for sales, Mythic Shop rotation, and player metadata.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
+*   [.NET 10.0 Runtime](https://dotnet.microsoft.com/es-es/download/dotnet/thank-you/runtime-desktop-10.0.2-windows-x64-installer) installed.
 
-*   [.NET 10.0 Runtime](https://dotnet.microsoft.com/es-es/download/dotnet/thank-you/runtime-desktop-10.0.2-windows-x64-installer) installed on your system for running the app.
-
-### How do I download the app from GitHub?
-
-1.  **Download the latest release:** Visit the [Releases page](https://github.com/Neinndall/AssetsManager/releases) and search `AssetsManager_vX.X.X.X.zip` and download.
-2.  **Extract the contents:** Unzip the file to your desired location.
-3.  **Run the application:** Launch `AssetsManager.exe` to start exploring.
-
-### How to update the app?
-
-1. It's very simple. You'll be notified in the `app's status bar` or you can update to the latest version in Help Updates section.
-2. Follow the steps and update easily.
+### Installation & Updates
+1.  **Download**: Get the latest `AssetsManager_vX.X.X.X.zip` from the [Releases page](https://github.com/Neinndall/AssetsManager/releases).
+2.  **Extract & Run**: Unzip to any folder and launch `AssetsManager.exe`.
+3.  **Updates**: The integrated **Update Manager** will notify you of new versions for seamless clean or preserved installations.
 
 ## ⚙️ Configuration
-
-All application settings are managed through a dedicated `Settings` window and persisted in `config.json`. This allows for deep customization, from setting default paths to fine-tuning background monitoring frequency and update behavior.
+All settings are managed via the `Settings` window and persisted in `config.json`, allowing for deep customization of monitoring frequencies and extraction preferences.
 
 ## 🤝 Contributing
-
-Contributions are welcome! If you have suggestions for improvements, bug reports, or want to contribute code, please feel free to:
-
-1.  Fork the repository and submit a [pull requests](https://github.com/Neinndall/AssetsManager/pulls). 
-2.  Open an [issues](https://github.com/Neinndall/AssetsManager/issues) to discuss your ideas or report bugs.
-
-Please ensure your code adheres to the project's existing style and conventions.
+Contributions are welcome! Feel free to fork the repo, submit **pull requests**, or open **issues** to discuss technical improvements or report bugs.
 
 ## 📄 License
-
 This project is licensed under the [GNU General Public License v3.0](LICENSE).
