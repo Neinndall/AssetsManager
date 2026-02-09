@@ -126,7 +126,7 @@ namespace AssetsManager.Services.Comparator
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                _logService.Log("Starting WADs comparison (Fast Mode)...");
+                _logService.Log("Starting WADs comparison...");
                 
                 // Notify UI immediately to show activity (Indeterminate spinner)
                 NotifyComparisonStarted(0);
