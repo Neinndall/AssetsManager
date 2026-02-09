@@ -20,12 +20,14 @@ namespace AssetsManager.Views.Dialogs
         public ImageMergerModel ViewModel { get; set; }
         private readonly CustomMessageBoxService _customMessageBox;
         private readonly ImageMergerService _imageMergerService;
+        private readonly LogService _logService;
 
-        public ImageMergerWindow(CustomMessageBoxService customMessageBoxService, ImageMergerService imageMergerService)
+        public ImageMergerWindow(CustomMessageBoxService customMessageBoxService, ImageMergerService imageMergerService, LogService logService)
         {
             InitializeComponent();
             _customMessageBox = customMessageBoxService;
             _imageMergerService = imageMergerService;
+            _logService = logService;
             
             ViewModel = new ImageMergerModel(_imageMergerService.Items);
             this.DataContext = ViewModel;
@@ -233,6 +235,7 @@ namespace AssetsManager.Views.Dialogs
                         encoder.Save(fileStream);
                     }
                     _customMessageBox.ShowSuccess("Success", "Image exported successfully!", this);
+                    _logService.LogInteractiveSuccess("Image exported successfully to", saveFileDialog.FileName, System.IO.Path.GetFileName(saveFileDialog.FileName));
                 }
                 catch (Exception ex)
                 {
