@@ -42,6 +42,7 @@ AssetsManager is a powerful tool designed for League of Legends enthusiasts who 
 
 *   **Live Dashboard**: Real-time telemetry for background services, PBE server status, and global system health.
 *   **File Watcher**: Automated tracking of remote JSON updates with version history and granular diff logging.
+*   **History**: Storage where you will find your comparison backups and monitored remotes.
 *   **Asset Tracker**: Persistent monitoring of specific assets with intelligent sequence management and extension fallback.
 *   **Comparison History**: Persistent registry of all past WAD comparisons, allowing instant access to cached results and differential data.
 *   **Backup Manager**: Specialized tool to create and manage local snapshots of the PBE file system, ensuring data safety across patches.
