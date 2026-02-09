@@ -150,6 +150,18 @@
                             <icons:MaterialIcon Kind="PlaylistRemove" Width="18" Height="18" Foreground="{StaticResource TextMuted}"/>
                         </Button>
                     </Grid>
+
+                    <!-- Volume Control -->
+                    <Grid Margin="0,15,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="45"/>
+                        </Grid.ColumnDefinitions>
+                        <icons:MaterialIcon x:Name="VolumeIcon" Kind="VolumeMedium" Width="18" Height="18" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Slider x:Name="VolumeSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=VolumeSlider, StringFormat={}{0:P0}}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="5,0,0,0" Width="30"/>
+                    </Grid>
                 </StackPanel>
             </Border>
         </Grid>

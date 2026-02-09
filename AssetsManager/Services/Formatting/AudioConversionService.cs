@@ -83,12 +83,12 @@ namespace AssetsManager.Services.Formatting
             }
         }
 
-        public Task<byte[]> ConvertWemToOggAsync(byte[] wemData, CancellationToken cancellationToken = default)
+        public Task<byte[]> ConvertAudioToFormatAsync(byte[] audioData, string inputExtension, AudioExportFormat format, CancellationToken cancellationToken = default)
         {
-            return ConvertWemToFormatAsync(wemData, AudioExportFormat.Ogg, cancellationToken);
+            return ConvertAudioToFormatInternalAsync(audioData, inputExtension, format, cancellationToken);
         }
 
-        public async Task<byte[]> ConvertWemToFormatAsync(byte[] wemData, AudioExportFormat format, CancellationToken cancellationToken = default)
+        private async Task<byte[]> ConvertAudioToFormatInternalAsync(byte[] audioData, string inputExtension, AudioExportFormat format, CancellationToken cancellationToken = default)
         {
             if (!_isExtracted || !File.Exists(_vgmstreamExePath))
             {
@@ -96,24 +96,25 @@ namespace AssetsManager.Services.Formatting
                 return null;
             }
 
-            string extension = format switch
+            string outputExtension = format switch
             {
                 AudioExportFormat.Wav => ".wav",
                 AudioExportFormat.Mp3 => ".mp3",
                 _ => ".ogg"
             };
 
-            var tempWemFile = Path.Combine(_tempConversionPath, $"{Guid.NewGuid()}.wem");
-            var tempOutFile = Path.Combine(_tempConversionPath, $"{Guid.NewGuid()}{extension}");
+            // Use the correct input extension so vgmstream knows how to decode it
+            var tempInputFile = Path.Combine(_tempConversionPath, $"{Guid.NewGuid()}{inputExtension}");
+            var tempOutFile = Path.Combine(_tempConversionPath, $"{Guid.NewGuid()}{outputExtension}");
 
             try
             {
-                await File.WriteAllBytesAsync(tempWemFile, wemData, cancellationToken);
+                await File.WriteAllBytesAsync(tempInputFile, audioData, cancellationToken);
 
                 var processStartInfo = new ProcessStartInfo
                 {
                     FileName = _vgmstreamExePath,
-                    Arguments = $"-o \"{tempOutFile}\" \"{tempWemFile}\"",
+                    Arguments = $"-o \"{tempOutFile}\" \"{tempInputFile}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -139,29 +140,23 @@ namespace AssetsManager.Services.Formatting
                     return await File.ReadAllBytesAsync(tempOutFile, cancellationToken);
                 }
 
-                _logService.LogWarning($"Vgmstream process succeeded but the output {extension} file was not found.");
+                _logService.LogWarning($"Vgmstream process succeeded but the output {outputExtension} file was not found.");
                 return null;
             }
             catch (OperationCanceledException)
             {
-                _logService.LogWarning($"WEM to {extension} conversion was cancelled.");
+                _logService.LogWarning($"Audio conversion to {outputExtension} was cancelled.");
                 throw;
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"An error occurred during WEM to {extension} conversion.");
+                _logService.LogError(ex, $"An error occurred during audio conversion to {outputExtension}.");
                 return null;
             }
             finally
             {
-                if (File.Exists(tempWemFile))
-                {
-                    File.Delete(tempWemFile);
-                }
-                if (File.Exists(tempOutFile))
-                {
-                    File.Delete(tempOutFile);
-                }
+                if (File.Exists(tempInputFile)) File.Delete(tempInputFile);
+                if (File.Exists(tempOutFile)) File.Delete(tempOutFile);
             }
         }
     }

@@ -40,6 +40,7 @@ namespace AssetsManager.Views.Dialogs
 
             _mediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
             _mediaPlayer.MediaEnded += MediaPlayer_MediaEnded;
+            _mediaPlayer.Volume = 0.5;
         }
 
         private async void AddUrl_Click(object sender, RoutedEventArgs e)
@@ -175,6 +176,22 @@ namespace AssetsManager.Views.Dialogs
             if (_isDragging)
             {
                 CurrentTimeText.Text = FormatTime(TimeSpan.FromSeconds(AudioSlider.Value));
+            }
+        }
+
+        private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_mediaPlayer != null)
+            {
+                _mediaPlayer.Volume = e.NewValue;
+            }
+
+            if (VolumeIcon != null)
+            {
+                if (e.NewValue == 0) VolumeIcon.Kind = Material.Icons.MaterialIconKind.VolumeMute;
+                else if (e.NewValue < 0.3) VolumeIcon.Kind = Material.Icons.MaterialIconKind.VolumeLow;
+                else if (e.NewValue < 0.7) VolumeIcon.Kind = Material.Icons.MaterialIconKind.VolumeMedium;
+                else VolumeIcon.Kind = Material.Icons.MaterialIconKind.VolumeHigh;
             }
         }
 

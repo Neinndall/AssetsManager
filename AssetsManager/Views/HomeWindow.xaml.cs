@@ -50,11 +50,11 @@ namespace AssetsManager.Views
             audioPlayerWindow.Show();
         }
 
-        private void TextureConverter_Click(object sender, RoutedEventArgs e)
+        private void Converter_Click(object sender, RoutedEventArgs e)
         {
-            var textureConverterWindow = App.ServiceProvider.GetRequiredService<TextureConverterWindow>();
-            textureConverterWindow.Owner = Window.GetWindow(this);
-            textureConverterWindow.Show();
+            var converterWindow = App.ServiceProvider.GetRequiredService<ConverterWindow>();
+            converterWindow.Owner = Window.GetWindow(this);
+            converterWindow.Show();
         }
     }
 }

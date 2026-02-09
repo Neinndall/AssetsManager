@@ -2,18 +2,26 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Views.Models.Home
 {
-    public class TextureConverterItem : INotifyPropertyChanged
+    public enum ConverterFileType
+    {
+        Image,
+        Audio
+    }
+
+    public class ConverterItem : INotifyPropertyChanged
     {
         private string _fileName;
         private string _filePath;
         private string _status = "Pending";
         private double _progress = 0;
+        private ConverterFileType _fileType;
 
         public string FileName
         {
@@ -39,6 +47,12 @@ namespace AssetsManager.Views.Models.Home
             set { _progress = value; OnPropertyChanged(); }
         }
 
+        public ConverterFileType FileType
+        {
+            get => _fileType;
+            set { _fileType = value; OnPropertyChanged(); }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
@@ -46,12 +60,13 @@ namespace AssetsManager.Views.Models.Home
         }
     }
 
-    public class TextureConverterModel : INotifyPropertyChanged
+    public class ConverterModel : INotifyPropertyChanged
     {
         private bool _isProcessing;
-        private ImageExportFormat _selectedFormat = ImageExportFormat.Png;
+        private ImageExportFormat _selectedImageFormat = ImageExportFormat.Png;
+        private AudioExportFormat _selectedAudioFormat = AudioExportFormat.Ogg;
 
-        public ObservableRangeCollection<TextureConverterItem> Items { get; } = new ObservableRangeCollection<TextureConverterItem>();
+        public ObservableRangeCollection<ConverterItem> Items { get; } = new ObservableRangeCollection<ConverterItem>();
 
         public bool IsProcessing
         {
@@ -59,10 +74,28 @@ namespace AssetsManager.Views.Models.Home
             set { _isProcessing = value; OnPropertyChanged(); }
         }
 
-        public ImageExportFormat SelectedFormat
+        public bool HasImages => Items.Any(i => i.FileType == ConverterFileType.Image);
+        public bool HasAudio => Items.Any(i => i.FileType == ConverterFileType.Audio);
+
+        public ConverterModel()
         {
-            get => _selectedFormat;
-            set { _selectedFormat = value; OnPropertyChanged(); }
+            Items.CollectionChanged += (s, e) => 
+            {
+                OnPropertyChanged(nameof(HasImages));
+                OnPropertyChanged(nameof(HasAudio));
+            };
+        }
+
+        public ImageExportFormat SelectedImageFormat
+        {
+            get => _selectedImageFormat;
+            set { _selectedImageFormat = value; OnPropertyChanged(); }
+        }
+
+        public AudioExportFormat SelectedAudioFormat
+        {
+            get => _selectedAudioFormat;
+            set { _selectedAudioFormat = value; OnPropertyChanged(); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

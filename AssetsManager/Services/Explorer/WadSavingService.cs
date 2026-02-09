@@ -235,7 +235,7 @@ namespace AssetsManager.Services.Explorer
 
             if (conversionNeeded)
             {
-                byte[] convertedData = await _audioConversionService.ConvertWemToFormatAsync(fileBytes, targetFormat, cancellationToken);
+                byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(fileBytes, ".wem", targetFormat, cancellationToken);
                 if (convertedData != null)
                 {
                     string extension = targetFormat switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
@@ -264,7 +264,7 @@ namespace AssetsManager.Services.Explorer
             }
 
             var format = _appSettings.AudioExportFormat;
-            byte[] convertedData = await _audioConversionService.ConvertWemToFormatAsync(wemData, format, cancellationToken);
+            byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
             if (convertedData != null)
             {
                 string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
@@ -362,7 +362,7 @@ namespace AssetsManager.Services.Explorer
                     if (wemData != null)
                     {
                         var format = _appSettings.AudioExportFormat;
-                        byte[] convertedData = await _audioConversionService.ConvertWemToFormatAsync(wemData, format, cancellationToken);
+                        byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
                         if (convertedData != null)
                         {
                             string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
