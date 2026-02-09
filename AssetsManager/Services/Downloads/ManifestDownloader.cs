@@ -356,14 +356,14 @@ public class ManifestDownloader
         double decompressedGB = totalDecompressedBytes / 1024.0 / 1024.0 / 1024.0;
         double compressionRatio = (double)totalDecompressedBytes / (usefulBytes > 0 ? usefulBytes : 1);
         
-        _logService.LogSuccess($"[Phase 2] Completed in {sec:F1}s");
-        _logService.Log($"  • HTTP Requests: {totalRequests}");
-        _logService.Log($"  • Useful data: {usefulBytes / 1024.0 / 1024.0:F2} MB");
-        _logService.Log($"  • Wasted (gaps): {wastedMB:F2} MB ({((double)wastedBytes / (totalDownloaded > 0 ? totalDownloaded : 1)) * 100:F1}%)");
-        _logService.Log($"  • Efficiency: {efficiency:F1}% (256KB gap strategy)");
-        _logService.Log($"  • Useful Speed: {usefulSpeed:F2} MB/s");
-        _logService.Log($"  • Actual Speed: {actualSpeed:F2} MB/s");
-        _logService.Log($"  • Decompressed: {decompressedGB:F2} GB (ratio {compressionRatio:F2}x)");
+        _logService.LogSuccess($"[Updating] Completed in {sec:F1}s");
+        _logService.LogDebug($"  • HTTP Requests: {totalRequests}");
+        _logService.LogDebug($"  • Useful data: {usefulBytes / 1024.0 / 1024.0:F2} MB");
+        _logService.LogDebug($"  • Wasted (gaps): {wastedMB:F2} MB ({((double)wastedBytes / (totalDownloaded > 0 ? totalDownloaded : 1)) * 100:F1}%)");
+        _logService.LogDebug($"  • Efficiency: {efficiency:F1}% (256KB gap strategy)");
+        _logService.LogDebug($"  • Useful Speed: {usefulSpeed:F2} MB/s");
+        _logService.LogDebug($"  • Actual Speed: {actualSpeed:F2} MB/s");
+        _logService.LogDebug($"  • Decompressed: {decompressedGB:F2} GB (ratio {compressionRatio:F2}x)");
         
         return totalFilesToPatch;
     }
