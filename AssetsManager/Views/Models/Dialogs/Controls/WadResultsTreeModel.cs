@@ -3,12 +3,13 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models.Dialogs.Controls
 {
     public class WadResultsTreeModel : INotifyPropertyChanged
     {
-        private ObservableCollection<WadGroupViewModel> _wadGroups;
+        private ObservableRangeCollection<WadGroupViewModel> _wadGroups;
         private bool _isBusy;
         private string _loadingText = "LOADING DATA";
 
@@ -24,7 +25,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             set { _loadingText = value; OnPropertyChanged(); }
         }
 
-        public ObservableCollection<WadGroupViewModel> WadGroups
+        public ObservableRangeCollection<WadGroupViewModel> WadGroups
         {
             get => _wadGroups;
             set { _wadGroups = value; OnPropertyChanged(); }

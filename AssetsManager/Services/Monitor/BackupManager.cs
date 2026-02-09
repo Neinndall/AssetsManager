@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
 
-namespace AssetsManager.Services.Backup
+namespace AssetsManager.Services.Monitor
 {
     public class BackupManager
     {
@@ -30,12 +31,17 @@ namespace AssetsManager.Services.Backup
         }
 
 
-        public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath)
+        public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath, CancellationToken cancellationToken)
         {
+            // Notify UI immediately to show activity (Indeterminate spinner)
+            BackupStarted?.Invoke(this, 0);
+
             await Task.Run(() =>
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     if (Directory.Exists(destinationBackupPath))
                     {
                         Directory.Delete(destinationBackupPath, true);
@@ -54,25 +60,38 @@ namespace AssetsManager.Services.Backup
                         _logService.LogWarning($"Could not count files for progress: {ex.Message}");
                     }
 
+                    // Update UI with the real total discovered
                     BackupStarted?.Invoke(this, totalFiles);
 
                     int processedFiles = 0;
-                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, totalFiles);
+                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
                     
                     _currentSessionBackups.Add(destinationBackupPath);
                     BackupCompleted?.Invoke(this, true);
                 }
+                catch (OperationCanceledException)
+                {
+                    _logService.LogWarning("Backup operation was cancelled by the user.");
+                    BackupCompleted?.Invoke(this, false);
+                    // Clean up partially created backup if cancelled
+                    if (Directory.Exists(destinationBackupPath))
+                    {
+                        try { Directory.Delete(destinationBackupPath, true); } catch { }
+                    }
+                }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, $"AssetsManager.Services.Backup.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
+                    _logService.LogError(ex, $"AssetsManager.Services.Monitor.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
                     BackupCompleted?.Invoke(this, false);
-                    throw; // Re-throw the exception after logging
+                    throw; 
                 }
-            });
+            }, cancellationToken);
         }
 
-        private void CopyDirectoryRecursive(string sourceDir, string destinationDir, ref int processedFiles, int totalFiles)
+        private void CopyDirectoryRecursive(string sourceDir, string destinationDir, ref int processedFiles, int totalFiles, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var dir = new DirectoryInfo(sourceDir);
             if (!dir.Exists)
                 throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
@@ -81,6 +100,7 @@ namespace AssetsManager.Services.Backup
 
             foreach (FileInfo file in dir.GetFiles())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 file.CopyTo(Path.Combine(destinationDir, file.Name), true);
                 processedFiles++;
                 BackupProgressChanged?.Invoke(this, (processedFiles, totalFiles, file.Name));
@@ -88,7 +108,7 @@ namespace AssetsManager.Services.Backup
 
             foreach (DirectoryInfo subDir in dir.GetDirectories())
             {
-                CopyDirectoryRecursive(subDir.FullName, Path.Combine(destinationDir, subDir.Name), ref processedFiles, totalFiles);
+                CopyDirectoryRecursive(subDir.FullName, Path.Combine(destinationDir, subDir.Name), ref processedFiles, totalFiles, cancellationToken);
             }
         }
         
@@ -97,73 +117,68 @@ namespace AssetsManager.Services.Backup
             return await Task.Run(() =>
             {
                 var backups = new List<BackupModel>();
-                var lolPbeDirectory = _appSettings.LolPbeDirectory;
-                
-                if (!string.IsNullOrEmpty(lolPbeDirectory))
+                var pathsToScan = new List<string>();
+
+                if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory)) 
+                    pathsToScan.Add(_appSettings.LolPbeDirectory);
+
+                foreach (var baseDir in pathsToScan)
                 {
-                    var specificBackupPath = lolPbeDirectory + "_old";
+                    // Clean trailing slashes to avoid "Path\_old"
+                    string cleanBaseDir = baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    var specificBackupPath = cleanBaseDir + "_old";
+
                     if (Directory.Exists(specificBackupPath))
                     {
-                        var directoryInfo = new DirectoryInfo(specificBackupPath);
-                        backups.Add(new BackupModel
-                        {
-                            Name = directoryInfo.Name,
-                            DisplayName = GetBackupDisplayName(directoryInfo.Name),
-                            Path = directoryInfo.FullName,
-                            CreationDate = directoryInfo.CreationTime,
-                            Size = FormatBytes(GetDirectorySize(directoryInfo.FullName)),
-                            IsSelected = false,
-                            IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
-                        });
+                        AddBackupToList(backups, specificBackupPath);
                     }
-                }
 
-                if (string.IsNullOrEmpty(lolPbeDirectory))
-                {
-                    return backups;
-                }
-                
-                var parentDirectory = Directory.GetParent(lolPbeDirectory)?.FullName;
-
-                if (string.IsNullOrEmpty(parentDirectory) || !Directory.Exists(parentDirectory))
-                {
-                    return backups;
-                }
-
-                foreach (var dir in Directory.EnumerateDirectories(parentDirectory))
-                {
-                    if (dir.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
+                    // Scan parent directory for other "_old" folders
+                    try
                     {
-                        if (backups.Any(b => b.Path.Equals(dir, StringComparison.OrdinalIgnoreCase)))
+                        var parentDirectory = Directory.GetParent(cleanBaseDir)?.FullName;
+                        if (!string.IsNullOrEmpty(parentDirectory) && Directory.Exists(parentDirectory))
                         {
-                            continue;
+                            foreach (var dir in Directory.EnumerateDirectories(parentDirectory))
+                            {
+                                if (dir.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    AddBackupToList(backups, dir);
+                                }
+                            }
                         }
-                        
-                        var directoryInfo = new DirectoryInfo(dir);
-                        backups.Add(new BackupModel
-                        {
-                            Name = directoryInfo.Name,
-                            DisplayName = GetBackupDisplayName(directoryInfo.Name),
-                            Path = directoryInfo.FullName,
-                            CreationDate = directoryInfo.CreationTime,
-                            Size = FormatBytes(GetDirectorySize(directoryInfo.FullName)),
-                            IsSelected = false,
-                            IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
-                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogWarning($"Error scanning parent directory for backups: {ex.Message}");
                     }
                 }
+
                 return backups.OrderByDescending(b => b.CreationDate).ToList();
+            });
+        }
+
+        private void AddBackupToList(List<BackupModel> backups, string path)
+        {
+            if (backups.Any(b => b.Path.Equals(path, StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            var directoryInfo = new DirectoryInfo(path);
+            backups.Add(new BackupModel
+            {
+                Name = directoryInfo.Name,
+                DisplayName = GetBackupDisplayName(directoryInfo.Name),
+                Path = directoryInfo.FullName,
+                CreationDate = directoryInfo.CreationTime,
+                Size = FormatBytes(GetDirectorySize(directoryInfo.FullName)),
+                IsSelected = false,
+                IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
             });
         }
 
         private string GetBackupDisplayName(string folderName)
         {
-            string cleanName = folderName.Replace("_old", "", StringComparison.OrdinalIgnoreCase);
-            if (cleanName.Contains("PBE", StringComparison.OrdinalIgnoreCase))
-            {
-                return "League of Legends PBE";
-            }
-            return "League of Legends LIVE";
+            return "League of Legends PBE";
         }
         
         private long GetDirectorySize(string path)

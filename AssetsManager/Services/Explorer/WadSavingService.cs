@@ -28,6 +28,7 @@ namespace AssetsManager.Services.Explorer
         private readonly AudioBankLinkerService _audioBankLinkerService;
         private readonly AudioConversionService _audioConversionService;
         private readonly AppSettings _appSettings;
+        private readonly WadNodeLoaderService _wadNodeLoaderService;
 
         public WadSavingService(
             LogService logService,
@@ -36,7 +37,8 @@ namespace AssetsManager.Services.Explorer
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
             AudioConversionService audioConversionService,
-            AppSettings appSettings)
+            AppSettings appSettings,
+            WadNodeLoaderService wadNodeLoaderService)
         {
             _logService = logService;
             _wadExtractionService = wadExtractionService;
@@ -45,6 +47,73 @@ namespace AssetsManager.Services.Explorer
             _audioBankLinkerService = audioBankLinkerService;
             _audioConversionService = audioConversionService;
             _appSettings = appSettings;
+            _wadNodeLoaderService = wadNodeLoaderService;
+        }
+
+        public async Task<int> CalculateTotalAsync(IEnumerable<FileSystemNodeModel> nodes, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
+        {
+            int count = 0;
+            foreach (var node in nodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile || node.Type == NodeType.WemFile)
+                {
+                    count++;
+                }
+                else if (node.Type == NodeType.SoundBank)
+                {
+                    // --- SMART REDUNDANCY CHECK ---
+                    // If it's an expandable bank name but has NO children, 
+                    // the Loader marked it as redundant. Skip it.
+                    if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && node.Children.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    if (node.Children.Count > 1 || (node.Children.Count == 1 && node.Children[0].Name != "Loading..."))
+                    {
+                        count += CountSoundsInAudioTree(node.Children);
+                    }
+                    else if (SupportedFileTypes.IsExpandableAudioBank(node.Name))
+                    {
+                        var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
+                        if (linkedBank != null)
+                        {
+                            byte[] wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode, cancellationToken) : null;
+                            byte[] audioBnkData = linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode, cancellationToken) : null;
+
+                            int soundsCount = _audioBankService.GetSoundCount(wpkData, audioBnkData);
+                            count += (soundsCount > 0) ? soundsCount : 1;
+                        }
+                        else count++;
+                    }
+                    // Else: It's a metadata bank (like _events.bnk). Skip from total count in SAVE mode.
+                }
+                else if (node.Type == NodeType.AudioEvent || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
+                {
+                    if ((node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile) &&
+                        node.Children.Count == 1 && node.Children[0].Name == "Loading...")
+                    {
+                        var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(node, cancellationToken);
+                        node.Children.Clear();
+                        foreach (var child in loadedChildren) node.Children.Add(child);
+                    }
+                    count += await CalculateTotalAsync(node.Children, rootNodes, currentRootPath, cancellationToken);
+                }
+            }
+            return count;
+        }
+
+        private int CountSoundsInAudioTree(IEnumerable<FileSystemNodeModel> nodes)
+        {
+            int count = 0;
+            foreach (var node in nodes)
+            {
+                if (node.Type == NodeType.WemFile) count++;
+                else count += CountSoundsInAudioTree(node.Children);
+            }
+            return count;
         }
 
         public async Task ProcessAndSaveDiffAsync(SerializableChunkDiff diff, string destinationPath, string oldLolPath, string newLolPath, CancellationToken cancellationToken)
@@ -64,7 +133,7 @@ namespace AssetsManager.Services.Explorer
             await ProcessAndSaveAsync(node, destinationPath, null, basePath, cancellationToken);
         }
 
-        public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback = null)
+        public async Task ProcessAndSaveAsync(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -104,7 +173,12 @@ namespace AssetsManager.Services.Explorer
             {
                 case ".wpk":
                 case ".bnk":
-                    await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
+                    // Only process as expandable bank if the Loader marked it as such (has children)
+                    if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && node.Children.Count > 0)
+                    {
+                        await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
+                    }
+                    // Else: Redundant sibling or metadata bank (like _events.bnk). Skip in SAVE mode.
                     break;
 
                 case ".tex":
@@ -161,7 +235,7 @@ namespace AssetsManager.Services.Explorer
 
             if (conversionNeeded)
             {
-                byte[] convertedData = await _audioConversionService.ConvertWemToFormatAsync(fileBytes, targetFormat, cancellationToken);
+                byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(fileBytes, ".wem", targetFormat, cancellationToken);
                 if (convertedData != null)
                 {
                     string extension = targetFormat switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
@@ -190,7 +264,7 @@ namespace AssetsManager.Services.Explorer
             }
 
             var format = _appSettings.AudioExportFormat;
-            byte[] convertedData = await _audioConversionService.ConvertWemToFormatAsync(wemData, format, cancellationToken);
+            byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
             if (convertedData != null)
             {
                 string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
@@ -216,7 +290,7 @@ namespace AssetsManager.Services.Explorer
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             if (!SupportedFileTypes.IsExpandableAudioBank(node.Name))
             {
@@ -234,7 +308,6 @@ namespace AssetsManager.Services.Explorer
             string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
             string audioBankPath = Path.Combine(destinationPath, PathUtils.SanitizeName(audioBankName));
             Directory.CreateDirectory(audioBankPath);
-            onFileSavedCallback?.Invoke(audioBankPath);
 
             cancellationToken.ThrowIfCancellationRequested();
             var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;
@@ -289,7 +362,7 @@ namespace AssetsManager.Services.Explorer
                     if (wemData != null)
                     {
                         var format = _appSettings.AudioExportFormat;
-                        byte[] convertedData = await _audioConversionService.ConvertWemToFormatAsync(wemData, format, cancellationToken);
+                        byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
                         if (convertedData != null)
                         {
                             string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };

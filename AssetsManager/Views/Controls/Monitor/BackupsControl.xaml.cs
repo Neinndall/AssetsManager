@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Backup;
+using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Shared;
@@ -20,6 +20,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public TaskCancellationManager TaskCancellationManager { get; set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -36,6 +37,10 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void BackupsControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
             try
             {
                 await LoadBackupsAsync();
@@ -48,7 +53,15 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void BackupsControl_Unloaded(object sender, RoutedEventArgs e)
         {
-            // Unsubscribe from events if any
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+        }
+
+        private async void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            await Dispatcher.InvokeAsync(async () => await LoadBackupsAsync());
         }
 
         private async Task LoadBackupsAsync()
@@ -133,10 +146,19 @@ namespace AssetsManager.Views.Controls.Monitor
             createBackupButton.IsEnabled = false;
             try
             {
-                await BackupManager.CreateLolPbeDirectoryBackupAsync(sourceLolPath, destinationBackupPath);
-                LogService.LogSuccess($"LoL backup completed successfully.");
-                CustomMessageBoxService.ShowInfo("Info", "LoL backup completed successfully.", Window.GetWindow(this));
+                var cancellationToken = TaskCancellationManager.PrepareNewOperation();
+                await BackupManager.CreateLolPbeDirectoryBackupAsync(sourceLolPath, destinationBackupPath, cancellationToken);
+                
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    LogService.LogSuccess($"LoL backup completed successfully.");
+                    CustomMessageBoxService.ShowInfo("Backup", "LoL backup completed successfully.", Window.GetWindow(this));
+                }
                 await LoadBackupsAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                LogService.LogWarning("LoL backup was cancelled.");
             }
             catch (System.IO.DirectoryNotFoundException ex)
             {

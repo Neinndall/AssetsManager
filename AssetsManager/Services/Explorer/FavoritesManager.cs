@@ -9,28 +9,29 @@ namespace AssetsManager.Services.Explorer
     public class FavoritesManager
     {
         private readonly AppSettings _appSettings;
-        public ObservableCollection<FavoriteItemModel> Favorites { get; private set; }
+        public ObservableRangeCollection<FavoriteItemModel> Favorites { get; private set; }
 
         public FavoritesManager(AppSettings appSettings)
         {
             _appSettings = appSettings;
-            Favorites = new ObservableCollection<FavoriteItemModel>();
+            Favorites = new ObservableRangeCollection<FavoriteItemModel>();
             LoadFavorites();
         }
 
         private void LoadFavorites()
         {
-            Favorites.Clear();
             if (_appSettings.FavoritePaths != null)
             {
-                foreach (var path in _appSettings.FavoritePaths)
-                {
-                    // Validación básica para no mostrar favoritos rotos si el usuario borró la config manualmente
-                    if (!string.IsNullOrWhiteSpace(path))
-                    {
-                        Favorites.Add(CreateViewModel(path));
-                    }
-                }
+                var viewModels = _appSettings.FavoritePaths
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Select(CreateViewModel)
+                    .ToList();
+
+                Favorites.ReplaceRange(viewModels);
+            }
+            else
+            {
+                Favorites.Clear();
             }
         }
 

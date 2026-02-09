@@ -11,21 +11,34 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Core;
+using Microsoft.Win32.SafeHandles;
 
 namespace AssetsManager.Services.Downloads;
 
 public class ManifestDownloader
 {
     private readonly HttpClient _httpClient;
+    private readonly LogService _logService;
     private readonly string _bundleBaseUrl = "https://lol.dyn.riotcdn.net/channels/public/bundles";
     private readonly HashService _hashService = new HashService();
+    
+    // Pools de recursos reutilizables
+    private readonly ConcurrentStack<Decompressor> _decompressorPool = new ConcurrentStack<Decompressor>();
+    private readonly ConcurrentBag<byte[]> _skipBufferPool = new ConcurrentBag<byte[]>();
+    private readonly ConcurrentBag<byte[]> _compBufferPool = new ConcurrentBag<byte[]>();
 
-    // Evento compatible con el nuevo sistema de progreso dinámico
     public event Action<string, string, int, int> ProgressChanged;
 
-    public ManifestDownloader(HttpClient httpClient)
+    public ManifestDownloader(HttpClient httpClient, LogService logService)
     {
         _httpClient = httpClient;
+        _logService = logService;
+        
+        // Inicializar pools
+        for (int i = 0; i < 4; i++) _decompressorPool.Push(new Decompressor());
+        for (int i = 0; i < 16; i++) _skipBufferPool.Add(new byte[64 * 1024]);
+        for (int i = 0; i < 16; i++) _compBufferPool.Add(new byte[256 * 1024]);
     }
 
     private class ChunkDownloadTask
@@ -43,7 +56,20 @@ public class ManifestDownloader
         public Dictionary<ulong, List<ChunkDownloadTask>> ChunksByBundle { get; set; }
     }
 
-    public async Task<int> DownloadManifestAsync(RmanManifest manifest, string outputPath, int maxThreads, string filter = null, List<string> langs = null)
+    private class UniqueChunkTask
+    {
+        public RmanChunk Chunk { get; set; }
+        public List<TargetInfo> Targets { get; set; }
+    }
+
+    private class TargetInfo
+    {
+        public string FullPath { get; set; }
+        public ulong FileOffset { get; set; }
+        public RmanFile FileInfo { get; set; }
+    }
+
+    public async Task<int> DownloadManifestAsync(RmanManifest manifest, string outputPath, string filter = null, List<string> langs = null)
     {
         var regex = !string.IsNullOrEmpty(filter) ? new Regex(filter, RegexOptions.IgnoreCase) : null;
         var selectedLangIds = new HashSet<byte>();
@@ -71,55 +97,79 @@ public class ManifestDownloader
 
         if (!Directory.Exists(outputPath)) Directory.CreateDirectory(outputPath);
 
-        // --- FASE 1: VERIFICACIÓN PARALELA (Background Thread) ---
+        // ===========================================================================
+        // VERIFICATION PROCESS (SMART SCAN ENGINE)
+        // ===========================================================================
+        
         var filesToPatch = new ConcurrentBag<FilePatchTask>();
+        long totalChunksToDownloadCount = 0;
+        long totalMBToDownload = 0;
+        int alreadyCorrect = 0;
+        var verifyStopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // --- FASE 1: FILTRADO Y SELECCIÓN DE OBJETIVOS ---
         int totalToVerify = filteredFiles.Count;
         int currentVerify = 0;
+        var lastProgressTime = DateTime.MinValue;
+
+        _logService.Log($"[Verification] Starting analysis of {totalToVerify} files...");
 
         await Task.Run(async () =>
         {
-            var scanSemaphore = new SemaphoreSlim(maxThreads);
+            var scanSemaphore = new SemaphoreSlim(Math.Clamp(Environment.ProcessorCount, 1, 2));
+            var pool = System.Buffers.ArrayPool<byte>.Shared;
+
             var scanTasks = filteredFiles.Select(async file =>
             {
                 await scanSemaphore.WaitAsync();
                 try 
                 {
                     var fullPath = Path.Combine(outputPath, file.Name.Replace("/", Path.DirectorySeparatorChar.ToString()));
-                    bool fileExists = File.Exists(fullPath);
-                    bool wrongSize = fileExists && (ulong)new FileInfo(fullPath).Length != file.FileSize;
-                    
+                    var fileInfo = new FileInfo(fullPath);
+                    bool fileExists = fileInfo.Exists;
                     var chunksByBundle = new Dictionary<ulong, List<ChunkDownloadTask>>();
                     ulong currentFileOffset = 0;
+                    ulong currentFileLength = fileExists ? (ulong)fileInfo.Length : 0;
 
-                    if (!fileExists || wrongSize)
+                    if (!fileExists)
                     {
                         foreach (var chunkId in file.ChunkIds)
                         {
                             var chunk = manifest.GetChunk(chunkId);
-                            if (chunk == null) continue;
-                            if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
-                            chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, FullPath = fullPath });
-                            currentFileOffset += chunk.UncompressedSize;
+                            if (chunk != null)
+                            {
+                                if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
+                                chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, FullPath = fullPath });
+                                currentFileOffset += chunk.UncompressedSize;
+                            }
                         }
                     }
                     else
                     {
-                        using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 256 * 1024, FileOptions.SequentialScan | FileOptions.Asynchronous))
                         {
                             foreach (var chunkId in file.ChunkIds)
                             {
                                 var chunk = manifest.GetChunk(chunkId);
                                 if (chunk == null) continue;
-
                                 bool needsUpdate = true;
-                                if ((ulong)fs.Length >= currentFileOffset + chunk.UncompressedSize)
+                                if (currentFileLength >= currentFileOffset + chunk.UncompressedSize)
                                 {
-                                    var localData = new byte[chunk.UncompressedSize];
-                                    fs.Position = (long)currentFileOffset;
-                                    await fs.ReadExactlyAsync(localData, 0, (int)chunk.UncompressedSize);
-                                    if (_hashService.VerifyChunk(localData, chunk.ChunkId, file.HashType)) needsUpdate = false;
+                                    byte[] localData = pool.Rent((int)chunk.UncompressedSize);
+                                    try
+                                    {
+                                        int totalRead = 0;
+                                        while (totalRead < (int)chunk.UncompressedSize)
+                                        {
+                                            int read = await fs.ReadAsync(localData, totalRead, (int)chunk.UncompressedSize - totalRead);
+                                            if (read == 0) break;
+                                            totalRead += read;
+                                        }
+                                        if (totalRead == (int)chunk.UncompressedSize && _hashService.VerifyChunk(localData.AsSpan(0, totalRead), chunk.ChunkId, file.HashType)) 
+                                            needsUpdate = false;
+                                    }
+                                    finally { pool.Return(localData); }
                                 }
-
                                 if (needsUpdate)
                                 {
                                     if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
@@ -130,124 +180,191 @@ public class ManifestDownloader
                         }
                     }
 
-                    if (chunksByBundle.Any())
+                    if (chunksByBundle.Any()) 
                     {
                         filesToPatch.Add(new FilePatchTask { FileInfo = file, FullPath = fullPath, ChunksByBundle = chunksByBundle });
+                        Interlocked.Add(ref totalChunksToDownloadCount, chunksByBundle.Values.Sum(l => l.Count));
+                        Interlocked.Add(ref totalMBToDownload, chunksByBundle.Values.SelectMany(l => l).Sum(c => (long)c.Chunk.CompressedSize));
                     }
+                    else Interlocked.Increment(ref alreadyCorrect);
 
                     int completed = Interlocked.Increment(ref currentVerify);
-                    ProgressChanged?.Invoke("Verifying", file.Name, completed, totalToVerify);
+                    var now = DateTime.Now;
+                    if ((now - lastProgressTime).TotalMilliseconds >= 100 || completed == totalToVerify)
+                    {
+                        lastProgressTime = now;
+                        // Use the professional format "File X of Y: filename" to enable dual-progress view
+                        ProgressChanged?.Invoke("Verifying", $"{completed} of {totalToVerify} files: {file.Name}", completed, totalToVerify);
+                    }
                 }
                 finally { scanSemaphore.Release(); }
             });
-
             await Task.WhenAll(scanTasks);
         });
 
-        // --- FASE 2: ACTUALIZACIÓN (UPDATING) ---
+        verifyStopwatch.Stop();
+        
+        double verifyMB = totalMBToDownload / 1024.0 / 1024.0;
+        _logService.Log($"[Verification] Finished in {verifyStopwatch.Elapsed.TotalSeconds:F1}s.");
+        _logService.Log($"  • Files OK: {alreadyCorrect}");
+        _logService.Log($"  • Files to patch: {filesToPatch.Count}");
+        _logService.Log($"  • Chunks to download: {totalChunksToDownloadCount:N0}");
+        _logService.Log($"  • Estimated download: {verifyMB:F2} MB (compressed)");
+
         if (!filesToPatch.Any()) return 0;
 
-        var sortedFilesToPatch = filesToPatch.OrderBy(f => f.FileInfo.Name).ToList();
-        int totalFilesToPatch = sortedFilesToPatch.Count;
-        int completedFiles = 0;
+        // ===========================================================================
+        // PHASE 2: GLOBAL UPDATE (STREAMING & DEDUPLICATED)
+        // ===========================================================================
+        var allTasks = filesToPatch.SelectMany(f => f.ChunksByBundle.Values.SelectMany(l => l)).ToList();
+        var uniqueChunks = allTasks.GroupBy(t => t.Chunk.ChunkId)
+                                   .Select(g => new UniqueChunkTask { 
+                                       Chunk = g.First().Chunk, 
+                                       Targets = g.Select(t => new TargetInfo { FullPath = t.FullPath, FileOffset = t.FileOffset, FileInfo = t.FileInfo }).ToList() 
+                                   }).ToList();
 
-        foreach (var task in sortedFilesToPatch)
+        var bundlesToProcess = uniqueChunks.GroupBy(c => c.Chunk.BundleId).ToDictionary(g => g.Key, g => g.ToList());
+        
+        int totalChunks = allTasks.Count;
+        int completedChunks = 0;
+        int completedFilesCount = 0;
+        int totalFilesToPatch = filesToPatch.Count;
+        long totalDownloaded = 0;
+        long wastedBytes = 0;
+        int totalRequests = 0;
+        long usefulBytes = allTasks.Sum(c => (long)c.Chunk.CompressedSize);
+        long totalDecompressedBytes = 0;
+        
+        var updateSw = System.Diagnostics.Stopwatch.StartNew();
+        var openHandles = new ConcurrentDictionary<string, SafeFileHandle>();
+        var pendingPerFile = new ConcurrentDictionary<string, int>(filesToPatch.ToDictionary(f => f.FullPath, f => f.ChunksByBundle.Values.Sum(l => l.Count)));
+
+        try
         {
-            completedFiles++;
-            ProgressChanged?.Invoke("Updating", task.FileInfo.Name, completedFiles, totalFilesToPatch);
+            var netSem = new SemaphoreSlim(8); 
+            var cpuSem = new SemaphoreSlim(Math.Clamp(Environment.ProcessorCount, 1, 4));
 
-            var dirName = Path.GetDirectoryName(task.FullPath);
-            if (!string.IsNullOrEmpty(dirName) && !Directory.Exists(dirName)) Directory.CreateDirectory(dirName);
-
-            if (!File.Exists(task.FullPath) || (ulong)new FileInfo(task.FullPath).Length != task.FileInfo.FileSize)
+            var tasks = bundlesToProcess.Select(async bundleEntry =>
             {
-                using (var fs = new FileStream(task.FullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
-                {
-                    fs.SetLength((long)task.FileInfo.FileSize);
-                }
-            }
-
-            var semaphore = new SemaphoreSlim(maxThreads);
-            var downloadTasks = task.ChunksByBundle.Select(async pair =>
-            {
-                await semaphore.WaitAsync();
+                await netSem.WaitAsync();
                 try
                 {
-                    using (var decompressor = new Decompressor())
+                    string url = $"{_bundleBaseUrl}/{bundleEntry.Key:X16}.bundle";
+                    var sorted = bundleEntry.Value.OrderBy(t => t.Chunk.BundleOffset).ToList();
+
+                    const uint MaxGap = 256 * 1024;
+                    var groups = new List<List<UniqueChunkTask>>();
+                    if (sorted.Count > 0)
                     {
-                        await DownloadAndPatchChunksAsync(pair.Key, pair.Value, decompressor);
+                        var currentGroup = new List<UniqueChunkTask> { sorted[0] };
+                        for (int i = 1; i < sorted.Count; i++)
+                        {
+                            uint gap = (uint)(sorted[i].Chunk.BundleOffset - (sorted[i - 1].Chunk.BundleOffset + sorted[i - 1].Chunk.CompressedSize));
+                            if (gap <= MaxGap) currentGroup.Add(sorted[i]);
+                            else { groups.Add(currentGroup); currentGroup = new List<UniqueChunkTask> { sorted[i] }; }
+                        }
+                        groups.Add(currentGroup);
+                    }
+
+                    Interlocked.Add(ref totalRequests, groups.Count);
+                    foreach (var group in groups)
+                    {
+                        long start = (long)group[0].Chunk.BundleOffset;
+                        long end = (long)(group.Last().Chunk.BundleOffset + group.Last().Chunk.CompressedSize - 1);
+
+                        var req = new HttpRequestMessage(HttpMethod.Get, url);
+                        req.Headers.Range = new RangeHeaderValue(start, end);
+                        
+                        using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+                        resp.EnsureSuccessStatusCode();
+
+                        using var responseStream = await resp.Content.ReadAsStreamAsync();
+                        long currentStreamPos = start;
+
+                        foreach (var t in group)
+                        {
+                            long gap = (long)t.Chunk.ChunkId == 0 ? 0 : (long)t.Chunk.BundleOffset - currentStreamPos; // Placeholder fix for gap logic
+                            if (gap > 0)
+                            {
+                                byte[] skipBuf = _skipBufferPool.TryTake(out var b) ? b : new byte[64 * 1024];
+                                long skipped = 0;
+                                while (skipped < gap)
+                                {
+                                    int read = await responseStream.ReadAsync(skipBuf, 0, (int)Math.Min(gap - skipped, skipBuf.Length));
+                                    if (read == 0) break;
+                                    skipped += read;
+                                }
+                                Interlocked.Add(ref wastedBytes, skipped);
+                                _skipBufferPool.Add(skipBuf);
+                            }
+
+                            byte[] comp = new byte[t.Chunk.CompressedSize];
+                            int tRead = 0;
+                            while (tRead < (int)t.Chunk.CompressedSize)
+                            {
+                                int r = await responseStream.ReadAsync(comp, tRead, (int)t.Chunk.CompressedSize - tRead);
+                                if (r == 0) break;
+                                tRead += r;
+                            }
+                            Interlocked.Add(ref totalDownloaded, tRead + (gap > 0 ? gap : 0));
+                            currentStreamPos = (long)t.Chunk.BundleOffset + tRead;
+
+                            await cpuSem.WaitAsync();
+                            try {
+                                if (!_decompressorPool.TryPop(out var decompressor)) decompressor = new Decompressor();
+                                try {
+                                    var uncomp = decompressor.Unwrap(comp.AsSpan(0, tRead)).ToArray();
+                                    Interlocked.Add(ref totalDecompressedBytes, (long)uncomp.Length);
+
+                                    foreach (var target in t.Targets)
+                                    {
+                                        var handle = openHandles.GetOrAdd(target.FullPath, (path) => {
+                                            var dir = Path.GetDirectoryName(path);
+                                            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                                            var h = File.OpenHandle(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);
+                                            if ((ulong)RandomAccess.GetLength(h) != target.FileInfo.FileSize) RandomAccess.SetLength(h, (long)target.FileInfo.FileSize);
+                                            return h;
+                                        });
+
+                                        RandomAccess.Write(handle, uncomp, (long)target.FileOffset);
+                                        int doneChunks = Interlocked.Increment(ref completedChunks);
+                                        int rem = pendingPerFile.AddOrUpdate(target.FullPath, 0, (k, v) => v - 1);
+                                        if (rem == 0) {
+                                            Interlocked.Increment(ref completedFilesCount);
+                                            if (openHandles.TryRemove(target.FullPath, out var hnd)) hnd.Dispose();
+                                        }
+                                        // Use the full relative path (FileInfo.Name) for consistent technical context
+                                        ProgressChanged?.Invoke("Updating", $"{completedFilesCount} of {totalFilesToPatch} files: {target.FileInfo.Name}", doneChunks, totalChunks);
+                                    }
+                                } finally { _decompressorPool.Push(decompressor); }
+                            } finally { cpuSem.Release(); }
+                        }
                     }
                 }
-                finally { semaphore.Release(); }
+                catch (Exception ex) { _logService.LogWarning($"Bundle {bundleEntry.Key:X16} error: {ex.Message}"); }
+                finally { netSem.Release(); }
             });
-
-            await Task.WhenAll(downloadTasks);
+            await Task.WhenAll(tasks);
         }
+        finally { foreach (var h in openHandles.Values) h.Dispose(); }
 
+        double sec = updateSw.Elapsed.TotalSeconds;
+        double efficiency = (double)usefulBytes / (totalDownloaded > 0 ? totalDownloaded : 1) * 100;
+        double wastedMB = wastedBytes / 1024.0 / 1024.0;
+        double usefulSpeed = (usefulBytes / 1024.0 / 1024.0) / (sec > 0 ? sec : 1);
+        double actualSpeed = (totalDownloaded / 1024.0 / 1024.0) / (sec > 0 ? sec : 1);
+        double decompressedGB = totalDecompressedBytes / 1024.0 / 1024.0 / 1024.0;
+        double compressionRatio = (double)totalDecompressedBytes / (usefulBytes > 0 ? usefulBytes : 1);
+        
+        _logService.LogSuccess($"[Updating] Completed in {sec:F1}s");
+        _logService.LogDebug($"  • HTTP Requests: {totalRequests}");
+        _logService.LogDebug($"  • Useful data: {usefulBytes / 1024.0 / 1024.0:F2} MB");
+        _logService.LogDebug($"  • Wasted (gaps): {wastedMB:F2} MB ({((double)wastedBytes / (totalDownloaded > 0 ? totalDownloaded : 1)) * 100:F1}%)");
+        _logService.LogDebug($"  • Efficiency: {efficiency:F1}% (256KB gap strategy)");
+        _logService.LogDebug($"  • Useful Speed: {usefulSpeed:F2} MB/s");
+        _logService.LogDebug($"  • Actual Speed: {actualSpeed:F2} MB/s");
+        _logService.LogDebug($"  • Decompressed: {decompressedGB:F2} GB (ratio {compressionRatio:F2}x)");
+        
         return totalFilesToPatch;
-    }
-
-    private async Task DownloadAndPatchChunksAsync(ulong bundleId, List<ChunkDownloadTask> tasks, Decompressor decompressor)
-    {
-        string bundleUrl = $"{_bundleBaseUrl}/{bundleId:X16}.bundle";
-        var sortedTasks = tasks.OrderBy(t => t.Chunk.BundleOffset).ToList();
-
-        int currentIndex = 0;
-        while (currentIndex < sortedTasks.Count)
-        {
-            var group = new List<ChunkDownloadTask> { sortedTasks[currentIndex] };
-            int nextIndex = currentIndex + 1;
-            while (nextIndex < sortedTasks.Count)
-            {
-                var prev = sortedTasks[nextIndex - 1].Chunk;
-                var curr = sortedTasks[nextIndex].Chunk;
-                if (prev.BundleOffset + prev.CompressedSize == curr.BundleOffset)
-                {
-                    group.Add(sortedTasks[nextIndex]);
-                    nextIndex++;
-                }
-                else break;
-            }
-
-            long start = (long)group.First().Chunk.BundleOffset;
-            long end = (long)(group.Last().Chunk.BundleOffset + group.Last().Chunk.CompressedSize - 1);
-
-            try 
-            {
-                var request = new HttpRequestMessage(HttpMethod.Get, bundleUrl);
-                request.Headers.Range = new RangeHeaderValue(start, end);
-
-                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
-                {
-                    response.EnsureSuccessStatusCode();
-                    var rangeData = await response.Content.ReadAsByteArrayAsync();
-
-                    int internalOffset = 0;
-                    foreach (var chunkTask in group)
-                    {
-                        var compressed = new byte[chunkTask.Chunk.CompressedSize];
-                        Array.Copy(rangeData, internalOffset, compressed, 0, (int)chunkTask.Chunk.CompressedSize);
-                        var uncompressed = decompressor.Unwrap(compressed).ToArray();
-
-                        if (!_hashService.VerifyChunk(uncompressed, chunkTask.Chunk.ChunkId, chunkTask.FileInfo.HashType))
-                            throw new Exception("Integrity failure");
-
-                        await WriteChunkToFileAsync(chunkTask.FullPath, (long)chunkTask.FileOffset, uncompressed);
-                        internalOffset += (int)chunkTask.Chunk.CompressedSize;
-                    }
-                }
-            }
-            catch { }
-            currentIndex = nextIndex;
-        }
-    }
-
-    private async Task WriteChunkToFileAsync(string path, long offset, byte[] data)
-    {
-        using (var fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
-        {
-            fs.Position = offset;
-            await fs.WriteAsync(data, 0, data.Length);
-        }
     }
 }

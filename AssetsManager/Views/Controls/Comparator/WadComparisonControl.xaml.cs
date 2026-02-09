@@ -15,7 +15,6 @@ using AssetsManager.Services.Downloads;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Backup;
 using AssetsManager.Utils;
 using AssetsManager.Services.Hashes;
 
@@ -164,7 +163,6 @@ namespace AssetsManager.Views.Controls.Comparator
             catch (OperationCanceledException)
             {
                 LogService.LogWarning("WAD comparison was cancelled by the user.");
-                CustomMessageBoxService.ShowInfo("Cancelled", "WAD comparison was cancelled.", Window.GetWindow(this));
             }
             catch (Exception ex)
             {
@@ -176,7 +174,5 @@ namespace AssetsManager.Views.Controls.Comparator
                 compareWadButton.IsEnabled = true;
             }
         }
-
-
     }
 }

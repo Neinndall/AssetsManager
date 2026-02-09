@@ -36,7 +36,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private FileSystemNodeModel _currentNode;
         private FileSystemNodeModel _currentFolderNode;
-        private ObservableCollection<FileSystemNodeModel> _rootNodes;
+        private ObservableRangeCollection<FileSystemNodeModel> _rootNodes;
         private bool _isShowingTemporaryPreview = false;
         private string _currentSearchFilter = string.Empty;
         private CancellationTokenSource _thumbnailCts;
@@ -242,7 +242,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 );
 
                 Breadcrumbs.NodeClicked += Breadcrumbs_NodeClicked;
-                FileGridView.NodeClicked += FileGridView_NodeClicked;
+                FileGridControl.NodeClicked += FileGridControl_NodeClicked;
                 UpdateScrollButtonsVisibility();
 
                 _isLoaded = true;
@@ -267,7 +267,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
                 
                 Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
-                FileGridView.NodeClicked -= FileGridView_NodeClicked;
+                FileGridControl.NodeClicked -= FileGridControl_NodeClicked;
             }
             catch (Exception ex)
             {
@@ -310,7 +310,7 @@ namespace AssetsManager.Views.Controls.Explorer
             await ExplorerPreviewService.ResetPreviewAsync();
         }
 
-        public void UpdateSelectedNode(FileSystemNodeModel node, ObservableCollection<FileSystemNodeModel> rootNodes)
+        public void UpdateSelectedNode(FileSystemNodeModel node, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
             ViewModel.IsDetailsTabSelected = false;
             _currentNode = node;
@@ -337,13 +337,13 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 _currentFolderNode = node;
 
-                var gridItems = new ObservableCollection<FileGridViewModel>(
+                var gridItems = new ObservableRangeCollection<FileGridViewModel>(
                     (!string.IsNullOrEmpty(_currentSearchFilter)
                         ? node.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
                         : node.Children)
                     .Select(n => new FileGridViewModel(n)));
 
-                FileGridView.ItemsSource = gridItems;
+                FileGridControl.ItemsSource = gridItems;
 
                 if (!ViewModel.IsGridMode)
                 {
@@ -357,7 +357,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async Task LoadThumbnailsQueueAsync(ObservableCollection<FileGridViewModel> items, CancellationToken ct)
+        private async Task LoadThumbnailsQueueAsync(ObservableRangeCollection<FileGridViewModel> items, CancellationToken ct)
         {
             foreach (var vm in items)
             {
@@ -383,7 +383,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private void FileGridView_NodeClicked(object sender, NodeClickedEventArgs e)
+        private void FileGridControl_NodeClicked(object sender, NodeClickedEventArgs e)
         {
             BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(e.Node));
         }

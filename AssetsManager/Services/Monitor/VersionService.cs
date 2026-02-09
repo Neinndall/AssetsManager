@@ -49,7 +49,7 @@ namespace AssetsManager.Services.Monitor
             _riotApiService = riotApiService;
 
             _manifestDownloader.ProgressChanged += (taskName, fileName, current, total) => {
-                VersionDownloadProgressChanged?.Invoke(this, (taskName, current, total, Path.GetFileName(fileName)));
+                VersionDownloadProgressChanged?.Invoke(this, (taskName, current, total, fileName));
             };
         }
 
@@ -100,7 +100,7 @@ namespace AssetsManager.Services.Monitor
                     var manifestBytes = await _httpClient.GetByteArrayAsync(url);
                     var manifest = _rmanService.Parse(manifestBytes);
 
-                    await _manifestDownloader.DownloadManifestAsync(manifest, tempDir, 4, "LeagueClient.exe");
+                    await _manifestDownloader.DownloadManifestAsync(manifest, tempDir, "LeagueClient.exe");
 
                     string exePath = Path.Combine(tempDir, "LeagueClient.exe");
                     if (File.Exists(exePath))
@@ -149,13 +149,15 @@ namespace AssetsManager.Services.Monitor
         {
             try
             {
-                _logService.Log($"Verifying/Updating {taskName}...");
+                // Instant notification to UI: This triggers "Verifying Files..." in ProgressUIManager
                 VersionDownloadStarted?.Invoke(this, taskName);
+                
+                _logService.Log($"Verifying/Updating {taskName}...");
 
                 var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl);
                 var manifest = _rmanService.Parse(manifestBytes);
 
-                int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, 4, null, locales);
+                int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, null, locales);
 
                 if (updatedCount > 0)
                 {

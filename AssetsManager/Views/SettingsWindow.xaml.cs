@@ -92,7 +92,7 @@ namespace AssetsManager.Views
             {
                 _appSettings.ResetToDefaults();
 
-                AppSettings.SaveSettings(_appSettings);
+                _appSettings.Save();
                 _customMessageBoxService.ShowInfo("Info", "Settings have been reset to default values.", this);
 
                 _settingsModel.Settings = _appSettings;
@@ -105,13 +105,34 @@ namespace AssetsManager.Views
         {
             _advancedSettingsView.SaveSettings();
 
-            AppSettings.SaveSettings(_settingsModel.Settings);
+            _appSettings.Save();
 
             _customMessageBoxService.ShowSuccess("Success", "Settings have been saved successfully.", this);
 
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = false });
         }
 
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
+        }
+
+        private void Maximize_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.WindowState == WindowState.Maximized)
+            {
+                this.WindowState = WindowState.Normal;
+            }
+            else
+            {
+                this.WindowState = WindowState.Maximized;
+            }
+        }
+
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
 
     }
 }

@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media.Imaging;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
@@ -20,6 +21,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -35,6 +37,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewChangesMenuItem");
         public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ExtractMenuItem");
         public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "SaveMenuItem");
+        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "AddToImageMergerMenuItem");
 
         // Injected Services
         public LogService LogService { get; set; }
@@ -52,11 +55,13 @@ namespace AssetsManager.Views.Controls.Explorer
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
         public HashResolverService HashResolverService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
+        public ImageMergerService ImageMergerService { get; set; }
+        public ProgressUIManager ProgressUIManager { get; set; }
 
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
 
-        public ObservableCollection<FileSystemNodeModel> RootNodes => _viewModel.RootNodes;
+        public ObservableRangeCollection<FileSystemNodeModel> RootNodes => _viewModel.RootNodes;
 
         private readonly FileExplorerModel _viewModel;
         
@@ -100,6 +105,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar.FavoritesVisibilityChanged -= Toolbar_FavoritesVisibilityChanged;
                 Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
                 Toolbar.ViewModeChanged -= Toolbar_ViewModeChanged;
+                Toolbar.ImageMergerClicked -= Toolbar_ImageMergerClicked;
             }
 
             // 3. Desuscribir eventos propios
@@ -149,7 +155,7 @@ namespace AssetsManager.Views.Controls.Explorer
             else
             {
                 // If we are not going to load, show the correct placeholder immediately.
-                ShowStatusMessage(_viewModel.IsWadMode);
+                _viewModel.UpdateEmptyState(_viewModel.IsWadMode);
             }
 
             // Now, perform the async hash loading.
@@ -174,6 +180,7 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.FavoritesVisibilityChanged += Toolbar_FavoritesVisibilityChanged;
             Toolbar.SortStateChanged += Toolbar_SortStateChanged;
             Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
+            Toolbar.ImageMergerClicked += Toolbar_ImageMergerClicked;
 
             Toolbar.SetWadMode(_viewModel.IsWadMode);
             
@@ -238,6 +245,11 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private void Toolbar_ImageMergerClicked(object sender, RoutedEventArgs e)
+        {
+            ImageMergerService.ShowWindow();
+        }
+
         public async Task ReloadTreeAsync()
         {
             if (_viewModel.IsWadMode)
@@ -248,7 +260,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    ShowStatusMessage(true);
+                    _viewModel.UpdateEmptyState(true);
                 }
             }
             else
@@ -259,27 +271,9 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    ShowStatusMessage(false);
+                    _viewModel.UpdateEmptyState(false);
                 }
             }
-        }
-
-        private void ShowStatusMessage(bool isWadMode)
-        {
-            if (isWadMode) {
-                StatusTitle.Text = "Select a LoL Directory";
-                StatusDescription.Text = "Choose the root folder where you installed League of Legends to browse its WAD files.";
-                SelectLolDirButton.Visibility = Visibility.Visible;
-            } else {
-                StatusTitle.Text = "Assets Directory Not Found";
-                StatusDescription.Text = "The application could not find the directory for downloaded assets.";
-                SelectLolDirButton.Visibility = Visibility.Collapsed;
-            }
-            
-            _viewModel.RootNodes.Clear();
-            _viewModel.IsBusy = false;
-            _viewModel.IsTreeReady = false;
-            _viewModel.IsEmptyState = true;
         }
 
         private async void Toolbar_LoadComparisonClicked(object sender, RoutedEventArgs e)
@@ -301,33 +295,31 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async Task BuildWadTreeAsync(string rootPath)
+        private async Task ExecuteTreeBuildInternalAsync(
+            Func<CancellationToken, Task<ObservableRangeCollection<FileSystemNodeModel>>> buildFunc, 
+            ExplorerLoadingState loadingState, 
+            string errorMsg, 
+            bool isBackupMode,
+            Action<ObservableRangeCollection<FileSystemNodeModel>> onSuccess = null)
         {
-            _viewModel.IsBackupMode = false;
-            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
+            _viewModel.IsBackupMode = isBackupMode;
+            var cancellationToken = TaskCancellationManager.PrepareNewOperation();
 
-            _currentRootPath = rootPath;
-            NewLolPath = null;
-            OldLolPath = null;
-            
-            _viewModel.SetLoadingState(ExplorerLoadingState.LoadingWads);
-
-            Toolbar.IsSortButtonVisible = false;
+            _viewModel.SetLoadingState(loadingState);
+            Toolbar.IsSortButtonVisible = isBackupMode;
 
             try
             {
-                var newNodes = await TreeBuilderService.BuildWadTreeAsync(rootPath, cancellationToken);
+                var newNodes = await buildFunc(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                _viewModel.RootNodes.Clear();
-                foreach (var node in newNodes)
-                {
-                    _viewModel.RootNodes.Add(node);
-                }
+                _viewModel.RootNodes.ReplaceRange(newNodes);
 
-                if (_viewModel.RootNodes.Count == 0)
+                onSuccess?.Invoke(newNodes);
+
+                if (_viewModel.RootNodes.Count == 0 && !isBackupMode)
                 {
-                    CustomMessageBoxService.ShowError("Error", "Could not find any WAD files in 'Game' or 'Plugins' subdirectories.", Window.GetWindow(this));
+                    CustomMessageBoxService.ShowError("Error", "No items found in the selected location.", Window.GetWindow(this));
                     _viewModel.IsEmptyState = true;
                 }
 
@@ -335,14 +327,14 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             catch (OperationCanceledException)
             {
-                LogService.LogWarning("WAD tree building was cancelled.");
+                LogService.LogWarning("The tree build was cancelled.");
                 await Task.Delay(1500);
                 TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, "Failed to build initial tree.");
-                CustomMessageBoxService.ShowError("Error", "Could not load the directory. Please check the logs.", Window.GetWindow(this));
+                LogService.LogError(ex, errorMsg);
+                CustomMessageBoxService.ShowError("Error", $"{errorMsg} Please check the logs.", Window.GetWindow(this));
                 _viewModel.IsEmptyState = true;
             }
             finally
@@ -353,127 +345,49 @@ namespace AssetsManager.Views.Controls.Explorer
                     _viewModel.IsTreeReady = true;
                 }
             }
+        }
+
+        private async Task BuildWadTreeAsync(string rootPath)
+        {
+            _currentRootPath = rootPath;
+            NewLolPath = null;
+            OldLolPath = null;
+
+            await ExecuteTreeBuildInternalAsync(
+                async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct),
+                ExplorerLoadingState.LoadingWads,
+                "Failed to build WAD tree.",
+                false);
         }
 
         private async Task BuildDirectoryTreeAsync(string rootPath)
         {
-            _viewModel.IsBackupMode = false;
-            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
-
             _currentRootPath = rootPath;
             NewLolPath = null;
             OldLolPath = null;
-            
-            _viewModel.SetLoadingState(ExplorerLoadingState.ExploringDirectory);
 
-            Toolbar.IsSortButtonVisible = false;
-
-            try
-            {
-                var newNodes = await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                _viewModel.RootNodes.Clear();
-                foreach (var node in newNodes)
-                {
-                    _viewModel.RootNodes.Add(node);
-                }
-
-                TaskCancellationManager.CompleteCurrentOperation();
-            }
-            catch (OperationCanceledException)
-            {
-                LogService.LogWarning("Directory tree building was cancelled.");
-                await Task.Delay(1500);
-                TaskCancellationManager.CompleteCurrentOperation();
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "Failed to build directory tree.");
-                CustomMessageBoxService.ShowError("Error", "Could not load the directory. Please check the logs.", Window.GetWindow(this));
-                _viewModel.IsEmptyState = true;
-            }
-            finally
-            {
-                _viewModel.IsBusy = false;
-                if (!_viewModel.IsEmptyState)
-                {
-                    _viewModel.IsTreeReady = true;
-                }
-            }
+            await ExecuteTreeBuildInternalAsync(
+                async ct => await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct),
+                ExplorerLoadingState.ExploringDirectory,
+                "Failed to build directory tree.",
+                false);
         }
 
         private async Task BuildTreeFromBackupAsync(string jsonPath)
         {
-            _viewModel.IsBackupMode = true;
             _backupJsonPath = jsonPath;
-            var cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Use the manager
 
-            _viewModel.SetLoadingState(ExplorerLoadingState.LoadingBackup);
-
-            Toolbar.IsSortButtonVisible = true;
-
-            try
-            {
-                var (backupNodes, newLolPath, oldLolPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _viewModel.IsSortingEnabled, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                _viewModel.RootNodes.Clear();
-                NewLolPath = newLolPath;
-                OldLolPath = oldLolPath;
-                foreach (var node in backupNodes)
+            await ExecuteTreeBuildInternalAsync(
+                async ct => 
                 {
-                    _viewModel.RootNodes.Add(node);
-                }
-
-                TaskCancellationManager.CompleteCurrentOperation();
-            }
-            catch (OperationCanceledException)
-            {
-                LogService.LogWarning("Backup tree building was cancelled.");
-                await Task.Delay(1500);
-                TaskCancellationManager.CompleteCurrentOperation();
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "Failed to build tree from backup.");
-                CustomMessageBoxService.ShowError("Error", "Could not load the backup file. Please check the logs.", Window.GetWindow(this));
-                _viewModel.IsEmptyState = true;
-            }
-            finally
-            {
-                _viewModel.IsBusy = false;
-                if (!_viewModel.IsEmptyState)
-                {
-                    _viewModel.IsTreeReady = true;
-                }
-            }
-        }
-
-        private List<FileSystemNodeModel> GetSelectedNodes()
-        {
-            var selected = new List<FileSystemNodeModel>();
-            FindMultiSelectedNodes(_viewModel.RootNodes, selected);
-
-            if (selected.Count == 0 && FileTreeView.SelectedItem is FileSystemNodeModel singleSelected)
-            {
-                selected.Add(singleSelected);
-            }
-
-            return selected;
-        }
-
-        private void FindMultiSelectedNodes(IEnumerable<FileSystemNodeModel> nodes, List<FileSystemNodeModel> result)
-        {
-            if (nodes == null) return;
-            foreach (var node in nodes)
-            {
-                if (node.IsMultiSelected)
-                {
-                    result.Add(node);
-                }
-                FindMultiSelectedNodes(node.Children, result);
-            }
+                    var (nodes, newPath, oldPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _viewModel.IsSortingEnabled, ct);
+                    NewLolPath = newPath;
+                    OldLolPath = oldPath;
+                    return nodes;
+                },
+                ExplorerLoadingState.LoadingBackup,
+                "Failed to build tree from backup.",
+                true);
         }
 
         private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
@@ -484,7 +398,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
-            var selectedNodes = GetSelectedNodes();
+            var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
             if (selectedNodes.Count == 0)
             {
                 CustomMessageBoxService.ShowInfo("Info", "Please select one or more files or folders to extract.", Window.GetWindow(this));
@@ -514,18 +428,25 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    if (selectedNodes.Count == 1)
-                    {
-                        LogService.Log($"Extracting {selectedNodes[0].Name}...");
-                    }
-                    else
-                    {
-                        LogService.Log($"Extracting {selectedNodes.Count} selected items...");
-                    }
+                    // Show immediate activity
+                    ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", 0));
 
+                    // Calculate total files for accurate progress
+                    int totalFiles = await WadExtractionService.CalculateTotalAsync(selectedNodes, cancellationToken);
+                    
+                    // Update with real total
+                    ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", totalFiles));
+
+                    int processedCount = 0;
                     foreach (var node in selectedNodes)
                     {
-                        await WadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        
+                        await WadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken, (fileName) => 
+                        {
+                            processedCount++;
+                            ProgressUIManager?.OnExtractionProgressChanged(processedCount, totalFiles, fileName);
+                        });
                     }
 
                     if (selectedNodes.Count == 1)
@@ -549,7 +470,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 catch (OperationCanceledException)
                 {
                     LogService.LogWarning("Extraction was cancelled by the user.");
-                    CustomMessageBoxService.ShowInfo("Cancelled", "Extraction was cancelled.", Window.GetWindow(this));
                 }
                 catch (Exception ex)
                 {
@@ -558,6 +478,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 finally
                 {
+                    ProgressUIManager?.OnExtractionCompleted();
                     // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;
@@ -573,7 +494,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
-            var selectedNodes = GetSelectedNodes();
+            var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
             if (selectedNodes.Count == 0)
             {
                 CustomMessageBoxService.ShowInfo("Info", "Please select one or more files or folders to save.", Window.GetWindow(this));
@@ -603,22 +524,29 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    if (selectedNodes.Count == 1)
-                    {
-                        LogService.Log($"Processing and saving {selectedNodes[0].Name}...");
-                    }
-                    else
-                    {
-                        LogService.Log($"Processing and saving {selectedNodes.Count} selected items...");
-                    }
+                    // Show immediate activity
+                    ProgressUIManager?.OnSavingStarted(0);
+
+                    int totalFiles = await WadSavingService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, cancellationToken);
+                    
+                    // Update with real total
+                    ProgressUIManager?.OnSavingStarted(totalFiles);
 
                     string singleSavedPath = null;
                     string singleDisplayName = null;
 
+                    int processedCount = 0;
                     foreach (var node in selectedNodes)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+
                         var savedFiles = new List<string>();
-                        await WadSavingService.ProcessAndSaveAsync(node, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => savedFiles.Add(path));
+                        await WadSavingService.ProcessAndSaveAsync(node, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => 
+                        {
+                            processedCount++;
+                            ProgressUIManager?.OnSavingProgressChanged(processedCount, totalFiles, Path.GetFileName(path));
+                            savedFiles.Add(path);
+                        });
 
                         if (selectedNodes.Count == 1 && savedFiles.Count > 0)
                         {
@@ -660,7 +588,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 catch (OperationCanceledException)
                 {
                     LogService.LogWarning("Save operation was cancelled by the user.");
-                    CustomMessageBoxService.ShowInfo("Cancelled", "Save operation was cancelled.", Window.GetWindow(this));
                 }
                 catch (Exception ex)
                 {
@@ -669,6 +596,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 finally
                 {
+                    ProgressUIManager?.OnSavingCompleted();
                     // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;
@@ -724,6 +652,71 @@ namespace AssetsManager.Views.Controls.Explorer
                     string fullPath = string.Join("/", validNodes.Select(n => n.Name));
                     
                     FavoritesManager.AddFavorite(fullPath);
+                }
+            }
+        }
+
+        private async void AddToImageMerger_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
+            if (selectedNodes.Count == 0) return;
+
+            int addedCount = 0;
+            foreach (var node in selectedNodes)
+            {
+                // Only process files that are supported images or textures
+                if (!(SupportedFileTypes.Images.Contains(node.Extension) || SupportedFileTypes.Textures.Contains(node.Extension)) ||
+                    !(node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    byte[] data = null;
+                    if (node.Type == NodeType.VirtualFile)
+                        data = await WadExtractionService.GetVirtualFileBytesAsync(node);
+                    else if (node.Type == NodeType.RealFile)
+                        data = await File.ReadAllBytesAsync(node.FullPath);
+
+                    if (data == null) continue;
+
+                    BitmapSource bitmap = null;
+                    if (SupportedFileTypes.Textures.Contains(node.Extension))
+                    {
+                        using (var stream = new MemoryStream(data))
+                        {
+                            bitmap = Utils.TextureUtils.LoadTexture(stream, node.Extension);
+                        }
+                    }
+                    else
+                    {
+                        using (var stream = new MemoryStream(data))
+                        {
+                            var bmp = new BitmapImage();
+                            bmp.BeginInit();
+                            bmp.StreamSource = stream;
+                            bmp.CacheOption = BitmapCacheOption.OnLoad;
+                            bmp.EndInit();
+                            bmp.Freeze();
+                            bitmap = bmp;
+                        }
+                    }
+
+                    if (bitmap != null)
+                    {
+                        ImageMergerService.AddItem(new ImageMergerItem
+                        {
+                            Name = node.Name,
+                            Path = node.FullPath ?? node.Name,
+                            Image = bitmap
+                        });
+                        addedCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, $"Failed to add image '{node.Name}' to merger.");
                 }
             }
         }
@@ -787,6 +780,12 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 ViewChangesMenuItem.IsEnabled = selectedNode.Status == DiffStatus.Modified;
             }
+
+            if (AddToImageMergerMenuItem is not null)
+            {
+                AddToImageMergerMenuItem.IsEnabled = (SupportedFileTypes.Images.Contains(selectedNode.Extension) || SupportedFileTypes.Textures.Contains(selectedNode.Extension)) && 
+                                                    (selectedNode.Type == NodeType.VirtualFile || selectedNode.Type == NodeType.RealFile);
+            }
         }
 
         private void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -822,96 +821,11 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
-                    await HandleAudioBankExpansion(selectedNode);
+                    await TreeBuilderService.ExpandAudioBankAsync(selectedNode, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
                 }
                 
                 FileSelected?.Invoke(this, e);
             }
-        }
-
-        private async Task HandleAudioBankExpansion(FileSystemNodeModel clickedNode)
-        {
-            var linkedBank = await AudioBankLinkerService.LinkAudioBankAsync(clickedNode, _viewModel.RootNodes, _currentRootPath);
-            if (linkedBank == null)
-            {
-                return; // Errors are logged by the service
-            }
-
-            // Read other file data from the WAD.
-            var eventsData = linkedBank.EventsBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
-            byte[] wpkData = linkedBank.WpkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await WadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
-
-            List<AudioEventNode> audioTree;
-            if (linkedBank.BinData != null)
-            {
-                // BIN-based parsing (Champions, Maps)
-                if (wpkData != null)
-                {
-                    audioTree = AudioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
-                }
-                else
-                {
-                    audioTree = AudioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
-                }
-            }
-            else
-            {
-                // Generic parsing (no BIN file)
-                audioTree = AudioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
-            }
-
-            // 5. Populate the tree view with the results.
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                clickedNode.Children.Clear();
-
-                // Determine the absolute source WAD path for the child sound nodes.
-                string absoluteSourceWadPath;
-                if (clickedNode.ChunkDiff != null && (!string.IsNullOrEmpty(NewLolPath) || !string.IsNullOrEmpty(OldLolPath)))
-                {
-                    // Backup mode: construct the absolute path from the base LoL directory and the relative WAD path.
-                    string basePath = clickedNode.ChunkDiff.Type == ChunkDiffType.Removed ? OldLolPath : NewLolPath;
-                    absoluteSourceWadPath = Path.Combine(basePath, clickedNode.SourceWadPath);
-                }
-                else
-                {
-                    // Normal mode: the SourceWadPath should already be absolute.
-                    absoluteSourceWadPath = clickedNode.SourceWadPath;
-                }
-
-                foreach (var eventNode in audioTree)
-                {
-                    var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
-                    foreach (var soundNode in eventNode.Sounds)
-                    {
-                        // Determine the correct source file (WPK or BNK) for the sound.
-                        // This is crucial for the previewer to know where to extract the WEM data from.
-                        AudioSourceType sourceType;
-                        ulong sourceHash;
-                        if (linkedBank.WpkNode != null)
-                        {
-                            sourceType = AudioSourceType.Wpk;
-                            sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
-                        }
-                        else
-                        {
-                            sourceType = AudioSourceType.Bnk;
-                            sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
-                        }
-
-                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
-                        {
-                            SourceWadPath = absoluteSourceWadPath, // Use the resolved absolute path
-                            SourceChunkPathHash = sourceHash,
-                            AudioSource = sourceType
-                        };
-                        newEventNode.Children.Add(newSoundNode);
-                    }
-                    clickedNode.Children.Add(newEventNode);
-                }
-                clickedNode.IsExpanded = true;
-            });
         }
 
         private void Toolbar_SearchTextChanged(object sender, RoutedEventArgs e)
@@ -997,7 +911,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
         {
-            await TreeBuilderService.LoadAllChildren(node, _currentRootPath);
+            await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
         }
 
         public void SelectNode(FileSystemNodeModel node)

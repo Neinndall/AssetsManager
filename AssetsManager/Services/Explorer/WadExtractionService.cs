@@ -29,33 +29,60 @@ namespace AssetsManager.Services.Explorer
             _wadNodeLoaderService = wadNodeLoaderService;
         }
 
+        public async Task<int> CalculateTotalAsync(IEnumerable<FileSystemNodeModel> nodes, CancellationToken cancellationToken)
+        {
+            int count = 0;
+            foreach (var node in nodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile || node.Type == NodeType.WemFile || node.Type == NodeType.SoundBank)
+                {
+                    count++;
+                }
+                else
+                {
+                    if ((node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile) && 
+                        node.Children.Count == 1 && node.Children[0].Name == "Loading...")
+                    {
+                        var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(node, cancellationToken);
+                        node.Children.ReplaceRange(loadedChildren);
+                    }
+                    count += await CalculateTotalAsync(node.Children, cancellationToken);
+                }
+            }
+            return count;
+        }
+
         // Dirige el proceso de extracción al método adecuado según el tipo de nodo.
-        public async Task ExtractNodeAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken)
+        public async Task ExtractNodeAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileExtracted = null)
         {
             switch (node.Type)
             {
                 case NodeType.SoundBank:
                 case NodeType.VirtualFile:
                     await ExtractVirtualFileAsync(node, destinationPath, cancellationToken);
+                    onFileExtracted?.Invoke(node.Name);
                     break;
                 case NodeType.VirtualDirectory:
                 case NodeType.WadFile:
-                    await ExtractVirtualDirectoryAsync(node, destinationPath, cancellationToken);
+                    await ExtractVirtualDirectoryAsync(node, destinationPath, cancellationToken, onFileExtracted);
                     break;
                 case NodeType.AudioEvent:
-                    await ExtractAudioEventDirectoryAsync(node, destinationPath, cancellationToken);
+                    await ExtractAudioEventDirectoryAsync(node, destinationPath, cancellationToken, onFileExtracted);
                     break;
                 case NodeType.WemFile:
                     await ExtractWemFileAsync(node, destinationPath, cancellationToken);
+                    onFileExtracted?.Invoke(node.Name);
                     break;
                 case NodeType.RealDirectory:
-                    await ExtractRealDirectoryAsync(node, destinationPath, cancellationToken);
+                    await ExtractRealDirectoryAsync(node, destinationPath, cancellationToken, onFileExtracted);
                     break;
             }
         }
 
         // Extrae el contenido de una carpeta de evento de audio (.wem) a un nuevo directorio.
-        private async Task ExtractAudioEventDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken)
+        private async Task ExtractAudioEventDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken, Action<string> onFileExtracted)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -68,6 +95,7 @@ namespace AssetsManager.Services.Explorer
                 if (childNode.Type == NodeType.WemFile)
                 {
                     await ExtractWemFileAsync(childNode, newDirPath, cancellationToken);
+                    onFileExtracted?.Invoke(childNode.Name);
                 }
             }
         }
@@ -85,7 +113,7 @@ namespace AssetsManager.Services.Explorer
         }
 
         // Extrae recursivamente un directorio que existe virtualmente dentro de un archivo WAD.
-        private async Task ExtractVirtualDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken)
+        private async Task ExtractVirtualDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken, Action<string> onFileExtracted)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -96,23 +124,19 @@ namespace AssetsManager.Services.Explorer
             if (dirNode.Children.Count == 1 && dirNode.Children[0].Name == "Loading...")
             {
                 var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(dirNode, cancellationToken);
-                dirNode.Children.Clear(); // Remove dummy node
-                foreach (var child in loadedChildren)
-                {
-                    dirNode.Children.Add(child);
-                }
+                dirNode.Children.ReplaceRange(loadedChildren);
             }
 
             // Now, recursively call ExtractNodeAsync on the actual children.
             foreach (var childNode in dirNode.Children)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await ExtractNodeAsync(childNode, newDirPath, cancellationToken);
+                await ExtractNodeAsync(childNode, newDirPath, cancellationToken, onFileExtracted);
             }
         }
 
         // Copia recursivamente un directorio que ya existe en el disco físico (modo directorio).
-        private async Task ExtractRealDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken)
+        private async Task ExtractRealDirectoryAsync(FileSystemNodeModel dirNode, string destinationPath, CancellationToken cancellationToken, Action<string> onFileExtracted)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -123,7 +147,7 @@ namespace AssetsManager.Services.Explorer
             foreach (var childNode in dirNode.Children)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await ExtractNodeAsync(childNode, newDirPath, cancellationToken);
+                await ExtractNodeAsync(childNode, newDirPath, cancellationToken, onFileExtracted);
             }
         }
 

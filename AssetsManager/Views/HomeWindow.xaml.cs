@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views.Models.Home;
 using AssetsManager.Utils;
+using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views
 {
@@ -33,6 +34,27 @@ namespace AssetsManager.Views
             {
                 NavigationRequested?.Invoke(destination);
             }
+        }
+
+        private void Notepad_Click(object sender, RoutedEventArgs e)
+        {
+            var notepadWindow = App.ServiceProvider.GetRequiredService<NotepadWindow>();
+            notepadWindow.Owner = Window.GetWindow(this);
+            notepadWindow.Show();
+        }
+
+        private void AudioPlayer_Click(object sender, RoutedEventArgs e)
+        {
+            var audioPlayerWindow = App.ServiceProvider.GetRequiredService<AudioPlayerWindow>();
+            audioPlayerWindow.Owner = Window.GetWindow(this);
+            audioPlayerWindow.Show();
+        }
+
+        private void Converter_Click(object sender, RoutedEventArgs e)
+        {
+            var converterWindow = App.ServiceProvider.GetRequiredService<ConverterWindow>();
+            converterWindow.Owner = Window.GetWindow(this);
+            converterWindow.Show();
         }
     }
 }

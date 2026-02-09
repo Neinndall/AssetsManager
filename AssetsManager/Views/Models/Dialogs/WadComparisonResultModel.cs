@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models.Dialogs
 {
@@ -13,6 +14,7 @@ namespace AssetsManager.Views.Models.Dialogs
     {
         Idle,
         ResolvingHashes,
+        ReloadingHashes,
         Ready
     }
 
@@ -84,6 +86,11 @@ namespace AssetsManager.Views.Models.Dialogs
                     TreeModel.LoadingText = "BUILDING TREE & DATA";
                     SummaryText = "Resolving hashes and building result tree...";
                     break;
+                case ComparisonLoadingState.ReloadingHashes:
+                    TreeModel.IsBusy = true;
+                    TreeModel.LoadingText = "RELOADING HASHES";
+                    SummaryText = "Force reloading hash databases...";
+                    break;
                 case ComparisonLoadingState.Ready:
                     TreeModel.IsBusy = false;
                     break;
@@ -93,7 +100,12 @@ namespace AssetsManager.Views.Models.Dialogs
         public void SetResults(List<SerializableChunkDiff> diffs, List<WadGroupViewModel> groups)
         {
             SetLoadingState(ComparisonLoadingState.Ready);
-            TreeModel.WadGroups = new ObservableCollection<WadGroupViewModel>(groups);
+            
+            if (TreeModel.WadGroups == null)
+                TreeModel.WadGroups = new ObservableRangeCollection<WadGroupViewModel>();
+                
+            TreeModel.WadGroups.ReplaceRange(groups);
+            
             SummaryText = $"Found {diffs.Count} differences across {groups.Count} WAD files.";
             
             CountNew = diffs.Count(d => d.Type == ChunkDiffType.New).ToString();
@@ -111,7 +123,7 @@ namespace AssetsManager.Views.Models.Dialogs
         public string WadName { get; set; }
         public int DiffCount { get; set; }
         public string WadNameWithCount => $"{WadName} ({DiffCount})";
-        public List<DiffTypeGroupViewModel> Types { get; set; }
+        public ObservableRangeCollection<DiffTypeGroupViewModel> Types { get; set; }
     }
 
     public class DiffTypeGroupViewModel
@@ -119,6 +131,6 @@ namespace AssetsManager.Views.Models.Dialogs
         public ChunkDiffType Type { get; set; }
         public int DiffCount { get; set; }
         public string TypeNameWithCount => $"{Type} ({DiffCount})";
-        public List<SerializableChunkDiff> Diffs { get; set; }
+        public ObservableRangeCollection<SerializableChunkDiff> Diffs { get; set; }
     }
 }

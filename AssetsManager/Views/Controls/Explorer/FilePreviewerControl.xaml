@@ -226,7 +226,7 @@
         <!-- Main Content Area -->
         <Grid Margin="0">
             <!-- 1. GRID VIEW (Folders) -->
-            <local:FileGridView x:Name="FileGridView" 
+            <local:FileGridControl x:Name="FileGridControl" 
                                 Visibility="{Binding IsGridVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
             <!-- 2. CONTENT PREVIEWS (Files) -->
@@ -343,7 +343,7 @@
             </Grid>
             
             <!-- 3. DETAILS VIEW (Renamed Info) -->
-            <local:DetailsTabView 
+            <local:DetailsTabControl 
                 Visibility="{Binding IsDetailsTabSelected, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}"/>
         </Grid>
     </DockPanel>

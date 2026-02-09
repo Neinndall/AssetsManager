@@ -58,6 +58,7 @@
 
     <!-- TreeViewItem Style -->
     <Style x:Key="ModernTreeViewItem" TargetType="TreeViewItem">
+        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="FontSize" Value="13"/>
@@ -173,8 +174,11 @@
         <Setter Property="ItemContainerStyle" Value="{StaticResource ModernTreeViewItem}"/>
 
         <!-- Virtualization for performance with large item counts -->
-        <!--<Setter Property="VirtualizingStackPanel.IsVirtualizing" Value="True"/>-->
-        <!--<Setter Property="VirtualizingStackPanel.VirtualizationMode" Value="Recycling"/>-->
+        <Setter Property="VirtualizingStackPanel.IsVirtualizing" Value="True"/>
+        <Setter Property="VirtualizingStackPanel.VirtualizationMode" Value="Recycling"/>
+        <Setter Property="VirtualizingStackPanel.CacheLength" Value="2,2"/>
+        <Setter Property="VirtualizingStackPanel.CacheLengthUnit" Value="Page"/>
+        <Setter Property="VirtualizingStackPanel.ScrollUnit" Value="Pixel"/>
     </Style>
 
 </ResourceDictionary>

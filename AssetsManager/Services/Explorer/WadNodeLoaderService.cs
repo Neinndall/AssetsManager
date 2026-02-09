@@ -26,7 +26,7 @@ namespace AssetsManager.Services.Explorer
             _logService = logService;
         }
 
-        public async Task<(List<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
+        public async Task<(ObservableRangeCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
         {
             var options = new JsonSerializerOptions
             {
@@ -39,7 +39,7 @@ namespace AssetsManager.Services.Explorer
 
             var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
 
-            var rootNodes = new List<FileSystemNodeModel>();
+            var rootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
             if (comparisonData?.Diffs == null || !comparisonData.Diffs.Any())
             {
                 return (rootNodes, null, null);
@@ -55,38 +55,21 @@ namespace AssetsManager.Services.Explorer
                 // Ensure paths are updated with the latest hash resolutions
                 foreach (var file in wadGroup)
                 {
-                    // Attempt to resolve both Old and New hashes if they exist.
-                    // This handles New, Removed, Modified, and Renamed automatically without complex switching.
                     if (file.OldPathHash != 0)
-                    {
-                        string resolved = _hashResolverService.ResolveHash(file.OldPathHash);
-                        if (resolved != file.OldPathHash.ToString("x16")) file.OldPath = resolved;
-                    }
+                        file.OldPath = RestoreExtension(file.OldPath, _hashResolverService.ResolveHash(file.OldPathHash), file.OldPathHash);
 
                     if (file.NewPathHash != 0)
-                    {
-                        string resolved = _hashResolverService.ResolveHash(file.NewPathHash);
-                        if (resolved != file.NewPathHash.ToString("x16")) file.NewPath = resolved;
-                    }
+                        file.NewPath = RestoreExtension(file.NewPath, _hashResolverService.ResolveHash(file.NewPathHash), file.NewPathHash);
 
-                    // [TEST] Commented out to verify if dependency resolution is redundant
-                    /*
                     if (file.Dependencies != null)
                     {
                         foreach (var dep in file.Dependencies)
                         {
                             ulong depHash = dep.NewPathHash != 0 ? dep.NewPathHash : dep.OldPathHash;
                             if (depHash != 0)
-                            {
-                                string depResolved = _hashResolverService.ResolveHash(depHash);
-                                if (depResolved != depHash.ToString("x16"))
-                                {
-                                    dep.Path = depResolved;
-                                }
-                            }
+                                dep.Path = RestoreExtension(dep.Path, _hashResolverService.ResolveHash(depHash), depHash);
                         }
                     }
-                    */
                 }
 
                 var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
@@ -162,6 +145,7 @@ namespace AssetsManager.Services.Explorer
                             statusNode.Status = GetDiffStatus(statusType);
                             wadNode.Children.Add(statusNode);
 
+                            var nodesToAdd = new List<FileSystemNodeModel>();
                             foreach (var file in filesInStatus.OrderBy(f => f.Path))
                             {
                                 string chunkPath = GetBackupChunkPath(backupRoot, file);
@@ -177,22 +161,15 @@ namespace AssetsManager.Services.Explorer
                                     OldPath = file.Type == ChunkDiffType.Renamed ? file.OldPath : null
                                 };
 
-                                statusNode.Children.Add(node);
-
                                 if (file.Dependencies != null)
                                 {
-                                    _logService.LogDebug($"[LoadFromBackupAsync] Processing audio bank '{file.Path}' dependencies (isSortingEnabled=false). Count: {file.Dependencies.Count}");
+                                    var depNodesToAdd = new List<FileSystemNodeModel>();
                                     foreach (var dep in file.Dependencies)
                                     {
-                                        _logService.LogDebug($"[LoadFromBackupAsync] Dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
                                         if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                         {
-                                            _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions. Adding as child node.");
-                                            // New format: Create a visible child node with status
                                             string depStatusPrefix = GetStatusPrefix(dep.Type.Value);
                                             string depFileName = Path.GetFileName(dep.Path);
-                                            
-                                            // The FullPath must also contain the prefix for the search to work correctly
                                             string prefixedFullPath = $"{depStatusPrefix}/{dep.Path}";
 
                                             var depNode = new FileSystemNodeModel($"{depStatusPrefix} {depFileName}", false, prefixedFullPath, wadGroup.Key)
@@ -212,12 +189,10 @@ namespace AssetsManager.Services.Explorer
                                                 },
                                                 BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
                                             };
-                                            node.Children.Add(depNode);
+                                            depNodesToAdd.Add(depNode);
                                         }
                                         else
                                         {
-                                            _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Adding as fallback.");
-                                            // Fallback for old backups or unchanged dependencies
                                             string depFileName = Path.GetFileName(dep.Path);
                                             var depNode = new FileSystemNodeModel(depFileName, false, dep.Path, wadGroup.Key)
                                             {
@@ -230,17 +205,20 @@ namespace AssetsManager.Services.Explorer
                                                     NewPath = dep.Path,
                                                     OldPathHash = dep.OldPathHash,
                                                     NewPathHash = dep.NewPathHash,
-                                            OldCompressionType = dep.CompressionType,
+                                                    OldCompressionType = dep.CompressionType,
                                                     NewCompressionType = dep.CompressionType,
                                                     BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified })
                                                 },
                                                 BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified })
                                             };
-                                            node.Children.Add(depNode);
+                                            depNodesToAdd.Add(depNode);
                                         }
                                     }
+                                    node.Children.AddRange(depNodesToAdd);
                                 }
+                                nodesToAdd.Add(node);
                             }
+                            statusNode.Children.AddRange(nodesToAdd);
                         }
                     }
                 }
@@ -259,6 +237,21 @@ namespace AssetsManager.Services.Explorer
             ChunkDiffType.Dependency => "[=] Dependency",
             _ => "[?] Unknown"
         };
+
+        private string RestoreExtension(string original, string resolved, ulong hash)
+        {
+            // If DB gives a path with extension, we trust it
+            if (Path.HasExtension(resolved)) return resolved;
+            // If the JSON (original) had an extension, we keep it
+            if (!string.IsNullOrEmpty(original) && Path.HasExtension(original))
+            {
+                // If resolved is just the raw hash, use the full original path
+                if (resolved == hash.ToString("x16")) return original;
+                // Otherwise, append the extension to the resolved name
+                return resolved + Path.GetExtension(original);
+            }
+            return resolved;
+        }
 
         private string GetBackupChunkPath(string backupRoot, SerializableChunkDiff diff)
         {
@@ -298,12 +291,12 @@ namespace AssetsManager.Services.Explorer
                 .ThenBy(c => c.Name)
                 .ToList();
 
-            node.Children.Clear();
             foreach (var child in sortedChildren)
             {
-                node.Children.Add(child);
                 SortChildrenRecursively(child);
             }
+
+            node.Children.ReplaceRange(sortedChildren);
 
             // Post-process to remove expander from redundant BNK files when a WPK exists
             var wpkFiles = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith(".wpk")).Select(c => Path.GetFileNameWithoutExtension(c.Name)).ToHashSet();
@@ -340,7 +333,75 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken cancellationToken)
+        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (node.Children.Count == 1 && node.Children[0].Name == "Loading...")
+            {
+                node.Children.Clear();
+            }
+
+            if (node.Type == NodeType.WadFile)
+            {
+                var children = await LoadChildrenAsync(node, cancellationToken);
+                node.Children.AddRange(children);
+                return;
+            }
+
+            if (node.Type == NodeType.RealDirectory)
+            {
+                try
+                {
+                    var directories = Directory.GetDirectories(node.FullPath);
+                    var childDirs = directories.OrderBy(d => d).Select(dir => new FileSystemNodeModel(dir)).ToList();
+                    node.Children.AddRange(childDirs);
+                    
+                    foreach(var childNode in childDirs)
+                    {
+                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken);
+                    }
+
+                    var files = Directory.GetFiles(node.FullPath);
+                    var childFiles = new List<FileSystemNodeModel>();
+                    foreach (var file in files.OrderBy(f => f))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        string lowerFile = file.ToLowerInvariant();
+
+                        bool keepFile = false;
+                        if (lowerFile.EndsWith(".wad.client"))
+                        {
+                            if (node.FullPath.StartsWith(Path.Combine(currentRootPath, "Game")))
+                                keepFile = true;
+                        }
+                        else if (lowerFile.EndsWith(".wad"))
+                        {
+                            if (node.FullPath.StartsWith(Path.Combine(currentRootPath, "Plugins")))
+                                keepFile = true;
+                        }
+
+                        if (keepFile)
+                        {
+                            var childNode = new FileSystemNodeModel(file);
+                            childFiles.Add(childNode);
+                        }
+                    }
+                    
+                    node.Children.AddRange(childFiles);
+                    foreach(var childNode in childFiles)
+                    {
+                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken); // Eager load WAD content
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    _logService.LogWarning($"Access denied to: {node.FullPath}");
+                }
+            }
+        }
+
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken cancellationToken)
         {
             var childrenToAdd = await Task.Run(() =>
             {
@@ -389,17 +450,17 @@ namespace AssetsManager.Services.Explorer
                 }
 
                 SortChildrenRecursively(rootVirtualNode);
-                return rootVirtualNode.Children.ToList();
+                return rootVirtualNode.Children; // Already an ObservableRangeCollection
             }, cancellationToken);
 
             return childrenToAdd;
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadWadContentAsync(string wadPath)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadWadContentAsync(string wadPath)
         {
             var nodes = await Task.Run(() =>
             {
-                var fileNodes = new List<FileSystemNodeModel>();
+                var fileNodes = new ObservableRangeCollection<FileSystemNodeModel>();
                 if (!File.Exists(wadPath))
                 {
                     return fileNodes; // Return empty list if WAD file doesn't exist
@@ -473,7 +534,7 @@ namespace AssetsManager.Services.Explorer
             return fileNode;
         }
 
-        public async Task<List<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
         {
             return await Task.Run(() =>
             {
@@ -481,7 +542,7 @@ namespace AssetsManager.Services.Explorer
                 var rootNode = new FileSystemNodeModel(rootPath);
                 rootNode.Children.Clear(); // Clear dummy node
                 AddNodeToRealTree(rootNode, rootPath, cancellationToken);
-                return rootNode.Children.ToList();
+                return rootNode.Children;
             }, cancellationToken);
         }
 

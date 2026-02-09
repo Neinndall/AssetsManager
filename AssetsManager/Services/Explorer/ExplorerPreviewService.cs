@@ -21,6 +21,7 @@ using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Settings;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
@@ -156,7 +157,7 @@ namespace AssetsManager.Services.Explorer
             {
                 if (extension == ".wem")
                 {
-                    byte[] oggData = await _audioConversionService.ConvertWemToOggAsync(data);
+                    byte[] oggData = await _audioConversionService.ConvertAudioToFormatAsync(data, ".wem", AudioExportFormat.Ogg);
                     if (oggData != null)
                     {
                         await ShowAudioVideoPreviewAsync(oggData, ".ogg", node.Name);

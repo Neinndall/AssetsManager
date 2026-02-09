@@ -25,7 +25,6 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
-using AssetsManager.Services.Backup;
 using AssetsManager.Services.Manifests;
 
 namespace AssetsManager
@@ -71,30 +70,28 @@ namespace AssetsManager
       services.AddSingleton<ProgressUIManager>();
       services.AddSingleton<UpdateCheckService>();
 
-      // High-Performance HttpClient Configuration
       services.AddSingleton<HttpClient>(sp =>
       {
-        var handler = new SocketsHttpHandler
-        {
-            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
-            MaxConnectionsPerServer = 100, // Desbloquea el límite de hilos concurrentes
-            EnableMultipleHttp2Connections = true,
-            ConnectTimeout = TimeSpan.FromSeconds(15),
-            SslOptions = new System.Net.Security.SslClientAuthenticationOptions
-            {
-                RemoteCertificateValidationCallback = (message, cert, chain, errors) =>
-                {
-                    // Mantener compatibilidad con la API local de la LCU
-                    if (message is HttpRequestMessage req && req.RequestUri != null && req.RequestUri.IsLoopback)
-                    {
-                        return true;
-                    }
-                    return errors == System.Net.Security.SslPolicyErrors.None;
-                }
-            }
-        };
-        return new HttpClient(handler) { DefaultRequestVersion = System.Net.HttpVersion.Version20 };
+          var handler = new SocketsHttpHandler
+          {
+              PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+              MaxConnectionsPerServer = 16,
+              UseCookies = false,
+              
+              SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+              {
+                  RemoteCertificateValidationCallback = (message, cert, chain, errors) =>
+                  {
+                      if (message is HttpRequestMessage req && req.RequestUri != null && req.RequestUri.IsLoopback)
+                          return true;
+                      
+                      // For all other requests, use the default system validation
+                      return errors == System.Net.Security.SslPolicyErrors.None;
+                  }
+              }
+          };
+          
+          return new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
       });
 
       // Utils Services
@@ -122,6 +119,7 @@ namespace AssetsManager
       services.AddTransient<TreeBuilderService>();
       services.AddTransient<TreeUIManager>();
       services.AddSingleton<FavoritesManager>();
+      services.AddSingleton<ImageMergerService>();
     
       // Downloads Services
       services.AddSingleton<AssetDownloader>();
@@ -160,8 +158,9 @@ namespace AssetsManager
       // Audio Services
       services.AddSingleton<AudioBankService>();
       services.AddSingleton<AudioBankLinkerService>();
+      services.AddSingleton<AudioPlayerService>();
 
-      // Windows, Views, and Dialogs
+      // Views
       services.AddTransient<MainWindow>();
       services.AddTransient<HomeWindow>();
       services.AddTransient<ExplorerWindow>();
@@ -169,25 +168,38 @@ namespace AssetsManager
       services.AddTransient<ModelWindow>();
       services.AddTransient<MonitorWindow>();
       services.AddTransient<HelpWindow>();
-      services.AddTransient<JsonDiffWindow>();
-      services.AddTransient<NotificationHubWindow>();
       services.AddTransient<SettingsWindow>();
-      services.AddTransient<ProgressDetailsWindow>();
-      services.AddTransient<UpdateProgressWindow>();
-      services.AddTransient<UpdateModeDialog>();
-      services.AddTransient<InputDialog>();
-      services.AddTransient<ConfirmationDialog>();
-
-      // Secondary Views
+            
+      // Views/Controls
       services.AddTransient<LogView>();
+      
+      // Views/Settings
       services.AddTransient<GeneralSettingsView>();
       services.AddTransient<AdvancedSettingsView>();
       services.AddTransient<DefaultPathsSettingsView>();
+      
+      // Views/Help
       services.AddTransient<AboutView>();
       services.AddTransient<DocumentationView>();
       services.AddTransient<BugReportsView>();
       services.AddTransient<ChangelogsView>();
       services.AddTransient<UpdatesView>();
+            
+      // Views/Dialogs/Controls
+      services.AddTransient<JsonDiffWindow>();
+      
+      // Views/Dialogs/
+      services.AddTransient<ImageMergerWindow>();
+      services.AddTransient<NotificationHubWindow>();
+      services.AddTransient<ProgressDetailsWindow>();
+      services.AddTransient<UpdateProgressWindow>();
+      services.AddTransient<UpdateModeDialog>();
+      services.AddTransient<InputDialog>();
+      services.AddTransient<ConfirmationDialog>();
+      services.AddTransient<WadComparisonResultWindow>();
+      services.AddTransient<NotepadWindow>();
+      services.AddTransient<AudioPlayerWindow>();
+      services.AddTransient<ConverterWindow>();
     }
 
     protected override void OnStartup(StartupEventArgs e)

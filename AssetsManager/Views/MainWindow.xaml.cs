@@ -19,7 +19,6 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
-using AssetsManager.Services.Backup;
 using AssetsManager.Views.Controls;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
@@ -27,18 +26,15 @@ using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
         private readonly UpdateManager _updateManager;
-        private readonly AssetDownloader _assetDownloader;
         private readonly WadComparatorService _wadComparatorService;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly WadDifferenceService _wadDifferenceService;
-        private readonly WadPackagingService _wadPackagingService;
         private readonly BackupManager _backupManager;
         private readonly HashResolverService _hashResolverService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
@@ -71,12 +67,9 @@ namespace AssetsManager.Views
             LogService logService,
             AppSettings appSettings,
             UpdateManager updateManager,
-            AssetDownloader assetDownloader,
             WadComparatorService wadComparatorService,
             DirectoriesCreator directoriesCreator,
             CustomMessageBoxService customMessageBoxService,
-            WadDifferenceService wadDifferenceService,
-            WadPackagingService wadPackagingService,
             BackupManager backupManager,
             HashResolverService hashResolverService,
             WadNodeLoaderService wadNodeLoaderService,
@@ -98,12 +91,9 @@ namespace AssetsManager.Views
             _logService = logService;
             _appSettings = appSettings;
             _updateManager = updateManager;
-            _assetDownloader = assetDownloader;
             _wadComparatorService = wadComparatorService;
             _customMessageBoxService = customMessageBoxService;
             _directoriesCreator = directoriesCreator;
-            _wadDifferenceService = wadDifferenceService;
-            _wadPackagingService = wadPackagingService;
             _backupManager = backupManager;
             _hashResolverService = hashResolverService;
             _wadNodeLoaderService = wadNodeLoaderService;
@@ -284,46 +274,42 @@ namespace AssetsManager.Views
                 return;
             }
 
-            if (_appSettings.ReportGeneration.Enabled) // Prioritize report generation
+            // 1. ALWAYS Save to History if enabled (Independent of other actions)
+            if (_appSettings.SaveWadComparisonHistory)
+            {
+                string displayName = "Unknown";
+                var uniqueWads = serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
+
+                if (uniqueWads.Count == 1)
+                {
+                    string wadFileName = System.IO.Path.GetFileName(uniqueWads[0]);
+                    displayName = wadFileName.Split('.')[0];
+                }
+                else
+                {
+                    displayName = System.IO.Path.GetFileName(newLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+                    if (string.IsNullOrEmpty(displayName)) displayName = "Root";
+                }
+
+                _ = _comparisonHistoryService.SaveComparisonAsync(serializableDiffs, oldLolPath, newLolPath, $"Comparison from {displayName}");
+            }
+
+            // 2. Handle follow-up actions (Report, Extraction, or View)
+            if (_appSettings.ReportGeneration.Enabled)
             {
                 await _reportGenerationService.GenerateReportAsync(serializableDiffs, oldLolPath, newLolPath);
             }
-            else if (_appSettings.EnableExtraction) // Only extract if report generation is NOT enabled
+            else if (_appSettings.EnableExtraction)
             {
                 _isExtractingAfterComparison = true;
                 _diffsForExtraction = serializableDiffs;
                 _extractionOldLolPath = oldLolPath;
                 _extractionNewLolPath = newLolPath;
-                
+
                 Dispatcher.Invoke(StartExtractionAsync);
             }
             else
             {
-                if (_appSettings.SaveWadComparisonHistory)
-                {
-                    string displayName = "Unknown";
-                    
-                    // Logic to determine a better display name
-                    var uniqueWads = serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
-                    
-                    if (uniqueWads.Count == 1)
-                    {
-                        // Single WAD comparison: Use the WAD name without extensions
-                        string wadFileName = System.IO.Path.GetFileName(uniqueWads[0]);
-                        // Strip common extensions: .wad.client, .wad, .es_ES, .en_US, etc.
-                        displayName = wadFileName.Split('.')[0]; 
-                    }
-                    else
-                    {
-                        // Directory comparison: Use the folder name
-                        displayName = System.IO.Path.GetFileName(newLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
-                        if (string.IsNullOrEmpty(displayName)) displayName = "Root";
-                    }
-
-                    // Fire and forget (or await if we want to ensure it's saved before showing result, but fire and forget is better for UX here)
-                    _ = _comparisonHistoryService.SaveComparisonAsync(serializableDiffs, oldLolPath, newLolPath, $"Comparison from {displayName}");
-                }
-
                 Dispatcher.Invoke(() =>
                 {
                     ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
@@ -333,7 +319,8 @@ namespace AssetsManager.Views
 
         private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
         {
-            var resultWindow = new WadComparisonResultWindow(diffs, _serviceProvider, _customMessageBoxService, _directoriesCreator, _assetDownloader, _logService, _wadDifferenceService, _wadPackagingService, _diffViewService, _hashResolverService, _appSettings, oldPath, newPath);
+            var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
+            resultWindow.Initialize(diffs, oldPath, newPath);
             resultWindow.Owner = this;
             resultWindow.Show();
         }
@@ -363,7 +350,7 @@ namespace AssetsManager.Views
                 // If the last height was too small (due to manual resize), use a default height
                 if (!_lastLogHeight.IsAbsolute || _lastLogHeight.Value <= 45)
                 {
-                    _lastLogHeight = new GridLength(185);
+                    _lastLogHeight = new GridLength(180);
                 }
 
                 LogRowDefinition.Height = _lastLogHeight;
@@ -479,6 +466,28 @@ namespace AssetsManager.Views
         {
             StateChanged -= MainWindow_StateChanged;
             TrayIcon?.Dispose();
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
+        }
+
+        private void Maximize_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.WindowState == WindowState.Maximized)
+            {
+                this.WindowState = WindowState.Normal;
+            }
+            else
+            {
+                this.WindowState = WindowState.Maximized;
+            }
+        }
+
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
         }
     }
 }

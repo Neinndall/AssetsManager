@@ -472,64 +472,93 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Global Segmented Radio Button Style for Tab-like behavior (Reworked: Clean Pill Style) -->
+    <!-- High-Fidelity Segmented Radio Button Style (Professional Technical UI) -->
     <Style x:Key="SegmentedRadioButtonStyle" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="Padding" Value="16,8"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Grid x:Name="RootGrid" Background="Transparent" SnapsToDevicePixels="True" UseLayoutRounding="True">
-                        
-                        <!-- Layer 1: Selection Background (With Shadow) -->
-                        <!-- Placed BEHIND content to prevent text blur -->
-                        <Border x:Name="SelectionBorder"
+                    <Grid x:Name="RootGrid" Margin="2">
+                        <!-- Layer 1: Selection Indicator (The Elevated Pill) -->
+                        <Border x:Name="SelectionPill"
                                 Background="{StaticResource AccentBrush}"
-                                CornerRadius="8"
-                                Margin="2"
-                                Opacity="0">
+                                CornerRadius="7"
+                                Opacity="0"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="0.95" ScaleY="0.95"/>
+                            </Border.RenderTransform>
                             <Border.Effect>
-                                <DropShadowEffect BlurRadius="4" ShadowDepth="1" Color="Black" Opacity="0.2" RenderingBias="Performance"/>
+                                <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.3" Color="Black"/>
                             </Border.Effect>
                         </Border>
 
-                        <!-- Layer 2: Hover Background -->
-                        <Border x:Name="HoverBorder"
+                        <!-- Layer 2: Hover Overlay -->
+                        <Border x:Name="HoverOverlay"
                                 Background="{StaticResource HoverColor}"
-                                CornerRadius="8"
-                                Margin="2"
+                                CornerRadius="7"
                                 Opacity="0"/>
 
-                        <!-- Layer 3: Content -->
+                        <!-- Layer 3: Technical Inner Glow (Only when selected) -->
+                        <Border x:Name="InnerGlow"
+                                BorderBrush="White"
+                                BorderThickness="1"
+                                CornerRadius="7"
+                                Opacity="0"
+                                Margin="1">
+                            <Border.OpacityMask>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="White" Offset="0"/>
+                                    <GradientStop Color="Transparent" Offset="0.5"/>
+                                </LinearGradientBrush>
+                            </Border.OpacityMask>
+                        </Border>
+
+                        <!-- Content -->
                         <ContentPresenter x:Name="Content" 
                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                           Margin="{TemplateBinding Padding}"
-                                          SnapsToDevicePixels="True"/>
+                                          RecognizesAccessKey="True"
+                                          Panel.ZIndex="10"/>
                     </Grid>
-                    <ControlTemplate.Triggers>
-                        <!-- Checked State -->
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="SelectionBorder" Property="Opacity" Value="1"/>
-                            <Setter Property="Foreground" Value="White"/>
-                            <Setter Property="FontWeight" Value="SemiBold"/>
-                        </Trigger>
 
-                        <!-- Hover State (Only if not checked) -->
+                    <ControlTemplate.Triggers>
+                        <!-- Hover State -->
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="IsMouseOver" Value="True"/>
                                 <Condition Property="IsChecked" Value="False"/>
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="HoverBorder" Property="Opacity" Value="1"/>
+                            <Setter TargetName="HoverOverlay" Property="Opacity" Value="1"/>
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                         </MultiTrigger>
+
+                        <!-- Checked State (Active Pill) -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="SelectionPill" Property="Opacity" Value="1"/>
+                            <Setter TargetName="SelectionPill" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                </Setter.Value>
+                            </Setter>
+                            <Setter TargetName="InnerGlow" Property="Opacity" Value="0.15"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Trigger>
+
+                        <!-- Disabled State -->
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4"/>
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

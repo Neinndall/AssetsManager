@@ -6,7 +6,10 @@
         xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Loading" SizeToContent="WidthAndHeight" WindowStyle="None" AllowsTransparency="True"
-        WindowStartupLocation="CenterOwner" Background="Transparent">
+        WindowStartupLocation="CenterOwner"
+        Background="Transparent"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
     <Grid>
         <controls:LoadingDiffControl x:Name="LoadingControl"/>
     </Grid>

@@ -13,6 +13,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public event RoutedPropertyChangedEventHandler<bool> FavoritesVisibilityChanged;
         public event RoutedPropertyChangedEventHandler<bool> SortStateChanged;
         public event RoutedPropertyChangedEventHandler<bool> ViewModeChanged; // True for Grid, False for Preview
+        public event RoutedEventHandler ImageMergerClicked;
 
         public string SearchText => SearchTextBox.Text;
 
@@ -97,6 +98,11 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 SortStateChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(toggleButton.IsChecked ?? false), toggleButton.IsChecked ?? false));
             }
+        }
+
+        private void ImageMergerButton_Click(object sender, RoutedEventArgs e)
+        {
+            ImageMergerClicked?.Invoke(this, e);
         }
     }
 }

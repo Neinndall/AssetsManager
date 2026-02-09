@@ -13,7 +13,9 @@
         Background="Transparent"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
-        FontFamily="{StaticResource AppFontFamily}">
+        FontFamily="{StaticResource AppFontFamily}"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
 
     <Window.Resources>
         <!-- DataTemplate for Notifications -->
@@ -127,7 +129,7 @@
             </Grid.RowDefinitions>
 
             <!-- Row 0: Header -->
-            <Border Grid.Row="0" Padding="20,16" Background="{StaticResource CardBackground}" CornerRadius="11,11,0,0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+            <Border Grid.Row="0" Height="40" Padding="16,0,10,0" Background="{StaticResource CardBackground}" CornerRadius="11,11,0,0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -136,20 +138,20 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <materialIcons:MaterialIcon Grid.Column="0" Kind="BellRing" Width="18" Height="18" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Text="Notifications" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    <TextBlock Grid.Column="1" Text="Notifications" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     
                     <Border Grid.Column="2" Background="{StaticResource AccentRed}" CornerRadius="10" Padding="8,2" Margin="12,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" 
                             Visibility="{Binding HasUnread, Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="{Binding UnreadCount, StringFormat='\{0\} NEW'}" Foreground="White" FontSize="10" FontWeight="Bold"/>
                     </Border>
                     
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Style="{StaticResource TransparentIconButton}" Click="Minimize_Click" Width="28" Height="28" Margin="0,0,4,0">
-                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="34" Height="40">
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
                         </Button>
 
-                        <Button Style="{StaticResource TransparentIconButton}" Click="Close_Click" Width="28" Height="28">
-                            <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="34" Height="40">
+                            <materialIcons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
                         </Button>
                     </StackPanel>
                 </Grid>

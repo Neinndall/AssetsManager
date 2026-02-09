@@ -17,6 +17,7 @@
     <SolidColorBrush x:Key="AccentPurple" Color="#FFBB86FC"/>
     <SolidColorBrush x:Key="AccentOrange" Color="#FFFF9100"/>
     <SolidColorBrush x:Key="AccentYellow" Color="#FFFFD600"/>
+    <SolidColorBrush x:Key="AccentTeal" Color="#FF00BFA5"/>
     <SolidColorBrush x:Key="AccentRed" Color="#FFFF5252"/>
 
     <!-- TYPOGRAPHY -->

@@ -55,14 +55,84 @@ namespace AssetsManager.Views.Dialogs
             _completedFiles = completedFiles;
             _totalFiles = totalFiles;
 
-            ProgressSummaryTextBlock.Text = $"{OperationVerb}: {completedFiles} of {totalFiles}";
-            CurrentFileTextBlock.Text = $"Current file: {currentFileName}";
-            UpdateEstimatedTime(completedFiles, totalFiles); // Update once immediately for responsiveness
+            // Sync the verb textblock with the property (since it might have changed in ProgressUIManager)
+            if (!string.IsNullOrEmpty(OperationVerb)) VerbTextBlock.Text = OperationVerb;
+
+            // 1. Universal Parser for formatted strings (e.g. "1 of 30 assets: audio.ogg")
+            if (!string.IsNullOrEmpty(currentFileName) && currentFileName.Contains(" of ") && currentFileName.Contains(": "))
+            {
+                var mainParts = currentFileName.Split(new[] { ": " }, 2, StringSplitOptions.None);
+                if (mainParts.Length == 2)
+                {
+                    // mainParts[0] is "1 of 30 assets" OR "Verifying 10 of 100 items"
+                    var countParts = mainParts[0].Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+                    
+                    // Intelligent offset: skip the first word if it's not a digit (the verb)
+                    int startIdx = 0;
+                    if (countParts.Length > 0 && !char.IsDigit(countParts[0][0])) 
+                    {
+                        startIdx = 1;
+                        // Update verb dynamically from the status string
+                        VerbTextBlock.Text = countParts[0];
+                        OperationVerb = countParts[0];
+                    }
+
+                    if (countParts.Length >= startIdx + 3)
+                    {
+                        // Use "of" for natural readability as requested
+                        ItemProgressTextBlock.Text = $"{countParts[startIdx]} of {countParts[startIdx + 2]}";
+                    }
+                    else
+                    {
+                        ItemProgressTextBlock.Text = mainParts[0];
+                    }
+                    
+                    CurrentFileTextBlock.Text = mainParts[1];
+                }
+                else
+                {
+                    ItemProgressTextBlock.Text = "0 / 0";
+                    CurrentFileTextBlock.Text = currentFileName;
+                }
+            }
+            else
+            {
+                ItemProgressTextBlock.Text = $"{completedFiles} of {totalFiles}";
+                CurrentFileTextBlock.Text = currentFileName ?? "...";
+            }
+
+            // 2. Technical Sub-progress (Visibility Logic)
+            // - Comparing/Updating: Show Chunks (Deep technical progress)
+            // - Verifying: Hide Chunks (Simple file count progress)
+            bool showChunks = OperationVerb == "Comparing" || OperationVerb == "Updating";
+            
+            if (showChunks)
+            {
+                SubProgressRow.Visibility = Visibility.Visible;
+                SubProgressTextBlock.Text = $"Chunks: {completedFiles} of {totalFiles}";
+            }
+            else
+            {
+                SubProgressRow.Visibility = Visibility.Collapsed;
+            }
+
+            // 3. Main Progress Bar
+            if (totalFiles > 0)
+            {
+                MainProgressBar.Value = (double)completedFiles / totalFiles * 100;
+            }
+            else
+            {
+                MainProgressBar.Value = 0;
+            }
+
+            UpdateEstimatedTime(completedFiles, totalFiles);
 
             if (completedFiles >= totalFiles && totalFiles > 0)
             {
                 _timer.Stop();
                 EstimatedTimeTextBlock.Text = "Estimated time remaining: 00:00:00";
+                MainProgressBar.Value = 100;
             }
         }
 

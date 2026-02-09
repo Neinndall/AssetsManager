@@ -28,16 +28,38 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             InitializeComponent();
             this.Loaded += HistoryViewControl_Loaded;
+            this.Unloaded += HistoryViewControl_Unloaded;
         }
 
         private void HistoryViewControl_Loaded(object sender, RoutedEventArgs e)
         {
             if (AppSettings != null)
             {
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+                
                 _viewModel = new HistoryModel();
                 this.DataContext = _viewModel;
                 _viewModel.LoadHistory(AppSettings.DiffHistory);
             }
+        }
+
+        private void HistoryViewControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+        }
+
+        private void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (_viewModel != null && AppSettings != null)
+                {
+                    _viewModel.LoadHistory(AppSettings.DiffHistory);
+                }
+            });
         }
 
         private async void btnViewDiff_Click(object sender, RoutedEventArgs e)
@@ -51,13 +73,8 @@ namespace AssetsManager.Views.Controls.Monitor
                     var (data, path) = await ComparisonHistoryService.LoadComparisonAsync(selectedEntry.ReferenceId);
                     if (data != null)
                     {
-                        // Resolve dependencies for the window
-                        var resultWindow = ActivatorUtilities.CreateInstance<WadComparisonResultWindow>(
-                            ServiceProvider, 
-                            data.Diffs, 
-                            data.OldLolPath, 
-                            data.NewLolPath
-                        );
+                        var resultWindow = ServiceProvider.GetRequiredService<WadComparisonResultWindow>();
+                        resultWindow.Initialize(data.Diffs, data.OldLolPath, data.NewLolPath, path);
                         resultWindow.Owner = Window.GetWindow(this);
                         resultWindow.Show();
                     }
@@ -113,7 +130,7 @@ namespace AssetsManager.Views.Controls.Monitor
                             AppSettings.DiffHistory.Remove(selectedEntry);
                         }
 
-                        AppSettings.SaveSettings(AppSettings);
+                        AppSettings.Save();
                         _viewModel.LoadHistory(AppSettings.DiffHistory);
                     }
                     catch (Exception ex)

@@ -7,116 +7,108 @@
              xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
              xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:jsonDiff="clr-namespace:AssetsManager.Views.Dialogs.Controls"
+             xmlns:localUtils="clr-namespace:AssetsManager.Utils"
              mc:Ignorable="d" Background="{StaticResource SidebarBackground}">
-    
+
+    <UserControl.CommandBindings>
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.NextDifference}" Executed="NextDifference_Executed" />
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Executed="PreviousDifference_Executed" />
+    </UserControl.CommandBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header Section -->
-        <Border Grid.Row="0"
-                Background="{StaticResource CardBackground}"
-                BorderBrush="{StaticResource BorderColor}"
-                BorderThickness="0,0,0,1"
-                Padding="24,20">
+        <!-- Professional Toolbar Area (Sub-header) -->
+        <Border Grid.Row="0" 
+                Background="{StaticResource CardBackground}" 
+                BorderBrush="{StaticResource BorderColor}" 
+                BorderThickness="0,0,0,1" 
+                Padding="24,10">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto"/> <!-- Status (Left) -->
+                    <ColumnDefinition Width="*"/>    <!-- Spacer -->
+                    <ColumnDefinition Width="Auto"/> <!-- All Tools (Right) -->
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                        <icons:MaterialIcon Kind="FileDocumentEditOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Text Comparison" 
-                                   FontSize="20" 
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Analyze differences between file versions" 
-                                   FontSize="13" 
-                                   Foreground="{StaticResource TextSecondary}"
-                                   Margin="0,2,0,0"/>
-                    </StackPanel>
+                <!-- Left: Metadata -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="TEXT ANALYSIS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                    <TextBlock Text="Structure &amp; Syntax Analysis" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                 </StackPanel>
 
-                <!-- TOOLBAR AREA -->
-                <Border Grid.Column="1" 
-                        Background="{StaticResource SidebarBackground}"
-                        BorderBrush="{StaticResource BorderColor}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="4,2"
-                        VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        
-                        <!-- MODES SECTION -->
-                        <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}"/>
-                        <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}"
-                                     IsChecked="{Binding IsInlineMode, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}" 
-                                     Checked="ComparisonInlineMode_Checked" ToolTip="Side by Side View">
-                            <icons:MaterialIcon Kind="DockWindow" Width="18" Height="18"/>
-                        </RadioButton>
-                        <RadioButton x:Name="UnifiedBtn" Style="{StaticResource ModernIconRadioButton}"
-                                     IsChecked="{Binding IsInlineMode}"
-                                     Checked="ComparisonInlineMode_Checked" ToolTip="Unified Inline Mode">
-                            <icons:MaterialIcon Kind="ViewStream" Width="18" Height="18"/>
-                        </RadioButton>
+                <!-- Right: Unified Tools Capsule -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <!-- MODES PART -->
+                            <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}" Margin="4,0,10,0"/>
+                            <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}"
+                                         IsChecked="{Binding IsInlineMode, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}" 
+                                         Checked="ComparisonInlineMode_Checked" ToolTip="Side by Side View" Width="30" Height="30">
+                                <icons:MaterialIcon Kind="DockWindow" Width="16" Height="16"/>
+                            </RadioButton>
+                            <RadioButton x:Name="UnifiedBtn" Style="{StaticResource ModernIconRadioButton}"
+                                         IsChecked="{Binding IsInlineMode}"
+                                         Checked="ComparisonInlineMode_Checked" ToolTip="Unified Inline Mode" Width="30" Height="30">
+                                <icons:MaterialIcon Kind="ViewStream" Width="16" Height="16"/>
+                            </RadioButton>
 
-                        <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,6" CornerRadius="1"/>
+                            <!-- SEPARATOR -->
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center"/>
 
-                        <!-- NAVIGATION SECTION -->
-                        <TextBlock Text="NAV" Style="{StaticResource ToolSectionLabel}"/>
-                        <Button x:Name="PreviousDiffButton" 
-                                Click="PreviousDiffButton_Click" 
-                                Style="{StaticResource TransparentIconButton}"
-                                Width="34" Height="34"
-                                ToolTip="Previous Difference">
-                             <icons:MaterialIcon Kind="ChevronUp" Width="20" Height="20"/>
-                        </Button>
-                        <Button x:Name="NextDiffButton" 
-                                Click="NextDiffButton_Click" 
-                                Style="{StaticResource TransparentIconButton}"
-                                Width="34" Height="34"
-                                ToolTip="Next Difference">
-                             <icons:MaterialIcon Kind="ChevronDown" Width="20" Height="20"/>
-                        </Button>
+                            <!-- NAV PART -->
+                            <TextBlock Text="NAV" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0"/>
+                            <Button x:Name="PreviousDiffButton" 
+                                    Click="PreviousDiffButton_Click" 
+                                    Style="{StaticResource TransparentIconButton}"
+                                    Width="30" Height="30"
+                                    ToolTip="Previous Difference">
+                                 <icons:MaterialIcon Kind="ChevronUp" Width="18" Height="18"/>
+                            </Button>
+                            <Button x:Name="NextDiffButton" 
+                                    Click="NextDiffButton_Click" 
+                                    Style="{StaticResource TransparentIconButton}"
+                                    Width="30" Height="30"
+                                    ToolTip="Next Difference">
+                                 <icons:MaterialIcon Kind="ChevronDown" Width="18" Height="18"/>
+                            </Button>
 
-                        <Border Background="{StaticResource BorderColor}" Width="1" Margin="8,6" CornerRadius="1"/>
+                            <!-- SEPARATOR -->
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center"/>
 
-                        <!-- TOOLS SECTION -->
-                        <TextBlock Text="TOOLS" Style="{StaticResource ToolSectionLabel}"/>
-                        <ToggleButton x:Name="WordWrapButton"
-                                      IsChecked="{Binding IsWordWrapEnabled}"
-                                      Click="WordWrapButton_Click"
-                                      Style="{StaticResource TransparentIconToggleButton}"
-                                      Width="34" Height="34"
-                                      ToolTip="Toggle Word Wrap">
-                             <icons:MaterialIcon Kind="Wrap" Width="18" Height="18"/>
-                        </ToggleButton>
-                        <ToggleButton x:Name="WordLevelDiffButton"
-                                      IsChecked="{Binding IsWordLevelDiff}"
-                                      Margin="4,0,0,0"
-                                      Click="WordLevelDiffButton_Click"
-                                      Style="{StaticResource TransparentIconToggleButton}"
-                                      Width="34" Height="34"
-                                      ToolTip="Toggle Word-Level Diff">
-                             <icons:MaterialIcon Kind="FormatText" Width="18" Height="18"/>
-                        </ToggleButton>
-                        <ToggleButton x:Name="HideUnchangedButton"
-                                      IsChecked="{Binding HideUnchangedLines}"
-                                      Margin="4,0,0,0"
-                                      Click="HideUnchangedButton_Click"
-                                      Style="{StaticResource TransparentIconToggleButton}"
-                                      Width="34" Height="34"
-                                      ToolTip="Show/Hide Unchanged Lines">
-                             <icons:MaterialIcon Kind="FilterVariant" Width="18" Height="18"/>
-                        </ToggleButton>
-                    </StackPanel>
-                </Border>
+                            <!-- TOOLS PART -->
+                            <TextBlock Text="TOOLS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0"/>
+                            <ToggleButton x:Name="WordWrapButton"
+                                          IsChecked="{Binding IsWordWrapEnabled}"
+                                          Click="WordWrapButton_Click"
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Word Wrap">
+                                 <icons:MaterialIcon Kind="Wrap" Width="16" Height="16"/>
+                            </ToggleButton>
+                            <ToggleButton x:Name="WordLevelDiffButton"
+                                          IsChecked="{Binding IsWordLevelDiff}"
+                                          Click="WordLevelDiffButton_Click"
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Word-Level Diff">
+                                 <icons:MaterialIcon Kind="FormatText" Width="16" Height="16"/>
+                            </ToggleButton>
+                            <ToggleButton x:Name="HideUnchangedButton"
+                                          IsChecked="{Binding HideUnchangedLines}"
+                                          Click="HideUnchangedButton_Click"
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Show/Hide Unchanged Lines">
+                                 <icons:MaterialIcon Kind="FilterVariant" Width="16" Height="16"/>
+                            </ToggleButton>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 

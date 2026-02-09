@@ -1,12 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using AssetsManager.Services.Comparator;
-using AssetsManager.Views.Models.Dialogs;
-using AssetsManager.Views.Models.Wad;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Services;
-using AssetsManager.Services.Core;
-using AssetsManager.Utils;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,13 +15,20 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Views.Models.Dialogs;
+using AssetsManager.Views.Models.Wad;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Services;
+using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class WadComparisonResultWindow : Window
     {
-        private readonly List<SerializableChunkDiff> _serializableDiffs;
+        private List<SerializableChunkDiff> _serializableDiffs;
         private readonly IServiceProvider _serviceProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly DirectoriesCreator _directoriesCreator;
@@ -38,15 +38,25 @@ namespace AssetsManager.Views.Dialogs
         private readonly WadPackagingService _wadPackagingService;
         private readonly DiffViewService _diffViewService;
         private readonly HashResolverService _hashResolverService;
-
         private readonly AppSettings _appSettings;
-        private readonly string _oldPbePath;
-        private readonly string _newPbePath;
-        private readonly string _sourceJsonPath; // Path to the loaded wadcomparison.json
+
+        private string _oldPbePath;
+        private string _newPbePath;
+        private string _sourceJsonPath; // Path to the loaded wadcomparison.json
 
         private readonly WadComparisonResultModel _viewModel;
 
-        public WadComparisonResultWindow(List<ChunkDiff> diffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, AppSettings appSettings, string oldPbePath, string newPbePath)
+        public WadComparisonResultWindow(
+            IServiceProvider serviceProvider, 
+            CustomMessageBoxService customMessageBoxService, 
+            DirectoriesCreator directoriesCreator, 
+            AssetDownloader assetDownloaderService, 
+            LogService logService, 
+            WadDifferenceService wadDifferenceService, 
+            WadPackagingService wadPackagingService, 
+            DiffViewService diffViewService, 
+            HashResolverService hashResolverService, 
+            AppSettings appSettings)
         {
             InitializeComponent();
             _viewModel = new WadComparisonResultModel();
@@ -62,9 +72,19 @@ namespace AssetsManager.Views.Dialogs
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
             _appSettings = appSettings;
+
+            Loaded += WadComparisonResultWindow_Loaded;
+            Closed += OnWindowClosed;
+        }
+
+        /// <summary>
+        /// Initializes the window with data from a live comparison.
+        /// </summary>
+        public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath)
+        {
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
-            _sourceJsonPath = null; // Not loaded from a file
+            _sourceJsonPath = null;
             _serializableDiffs = diffs.Select(d => new SerializableChunkDiff
             {
                 Type = d.Type,
@@ -78,32 +98,17 @@ namespace AssetsManager.Views.Dialogs
                 OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
                 NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
             }).ToList();
-            Loaded += WadComparisonResultWindow_Loaded;
-            Closed += OnWindowClosed;
         }
 
-        public WadComparisonResultWindow(List<SerializableChunkDiff> serializableDiffs, IServiceProvider serviceProvider, CustomMessageBoxService customMessageBoxService, DirectoriesCreator directoriesCreator, AssetDownloader assetDownloaderService, LogService logService, WadDifferenceService wadDifferenceService, WadPackagingService wadPackagingService, DiffViewService diffViewService, HashResolverService hashResolverService, AppSettings appSettings, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
+        /// <summary>
+        /// Initializes the window with data loaded from a saved JSON file.
+        /// </summary>
+        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
         {
-            InitializeComponent();
-            _viewModel = new WadComparisonResultModel();
-            DataContext = _viewModel;
-
-            _serviceProvider = serviceProvider;
-            _customMessageBoxService = customMessageBoxService;
-            _directoriesCreator = directoriesCreator;
-            _assetDownloaderService = assetDownloaderService;
-            _logService = logService;
-            _wadDifferenceService = wadDifferenceService;
-            _wadPackagingService = wadPackagingService;
-            _diffViewService = diffViewService;
-            _hashResolverService = hashResolverService;
-            _appSettings = appSettings;
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
-            _sourceJsonPath = sourceJsonPath; // Store the path of the loaded file
-            Loaded += WadComparisonResultWindow_Loaded;
-            Closed += OnWindowClosed;
+            _sourceJsonPath = sourceJsonPath;
         }
 
         private void OnWindowClosed(object sender, System.EventArgs e)
@@ -246,14 +251,14 @@ namespace AssetsManager.Views.Dialogs
             {
                 WadName = wadGroup.Key,
                 DiffCount = wadGroup.Count(),
-                Types = wadGroup.GroupBy(d => d.Type)
+                Types = new ObservableRangeCollection<DiffTypeGroupViewModel>(wadGroup.GroupBy(d => d.Type)
                                   .OrderBy(g => g.Key.ToString())
                                   .Select(typeGroup => new DiffTypeGroupViewModel
                                   {
                                       Type = typeGroup.Key,
                                       DiffCount = typeGroup.Count(),
-                                      Diffs = typeGroup.OrderBy(d => d.NewPath ?? d.OldPath).ToList()
-                                  }).ToList()
+                                      Diffs = new ObservableRangeCollection<SerializableChunkDiff>(typeGroup.OrderBy(d => d.NewPath ?? d.OldPath))
+                                  }))
             }).ToList();
         }
 
@@ -270,12 +275,6 @@ namespace AssetsManager.Views.Dialogs
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_sourceJsonPath != null)
-            {
-                _customMessageBoxService.ShowInfo("Info", "This result is already saved.", this);
-                return;
-            }
-
             try
             {
                 _directoriesCreator.GenerateNewWadComparisonPaths();
@@ -317,25 +316,31 @@ namespace AssetsManager.Views.Dialogs
         {
             try
             {
-                await _hashResolverService.ForceReloadHashesAsync();
+                _viewModel.SetLoadingState(ComparisonLoadingState.ReloadingHashes);
 
-                foreach (var diff in _serializableDiffs)
+                await Task.Run(async () =>
                 {
-                    if (diff.OldPathHash != 0)
+                    await _hashResolverService.ForceReloadHashesAsync();
+
+                    foreach (var diff in _serializableDiffs)
                     {
-                        diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
+                        if (diff.OldPathHash != 0)
+                        {
+                            diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
+                        }
+                        if (diff.NewPathHash != 0)
+                        {
+                            diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
+                        }
                     }
-                    if (diff.NewPathHash != 0)
-                    {
-                        diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
-                    }
-                }
+                });
 
                 PopulateResults(_serializableDiffs);
                 _customMessageBoxService.ShowSuccess("Success", "Hashes have been reloaded and the result tree has been refreshed.", this);
             }
             catch (Exception ex)
             {
+                _viewModel.SetLoadingState(ComparisonLoadingState.Ready);
                 _customMessageBoxService.ShowError("Error", $"Failed to reload hashes: {ex.Message}", this);
                 _logService.LogError(ex, "Failed to reload hashes.");
             }
@@ -359,6 +364,28 @@ namespace AssetsManager.Views.Dialogs
                     viewDiffMenuItem.IsEnabled = true;
                 }
             }
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
+        }
+
+        private void Maximize_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.WindowState == WindowState.Maximized)
+            {
+                this.WindowState = WindowState.Normal;
+            }
+            else
+            {
+                this.WindowState = WindowState.Maximized;
+            }
+        }
+
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
         }
     }
 }

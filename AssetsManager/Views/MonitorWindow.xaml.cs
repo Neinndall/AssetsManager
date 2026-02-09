@@ -2,7 +2,6 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Backup;
 using AssetsManager.Utils;
 using System;
 using System.Windows.Controls;
@@ -64,6 +63,7 @@ namespace AssetsManager.Views
             AssetTrackerControl.AssetDownloader = assetDownloader;
             AssetTrackerControl.LogService = logService;
             AssetTrackerControl.CustomMessageBoxService = customMessageBoxService;
+            AssetTrackerControl.AppSettings = appSettings;
 
             // Setup and inject dependencies for ManageVersionsControl
             ManageVersionsControl.VersionService = versionService;
@@ -77,6 +77,7 @@ namespace AssetsManager.Views
             BackupsControl.LogService = logService;
             BackupsControl.AppSettings = appSettings;
             BackupsControl.CustomMessageBoxService = customMessageBoxService;
+            BackupsControl.TaskCancellationManager = taskCancellationManager;
 
             // Setup and inject dependencies for ApiControl
             ApiControl.LogService = logService;

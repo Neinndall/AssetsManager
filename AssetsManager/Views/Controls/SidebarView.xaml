@@ -12,6 +12,7 @@
     <Border Background="{StaticResource CardBackground}" 
             BorderBrush="{StaticResource BorderColor}" 
             BorderThickness="0,0,1,0" 
+            CornerRadius="0,0,0,11"
             ClipToBounds="True">
 
         <Grid Margin="0,16,0,12">

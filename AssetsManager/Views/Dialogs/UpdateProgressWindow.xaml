@@ -9,7 +9,9 @@
         ResizeMode="NoResize" WindowStyle="None"
         AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen"
-        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+        TextOptions.TextFormattingMode="Display" 
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
 
     <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="12">
         <Border.Effect>
@@ -23,7 +25,7 @@
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <Grid Grid.Row="0" Margin="16,10,16,10" MouseDown="TitleBar_MouseDown" Background="Transparent">
+            <Grid Grid.Row="0" Height="40" Margin="16,0,10,0" MouseDown="TitleBar_MouseDown" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -32,20 +34,20 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="CloudDownload" 
                                                 Foreground="{StaticResource AccentBrush}" 
-                                                Width="16" Height="16" Margin="0,0,10,0"
+                                                Width="18" Height="18" Margin="0,0,10,0"
                                                 VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" 
-                               FontWeight="SemiBold" FontSize="14" 
+                               FontWeight="SemiBold" FontSize="12" 
                                Foreground="{StaticResource TextPrimary}" 
                                VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click">
-                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="12" Height="12"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click" Width="34" Height="40">
+                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
                     </Button>
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Margin="6,0,0,0">
-                        <materialIcons:MaterialIcon Kind="WindowClose" Width="12" Height="12"/>
+                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Width="34" Height="40">
+                        <materialIcons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
                     </Button>
                 </StackPanel>
             </Grid>

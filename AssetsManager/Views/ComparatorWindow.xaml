@@ -8,7 +8,7 @@
              xmlns:comparator="clr-namespace:AssetsManager.Views.Controls.Comparator"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
     
-    <Grid Background="{StaticResource DarkBackground}">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Floating Hero Header -->
             <RowDefinition Height="*"/>    <!-- Content Area -->

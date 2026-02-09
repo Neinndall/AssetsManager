@@ -256,6 +256,10 @@ namespace AssetsManager.Utils
 
             switch (format)
             {
+                case ImageExportFormat.Jpeg:
+                    encoder = new JpegBitmapEncoder { QualityLevel = 90 };
+                    extension = ".jpg";
+                    break;
                 case ImageExportFormat.Png:
                 default:
                     encoder = new PngBitmapEncoder();

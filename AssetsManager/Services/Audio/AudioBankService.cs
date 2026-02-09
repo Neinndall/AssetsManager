@@ -27,6 +27,32 @@ namespace AssetsManager.Services.Audio
             _logService = logService;
         }
 
+        public int GetSoundCount(byte[] wpkData, byte[] audioBnkData)
+        {
+            // The logic to count is basically what ExtractWems does, but we can make it direct
+            if (wpkData != null)
+            {
+                using var audioStream = new MemoryStream(wpkData);
+                var wpkFile = WpkParser.Parse(audioStream, _logService);
+                if (wpkFile?.Wems != null && wpkFile.Wems.Any())
+                {
+                    return wpkFile.Wems.Count;
+                }
+            }
+
+            if (audioBnkData != null)
+            {
+                using var audioStream = new MemoryStream(audioBnkData);
+                var audioBnk = BnkParser.Parse(audioStream, _logService);
+                if (audioBnk?.Didx?.Wems != null)
+                {
+                    return audioBnk.Didx.Wems.Count;
+                }
+            }
+
+            return 0;
+        }
+
         public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData, string baseName, BinType binType)
         {
             var eventNameMap = BinParser.GetEventsFromBin(binData, baseName, binType, _logService);

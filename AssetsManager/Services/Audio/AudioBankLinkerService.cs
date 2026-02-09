@@ -16,6 +16,7 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Audio
 {
@@ -25,7 +26,6 @@ namespace AssetsManager.Services.Audio
         private readonly WadSearchBoxService _wadSearchBoxService;
         private readonly LogService _logService;
         private readonly TreeUIManager _treeUIManager;
-        private readonly TreeBuilderService _treeBuilderService;
         private readonly HashResolverService _hashResolverService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
 
@@ -34,7 +34,6 @@ namespace AssetsManager.Services.Audio
             WadSearchBoxService wadSearchBoxService,
             LogService logService,
             TreeUIManager treeUIManager,
-            TreeBuilderService treeBuilderService,
             HashResolverService hashResolverService,
             WadNodeLoaderService wadNodeLoaderService)
         {
@@ -42,7 +41,6 @@ namespace AssetsManager.Services.Audio
             _wadSearchBoxService = wadSearchBoxService;
             _logService = logService;
             _treeUIManager = treeUIManager;
-            _treeBuilderService = treeBuilderService;
             _hashResolverService = hashResolverService;
             _wadNodeLoaderService = wadNodeLoaderService;
         }
@@ -182,7 +180,7 @@ namespace AssetsManager.Services.Audio
             return linkedBank;
         }
 
-        public async Task<LinkedAudioBank> LinkAudioBankAsync(FileSystemNodeModel clickedNode, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
+        public async Task<LinkedAudioBank> LinkAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
         {
             // Explorer Backup Mode or Diff View Mode
             if (clickedNode.ChunkDiff != null)
@@ -543,7 +541,7 @@ namespace AssetsManager.Services.Audio
             }
         }
 
-        private (FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode) FindSiblingFilesByName(FileSystemNodeModel clickedNode, ObservableCollection<FileSystemNodeModel> rootNodes)
+        private (FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode) FindSiblingFilesByName(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
             // A simple way to detect backup mode is to check if the node has ChunkDiff data.
             bool isBackupMode = clickedNode.ChunkDiff != null;
@@ -589,7 +587,7 @@ namespace AssetsManager.Services.Audio
             return (wpkNode, audioBnkNode, eventsBnkNode);
         }
 
-        private async Task<(FileSystemNodeModel BinNode, string BaseName, BinType Type)> FindAssociatedBinFileAsync(FileSystemNodeModel clickedNode, ObservableCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
+        private async Task<(FileSystemNodeModel BinNode, string BaseName, BinType Type)> FindAssociatedBinFileAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
         {
             string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
             var strategy = GetBinFileSearchStrategy(clickedNode);
@@ -640,13 +638,13 @@ namespace AssetsManager.Services.Audio
             // Normal Mode
             else
             {
-                Func<FileSystemNodeModel, Task> loader = async (node) => await LoadAllChildrenForSearch(node, currentRootPath);
+                Func<FileSystemNodeModel, Task> loader = async (node) => await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath);
 
                 var targetWadNode = FindNodeByName(rootNodes, strategy.TargetWadName);
                 if (targetWadNode != null)
                 {
                     _logService.LogDebug($"[FindAssociatedBinFileAsync] Searching for BIN '{strategy.BinPath}' inside '{targetWadNode.Name}'...");
-                    var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableCollection<FileSystemNodeModel> { targetWadNode }, loader);
+                    var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { targetWadNode }, loader);
                     if (binNode != null)
                     {
                         _logService.LogDebug($"[FindAssociatedBinFileAsync] Found BIN node in primary target WAD.");
@@ -664,7 +662,7 @@ namespace AssetsManager.Services.Audio
                 if (commonWadNode != null && commonWadNode != targetWadNode)
                 {
                     _logService.LogDebug($"[FindAssociatedBinFileAsync] Fallback: Searching for BIN '{strategy.BinPath}' inside '{commonWadNode.Name}'...");
-                    var binNodeInCommon = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableCollection<FileSystemNodeModel> { commonWadNode }, loader);
+                    var binNodeInCommon = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { commonWadNode }, loader);
                     if (binNodeInCommon != null)
                     {
                         _logService.LogDebug($"[FindAssociatedBinFileAsync] Found BIN node in fallback WAD 'Common.wad.client'.");
@@ -678,11 +676,6 @@ namespace AssetsManager.Services.Audio
         }
 
 
-
-        private async Task LoadAllChildrenForSearch(FileSystemNodeModel node, string rootPath)
-        {
-            await _treeBuilderService.LoadAllChildren(node, rootPath);
-        }
 
         private void FindAllNodesByNameRecursive(IEnumerable<FileSystemNodeModel> nodes, List<string> namesToFind, List<FileSystemNodeModel> foundNodes)
         {

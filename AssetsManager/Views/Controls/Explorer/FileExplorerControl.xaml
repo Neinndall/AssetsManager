@@ -10,12 +10,12 @@
     <UserControl.Resources>
         
         <ContextMenu x:Key="ExplorerContextMenu" Opened="ContextMenu_Opened">
-            <MenuItem Header="Extract Selected" x:Name="ExtractMenuItem" Click="ExtractSelected_Click">
+            <MenuItem Header="Extract" x:Name="ExtractMenuItem" Click="ExtractSelected_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="FileDownload"/>
                 </MenuItem.Icon>
             </MenuItem>
-            <MenuItem Header="Save Selected" x:Name="SaveMenuItem" Click="SaveSelected_Click">
+            <MenuItem Header="Save" x:Name="SaveMenuItem" Click="SaveSelected_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="ContentSave"/>
                 </MenuItem.Icon>
@@ -25,12 +25,17 @@
                     <materialIcons:MaterialIcon Kind="CompareHorizontal"/>
                 </MenuItem.Icon>
             </MenuItem>
-            <MenuItem Header="Add to Favorites" x:Name="AddToFavoritesMenuItem" Click="AddToFavorites_Click">
+            <MenuItem Header="To Favorites" x:Name="AddToFavoritesMenuItem" Click="AddToFavorites_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="StarOutline"/>
                 </MenuItem.Icon>
             </MenuItem>
-            <MenuItem Header="Pin" x:Name="PinMenuItem" Click="PinSelected_Click">
+            <MenuItem Header="To Image Merger" x:Name="AddToImageMergerMenuItem" Click="AddToImageMerger_Click">
+                <MenuItem.Icon>
+                    <materialIcons:MaterialIcon Kind="ViewGridPlus"/>
+                </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Pin to Preview" x:Name="PinMenuItem" Click="PinSelected_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="Pin"/>
                 </MenuItem.Icon>
@@ -321,8 +326,7 @@
                                         HorizontalAlignment="Center"
                                         Foreground="{StaticResource TextMuted}"
                                         Opacity="0.5"/>
-            <TextBlock x:Name="StatusTitle"
-                       Text="No Directory Selected"
+            <TextBlock Text="{Binding StatusTitle}"
                        FontSize="20"
                        FontWeight="SemiBold"
                        Foreground="{StaticResource TextPrimary}"
@@ -330,8 +334,7 @@
                        TextWrapping="Wrap"
                        TextAlignment="Center"
                        Margin="0,16,0,0"/>
-            <TextBlock x:Name="StatusDescription"
-                       Text="Please select your League of Legends installation folder to start exploring."
+            <TextBlock Text="{Binding StatusDescription}"
                        TextWrapping="Wrap"
                        FontSize="14"
                        Foreground="{StaticResource TextSecondary}"
@@ -342,6 +345,7 @@
                     Content="Open Folder"
                     Style="{StaticResource SecondaryButton}"
                     Click="SelectLolDirButton_Click"
+                    Visibility="{Binding IsSelectDirectoryActionVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                     Padding="24,8"
                     HorizontalAlignment="Center"
                     Margin="0,24,0,0"/>

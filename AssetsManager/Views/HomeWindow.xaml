@@ -106,35 +106,36 @@
         </Grid.Background>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="50,85,50,50">
+            <Grid Margin="50,60,50,50">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/> <!-- Hero -->
                     <RowDefinition Height="Auto"/> <!-- Main Grid -->
+                    <RowDefinition Height="Auto"/> <!-- Others Apps -->
                 </Grid.RowDefinitions>
 
                 <!-- 1. HERO SECTION -->
-                <Grid Grid.Row="0" Margin="0,0,0,40">
+                <Grid Grid.Row="0" Margin="0,0,0,32">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Restored Icon Box -->
-                        <Border Width="64" Height="64" Background="{StaticResource SidebarBackground}" CornerRadius="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,24,0">
-                            <materialIcons:MaterialIcon Kind="AutoFix" Width="36" Height="36" Foreground="{StaticResource AccentBrush}"/>
+                        <Border Width="56" Height="56" Background="{StaticResource SidebarBackground}" CornerRadius="14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,20,0">
+                            <materialIcons:MaterialIcon Kind="AutoFix" Width="28" Height="28" Foreground="{StaticResource AccentBrush}"/>
                         </Border>
 
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="{Binding Greeting}" 
-                                       FontSize="32" 
+                                       FontSize="28" 
                                        FontWeight="Bold" 
                                        Foreground="{StaticResource TextPrimary}"
-                                       Margin="0,0,0,4"/>
+                                       Margin="0,0,0,2"/>
                             <TextBlock Text="What would you like to do today?" 
-                                       FontSize="16" 
+                                       FontSize="14" 
                                        Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
 
                 <!-- 2. MAIN TOOLS GRID (Asymmetrical Layout) -->
-                <Grid Grid.Row="1" Margin="0,0,0,30">
+                <Grid Grid.Row="1" Margin="0,0,0,24">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1.5*"/> <!-- Large Card -->
                         <ColumnDefinition Width="1*"/>
@@ -224,7 +225,57 @@
                         </Button>
                     </Grid>
                 </Grid>
-                
+
+                <!-- 3. OTHERS APPS SECTION -->
+                <StackPanel Grid.Row="2">
+                    <TextBlock Text="OTHERS APPS" Style="{StaticResource ToolSectionLabel}" Margin="8,0,0,12"/>
+                    <StackPanel Orientation="Horizontal">
+                        <!-- Notepad -->
+                        <Button Width="200" Height="100" Style="{StaticResource DashboardTileStyle}" Click="Notepad_Click" Tag="{StaticResource AccentOrange}" Margin="0,0,8,0">
+                            <Grid Margin="16">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="36" Height="36" CornerRadius="10" Background="#1AFF9100" Margin="0,0,12,0">
+                                        <materialIcons:MaterialIcon Kind="NoteTextOutline" Width="20" Height="20" Foreground="{StaticResource AccentOrange}"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Notepad" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="Quick notes" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- Audio Player -->
+                        <Button Width="200" Height="100" Style="{StaticResource DashboardTileStyle}" Click="AudioPlayer_Click" Tag="{StaticResource AccentBlue}" Margin="8,0,8,0">
+                            <Grid Margin="16">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="36" Height="36" CornerRadius="10" Background="#1A4FC1FF" Margin="0,0,12,0">
+                                        <materialIcons:MaterialIcon Kind="Waveform" Width="20" Height="20" Foreground="{StaticResource AccentBlue}"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Audio Player" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="Session playlist" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- Universal Converter -->
+                        <Button Width="200" Height="100" Style="{StaticResource DashboardTileStyle}" Click="Converter_Click" Tag="{StaticResource AccentTeal}" Margin="8,0,8,0">
+                            <Grid Margin="16">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="36" Height="36" CornerRadius="10" Background="#1A00BFA5" Margin="0,0,12,0">
+                                        <materialIcons:MaterialIcon Kind="AutoFix" Width="20" Height="20" Foreground="{StaticResource AccentTeal}"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Converter" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="Image &amp; Audio tool" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
             </Grid>
         </ScrollViewer>
     </Grid>

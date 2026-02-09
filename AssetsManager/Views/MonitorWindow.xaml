@@ -8,7 +8,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
     
-    <Grid Background="{StaticResource DarkBackground}">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 0. Hero Header -->
             <RowDefinition Height="Auto"/> <!-- 1. Navigation Tab Bar -->
