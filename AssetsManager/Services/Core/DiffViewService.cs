@@ -106,7 +106,7 @@ namespace AssetsManager.Services.Core
                 string backupChunkPathOld = null;
                 if (backupRootDir != null)
                 {
-                    backupChunkPathOld = Path.Combine(backupRootDir, "wad_chunks", "old", $"{diff.OldPathHash:X16}.chunk");
+                    backupChunkPathOld = Path.Combine(backupRootDir, "wad_chunks", "old", diff.SourceWadFile, $"{diff.OldPathHash:X16}.chunk");
                 }
                 var tempNodeOld = new FileSystemNodeModel { Name = Path.GetFileName(diff.OldPath), FullPath = diff.OldPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPathOld, Type = NodeType.SoundBank };
                 var linkedBankOld = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeOld, oldPbePath, true, backupRootDir);
@@ -127,7 +127,7 @@ namespace AssetsManager.Services.Core
                 string backupChunkPathNew = null;
                 if (backupRootDir != null)
                 {
-                    backupChunkPathNew = Path.Combine(backupRootDir, "wad_chunks", "new", $"{diff.NewPathHash:X16}.chunk");
+                    backupChunkPathNew = Path.Combine(backupRootDir, "wad_chunks", "new", diff.SourceWadFile, $"{diff.NewPathHash:X16}.chunk");
                 }
                 var tempNodeNew = new FileSystemNodeModel { Name = Path.GetFileName(diff.NewPath), FullPath = diff.NewPath, SourceWadPath = diff.SourceWadFile, ChunkDiff = diff, BackupChunkPath = backupChunkPathNew, Type = NodeType.SoundBank };
                 var linkedBankNew = await _audioBankLinkerService.LinkAudioBankForDiffAsync(tempNodeNew, newPbePath, false, backupRootDir);

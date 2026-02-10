@@ -116,11 +116,12 @@ namespace AssetsManager.Services.Explorer
                                         Type = depType,
                                         OldPath = dep.Path,
                                         NewPath = dep.Path,
+                                        SourceWadFile = dep.SourceWad,
                                         OldPathHash = dep.OldPathHash,
                                         NewPathHash = dep.NewPathHash,
                                         OldCompressionType = dep.CompressionType,
                                         NewCompressionType = dep.CompressionType,
-                                        BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = depType })
+                                        BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = depType, SourceWadFile = dep.SourceWad })
                                     };
                                     depNode.BackupChunkPath = depNode.ChunkDiff.BackupChunkPath;
                                 } else {
@@ -181,13 +182,14 @@ namespace AssetsManager.Services.Explorer
                                                     Type = dep.Type.Value,
                                                     OldPath = dep.Path,
                                                     NewPath = dep.Path,
+                                                    SourceWadFile = dep.SourceWad,
                                                     OldPathHash = dep.OldPathHash,
                                                     NewPathHash = dep.NewPathHash,
                                                     OldCompressionType = dep.CompressionType,
                                                     NewCompressionType = dep.CompressionType,
-                                                    BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
+                                                    BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value, SourceWadFile = dep.SourceWad })
                                                 },
-                                                BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value })
+                                                BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value, SourceWadFile = dep.SourceWad })
                                             };
                                             depNodesToAdd.Add(depNode);
                                         }
@@ -203,13 +205,14 @@ namespace AssetsManager.Services.Explorer
                                                     Type = ChunkDiffType.Dependency,
                                                     OldPath = dep.Path,
                                                     NewPath = dep.Path,
+                                                    SourceWadFile = dep.SourceWad,
                                                     OldPathHash = dep.OldPathHash,
                                                     NewPathHash = dep.NewPathHash,
                                                     OldCompressionType = dep.CompressionType,
                                                     NewCompressionType = dep.CompressionType,
-                                                    BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified })
+                                                    BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified, SourceWadFile = dep.SourceWad })
                                                 },
-                                                BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified })
+                                                BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified, SourceWadFile = dep.SourceWad })
                                             };
                                             depNodesToAdd.Add(depNode);
                                         }
@@ -257,16 +260,16 @@ namespace AssetsManager.Services.Explorer
         {
             if (diff.Type == ChunkDiffType.Removed)
             {
-                return Path.Combine(backupRoot, "wad_chunks", "old", $"{diff.OldPathHash:X16}.chunk");
+                return Path.Combine(backupRoot, "wad_chunks", "old", diff.SourceWadFile, $"{diff.OldPathHash:X16}.chunk");
             }
 
-            string newPath = Path.Combine(backupRoot, "wad_chunks", "new", $"{diff.NewPathHash:X16}.chunk");
+            string newPath = Path.Combine(backupRoot, "wad_chunks", "new", diff.SourceWadFile, $"{diff.NewPathHash:X16}.chunk");
             if (File.Exists(newPath))
             {
                 return newPath;
             }
 
-            return Path.Combine(backupRoot, "wad_chunks", "old", $"{diff.OldPathHash:X16}.chunk");
+            return Path.Combine(backupRoot, "wad_chunks", "old", diff.SourceWadFile, $"{diff.OldPathHash:X16}.chunk");
         }
 
         private DiffStatus GetDiffStatus(ChunkDiffType type)

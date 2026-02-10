@@ -83,12 +83,21 @@ namespace AssetsManager.Services.Audio
                     _logService.LogDebug($"[LinkAudioBankForDiffAsync] Found .bin dependency: '{binDep.Path}' from WAD '{binDep.SourceWad}'");
                     ulong binHash = preferOld ? binDep.OldPathHash : binDep.NewPathHash;
                     string binChunkDir = preferOld ? "old" : "new";
-                    string binBackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", binChunkDir, $"{binHash:X16}.chunk");
+                    string binBackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", binChunkDir, binDep.SourceWad, $"{binHash:X16}.chunk");
                     _logService.LogDebug($"[LinkAudioBankForDiffAsync] Constructed .bin chunk path: '{binBackupChunkPath}'");
 
                     binNode = new FileSystemNodeModel(Path.GetFileName(binDep.Path), false, binDep.Path, binDep.SourceWad)
                     {
-                        ChunkDiff = new SerializableChunkDiff { OldPathHash = binDep.OldPathHash, NewPathHash = binDep.NewPathHash, OldCompressionType = binDep.CompressionType, NewCompressionType = binDep.CompressionType },
+                        ChunkDiff = new SerializableChunkDiff 
+                        { 
+                            OldPath = binDep.Path, 
+                            NewPath = binDep.Path, 
+                            SourceWadFile = binDep.SourceWad,
+                            OldPathHash = binDep.OldPathHash, 
+                            NewPathHash = binDep.NewPathHash, 
+                            OldCompressionType = binDep.CompressionType, 
+                            NewCompressionType = binDep.CompressionType 
+                        },
                         BackupChunkPath = binBackupChunkPath,
                         Type = NodeType.SoundBank
                     };
@@ -111,12 +120,21 @@ namespace AssetsManager.Services.Audio
                     _logService.LogDebug($"[LinkAudioBankForDiffAsync] Found sibling audio dependency: '{audioDep.Path}' from WAD '{audioDep.SourceWad}'");
                     ulong audioHash = preferOld ? audioDep.OldPathHash : audioDep.NewPathHash;
                     string audioChunkDir = preferOld ? "old" : "new";
-                    string audioBackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", audioChunkDir, $"{audioHash:X16}.chunk");
+                    string audioBackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", audioChunkDir, audioDep.SourceWad, $"{audioHash:X16}.chunk");
                     _logService.LogDebug($"[LinkAudioBankForDiffAsync] Constructed sibling chunk path: '{audioBackupChunkPath}'");
 
                     var siblingNode = new FileSystemNodeModel(Path.GetFileName(audioDep.Path), false, audioDep.Path, audioDep.SourceWad)
                     {
-                        ChunkDiff = new SerializableChunkDiff { OldPathHash = audioDep.OldPathHash, NewPathHash = audioDep.NewPathHash, OldCompressionType = audioDep.CompressionType, NewCompressionType = audioDep.CompressionType },
+                        ChunkDiff = new SerializableChunkDiff 
+                        { 
+                            OldPath = audioDep.Path,
+                            NewPath = audioDep.Path,
+                            SourceWadFile = audioDep.SourceWad,
+                            OldPathHash = audioDep.OldPathHash, 
+                            NewPathHash = audioDep.NewPathHash, 
+                            OldCompressionType = audioDep.CompressionType, 
+                            NewCompressionType = audioDep.CompressionType 
+                        },
                         BackupChunkPath = audioBackupChunkPath
                     };
 
@@ -245,9 +263,19 @@ namespace AssetsManager.Services.Audio
             {
                 if (clickedNode.ChunkDiff != null && !string.IsNullOrEmpty(clickedNode.BackupChunkPath))
                 {
-                    string backupChunkDir = Path.GetDirectoryName(clickedNode.BackupChunkPath);
-                    string backupWadChunksDir = Path.GetDirectoryName(backupChunkDir);
-                    string backupRootDir = Path.GetDirectoryName(backupWadChunksDir);
+                    // Find the backup root by looking for 'wad_chunks' in the current path
+                    string backupRootDir = clickedNode.BackupChunkPath;
+                    int wadChunksIndex = backupRootDir.IndexOf("wad_chunks", StringComparison.OrdinalIgnoreCase);
+                    if (wadChunksIndex != -1)
+                    {
+                        backupRootDir = backupRootDir.Substring(0, wadChunksIndex);
+                    }
+                    else
+                    {
+                        // Fallback logic
+                        backupRootDir = Path.GetDirectoryName(Path.GetDirectoryName(clickedNode.BackupChunkPath));
+                    }
+
                     string backupJsonPath = Path.Combine(backupRootDir, "wadcomparison.json");
 
                     if (File.Exists(backupJsonPath))
@@ -281,7 +309,7 @@ namespace AssetsManager.Services.Audio
                                     ChunkDiff = diff,
                                     FullPath = fullPath,
                                     Name = Path.GetFileName(fullPath),
-                                    BackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", chunkDir, $"{hashForPath:X16}.chunk"),
+                                    BackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", chunkDir, diff.SourceWadFile, $"{hashForPath:X16}.chunk"),
                                     Type = NodeType.SoundBank
                                 };
                             };
@@ -448,9 +476,19 @@ namespace AssetsManager.Services.Audio
                 {
                     ulong binHash = XxHash64Ext.Hash(strategy.BinPath.ToLower());
 
-                    string backupChunkDir = Path.GetDirectoryName(clickedNode.BackupChunkPath);
-                    string backupWadChunksDir = Path.GetDirectoryName(backupChunkDir);
-                    string backupRootDir = Path.GetDirectoryName(backupWadChunksDir);
+                    // Find the backup root by looking for 'wad_chunks' in the current path
+                    string backupRootDir = clickedNode.BackupChunkPath;
+                    int wadChunksIndex = backupRootDir.IndexOf("wad_chunks", StringComparison.OrdinalIgnoreCase);
+                    if (wadChunksIndex != -1)
+                    {
+                        backupRootDir = backupRootDir.Substring(0, wadChunksIndex);
+                    }
+                    else
+                    {
+                        // Fallback logic
+                        backupRootDir = Path.GetDirectoryName(Path.GetDirectoryName(clickedNode.BackupChunkPath));
+                    }
+
                     string backupJsonPath = Path.Combine(backupRootDir, "wadcomparison.json");
 
                     if (File.Exists(backupJsonPath))
@@ -470,7 +508,7 @@ namespace AssetsManager.Services.Audio
                             {
                                 ChunkDiff = binDiff,
                                 SourceChunkPathHash = hashForPath,
-                                BackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", chunkDir, $"{hashForPath:X16}.chunk")
+                                BackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", chunkDir, binDiff.SourceWadFile, $"{hashForPath:X16}.chunk")
                             };
                             return (binNode, baseName, strategy.Type);
                         }
