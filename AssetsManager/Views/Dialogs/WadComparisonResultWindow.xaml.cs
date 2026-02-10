@@ -36,6 +36,7 @@ namespace AssetsManager.Views.Dialogs
         private readonly LogService _logService;
         private readonly WadDifferenceService _wadDifferenceService;
         private readonly WadPackagingService _wadPackagingService;
+        private readonly ComparisonHistoryService _comparisonHistoryService;
         private readonly DiffViewService _diffViewService;
         private readonly HashResolverService _hashResolverService;
         private readonly AppSettings _appSettings;
@@ -43,6 +44,7 @@ namespace AssetsManager.Views.Dialogs
         private string _oldPbePath;
         private string _newPbePath;
         private string _sourceJsonPath; // Path to the loaded wadcomparison.json
+        private string _assignedFolderName; // Stores the folder name if it was already auto-saved
 
         private readonly WadComparisonResultModel _viewModel;
 
@@ -54,6 +56,7 @@ namespace AssetsManager.Views.Dialogs
             LogService logService, 
             WadDifferenceService wadDifferenceService, 
             WadPackagingService wadPackagingService, 
+            ComparisonHistoryService comparisonHistoryService,
             DiffViewService diffViewService, 
             HashResolverService hashResolverService, 
             AppSettings appSettings)
@@ -69,6 +72,7 @@ namespace AssetsManager.Views.Dialogs
             _logService = logService;
             _wadDifferenceService = wadDifferenceService;
             _wadPackagingService = wadPackagingService;
+            _comparisonHistoryService = comparisonHistoryService;
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
             _appSettings = appSettings;
@@ -80,11 +84,12 @@ namespace AssetsManager.Views.Dialogs
         /// <summary>
         /// Initializes the window with data from a live comparison.
         /// </summary>
-        public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath)
+        public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string assignedFolderName = null)
         {
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = null;
+            _assignedFolderName = assignedFolderName;
             _serializableDiffs = diffs.Select(d => new SerializableChunkDiff
             {
                 Type = d.Type,
@@ -103,12 +108,13 @@ namespace AssetsManager.Views.Dialogs
         /// <summary>
         /// Initializes the window with data loaded from a saved JSON file.
         /// </summary>
-        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
+        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string assignedFolderName = null)
         {
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath;
+            _assignedFolderName = assignedFolderName;
         }
 
         private void OnWindowClosed(object sender, System.EventArgs e)
@@ -277,32 +283,39 @@ namespace AssetsManager.Views.Dialogs
         {
             try
             {
-                _directoriesCreator.GenerateNewWadComparisonPaths();
-
-                string comparisonFullPath = _directoriesCreator.WadComparisonFullPath;
-                string oldChunksPath = _directoriesCreator.OldChunksPath;
-                string newChunksPath = _directoriesCreator.NewChunksPath;
-
-                _logService.Log("Starting lean WAD packaging process...");
-                var finalDiffs = await _wadPackagingService.CreateLeanWadPackageAsync(_serializableDiffs, _oldPbePath, _newPbePath, oldChunksPath, newChunksPath);
-                _logService.LogSuccess("Finished lean WAD packaging process.");
-
-                string jsonFilePath = Path.Combine(comparisonFullPath, "wadcomparison.json");
-                var options = new JsonSerializerOptions
+                // If it was already auto-saved, just notify the user and don't do anything else.
+                if (!string.IsNullOrEmpty(_assignedFolderName))
                 {
-                    WriteIndented = true,
-                    Converters = { new JsonStringEnumConverter() }
-                };
-                var comparisonResult = new WadComparisonData
-                {
-                    OldLolPath = _oldPbePath,
-                    NewLolPath = _newPbePath,
-                    Diffs = finalDiffs
-                };
-                var json = JsonSerializer.Serialize(comparisonResult, options);
-                await File.WriteAllTextAsync(jsonFilePath, json);
+                    _customMessageBoxService.ShowSuccess("Already Saved", $"This comparison is already stored in your history:\n{_assignedFolderName}", this);
+                    return;
+                }
 
-                // _logService.LogInteractiveInfo($"Saved comparison WAD files in {comparisonFullPath}", comparisonFullPath);
+                _logService.Log("Starting comparison backup and asset packaging...");
+                
+                string displayName = "Manual Backup";
+                var uniqueWads = _serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
+
+                if (uniqueWads.Count == 1)
+                {
+                    displayName = Path.GetFileName(uniqueWads[0]).Split('.')[0];
+                }
+                else if (!string.IsNullOrEmpty(_newPbePath))
+                {
+                    displayName = Path.GetFileName(_newPbePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                    if (string.IsNullOrEmpty(displayName)) displayName = "Root";
+                }
+
+                // 1. Physical Save (WadPackagingService)
+                var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
+                
+                await _wadPackagingService.SaveBackupAsync(_serializableDiffs, _oldPbePath, _newPbePath, folderInfo.FullPath);
+
+                // 2. Metadata Registration (ComparisonHistoryService)
+                _comparisonHistoryService.RegisterComparisonInHistory(folderInfo.FolderName, $"Comparison from {displayName}", _oldPbePath, _newPbePath);
+
+                // Assign the folder name so subsequent clicks also don't duplicate
+                _assignedFolderName = folderInfo.FolderName;
+
                 _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);
             }
             catch (Exception ex)

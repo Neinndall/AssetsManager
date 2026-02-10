@@ -74,13 +74,13 @@ namespace AssetsManager.Views.Controls.Monitor
                     if (data != null)
                     {
                         var resultWindow = ServiceProvider.GetRequiredService<WadComparisonResultWindow>();
-                        resultWindow.Initialize(data.Diffs, data.OldLolPath, data.NewLolPath, path);
+                        resultWindow.Initialize(data.Diffs, data.OldLolPath, data.NewLolPath, path, selectedEntry.ReferenceId);
                         resultWindow.Owner = Window.GetWindow(this);
                         resultWindow.Show();
                     }
                     else
                     {
-                        CustomMessageBoxService.ShowError("Error", "Could not load the comparison history. The file might be missing or corrupted.", Window.GetWindow(this));
+                        CustomMessageBoxService.ShowWarning("Backup Missing", $"The backup for '{selectedEntry.FileName}' was not found. It may have been deleted or moved manually.", Window.GetWindow(this));
                     }
                 }
                 else
@@ -119,24 +119,23 @@ namespace AssetsManager.Views.Controls.Monitor
                             }
                             else
                             {
+                                // Manual cleanup for legacy FileDiffs
                                 string historyDirectoryPath = Path.GetDirectoryName(selectedEntry.OldFilePath);
-
                                 if (!string.IsNullOrEmpty(historyDirectoryPath) && Directory.Exists(historyDirectoryPath))
                                 {
                                     Directory.Delete(historyDirectoryPath, true);
                                 }
+                                AppSettings.DiffHistory.Remove(selectedEntry);
+                                AppSettings.Save();
                             }
-
-                            AppSettings.DiffHistory.Remove(selectedEntry);
                         }
-
-                        AppSettings.Save();
-                        _viewModel.LoadHistory(AppSettings.DiffHistory);
+                        
+                        // UI will refresh automatically via ConfigurationSaved event
                     }
                     catch (Exception ex)
                     {
                         LogService.LogError(ex, "Error deleting history entries.");
-                        CustomMessageBoxService.ShowInfo("Error", "Could not delete one or more history entries. Please check the logs for details.", Window.GetWindow(this), CustomMessageBoxIcon.Error);
+                        CustomMessageBoxService.ShowError("Error", "Could not delete one or more history entries. Please check the logs for details.", Window.GetWindow(this));
                     }
                 }
             }

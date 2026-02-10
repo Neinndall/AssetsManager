@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
@@ -31,64 +33,32 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
         }
 
-        public async Task SaveComparisonAsync(List<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string comparisonDisplayName)
+        public void RegisterComparisonInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath)
         {
             try
             {
-                // 1. Generate ID and Paths
-                string id = Guid.NewGuid().ToString();
-                string historyDir = Path.Combine(_directoriesCreator.HistoryCachePath, id);
-                string wadChunksOldDir = Path.Combine(historyDir, "wad_chunks", "old");
-                string wadChunksNewDir = Path.Combine(historyDir, "wad_chunks", "new");
-                string indexFilePath = Path.Combine(historyDir, "index.json");
-
-                // Ensure directories exist
-                Directory.CreateDirectory(wadChunksOldDir);
-                Directory.CreateDirectory(wadChunksNewDir);
-
-                _logService.LogDebug($"[ComparisonHistoryService] Saving comparison {id} to {historyDir}");
-
-                // 2. Package chunks (extract from WADs to history folder)
-                // We use the packaging service to get a "lean" list of diffs with dependencies resolved
-                // and to save the physical chunk files to our new history directory.
-                var leanDiffs = await _wadPackagingService.CreateLeanWadPackageAsync(
-                    diffs, 
-                    oldPbePath, 
-                    newPbePath, 
-                    wadChunksOldDir, 
-                    wadChunksNewDir
-                );
-
-                // 3. Serialize the data
-                var comparisonData = new WadComparisonData
+                // Ensure we don't add duplicates based on the folder name (ReferenceId)
+                bool alreadyInHistory = _appSettings.DiffHistory.Any(h => h.ReferenceId == folderName);
+                if (!alreadyInHistory)
                 {
-                    OldLolPath = oldPbePath,
-                    NewLolPath = newPbePath,
-                    Diffs = leanDiffs
-                };
+                    var entry = new HistoryEntry
+                    {
+                        FileName = comparisonDisplayName,
+                        OldFilePath = oldPbePath,
+                        NewFilePath = newPbePath,
+                        Timestamp = DateTime.Now,
+                        Type = HistoryEntryType.WadComparison,
+                        ReferenceId = folderName
+                    };
 
-                string json = JsonSerializer.Serialize(comparisonData, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(indexFilePath, json);
-
-                // 4. Update AppSettings
-                var entry = new HistoryEntry
-                {
-                    FileName = comparisonDisplayName, // e.g. "Patch 14.1 vs 14.2"
-                    OldFilePath = oldPbePath, // Informational
-                    NewFilePath = newPbePath, // Informational
-                    Timestamp = DateTime.Now,
-                    Type = HistoryEntryType.WadComparison,
-                    ReferenceId = id
-                };
-
-                _appSettings.DiffHistory.Insert(0, entry); // Add to top
-                AppSettings.SaveSettings(_appSettings);
-
-                _logService.LogSuccess("Comparison history saved successfully.");
+                    _appSettings.DiffHistory.Insert(0, entry);
+                    _appSettings.Save();
+                    _logService.LogSuccess($"{comparisonDisplayName} registered in history.");
+                }
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Failed to save comparison history.");
+                _logService.LogError(ex, "Failed to register comparison in history.");
             }
         }
 
@@ -96,17 +66,22 @@ namespace AssetsManager.Services.Monitor
         {
             try
             {
-                string historyDir = Path.Combine(_directoriesCreator.HistoryCachePath, referenceId);
-                string indexFilePath = Path.Combine(historyDir, "index.json");
+                // Centralize: Look into WadComparisonSavePath
+                string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, referenceId);
+                string indexFilePath = Path.Combine(historyDir, "wadcomparison.json");
 
                 if (!File.Exists(indexFilePath))
                 {
-                    _logService.LogError($"History index file not found: {indexFilePath}");
                     return (null, null);
                 }
 
                 string json = await File.ReadAllTextAsync(indexFilePath);
-                var data = JsonSerializer.Deserialize<WadComparisonData>(json);
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    Converters = { new JsonStringEnumConverter() }
+                };
+                var data = JsonSerializer.Deserialize<WadComparisonData>(json, options);
 
                 return (data, indexFilePath);
             }
@@ -123,16 +98,19 @@ namespace AssetsManager.Services.Monitor
             {
                 if (entry.Type == HistoryEntryType.WadComparison && !string.IsNullOrEmpty(entry.ReferenceId))
                 {
-                    string historyDir = Path.Combine(_directoriesCreator.HistoryCachePath, entry.ReferenceId);
+                    // 1. Delete physical directory
+                    string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, entry.ReferenceId);
                     if (Directory.Exists(historyDir))
                     {
                         Directory.Delete(historyDir, true);
-                        _logService.LogDebug($"Deleted history directory: {historyDir}");
                     }
+
+                    // 2. Remove from internal list
+                    _appSettings.DiffHistory.Remove(entry);
+                    _appSettings.Save();
+                    
+                    _logService.LogSuccess($"{entry.FileName} and its backup files deleted.");
                 }
-                
-                // Also handle legacy FileDiff deletions if needed, though HistoryViewControl handles that manually currently.
-                // We'll leave the existing logic in HistoryViewControl for FileDiffs for now or refactor it later.
             }
             catch (Exception ex)
             {

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -49,6 +50,7 @@ namespace AssetsManager.Views
         private readonly TaskCancellationManager _taskCancellationManager;
         private readonly NotificationService _notificationService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
+        private readonly WadPackagingService _wadPackagingService;
 
         private string _latestAppVersionAvailable;
         private NotificationHubWindow _notificationHubWindow;
@@ -58,6 +60,7 @@ namespace AssetsManager.Views
         private string _extractionOldLolPath;
         private string _extractionNewLolPath;
         private List<SerializableChunkDiff> _diffsForExtraction;
+        private string _lastAssignedFolder; // Persists the folder name during the extraction process
 
         private GridLength _lastLogHeight;
         private bool _isLogMinimized = false;
@@ -83,7 +86,8 @@ namespace AssetsManager.Views
             ReportGenerationService reportGenerationService,
             TaskCancellationManager taskCancellationManager,
             NotificationService notificationService,
-            ComparisonHistoryService comparisonHistoryService)
+            ComparisonHistoryService comparisonHistoryService,
+            WadPackagingService wadPackagingService)
         {
             InitializeComponent();
 
@@ -108,6 +112,7 @@ namespace AssetsManager.Views
             _taskCancellationManager = taskCancellationManager;
             _notificationService = notificationService;
             _comparisonHistoryService = comparisonHistoryService;
+            _wadPackagingService = wadPackagingService;
 
             _progressUIManager.Initialize(StatusBar.ViewModel, this);
             
@@ -275,6 +280,8 @@ namespace AssetsManager.Views
             }
 
             // 1. ALWAYS Save to History if enabled (Independent of other actions)
+            _lastAssignedFolder = null; // Reset for new comparison
+
             if (_appSettings.SaveWadComparisonHistory)
             {
                 string displayName = "Unknown";
@@ -282,16 +289,34 @@ namespace AssetsManager.Views
 
                 if (uniqueWads.Count == 1)
                 {
-                    string wadFileName = System.IO.Path.GetFileName(uniqueWads[0]);
+                    string wadFileName = Path.GetFileName(uniqueWads[0]);
                     displayName = wadFileName.Split('.')[0];
                 }
                 else
                 {
-                    displayName = System.IO.Path.GetFileName(newLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+                    displayName = Path.GetFileName(newLolPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                     if (string.IsNullOrEmpty(displayName)) displayName = "Root";
                 }
 
-                _ = _comparisonHistoryService.SaveComparisonAsync(serializableDiffs, oldLolPath, newLolPath, $"Comparison from {displayName}");
+                try
+                {
+                    // Unified Flow:
+                    // 1. Physical Save (WadPackagingService)
+                    var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
+                    _lastAssignedFolder = folderInfo.FolderName; // Store for follow-up actions
+                    
+                    // We run this without awaiting to not block UI thread, but we log errors inside the services
+                    _ = Task.Run(async () => 
+                    {
+                        await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.FullPath);
+                        // 2. Metadata Registration (ComparisonHistoryService)
+                        _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, $"Comparison from {displayName}", oldLolPath, newLolPath);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "Failed to auto-save comparison history.");
+                }
             }
 
             // 2. Handle follow-up actions (Report, Extraction, or View)
@@ -320,7 +345,7 @@ namespace AssetsManager.Views
         private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
         {
             var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
-            resultWindow.Initialize(diffs, oldPath, newPath);
+            resultWindow.Initialize(diffs, oldPath, newPath, null, _lastAssignedFolder);
             resultWindow.Owner = this;
             resultWindow.Show();
         }
