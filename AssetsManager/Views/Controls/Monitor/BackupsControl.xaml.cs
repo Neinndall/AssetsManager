@@ -109,7 +109,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            var result = CustomMessageBoxService.ShowYesNo("Delete Backups", $"Are you sure you want to delete {selectedBackups.Count} selected backup(s)? This action is irreversible.", Window.GetWindow(this));
+            var result = CustomMessageBoxService.ShowYesNo("Delete Backup", $"Are you sure you want to delete the selected backup? This action is irreversible.", Window.GetWindow(this));
             if (result == true)
             {
                 var deletedCount = DeleteBackups(selectedBackups);
