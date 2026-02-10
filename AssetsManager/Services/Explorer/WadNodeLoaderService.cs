@@ -26,6 +26,9 @@ namespace AssetsManager.Services.Explorer
             _logService = logService;
         }
 
+        /// <summary>
+        /// Loads a virtual file tree from a saved comparison backup JSON file.
+        /// </summary>
         public async Task<(ObservableRangeCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> LoadFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
         {
             var options = new JsonSerializerOptions
@@ -52,7 +55,6 @@ namespace AssetsManager.Services.Explorer
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Ensure paths are updated with the latest hash resolutions
                 foreach (var file in wadGroup)
                 {
                     if (file.OldPathHash != 0)
@@ -79,7 +81,7 @@ namespace AssetsManager.Services.Explorer
                     foreach (var file in wadGroup)
                     {
                         string chunkPath = GetBackupChunkPath(backupRoot, file);
-                        file.BackupChunkPath = chunkPath; // Ensure the main diff object has the path
+                        file.BackupChunkPath = chunkPath; 
                         var status = GetDiffStatus(file.Type);
 
                         string statusPrefix = GetStatusPrefix(file.Type);
@@ -97,18 +99,13 @@ namespace AssetsManager.Services.Explorer
                         {
                             foreach (var dep in file.Dependencies)
                             {
-                                _logService.LogDebug($"[LoadFromBackupAsync] Processing dependency: Path='{dep.Path}', Type='{dep.Type}', WasTopLevelDiff='{dep.WasTopLevelDiff}'");
-                                // In this view, we add dependencies as top-level entries to respect the file path structure.
-                                // We only do this for dependencies that were originally top-level diffs to avoid clutter.
                                 if (dep.WasTopLevelDiff && dep.Type.HasValue)
                                 {
-                                    _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' meets conditions (WasTopLevelDiff and Type.HasValue). Adding to tree.");
                                     var depType = dep.Type.Value;
                                     var depStatus = GetDiffStatus(depType);
                                     string depStatusPrefix = GetStatusPrefix(depType);
                                     string depPrefixedPath = $"{depStatusPrefix}/{dep.Path}";
 
-                                    // Add the dependency as a top-level node in its correct virtual path
                                     var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, dep.SourceWad, dep.NewPathHash, depStatus);
                                     
                                     depNode.ChunkDiff = new SerializableChunkDiff
@@ -124,14 +121,13 @@ namespace AssetsManager.Services.Explorer
                                         BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = depType, SourceWadFile = dep.SourceWad })
                                     };
                                     depNode.BackupChunkPath = depNode.ChunkDiff.BackupChunkPath;
-                                } else {
-                                    _logService.LogDebug($"[LoadFromBackupAsync] Dependency '{dep.Path}' does NOT meet conditions (WasTopLevelDiff={dep.WasTopLevelDiff}, Type.HasValue={dep.Type.HasValue}). Skipping addition to tree in sorted view.");
                                 }
                             }
                         }
                     }
 
                     SortChildrenRecursively(wadNode);
+                    PostProcessAudioNodes(wadNode);
                 }
                 else
                 {
@@ -243,14 +239,10 @@ namespace AssetsManager.Services.Explorer
 
         private string RestoreExtension(string original, string resolved, ulong hash)
         {
-            // If DB gives a path with extension, we trust it
             if (Path.HasExtension(resolved)) return resolved;
-            // If the JSON (original) had an extension, we keep it
             if (!string.IsNullOrEmpty(original) && Path.HasExtension(original))
             {
-                // If resolved is just the raw hash, use the full original path
                 if (resolved == hash.ToString("x16")) return original;
-                // Otherwise, append the extension to the resolved name
                 return resolved + Path.GetExtension(original);
             }
             return resolved;
@@ -285,6 +277,9 @@ namespace AssetsManager.Services.Explorer
             };
         }
 
+        /// <summary>
+        /// Recursively sorts tree nodes and performs post-processing cleanup.
+        /// </summary>
         private void SortChildrenRecursively(FileSystemNodeModel node)
         {
             if (node.Type != NodeType.VirtualDirectory && node.Type != NodeType.WadFile) return;
@@ -300,42 +295,63 @@ namespace AssetsManager.Services.Explorer
             }
 
             node.Children.ReplaceRange(sortedChildren);
+        }
 
-            // Post-process to remove expander from redundant BNK files when a WPK exists
-            var wpkFiles = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith(".wpk")).Select(c => Path.GetFileNameWithoutExtension(c.Name)).ToHashSet();
-            var bnkFiles = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith(".bnk")).ToList();
+        /// <summary>
+        /// Removes expanders from redundant audio nodes (like event banks or redundant format containers).
+        /// </summary>
+        private void PostProcessAudioNodes(FileSystemNodeModel wadRoot)
+        {
+            var allNodes = new List<FileSystemNodeModel>();
+            FlattenTree(wadRoot, allNodes);
 
-            foreach (var bnkNode in bnkFiles)
+            var audioNodes = allNodes.Where(n => n.Type == NodeType.SoundBank).ToList();
+            if (!audioNodes.Any()) return;
+
+            // 1. Create a map of all SoundBank names for fast lookup
+            var nodeNames = audioNodes.Select(n => n.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var node in audioNodes)
             {
-                string bnkBaseName = Path.GetFileNameWithoutExtension(bnkNode.Name);
+                string name = node.Name;
+                string baseName = Path.GetFileNameWithoutExtension(name);
 
-                // Case 1: A WPK with the exact same name exists (e.g., common.bnk, common.wpk)
-                bool directMatch = wpkFiles.Contains(bnkBaseName);
-
-                // Case 2: An events/music BNK corresponds to an audio WPK (e.g., vo_events.bnk, vo_audio.wpk)
-                string correspondingAudioWpkName = bnkBaseName.Replace("_events", "_audio").Replace("_music", "_audio");
-                bool audioMatch = wpkFiles.Contains(correspondingAudioWpkName);
-
-                if (directMatch || audioMatch)
+                // CASE A: It's an events bank (e.g., ashe_base_vo_events.bnk)
+                if (name.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
                 {
-                    bnkNode.Children.Clear(); // Remove the dummy node, thus removing the expander
+                    string prefix = name.Replace("_events.bnk", "");
+                    // Redundant if there's a corresponding audio container (_audio.wpk or _audio.bnk)
+                    if (nodeNames.Contains(prefix + "_audio.wpk") || nodeNames.Contains(prefix + "_audio.bnk"))
+                    {
+                        node.Children.Clear();
+                    }
                 }
-            }
-
-            // Post-process to remove expander from redundant _events.bnk files when a _audio.bnk exists
-            var audioBnks = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith("_audio.bnk")).Select(c => c.Name).ToHashSet();
-            var eventsBnks = node.Children.Where(c => c.Type == NodeType.SoundBank && c.Name.EndsWith("_events.bnk")).ToList();
-
-            foreach (var eventsBnkNode in eventsBnks)
-            {
-                string correspondingAudioBnk = eventsBnkNode.Name.Replace("_events.bnk", "_audio.bnk");
-                if (audioBnks.Contains(correspondingAudioBnk))
+                // CASE B: It's a BNK that might have a corresponding WPK (e.g., ashe_base_vo_audio.bnk vs ashe_base_vo_audio.wpk)
+                else if (name.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
                 {
-                    eventsBnkNode.Children.Clear(); // Remove the dummy node, thus removing the expander
+                    // Redundant if there is a .wpk with the exact same base name
+                    if (nodeNames.Contains(baseName + ".wpk"))
+                    {
+                        node.Children.Clear();
+                    }
                 }
             }
         }
 
+        private void FlattenTree(FileSystemNodeModel parent, List<FileSystemNodeModel> result)
+        {
+            if (parent.Children == null) return;
+            
+            foreach (var child in parent.Children)
+            {
+                result.Add(child);
+                FlattenTree(child, result);
+            }
+        }
+
+        /// <summary>
+        /// Ensures all children of a node are loaded, primarily used for lazy loading WAD files.
+        /// </summary>
         public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -394,7 +410,7 @@ namespace AssetsManager.Services.Explorer
                     node.Children.AddRange(childFiles);
                     foreach(var childNode in childFiles)
                     {
-                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken); // Eager load WAD content
+                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken);
                     }
                 }
                 catch (UnauthorizedAccessException)
@@ -404,6 +420,9 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        /// <summary>
+        /// Loads the contents of a WAD file into a collection of tree nodes.
+        /// </summary>
         public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadChildrenAsync(FileSystemNodeModel wadNode, CancellationToken cancellationToken)
         {
             var childrenToAdd = await Task.Run(() =>
@@ -445,7 +464,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 catch (OperationCanceledException)
                 {
-                    throw; // Propagate cancellation
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -453,12 +472,16 @@ namespace AssetsManager.Services.Explorer
                 }
 
                 SortChildrenRecursively(rootVirtualNode);
-                return rootVirtualNode.Children; // Already an ObservableRangeCollection
+                PostProcessAudioNodes(rootVirtualNode);
+                return rootVirtualNode.Children;
             }, cancellationToken);
 
             return childrenToAdd;
         }
 
+        /// <summary>
+        /// Quick load of WAD file names without deep analysis.
+        /// </summary>
         public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadWadContentAsync(string wadPath)
         {
             var nodes = await Task.Run(() =>
@@ -466,7 +489,7 @@ namespace AssetsManager.Services.Explorer
                 var fileNodes = new ObservableRangeCollection<FileSystemNodeModel>();
                 if (!File.Exists(wadPath))
                 {
-                    return fileNodes; // Return empty list if WAD file doesn't exist
+                    return fileNodes;
                 }
 
                 try
@@ -478,7 +501,7 @@ namespace AssetsManager.Services.Explorer
                             string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
                             if (string.IsNullOrEmpty(virtualPath) || virtualPath == chunk.PathHash.ToString("x16"))
                             {
-                                virtualPath = chunk.PathHash.ToString("x16"); // Use hash as name if not resolved
+                                virtualPath = chunk.PathHash.ToString("x16");
                             }
 
                             var fileNode = new FileSystemNodeModel(Path.GetFileName(virtualPath), false, virtualPath, wadPath)
@@ -526,7 +549,6 @@ namespace AssetsManager.Services.Explorer
                 Status = status
             };
 
-            // Prevent duplicates: Check if the file already exists in the current directory
             var existingNode = currentNode.Children.FirstOrDefault(c => c.Name.Equals(fileNode.Name, StringComparison.OrdinalIgnoreCase));
             if (existingNode != null)
             {
@@ -537,13 +559,16 @@ namespace AssetsManager.Services.Explorer
             return fileNode;
         }
 
+        /// <summary>
+        /// Loads a physical directory into the tree structure.
+        /// </summary>
         public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
         {
             return await Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var rootNode = new FileSystemNodeModel(rootPath);
-                rootNode.Children.Clear(); // Clear dummy node
+                rootNode.Children.Clear();
                 AddNodeToRealTree(rootNode, rootPath, cancellationToken);
                 return rootNode.Children;
             }, cancellationToken);
@@ -552,18 +577,16 @@ namespace AssetsManager.Services.Explorer
         private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // Use EnumerateDirectories for better cancellation responsiveness
             foreach (var directory in Directory.EnumerateDirectories(path).OrderBy(d => d))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var dirNode = new FileSystemNodeModel(directory);
-                dirNode.Children.Clear(); // Clear dummy node
+                dirNode.Children.Clear();
                 parentNode.Children.Add(dirNode);
                 AddNodeToRealTree(dirNode, directory, cancellationToken);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            // Use EnumerateFiles and add cancellation check inside the loop
             foreach (var file in Directory.EnumerateFiles(path).OrderBy(f => f))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -572,6 +595,9 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        /// <summary>
+        /// Searches for a specific virtual path within all WAD files in a directory.
+        /// </summary>
         public async Task<FileSystemNodeModel> FindNodeByVirtualPathAsync(string virtualPath, string gameDataPath)
         {
             return await Task.Run(() =>
