@@ -90,7 +90,7 @@ namespace AssetsManager.Services.Downloads
                         fileDestinationDirectory = destinationRootPath;
                     }
 
-                    await _directoriesCreator.CreateDirectoryAsync(fileDestinationDirectory);
+                    _directoriesCreator.CreateDirectory(fileDestinationDirectory);
 
                     string extension = Path.GetExtension(node.Name).ToLower();
 

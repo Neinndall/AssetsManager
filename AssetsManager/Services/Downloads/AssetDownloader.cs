@@ -30,7 +30,7 @@ namespace AssetsManager.Services.Downloads
                 string dir = Path.GetDirectoryName(fullDestinationPath);
                 if (!string.IsNullOrEmpty(dir))
                 {
-                    await _directoriesCreator.CreateDirectoryAsync(dir);
+                    _directoriesCreator.CreateDirectory(dir);
                 }
 
                 var response = await _httpClient.GetAsync(url);
