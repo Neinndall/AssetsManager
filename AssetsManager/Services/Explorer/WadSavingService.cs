@@ -143,7 +143,7 @@ namespace AssetsManager.Services.Explorer
             if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
             {
                 string currentDestinationPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
-                await _directoriesCreator.CreateDirectoryAsync(currentDestinationPath);
+                _directoriesCreator.CreateDirectory(currentDestinationPath);
 
                 foreach (var child in node.Children)
                 {
@@ -156,7 +156,7 @@ namespace AssetsManager.Services.Explorer
             if (node.Type == NodeType.AudioEvent)
             {
                 string eventPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
-                await _directoriesCreator.CreateDirectoryAsync(eventPath);
+                _directoriesCreator.CreateDirectory(eventPath);
 
                 foreach (var soundNode in node.Children)
                 {
@@ -310,7 +310,7 @@ namespace AssetsManager.Services.Explorer
 
             string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
             string audioBankPath = Path.Combine(destinationPath, PathUtils.SanitizeName(audioBankName));
-            await _directoriesCreator.CreateDirectoryAsync(audioBankPath);
+            _directoriesCreator.CreateDirectory(audioBankPath);
 
             cancellationToken.ThrowIfCancellationRequested();
             var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;
@@ -338,7 +338,7 @@ namespace AssetsManager.Services.Explorer
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string eventPath = Path.Combine(audioBankPath, PathUtils.SanitizeName(eventNode.Name));
-                await _directoriesCreator.CreateDirectoryAsync(eventPath);
+                _directoriesCreator.CreateDirectory(eventPath);
 
                 foreach (var soundNode in eventNode.Sounds)
                 {

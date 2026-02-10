@@ -45,7 +45,7 @@ namespace AssetsManager.Services.Updater
             try
             {
                 // Llamamos a _directoriesCreator para crear la carpeta de update cache
-                await _directoriesCreator.CreateDirectoryAsync(_directoriesCreator.UpdateCachePath);
+                _directoriesCreator.CreateDirectory(_directoriesCreator.UpdateCachePath);
 
                 var response = await _httpClient.GetStringAsync(apiUrl);
                 var releaseData = JsonConvert.DeserializeObject<dynamic>(response);

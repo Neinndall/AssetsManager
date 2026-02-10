@@ -309,7 +309,7 @@ namespace AssetsManager.Services.Comparator
         public async Task<List<SerializableChunkDiff>> SaveBackupAsync(List<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string destinationPath)
         {
             // Use the centralized directory creator to prepare the structure
-            await _directoriesCreator.PrepareComparisonDirectory(destinationPath);
+            _directoriesCreator.PrepareComparisonDirectory(destinationPath);
 
             string wadChunksOldDir = Path.Combine(destinationPath, "wad_chunks", "old");
             string wadChunksNewDir = Path.Combine(destinationPath, "wad_chunks", "new");
@@ -398,7 +398,7 @@ namespace AssetsManager.Services.Comparator
 
                 // Create a subfolder for the specific WAD to avoid hash collisions (e.g., localized files)
                 string finalTargetDir = Path.Combine(targetChunkPath, wadRelativePath);
-                await _directoriesCreator.CreateDirectoryAsync(finalTargetDir);
+                _directoriesCreator.CreateDirectory(finalTargetDir);
                 
                 // Open the stream ONCE for the entire WAD file processing
                 await using var fs = new FileStream(sourceWadPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 65536, useAsync: true);

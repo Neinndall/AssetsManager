@@ -98,7 +98,7 @@ public class ManifestDownloader
             return true;
         }).ToList();
 
-        await _directoriesCreator.CreateDirectoryAsync(outputPath);
+        _directoriesCreator.CreateDirectory(outputPath);
 
         // ===========================================================================
         // VERIFICATION PROCESS (SMART SCAN ENGINE)
@@ -322,7 +322,7 @@ public class ManifestDownloader
                                     foreach (var target in t.Targets)
                                     {
                                         var dir = Path.GetDirectoryName(target.FullPath);
-                                        if (!string.IsNullOrEmpty(dir)) await _directoriesCreator.CreateDirectoryAsync(dir);
+                                        if (!string.IsNullOrEmpty(dir)) _directoriesCreator.CreateDirectory(dir);
 
                                         var handle = openHandles.GetOrAdd(target.FullPath, (path) => {
                                             var h = File.OpenHandle(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);

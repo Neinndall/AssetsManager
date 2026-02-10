@@ -47,7 +47,7 @@ namespace AssetsManager.Services.Updater
                         var relativePath = resource.Substring(resourcePrefix.Length);
                         var destinationPath = Path.Combine(updaterCachePath, relativePath);
                         var dir = Path.GetDirectoryName(destinationPath);
-                        if (!string.IsNullOrEmpty(dir)) await _directoriesCreator.CreateDirectoryAsync(dir);
+                        if (!string.IsNullOrEmpty(dir)) _directoriesCreator.CreateDirectory(dir);
 
                         using (var stream = assembly.GetManifestResourceStream(resource))
                         {

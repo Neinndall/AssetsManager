@@ -89,7 +89,7 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             string newDirPath = Path.Combine(destinationPath, PathUtils.SanitizeName(dirNode.Name));
-            await _directoriesCreator.CreateDirectoryAsync(newDirPath);
+            _directoriesCreator.CreateDirectory(newDirPath);
 
             foreach (var childNode in dirNode.Children)
             {
@@ -120,7 +120,7 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             string newDirPath = Path.Combine(destinationPath, PathUtils.SanitizeName(dirNode.Name));
-            await _directoriesCreator.CreateDirectoryAsync(newDirPath);
+            _directoriesCreator.CreateDirectory(newDirPath);
 
             // If children are not loaded (i.e., it's the dummy node), load them.
             if (dirNode.Children.Count == 1 && dirNode.Children[0].Name == "Loading...")
@@ -143,7 +143,7 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             string newDirPath = Path.Combine(destinationPath, PathUtils.SanitizeName(dirNode.Name));
-            await _directoriesCreator.CreateDirectoryAsync(newDirPath);
+            _directoriesCreator.CreateDirectory(newDirPath);
 
             // The tree is already fully loaded in memory, so we can just iterate through the children.
             foreach (var childNode in dirNode.Children)

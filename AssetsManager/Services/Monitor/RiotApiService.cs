@@ -221,7 +221,7 @@ namespace AssetsManager.Services.Monitor
                 var salesJson = await response.Content.ReadAsStringAsync();
 
                 // Save to API cache
-                await _directoriesCreator.CreateDirectoryAsync(_directoriesCreator.ApiCachePath);
+                _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
                 var fileName = "sales.json";
                 var filePath = Path.Combine(_directoriesCreator.ApiCachePath, fileName);
                 await File.WriteAllTextAsync(filePath, salesJson);
@@ -248,7 +248,7 @@ namespace AssetsManager.Services.Monitor
                 var mythicShopJson = await response.Content.ReadAsStringAsync();
 
                 // Save to API cache
-                await _directoriesCreator.CreateDirectoryAsync(_directoriesCreator.ApiCachePath);
+                _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
                 var fileName = "mythic_shop.json";
                 var filePath = Path.Combine(_directoriesCreator.ApiCachePath, fileName);
                 await File.WriteAllTextAsync(filePath, mythicShopJson);

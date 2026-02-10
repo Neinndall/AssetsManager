@@ -69,7 +69,7 @@ namespace AssetsManager.Services.Downloads
 
                     if (syncHashesWithCDTB)
                     {
-                        await _directoriesCreator.CreateHashesDirectories();
+                        _directoriesCreator.CreateHashesDirectories();
                         await _requests.DownloadSpecificHashesAsync(outdatedFiles);
                     }
 

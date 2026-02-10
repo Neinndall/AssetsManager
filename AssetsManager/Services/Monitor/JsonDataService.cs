@@ -182,8 +182,8 @@ namespace AssetsManager.Services.Monitor
                     string oldFilePath = Path.Combine(_directoriesCreator.JsonCacheOldPath, key);
                     string newFilePath = Path.Combine(_directoriesCreator.JsonCacheNewPath, key);
 
-                    await _directoriesCreator.CreateDirectoryAsync(Path.GetDirectoryName(oldFilePath));
-                    await _directoriesCreator.CreateDirectoryAsync(Path.GetDirectoryName(newFilePath));
+                    _directoriesCreator.CreateDirectory(Path.GetDirectoryName(oldFilePath));
+                    _directoriesCreator.CreateDirectory(Path.GetDirectoryName(newFilePath));
 
                     try
                     {

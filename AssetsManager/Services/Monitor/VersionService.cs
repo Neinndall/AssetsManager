@@ -57,7 +57,7 @@ namespace AssetsManager.Services.Monitor
         {
             _logService.Log("Starting get versions from League Client and Game Client...");
 
-            await _directoriesCreator.CreateDirectoryAsync(_directoriesCreator.VersionsPath);
+            _directoriesCreator.CreateDirectory(_directoriesCreator.VersionsPath);
 
             var riotVersions = await _riotApiService.FetchVersionsAsync();
 
@@ -70,7 +70,7 @@ namespace AssetsManager.Services.Monitor
             foreach (var v in riotVersions.Where(x => x.Product == "Game Client"))
             {
                 var path = Path.Combine(_directoriesCreator.VersionsPath, "PBE1", "windows", v.Category);
-                await _directoriesCreator.CreateDirectoryAsync(path);
+                _directoriesCreator.CreateDirectory(path);
                 var filePath = Path.Combine(path, $"{v.Version}.txt");
                 if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, v.ManifestUrl);
             }
@@ -95,7 +95,7 @@ namespace AssetsManager.Services.Monitor
                 try
                 {
                     if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
-                    await _directoriesCreator.CreateDirectoryAsync(tempDir);
+                    _directoriesCreator.CreateDirectory(tempDir);
 
                     var manifestBytes = await _httpClient.GetByteArrayAsync(url);
                     var manifest = _rmanService.Parse(manifestBytes);
@@ -124,11 +124,11 @@ namespace AssetsManager.Services.Monitor
 
         private async Task SaveClientVersionsAsync(List<(string region, string os, string version, string url)> versions)
         {
-            await _directoriesCreator.CreateDirectoryAsync(_directoriesCreator.VersionsPath);
+            _directoriesCreator.CreateDirectory(_directoriesCreator.VersionsPath);
             foreach (var (region, os, version, url) in versions)
             {
                 var path = Path.Combine(_directoriesCreator.VersionsPath, region, os, "league-client");
-                await _directoriesCreator.CreateDirectoryAsync(path);
+                _directoriesCreator.CreateDirectory(path);
                 var filePath = Path.Combine(path, $"{version}.txt");
                 if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, url);
             }

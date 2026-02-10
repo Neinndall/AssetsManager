@@ -48,7 +48,7 @@ namespace AssetsManager.Utils
         public string GetNewSubAssetsDownloadedPath()
         {
             string path = Path.Combine(AssetsDownloadedPath, DateTime.Now.ToString("ddMMyyyy_HHmmss"));
-            CreateDirectoryInternal(path);
+            CreateDirectory(path);
             return path;
         }
 
@@ -66,7 +66,7 @@ namespace AssetsManager.Utils
                 : fileName;
             
             string path = Path.Combine(JsonCacheHistoryPath, historyKey, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
-            CreateDirectoryInternal(path);
+            CreateDirectory(path);
             return path;
         }
 
@@ -76,31 +76,24 @@ namespace AssetsManager.Utils
             string exePath = Path.Combine(dirPath, "Updater.exe");
             string logPath = Path.Combine(UpdateCachePath, "update_log.log");
             
-            CreateDirectoryInternal(dirPath);
+            CreateDirectory(dirPath);
             return (dirPath, exePath, logPath);
         }
 
         // Action methods
-        public async Task PrepareComparisonDirectory(string fullPath)
+        public void PrepareComparisonDirectory(string fullPath)
         {
-            await CreateDirectoryAsync(fullPath);
-            await CreateDirectoryAsync(Path.Combine(fullPath, "wad_chunks", "old"));
-            await CreateDirectoryAsync(Path.Combine(fullPath, "wad_chunks", "new"));
+            CreateDirectory(fullPath);
+            CreateDirectory(Path.Combine(fullPath, "wad_chunks", "old"));
+            CreateDirectory(Path.Combine(fullPath, "wad_chunks", "new"));
+        }
+        
+        public void CreateHashesDirectories()
+        {
+            CreateDirectory(HashesPath);
         }
 
-        public Task CreateDirectoryAsync(string path)
-        {
-            CreateDirectoryInternal(path);
-            return Task.CompletedTask;
-        }
-
-        public Task CreateHashesDirectories()
-        {
-            CreateDirectoryInternal(HashesPath);
-            return Task.CompletedTask;
-        }
-
-        private void CreateDirectoryInternal(string path)
+        public void CreateDirectory(string path)
         {
             try
             {
