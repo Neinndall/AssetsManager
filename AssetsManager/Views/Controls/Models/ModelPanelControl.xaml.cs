@@ -576,7 +576,7 @@ namespace AssetsManager.Views.Controls.Models
             UpdateEnvironment();
         }
 
-        private void UpdateEnvironment()
+        public void UpdateEnvironment()
         {
             if (Viewport == null || TransparentBgCheck == null || ShowSkyboxCheck == null) return;
 

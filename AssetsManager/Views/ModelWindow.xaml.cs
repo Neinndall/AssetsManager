@@ -176,6 +176,13 @@ namespace AssetsManager.Views
                 return;
             }
 
+            // Cleanup previous environment if exists
+            if (_groundVisual != null && ViewportControl.Viewport.Children.Contains(_groundVisual))
+                ViewportControl.Viewport.Children.Remove(_groundVisual);
+            
+            if (_skyVisual != null && ViewportControl.Viewport.Children.Contains(_skyVisual))
+                ViewportControl.Viewport.Children.Remove(_skyVisual);
+
             // Otherwise, create and add them
             _groundVisual = SceneElements.CreateGroundPlane(path => LoadSceneTexture(path), _logService.LogError, _appSettings.CustomFloorTexturePath);
             _skyVisual = SceneElements.CreateSidePlanes(path => LoadSceneTexture(path), _logService.LogError);
@@ -184,6 +191,9 @@ namespace AssetsManager.Views
             ViewportControl.Viewport.Children.Add(_skyVisual);
             
             ViewportControl.RegisterEnvironment(_skyVisual, _groundVisual);
+            
+            // Re-apply current environment settings from panel
+            PanelControl?.UpdateEnvironment();
         }
 
         private BitmapSource LoadSceneTexture(string path)
