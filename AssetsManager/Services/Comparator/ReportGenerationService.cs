@@ -47,8 +47,7 @@ namespace AssetsManager.Services.Comparator
                 return;
             }
 
-            _directoriesCreator.GenerateNewSubAssetsDownloadedPath();
-            string destinationPath = _directoriesCreator.SubAssetsDownloadedPath;
+            string destinationPath = _directoriesCreator.GetNewSubAssetsDownloadedPath();
             string logFilePath = Path.Combine(destinationPath, "assets.log");
 
             var reportContent = new StringBuilder();

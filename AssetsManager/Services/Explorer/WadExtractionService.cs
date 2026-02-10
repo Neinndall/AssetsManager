@@ -22,11 +22,13 @@ namespace AssetsManager.Services.Explorer
     {
         private readonly LogService _logService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
+        private readonly DirectoriesCreator _directoriesCreator;
 
-        public WadExtractionService(LogService logService, WadNodeLoaderService wadNodeLoaderService)
+        public WadExtractionService(LogService logService, WadNodeLoaderService wadNodeLoaderService, DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
             _wadNodeLoaderService = wadNodeLoaderService;
+            _directoriesCreator = directoriesCreator;
         }
 
         public async Task<int> CalculateTotalAsync(IEnumerable<FileSystemNodeModel> nodes, CancellationToken cancellationToken)
@@ -87,7 +89,7 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             string newDirPath = Path.Combine(destinationPath, PathUtils.SanitizeName(dirNode.Name));
-            Directory.CreateDirectory(newDirPath);
+            await _directoriesCreator.CreateDirectoryAsync(newDirPath);
 
             foreach (var childNode in dirNode.Children)
             {
@@ -118,7 +120,7 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             string newDirPath = Path.Combine(destinationPath, PathUtils.SanitizeName(dirNode.Name));
-            Directory.CreateDirectory(newDirPath);
+            await _directoriesCreator.CreateDirectoryAsync(newDirPath);
 
             // If children are not loaded (i.e., it's the dummy node), load them.
             if (dirNode.Children.Count == 1 && dirNode.Children[0].Name == "Loading...")
@@ -141,7 +143,7 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             string newDirPath = Path.Combine(destinationPath, PathUtils.SanitizeName(dirNode.Name));
-            Directory.CreateDirectory(newDirPath);
+            await _directoriesCreator.CreateDirectoryAsync(newDirPath);
 
             // The tree is already fully loaded in memory, so we can just iterate through the children.
             foreach (var childNode in dirNode.Children)

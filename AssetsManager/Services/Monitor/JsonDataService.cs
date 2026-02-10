@@ -182,8 +182,8 @@ namespace AssetsManager.Services.Monitor
                     string oldFilePath = Path.Combine(_directoriesCreator.JsonCacheOldPath, key);
                     string newFilePath = Path.Combine(_directoriesCreator.JsonCacheNewPath, key);
 
-                    Directory.CreateDirectory(Path.GetDirectoryName(oldFilePath));
-                    Directory.CreateDirectory(Path.GetDirectoryName(newFilePath));
+                    await _directoriesCreator.CreateDirectoryAsync(Path.GetDirectoryName(oldFilePath));
+                    await _directoriesCreator.CreateDirectoryAsync(Path.GetDirectoryName(newFilePath));
 
                     try
                     {
@@ -206,11 +206,7 @@ namespace AssetsManager.Services.Monitor
 
                             if (_appSettings.SaveJsonHistory && isUpdate)
                             {
-                                string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
-                                string historyKey = key.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? key.Substring(0, key.Length - 5) : key;
-                                string fileHistoryBasePath = Path.Combine(_directoriesCreator.JsonCacheHistoryPath, historyKey);
-                                string changeInstancePath = Path.Combine(fileHistoryBasePath, timestamp);
-                                Directory.CreateDirectory(changeInstancePath);
+                                string changeInstancePath = _directoriesCreator.GetNewJsonHistoryPath(key);
 
                                 string historyOldFilePath = Path.Combine(changeInstancePath, $"old_{Path.GetFileName(key)}");
                                 string historyNewFilePath = Path.Combine(changeInstancePath, $"new_{Path.GetFileName(key)}");

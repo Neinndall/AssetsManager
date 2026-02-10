@@ -8,6 +8,7 @@ using SharpCompress.Common;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace AssetsManager.Services.Updater
 {
@@ -24,17 +25,17 @@ namespace AssetsManager.Services.Updater
             _customMessageBoxService = customMessageBoxService ?? throw new ArgumentNullException(nameof(customMessageBoxService));
         }
 
-        public void ExtractAndRestart(string zipPath, bool preserveConfig, Window owner = null)
+        public async Task ExtractAndRestart(string zipPath, bool preserveConfig, Window owner = null)
         {
             try
             {
                 _logService.Log("Starting update extraction process...");
 
-                _directoriesCreator.GenerateUpdateFilePaths();
+                var updaterInfo = _directoriesCreator.GetUpdaterInfo();
                 string executablePath = Process.GetCurrentProcess().MainModule.FileName;
                 string appDirectory = Path.GetDirectoryName(executablePath)!;
-                string updaterCachePath = _directoriesCreator.UpdaterDirectoryPath;
-                string updaterExePath = _directoriesCreator.UpdaterExePath;
+                string updaterCachePath = updaterInfo.DirectoryPath;
+                string updaterExePath = updaterInfo.ExePath;
 
                 var assembly = Assembly.GetExecutingAssembly();
                 var resourcePrefix = "AssetsManager.Resources.Updater.";
@@ -45,7 +46,8 @@ namespace AssetsManager.Services.Updater
                     {
                         var relativePath = resource.Substring(resourcePrefix.Length);
                         var destinationPath = Path.Combine(updaterCachePath, relativePath);
-                        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+                        var dir = Path.GetDirectoryName(destinationPath);
+                        if (!string.IsNullOrEmpty(dir)) await _directoriesCreator.CreateDirectoryAsync(dir);
 
                         using (var stream = assembly.GetManifestResourceStream(resource))
                         {
@@ -73,7 +75,7 @@ namespace AssetsManager.Services.Updater
                     zipPath,
                     appDirectory,
                     executablePath,
-                    _directoriesCreator.UpdateLogFilePath,
+                    updaterInfo.LogFilePath,
                     updaterCachePath,
                     preserveConfig.ToString()
                 };

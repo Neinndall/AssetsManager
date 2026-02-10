@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using Microsoft.Win32.SafeHandles;
 
 namespace AssetsManager.Services.Downloads;
@@ -20,6 +21,7 @@ public class ManifestDownloader
 {
     private readonly HttpClient _httpClient;
     private readonly LogService _logService;
+    private readonly DirectoriesCreator _directoriesCreator;
     private readonly string _bundleBaseUrl = "https://lol.dyn.riotcdn.net/channels/public/bundles";
     private readonly HashService _hashService = new HashService();
     
@@ -30,10 +32,11 @@ public class ManifestDownloader
 
     public event Action<string, string, int, int> ProgressChanged;
 
-    public ManifestDownloader(HttpClient httpClient, LogService logService)
+    public ManifestDownloader(HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator)
     {
         _httpClient = httpClient;
         _logService = logService;
+        _directoriesCreator = directoriesCreator;
         
         // Inicializar pools
         for (int i = 0; i < 4; i++) _decompressorPool.Push(new Decompressor());
@@ -95,7 +98,7 @@ public class ManifestDownloader
             return true;
         }).ToList();
 
-        if (!Directory.Exists(outputPath)) Directory.CreateDirectory(outputPath);
+        await _directoriesCreator.CreateDirectoryAsync(outputPath);
 
         // ===========================================================================
         // VERIFICATION PROCESS (SMART SCAN ENGINE)
@@ -318,9 +321,10 @@ public class ManifestDownloader
 
                                     foreach (var target in t.Targets)
                                     {
+                                        var dir = Path.GetDirectoryName(target.FullPath);
+                                        if (!string.IsNullOrEmpty(dir)) await _directoriesCreator.CreateDirectoryAsync(dir);
+
                                         var handle = openHandles.GetOrAdd(target.FullPath, (path) => {
-                                            var dir = Path.GetDirectoryName(path);
-                                            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                                             var h = File.OpenHandle(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);
                                             if ((ulong)RandomAccess.GetLength(h) != target.FileInfo.FileSize) RandomAccess.SetLength(h, (long)target.FileInfo.FileSize);
                                             return h;

@@ -148,7 +148,7 @@ namespace AssetsManager.Services.Explorer
         private async Task DispatchPreview(byte[] data, string extension, FileSystemNodeModel node)
         {
             // Aseguramos la creacion de la carpeta necesaria
-            await _directoriesCreator.CreateDirTempPreviewAsync();
+            await _directoriesCreator.CreateDirectoryAsync(_directoriesCreator.TempPreviewPath);
 
             if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data); }
             else if (SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data); }

@@ -36,7 +36,7 @@ namespace AssetsManager.Services.Monitor
             // Notify UI immediately to show activity (Indeterminate spinner)
             BackupStarted?.Invoke(this, 0);
 
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 try
                 {
@@ -64,7 +64,33 @@ namespace AssetsManager.Services.Monitor
                     BackupStarted?.Invoke(this, totalFiles);
 
                     int processedFiles = 0;
-                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
+
+                    // Local function to handle recursion and capture 'processedFiles'
+                    async Task CopyRecursive(string sourceDir, string destinationDir)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        var dir = new DirectoryInfo(sourceDir);
+                        if (!dir.Exists)
+                            throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
+
+                        await _directoriesCreator.CreateDirectoryAsync(destinationDir);
+
+                        foreach (FileInfo file in dir.GetFiles())
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            file.CopyTo(Path.Combine(destinationDir, file.Name), true);
+                            processedFiles++;
+                            BackupProgressChanged?.Invoke(this, (processedFiles, totalFiles, file.Name));
+                        }
+
+                        foreach (DirectoryInfo subDir in dir.GetDirectories())
+                        {
+                            await CopyRecursive(subDir.FullName, Path.Combine(destinationDir, subDir.Name));
+                        }
+                    }
+
+                    await CopyRecursive(sourceLolPath, destinationBackupPath);
                     
                     _currentSessionBackups.Add(destinationBackupPath);
                     BackupCompleted?.Invoke(this, true);
@@ -88,30 +114,6 @@ namespace AssetsManager.Services.Monitor
             }, cancellationToken);
         }
 
-        private void CopyDirectoryRecursive(string sourceDir, string destinationDir, ref int processedFiles, int totalFiles, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var dir = new DirectoryInfo(sourceDir);
-            if (!dir.Exists)
-                throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
-
-            Directory.CreateDirectory(destinationDir);
-
-            foreach (FileInfo file in dir.GetFiles())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                file.CopyTo(Path.Combine(destinationDir, file.Name), true);
-                processedFiles++;
-                BackupProgressChanged?.Invoke(this, (processedFiles, totalFiles, file.Name));
-            }
-
-            foreach (DirectoryInfo subDir in dir.GetDirectories())
-            {
-                CopyDirectoryRecursive(subDir.FullName, Path.Combine(destinationDir, subDir.Name), ref processedFiles, totalFiles, cancellationToken);
-            }
-        }
-        
         public async Task<List<BackupModel>> GetBackupsAsync()
         {
             return await Task.Run(() =>

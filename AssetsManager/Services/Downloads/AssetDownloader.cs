@@ -6,6 +6,7 @@ using Serilog;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using AssetsManager.Services.Core; // For LogService
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Downloads
 {
@@ -13,17 +14,25 @@ namespace AssetsManager.Services.Downloads
     {
         private readonly HttpClient _httpClient;
         private readonly LogService _logService;
-        public AssetDownloader(HttpClient httpClient, LogService logService)
+        private readonly DirectoriesCreator _directoriesCreator;
+
+        public AssetDownloader(HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator)
         {
             _httpClient = httpClient;
             _logService = logService;
+            _directoriesCreator = directoriesCreator;
         }
 
         public async Task DownloadAssetToCustomPathAsync(string url, string fullDestinationPath)
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(fullDestinationPath));
+                string dir = Path.GetDirectoryName(fullDestinationPath);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    await _directoriesCreator.CreateDirectoryAsync(dir);
+                }
+
                 var response = await _httpClient.GetAsync(url);
                 response.EnsureSuccessStatusCode(); // This will throw on non-2xx status codes
 

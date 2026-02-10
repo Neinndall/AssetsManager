@@ -57,8 +57,7 @@ namespace AssetsManager.Services.Downloads
             ExtractionStarted?.Invoke(this, ("Extraction of new assets started...", totalFiles));
 
             // Create a unique destination directory for this extraction session
-            _directoriesCreator.GenerateNewSubAssetsDownloadedPath();
-            string destinationRootPath = _directoriesCreator.SubAssetsDownloadedPath;
+            string destinationRootPath = _directoriesCreator.GetNewSubAssetsDownloadedPath();
 
             int extractedCount = 0;
 
@@ -91,7 +90,7 @@ namespace AssetsManager.Services.Downloads
                         fileDestinationDirectory = destinationRootPath;
                     }
 
-                    Directory.CreateDirectory(fileDestinationDirectory);
+                    await _directoriesCreator.CreateDirectoryAsync(fileDestinationDirectory);
 
                     string extension = Path.GetExtension(node.Name).ToLower();
 
@@ -106,7 +105,9 @@ namespace AssetsManager.Services.Downloads
                         await _wadSavingService.ProcessAndSaveAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken);
                     }
                 }
-                _logService.LogInteractiveSuccess($"Extraction completed of {extractedCount} assets in {_directoriesCreator.SubAssetsDownloadedPath}", _directoriesCreator.SubAssetsDownloadedPath, _directoriesCreator.SubAssetsDownloadedPath);
+
+                string relativePath = Path.Combine("AssetsDownloaded", Path.GetFileName(destinationRootPath));
+                _logService.LogInteractiveSuccess($"Extraction completed of {extractedCount} assets in", destinationRootPath, relativePath);
             }
             catch (OperationCanceledException)
             {
