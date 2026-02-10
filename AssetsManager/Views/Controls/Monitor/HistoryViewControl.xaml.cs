@@ -107,7 +107,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     ? $"Are you sure you want to delete the history entry for '{itemsToRemove.First().FileName}' from {itemsToRemove.First().Timestamp}? This will delete the backup files and cannot be undone."
                     : $"Are you sure you want to delete the {itemsToRemove.Count} selected history entries? This will delete their backup files and cannot be undone.";
 
-                if (CustomMessageBoxService.ShowYesNo("Info", message, Window.GetWindow(this)) == true)
+                if (CustomMessageBoxService.ShowYesNo("Remove Backup", message, Window.GetWindow(this)) == true)
                 {
                     try
                     {

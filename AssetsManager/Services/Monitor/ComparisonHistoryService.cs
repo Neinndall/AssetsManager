@@ -53,7 +53,7 @@ namespace AssetsManager.Services.Monitor
 
                     _appSettings.DiffHistory.Insert(0, entry);
                     _appSettings.Save();
-                    _logService.LogSuccess($"{comparisonDisplayName} registered in history.");
+                    _logService.LogSuccess("Comparison history saved successfully.");
                 }
             }
             catch (Exception ex)
