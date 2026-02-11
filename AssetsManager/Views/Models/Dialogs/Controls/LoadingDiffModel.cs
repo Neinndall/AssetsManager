@@ -7,6 +7,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
     {
         Idle,
         AcquiringBinaryData,
+        ReadingLocalFiles,
         AcquiringTextureData,
         LinkingAudio,
         AcquiringAudioComponents,
@@ -62,6 +63,10 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                 case DiffLoadingState.AcquiringBinaryData:
                     Description = "Acquiring binary data from WADs...";
                     ProgressValue = 20;
+                    break;
+                case DiffLoadingState.ReadingLocalFiles:
+                    Description = "Reading local files from disk...";
+                    ProgressValue = 30;
                     break;
                 case DiffLoadingState.ParsingTextContent:
                     Description = "Parsing and formatting content...";

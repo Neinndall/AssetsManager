@@ -248,7 +248,7 @@ namespace AssetsManager.Services.Core
             string extension = Path.GetExtension(newFilePath ?? oldFilePath).ToLowerInvariant();
             if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
             {
-                _customMessageBoxService.ShowInfo("Info", "Image comparison for local files is not implemented yet.", owner);
+                _customMessageBoxService.ShowInfo("Information", "Image comparison for local files is not implemented yet.", owner);
                 return;
             }
 
@@ -257,28 +257,25 @@ namespace AssetsManager.Services.Core
 
             try
             {
-                loadingWindow.SetDescription("Reading local files...");
-                loadingWindow.SetProgress(30);
+                loadingWindow.SetState(DiffLoadingState.ReadingLocalFiles);
                 var (dataType, oldData, newData) = await _wadDifferenceService.PrepareFileDifferenceDataAsync(oldFilePath, newFilePath);
                 
-                loadingWindow.SetDescription("Formatting content...");
-                loadingWindow.SetProgress(60);
+                loadingWindow.SetState(DiffLoadingState.ParsingTextContent);
                 var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
 
                 if (oldText == newText)
                 {
                     loadingWindow.Close();
-                    _customMessageBoxService.ShowInfo("Info", "No differences found. The two files are identical.", owner);
+                    _customMessageBoxService.ShowInfo("Information", "No differences found. The two files are identical.", owner);
                     return;
                 }
 
-                loadingWindow.SetDescription("Generating differences view...");
-                loadingWindow.SetProgress(90);
+                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
                 var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath));
 
-                loadingWindow.SetProgress(100);
+                loadingWindow.SetState(DiffLoadingState.Ready);
                 loadingWindow.Close();
                 diffWindow.ShowDialog();
             }
