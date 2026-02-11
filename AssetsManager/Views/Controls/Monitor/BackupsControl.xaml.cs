@@ -109,13 +109,13 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            var result = CustomMessageBoxService.ShowYesNo("Delete Backups", $"Are you sure you want to delete {selectedBackups.Count} selected backup(s)? This action is irreversible.", Window.GetWindow(this));
+            var result = CustomMessageBoxService.ShowYesNo("Delete Backup", $"Are you sure you want to delete the selected backup? This action is irreversible.", Window.GetWindow(this));
             if (result == true)
             {
                 var deletedCount = DeleteBackups(selectedBackups);
                 if(deletedCount > 0)
                 {
-                    CustomMessageBoxService.ShowInfo("Success", $"Successfully deleted {deletedCount} backup(s).", Window.GetWindow(this));
+                    CustomMessageBoxService.ShowInfo("Success", $"Successfully deleted {deletedCount} backup.", Window.GetWindow(this));
                 }
                 else
                 {

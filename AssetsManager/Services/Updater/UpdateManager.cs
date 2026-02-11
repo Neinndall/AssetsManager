@@ -45,7 +45,7 @@ namespace AssetsManager.Services.Updater
             try
             {
                 // Llamamos a _directoriesCreator para crear la carpeta de update cache
-                Directory.CreateDirectory(_directoriesCreator.UpdateCachePath);
+                _directoriesCreator.CreateDirectory(_directoriesCreator.UpdateCachePath);
 
                 var response = await _httpClient.GetStringAsync(apiUrl);
                 var releaseData = JsonConvert.DeserializeObject<dynamic>(response);
@@ -145,11 +145,11 @@ namespace AssetsManager.Services.Updater
                         {
                             if (dialog.SelectedMode == UpdateMode.CleanWithSaving)
                             {
-                                _updateExtractor.ExtractAndRestart(downloadPath, true, owner);
+                                await _updateExtractor.ExtractAndRestart(downloadPath, true, owner);
                             }
                             else if (dialog.SelectedMode == UpdateMode.CleanWithoutSaving)
                             {
-                                _updateExtractor.ExtractAndRestart(downloadPath, false, owner);
+                                await _updateExtractor.ExtractAndRestart(downloadPath, false, owner);
                             }
                         }
                         else

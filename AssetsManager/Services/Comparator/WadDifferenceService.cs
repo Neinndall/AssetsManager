@@ -56,11 +56,22 @@ namespace AssetsManager.Services.Comparator
                     return ("error", null, null, null, null);
                 }
 
-                string backupRoot = Path.GetDirectoryName(Path.GetDirectoryName(diff.BackupChunkPath));
+                // diff.BackupChunkPath is something like: .../wad_chunks/new/Game/DATA/FINAL/Localized/Global.es_US.wad.client/HASH.chunk
+                // We need the root of the backup (where wad_chunks is)
+                string backupRoot = diff.BackupChunkPath;
+                int wadChunksIndex = backupRoot.IndexOf("wad_chunks", StringComparison.OrdinalIgnoreCase);
+                if (wadChunksIndex != -1)
+                {
+                    backupRoot = backupRoot.Substring(0, wadChunksIndex);
+                }
+                else
+                {
+                    backupRoot = Path.GetDirectoryName(Path.GetDirectoryName(diff.BackupChunkPath));
+                }
 
                 if (diff.OldPathHash != 0)
                 {
-                    string oldChunkPath = Path.Combine(backupRoot, "old", $"{diff.OldPathHash:X16}.chunk");
+                    string oldChunkPath = Path.Combine(backupRoot, "wad_chunks", "old", diff.SourceWadFile, $"{diff.OldPathHash:X16}.chunk");
                     if (File.Exists(oldChunkPath))
                     {
                         byte[] compressedOldData = await File.ReadAllBytesAsync(oldChunkPath);
@@ -70,7 +81,7 @@ namespace AssetsManager.Services.Comparator
 
                 if (diff.NewPathHash != 0)
                 {
-                    string newChunkPath = Path.Combine(backupRoot, "new", $"{diff.NewPathHash:X16}.chunk");
+                    string newChunkPath = Path.Combine(backupRoot, "wad_chunks", "new", diff.SourceWadFile, $"{diff.NewPathHash:X16}.chunk");
                     if (File.Exists(newChunkPath))
                     {
                         byte[] compressedNewData = await File.ReadAllBytesAsync(newChunkPath);

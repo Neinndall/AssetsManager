@@ -35,7 +35,7 @@
                                                 Width="18" Height="18" Margin="0,0,10,0"
                                                 VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" 
-                               FontWeight="SemiBold" FontSize="12" 
+                               FontWeight="Normal" FontSize="13" 
                                Foreground="{StaticResource TextPrimary}" 
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -72,7 +72,7 @@
                                    TextWrapping="Wrap" 
                                    Margin="0,0,0,16" 
                                    Foreground="{StaticResource TextSecondary}" 
-                                   FontSize="13"/>
+                                   FontSize="12"/>
                                    
                         <TextBox Name="textBoxInput" Grid.Row="1"
                                  Style="{StaticResource ModernTextBoxEditable}" 
@@ -80,7 +80,7 @@
                                  TextWrapping="Wrap" 
                                  VerticalScrollBarVisibility="Auto" 
                                  MinHeight="44" MaxHeight="250"
-                                 FontSize="13"
+                                 FontSize="12"
                                  Padding="12"/>
                     </Grid>
 

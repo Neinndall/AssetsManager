@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -49,6 +51,7 @@ namespace AssetsManager.Views
         private readonly TaskCancellationManager _taskCancellationManager;
         private readonly NotificationService _notificationService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
+        private readonly WadPackagingService _wadPackagingService;
 
         private string _latestAppVersionAvailable;
         private NotificationHubWindow _notificationHubWindow;
@@ -58,6 +61,8 @@ namespace AssetsManager.Views
         private string _extractionOldLolPath;
         private string _extractionNewLolPath;
         private List<SerializableChunkDiff> _diffsForExtraction;
+        private string _lastAssignedFolder; // Persists the folder name during the extraction process
+        private string _lastComparisonIdentity; // Identity fingerprint of the last comparison
 
         private GridLength _lastLogHeight;
         private bool _isLogMinimized = false;
@@ -83,7 +88,8 @@ namespace AssetsManager.Views
             ReportGenerationService reportGenerationService,
             TaskCancellationManager taskCancellationManager,
             NotificationService notificationService,
-            ComparisonHistoryService comparisonHistoryService)
+            ComparisonHistoryService comparisonHistoryService,
+            WadPackagingService wadPackagingService)
         {
             InitializeComponent();
 
@@ -108,6 +114,7 @@ namespace AssetsManager.Views
             _taskCancellationManager = taskCancellationManager;
             _notificationService = notificationService;
             _comparisonHistoryService = comparisonHistoryService;
+            _wadPackagingService = wadPackagingService;
 
             _progressUIManager.Initialize(StatusBar.ViewModel, this);
             
@@ -274,24 +281,52 @@ namespace AssetsManager.Views
                 return;
             }
 
+            // Identify if this is the same comparison as before to avoid duplicate backups
+            string currentIdentity = CalculateComparisonIdentity(serializableDiffs, oldLolPath, newLolPath);
+            bool isSameComparison = currentIdentity == _lastComparisonIdentity;
+
+            if (!isSameComparison)
+            {
+                _lastAssignedFolder = null;
+                _lastComparisonIdentity = currentIdentity;
+            }
+
             // 1. ALWAYS Save to History if enabled (Independent of other actions)
-            if (_appSettings.SaveWadComparisonHistory)
+            if (_appSettings.SaveWadComparisonHistory && string.IsNullOrEmpty(_lastAssignedFolder))
             {
                 string displayName = "Unknown";
                 var uniqueWads = serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
 
                 if (uniqueWads.Count == 1)
                 {
-                    string wadFileName = System.IO.Path.GetFileName(uniqueWads[0]);
+                    string wadFileName = Path.GetFileName(uniqueWads[0]);
                     displayName = wadFileName.Split('.')[0];
                 }
                 else
                 {
-                    displayName = System.IO.Path.GetFileName(newLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+                    displayName = Path.GetFileName(newLolPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                     if (string.IsNullOrEmpty(displayName)) displayName = "Root";
                 }
 
-                _ = _comparisonHistoryService.SaveComparisonAsync(serializableDiffs, oldLolPath, newLolPath, $"Comparison from {displayName}");
+                try
+                {
+                    // Unified Flow:
+                    // 1. Physical Save (WadPackagingService)
+                    var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
+                    _lastAssignedFolder = folderInfo.FolderName; // Store for follow-up actions
+                    
+                    // We run this without awaiting to not block UI thread, but we log errors inside the services
+                    _ = Task.Run(async () => 
+                    {
+                        await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.FullPath);
+                        // 2. Metadata Registration (ComparisonHistoryService)
+                        _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, $"Comparison from {displayName}", oldLolPath, newLolPath);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "Failed to auto-save comparison history.");
+                }
             }
 
             // 2. Handle follow-up actions (Report, Extraction, or View)
@@ -317,10 +352,30 @@ namespace AssetsManager.Views
             }
         }
 
+        private string CalculateComparisonIdentity(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
+        {
+            // Create a fast unique identity based on paths, count and key hashes
+            var sb = new StringBuilder();
+            sb.Append(oldPath);
+            sb.Append(newPath);
+            sb.Append(diffs.Count);
+
+            if (diffs.Count > 0)
+            {
+                // Concatenate first and last entry info to differentiate between same-count diffs
+                var first = diffs[0];
+                var last = diffs[^1];
+                sb.Append(first.NewPathHash).Append(first.OldPathHash);
+                sb.Append(last.NewPathHash).Append(last.OldPathHash);
+            }
+
+            return sb.ToString();
+        }
+
         private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
         {
             var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
-            resultWindow.Initialize(diffs, oldPath, newPath);
+            resultWindow.Initialize(diffs, oldPath, newPath, null, _lastAssignedFolder);
             resultWindow.Owner = this;
             resultWindow.Show();
         }

@@ -1,181 +1,108 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using AssetsManager.Services;
-using AssetsManager.Services.Core;
 
 namespace AssetsManager.Utils
 {
     public class DirectoriesCreator
     {
-        private readonly LogService _logService;
+        // Fixed root paths
+        public string AppDirectory { get; }
+        public string HashesPath { get; }
+        public string JsonCacheNewPath { get; }
+        public string JsonCacheOldPath { get; }
+        public string JsonCacheHistoryPath { get; }
+        public string AssetsDownloadedPath { get; }
+        public string WadComparisonSavePath { get; }
+        public string VersionsPath { get; }
+        public string UpdateCachePath { get; }
+        public string WebView2DataPath { get; }
+        public string TempPreviewPath { get; }
+        public string ApiCachePath { get; }
 
-        public string HashesNewPath { get; private set; }
-        public string HashesOldPath { get; private set; }
-        public string JsonCacheNewPath { get; private set; }
-        public string JsonCacheOldPath { get; private set; }
-        public string JsonCacheHistoryPath { get; private set; }
-        public string AssetsDownloadedPath { get; private set; }
-        public string SubAssetsDownloadedPath { get; private set; }
-        public string BackUpOldHashesPath { get; private set; }
-        public string WadComparisonSavePath { get; private set; }
-        public string VersionsPath { get; private set; }
-        public string AppDirectory { get; private set; }
-
-        public string UpdateCachePath { get; private set; }
-        public string UpdateLogFilePath { get; private set; }
-        public string UpdaterDirectoryPath { get; private set; }
-        public string UpdaterExePath { get; private set; }
-
-        public string WadNewAssetsPath { get; private set; }
-        public string WadModifiedAssetsPath { get; private set; }
-        public string WadRenamedAssetsPath { get; private set; }
-        public string WadRemovedAssetsPath { get; private set; }
-
-        public string WebView2DataPath { get; private set; }
-        public string TempPreviewPath { get; private set; }
-        public string ApiCachePath { get; private set; }
-
-        public string HistoryCachePath { get; private set; }
-
-        public string WadComparisonDirName { get; private set; }
-        public string WadComparisonFullPath { get; private set; }
-        public string OldChunksPath { get; private set; }
-        public string NewChunksPath { get; private set; }
-
-        public DirectoriesCreator(LogService logService)
+        public DirectoriesCreator()
         {
-            _logService = logService;
-
             AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
-
-            HashesNewPath = Path.Combine(AppDirectory, "hashes", "new");
-            HashesOldPath = Path.Combine(AppDirectory, "hashes", "olds");
+            HashesPath = Path.Combine(AppDirectory, "hashes");
 
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
 
-            AssetsDownloadedPath = "AssetsDownloaded";
-
+            AssetsDownloadedPath = Path.Combine(AppDirectory, "AssetsDownloaded");
+            
             JsonCacheNewPath = Path.Combine(appFolderPath, "json_cache", "new");
             JsonCacheOldPath = Path.Combine(appFolderPath, "json_cache", "old");
             JsonCacheHistoryPath = Path.Combine(appFolderPath, "json_cache", "history");
 
             UpdateCachePath = Path.Combine(appFolderPath, "update_cache");
-            UpdateLogFilePath = Path.Combine(UpdateCachePath, "update_log.log");
 
             WebView2DataPath = Path.Combine(appFolderPath, "webview2data");
             TempPreviewPath = Path.Combine(WebView2DataPath, "TempPreview");
             ApiCachePath = Path.Combine(appFolderPath, "api_cache");
-            HistoryCachePath = Path.Combine(appFolderPath, "history_cache");
 
             WadComparisonSavePath = Path.Combine(appFolderPath, "wadcomparison");
             VersionsPath = Path.Combine(appFolderPath, "versions");
         }
 
-        public void GenerateNewSubAssetsDownloadedPath()
+        // Dynamic naming logic (Stateless & Safe)
+        public string GetNewSubAssetsDownloadedPath()
         {
-            string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
-            SubAssetsDownloadedPath = Path.Combine(AssetsDownloadedPath, date);
-            CreateDirectoryInternal(SubAssetsDownloadedPath, false);
+            string path = Path.Combine(AssetsDownloadedPath, DateTime.Now.ToString("ddMMyyyy_HHmmss"));
+            CreateDirectory(path);
+            return path;
         }
 
-        public void GenerateNewBackUpOldHashesPath()
+        public (string FolderName, string FullPath) GetNewWadComparisonFolderInfo()
         {
-            string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
-            BackUpOldHashesPath = Path.Combine("hashes", "olds", "BackUp", date);
-            CreateDirectoryInternal(BackUpOldHashesPath, false);
+            string folderName = $"comparison_{DateTime.Now:ddMMyyyy_HHmmss}";
+            string fullPath = Path.Combine(WadComparisonSavePath, folderName);
+            return (folderName, fullPath);
         }
 
-        public void GenerateNewWadComparisonPaths()
+        public string GetNewJsonHistoryPath(string fileName)
         {
-            string date = DateTime.Now.ToString("ddMMyyyy_HHmmss");
-            WadComparisonDirName = $"comparison_{date}";
-            WadComparisonFullPath = Path.Combine(WadComparisonSavePath, WadComparisonDirName);
-            OldChunksPath = Path.Combine(WadComparisonFullPath, "wad_chunks", "old");
-            NewChunksPath = Path.Combine(WadComparisonFullPath, "wad_chunks", "new");
-
-            CreateDirectoryInternal(OldChunksPath, false);
-            CreateDirectoryInternal(NewChunksPath, false);
+            string historyKey = fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase) 
+                ? fileName.Substring(0, fileName.Length - 5) 
+                : fileName;
+            
+            string path = Path.Combine(JsonCacheHistoryPath, historyKey, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
+            CreateDirectory(path);
+            return path;
         }
 
-        public void GenerateUpdateFilePaths()
+        public (string DirectoryPath, string ExePath, string LogFilePath) GetUpdaterInfo()
         {
-            UpdaterDirectoryPath = Path.Combine(UpdateCachePath, "Updater");
-            UpdaterExePath = Path.Combine(UpdaterDirectoryPath, "Updater.exe");
-            CreateDirectoryInternal(UpdaterDirectoryPath, false);
+            string dirPath = Path.Combine(UpdateCachePath, "Updater");
+            string exePath = Path.Combine(dirPath, "Updater.exe");
+            string logPath = Path.Combine(UpdateCachePath, "update_log.log");
+            
+            CreateDirectory(dirPath);
+            return (dirPath, exePath, logPath);
         }
 
-        public Task CreateDirJsonCacheNewAsync() => CreateDirectoryInternal(JsonCacheNewPath, false);
-        public Task CreateDirJsonCacheOldAsync() => CreateDirectoryInternal(JsonCacheOldPath, false);
-        public Task CreateDirVersionsAsync() => CreateDirectoryInternal(VersionsPath, false);
-        public Task CreateDirTempPreviewAsync() => CreateDirectoryInternal(TempPreviewPath, false);
-        public Task CreateDirWebView2DataAsync() => CreateDirectoryInternal(WebView2DataPath, false);
-        public Task CreateDirApiCacheAsync() => CreateDirectoryInternal(ApiCachePath, false);
-        public Task CreateDirHistoryCacheAsync() => CreateDirectoryInternal(HistoryCachePath, false);
-
-        public Task CreateHashesDirectories()
+        // Action methods
+        public void PrepareComparisonDirectory(string fullPath)
         {
-            CreateDirectoryInternal(HashesNewPath, false);
-            CreateDirectoryInternal(HashesOldPath, false);
-            return Task.CompletedTask;
+            CreateDirectory(fullPath);
+            CreateDirectory(Path.Combine(fullPath, "wad_chunks", "old"));
+            CreateDirectory(Path.Combine(fullPath, "wad_chunks", "new"));
+        }
+        
+        public void CreateHashesDirectories()
+        {
+            CreateDirectory(HashesPath);
         }
 
-        public string CreateAssetDirectoryPath(string url, string downloadDirectory)
-        {
-            string path = new Uri(url).AbsolutePath;
-
-            if (path.StartsWith("/pbe/"))
-            {
-                path = path.Substring(5); // Eliminar "/pbe/"
-            }
-
-            // Reemplazar "rcp-be-lol-game-data/global/" por "rcp-be-lol-game-data/"
-            string patternToReplace = "rcp-be-lol-game-data/global/default/";
-            if (path.Contains(patternToReplace))
-            {
-                path = path.Replace(patternToReplace, "rcp-be-lol-game-data/");
-            }
-
-            // Mantener la estructura de carpetas en Windows
-            string safePath = path.Replace("/", "\\");
-
-            foreach (char invalidChar in Path.GetInvalidPathChars())
-            {
-                safePath = safePath.Replace(invalidChar.ToString(), "_");
-            }
-
-            string fullDirectoryPath = Path.Combine(downloadDirectory, safePath);
-            string directory = Path.GetDirectoryName(fullDirectoryPath);
-
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-                // Opcional: _logService.LogDebug($"Created directory for asset: {directory}");
-            }
-
-            return directory;
-        }
-
-        private Task CreateDirectoryInternal(string path, bool withLogging)
+        public void CreateDirectory(string path)
         {
             try
             {
-                if (!Directory.Exists(path))
+                if (!string.IsNullOrEmpty(path) && !Directory.Exists(path))
                 {
                     Directory.CreateDirectory(path);
-                    if (withLogging)
-                    {
-                        _logService.LogInteractiveInfo($"Directory created at: {path}", path);
-                    }
                 }
             }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, $"Error during directory creation for path: {path}.");
-            }
-
-            return Task.CompletedTask;
+            catch { /* Silent Fail */ }
         }
     }
 }

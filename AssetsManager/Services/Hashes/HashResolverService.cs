@@ -81,9 +81,9 @@ namespace AssetsManager.Services.Hashes
                 return;
             }
 
-            var newHashesDir = _directoriesCreator.HashesNewPath;
-            var gameHashesFile = Path.Combine(newHashesDir, "hashes.game.txt");
-            var lcuHashesFile = Path.Combine(newHashesDir, "hashes.lcu.txt");
+            var hashesDir = _directoriesCreator.HashesPath;
+            var gameHashesFile = Path.Combine(hashesDir, "hashes.game.txt");
+            var lcuHashesFile = Path.Combine(hashesDir, "hashes.lcu.txt");
 
             long totalSize = 0;
             if (File.Exists(gameHashesFile)) totalSize += new FileInfo(gameHashesFile).Length;
@@ -108,7 +108,7 @@ namespace AssetsManager.Services.Hashes
             _binFieldsMap.Clear();
             _binTypesMap.Clear();
 
-            var binHashesDir = _directoriesCreator.HashesNewPath;
+            var binHashesDir = _directoriesCreator.HashesPath;
             var files = new[]
             {
                 Path.Combine(binHashesDir, "hashes.binhashes.txt"),
@@ -219,7 +219,7 @@ namespace AssetsManager.Services.Hashes
         public async Task LoadRstXxh3HashesAsync()
         {
             _rstXxh3HashesMap.Clear();
-            var rstHashesDir = _directoriesCreator.HashesNewPath;
+            var rstHashesDir = _directoriesCreator.HashesPath;
             var file = Path.Combine(rstHashesDir, "hashes.rst.xxh3.txt");
             if (File.Exists(file)) 
             {
@@ -230,7 +230,7 @@ namespace AssetsManager.Services.Hashes
         public async Task LoadRstXxh64HashesAsync()
         {
             _rstXxh64HashesMap.Clear();
-            var rstHashesDir = _directoriesCreator.HashesNewPath;
+            var rstHashesDir = _directoriesCreator.HashesPath;
             var file = Path.Combine(rstHashesDir, "hashes.rst.xxh64.txt");
             if (File.Exists(file)) 
             {

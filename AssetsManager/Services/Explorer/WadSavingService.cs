@@ -29,6 +29,7 @@ namespace AssetsManager.Services.Explorer
         private readonly AudioConversionService _audioConversionService;
         private readonly AppSettings _appSettings;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
+        private readonly DirectoriesCreator _directoriesCreator;
 
         public WadSavingService(
             LogService logService,
@@ -38,7 +39,8 @@ namespace AssetsManager.Services.Explorer
             AudioBankLinkerService audioBankLinkerService,
             AudioConversionService audioConversionService,
             AppSettings appSettings,
-            WadNodeLoaderService wadNodeLoaderService)
+            WadNodeLoaderService wadNodeLoaderService,
+            DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
             _wadExtractionService = wadExtractionService;
@@ -48,6 +50,7 @@ namespace AssetsManager.Services.Explorer
             _audioConversionService = audioConversionService;
             _appSettings = appSettings;
             _wadNodeLoaderService = wadNodeLoaderService;
+            _directoriesCreator = directoriesCreator;
         }
 
         public async Task<int> CalculateTotalAsync(IEnumerable<FileSystemNodeModel> nodes, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
@@ -140,7 +143,7 @@ namespace AssetsManager.Services.Explorer
             if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
             {
                 string currentDestinationPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
-                Directory.CreateDirectory(currentDestinationPath);
+                _directoriesCreator.CreateDirectory(currentDestinationPath);
 
                 foreach (var child in node.Children)
                 {
@@ -153,7 +156,7 @@ namespace AssetsManager.Services.Explorer
             if (node.Type == NodeType.AudioEvent)
             {
                 string eventPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
-                Directory.CreateDirectory(eventPath);
+                _directoriesCreator.CreateDirectory(eventPath);
 
                 foreach (var soundNode in node.Children)
                 {
@@ -307,7 +310,7 @@ namespace AssetsManager.Services.Explorer
 
             string audioBankName = Path.GetFileNameWithoutExtension(node.Name);
             string audioBankPath = Path.Combine(destinationPath, PathUtils.SanitizeName(audioBankName));
-            Directory.CreateDirectory(audioBankPath);
+            _directoriesCreator.CreateDirectory(audioBankPath);
 
             cancellationToken.ThrowIfCancellationRequested();
             var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;
@@ -335,7 +338,7 @@ namespace AssetsManager.Services.Explorer
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string eventPath = Path.Combine(audioBankPath, PathUtils.SanitizeName(eventNode.Name));
-                Directory.CreateDirectory(eventPath);
+                _directoriesCreator.CreateDirectory(eventPath);
 
                 foreach (var soundNode in eventNode.Sounds)
                 {

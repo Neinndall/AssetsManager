@@ -69,26 +69,8 @@ namespace AssetsManager.Services.Downloads
 
                     if (syncHashesWithCDTB)
                     {
-                        await _directoriesCreator.CreateHashesDirectories();
+                        _directoriesCreator.CreateHashesDirectories();
                         await _requests.DownloadSpecificHashesAsync(outdatedFiles);
-
-                        // Comprobamos si es una sincronización inicial.
-                        // Una forma de detectarlo es si la carpeta 'olds' está vacía.
-                        bool isInitialSync = !Directory.EnumerateFileSystemEntries(_directoriesCreator.HashesOldPath).Any();
-
-                        if (isInitialSync)
-                        {
-                            var filesToCopyToOld = new[] { GAME_HASHES_FILENAME, LCU_HASHES_FILENAME };
-                            foreach (var fileName in filesToCopyToOld)
-                            {
-                                var sourceFile = Path.Combine(_directoriesCreator.HashesNewPath, fileName);
-                                var destFile = Path.Combine(_directoriesCreator.HashesOldPath, fileName);
-                                if (File.Exists(sourceFile))
-                                {
-                                    File.Copy(sourceFile, destFile, true);
-                                }
-                            }
-                        }
                     }
 
                     UpdateConfigWithLocalFileSizes();
@@ -111,17 +93,17 @@ namespace AssetsManager.Services.Downloads
 
         private void UpdateConfigWithLocalFileSizes()
         {
-            var newHashesPath = _directoriesCreator.HashesNewPath;
-            if (!Directory.Exists(newHashesPath))
+            var hashesPath = _directoriesCreator.HashesPath;
+            if (!Directory.Exists(hashesPath))
             {
-                _logService.LogWarning($"Cannot update hash config: 'hashes/new' directory not found at '{newHashesPath}'.");
+                _logService.LogWarning($"Cannot update hash config: 'hashes' directory not found at '{hashesPath}'.");
                 return;
             }
 
             var newSizes = new Dictionary<string, long>();
             foreach (var filename in AllKnownHashFiles)
             {
-                var filePath = Path.Combine(newHashesPath, filename);
+                var filePath = Path.Combine(hashesPath, filename);
                 if (File.Exists(filePath))
                 {
                     newSizes[filename] = new FileInfo(filePath).Length;
@@ -140,9 +122,9 @@ namespace AssetsManager.Services.Downloads
         {
             var outdatedFiles = new List<string>();
             var configSizes = _appSettings.HashesSizes;
-            var newHashesPath = _directoriesCreator.HashesNewPath;
+            var hashesPath = _directoriesCreator.HashesPath;
 
-            if (string.IsNullOrEmpty(newHashesPath) || !Directory.Exists(newHashesPath))
+            if (string.IsNullOrEmpty(hashesPath) || !Directory.Exists(hashesPath))
             {
                 _logService.Log($"Hashes not found. Forcing Sync.");
                 return AllKnownHashFiles.ToList();
@@ -157,7 +139,7 @@ namespace AssetsManager.Services.Downloads
             {
                 string filename = entry.Key;
                 long configSize = entry.Value;
-                string filePath = Path.Combine(newHashesPath, filename);
+                string filePath = Path.Combine(hashesPath, filename);
 
                 bool isOutOfSync = false;
                 if (!File.Exists(filePath))

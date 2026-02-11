@@ -192,32 +192,39 @@ namespace AssetsManager.Services.Core
         /// </summary>
         public async Task CheckForGeneralUpdatesAsync(bool silent = false)
         {
-            var (appUpdateAvailable, newVersion) = await _updateManager.IsNewVersionAvailableAsync();
+            var tasks = new List<Task>();
 
-            if (appUpdateAvailable)
+            // 1. App Version Check
+            tasks.Add(Task.Run(async () =>
             {
-                AvailableVersion = newVersion;
-                UpdatesFound?.Invoke($"Version {newVersion} is available", newVersion);
-            }
-            else 
-            {
-                AvailableVersion = null;
-            }
+                var (appUpdateAvailable, newVersion) = await _updateManager.IsNewVersionAvailableAsync();
+                if (appUpdateAvailable)
+                {
+                    AvailableVersion = newVersion;
+                    UpdatesFound?.Invoke($"Version {newVersion} is available", newVersion);
+                }
+                else
+                {
+                    AvailableVersion = null;
+                }
+            }));
 
+            // 2. Hash Sync Check
             if (_appSettings.SyncHashesWithCDTB)
             {
-                await _status.SyncHashesIfNeeds(_appSettings.SyncHashesWithCDTB, silent, () =>
+                tasks.Add(_status.SyncHashesIfNeeds(_appSettings.SyncHashesWithCDTB, silent, () =>
                 {
                     if (silent)
                     {
                         UpdatesFound?.Invoke("New hashes are available", null);
                     }
-                });
+                }));
             }
 
+            // 3. JSON Data Updates Check
             if (_appSettings.CheckJsonDataUpdates)
             {
-                await _jsonDataService.CheckJsonDataUpdatesAsync(silent, (updatedFiles) =>
+                tasks.Add(_jsonDataService.CheckJsonDataUpdatesAsync(silent, (updatedFiles) =>
                 {
                     if (updatedFiles != null && updatedFiles.Any())
                     {
@@ -231,8 +238,10 @@ namespace AssetsManager.Services.Core
                             UpdatesFound?.Invoke($"Monitored files updated: {files}", null);
                         }
                     }
-                });
+                }));
             }
+
+            await Task.WhenAll(tasks);
         }
 
         /// <summary>
@@ -242,14 +251,18 @@ namespace AssetsManager.Services.Core
         /// </summary>
         public async Task CheckForAllUpdatesAsync(bool silent = false)
         {
+            var tasks = new List<Task>();
+
             // Checkeo al arrancar de Json Updates, Hashes and New Version App
-            await CheckForGeneralUpdatesAsync(silent);
+            tasks.Add(CheckForGeneralUpdatesAsync(silent));
 
             // Checkeo al arrancar de PbeStatus
             if (_appSettings.CheckPbeStatus)
             {
-                await CheckForPbeStatusAsync();
+                tasks.Add(CheckForPbeStatusAsync());
             }
+
+            await Task.WhenAll(tasks);
         }
     }
 }

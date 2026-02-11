@@ -36,7 +36,7 @@ namespace AssetsManager.Services.Monitor
             // Notify UI immediately to show activity (Indeterminate spinner)
             BackupStarted?.Invoke(this, 0);
 
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 try
                 {
@@ -96,7 +96,7 @@ namespace AssetsManager.Services.Monitor
             if (!dir.Exists)
                 throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
 
-            Directory.CreateDirectory(destinationDir);
+            _directoriesCreator.CreateDirectory(destinationDir);
 
             foreach (FileInfo file in dir.GetFiles())
             {
@@ -111,7 +111,7 @@ namespace AssetsManager.Services.Monitor
                 CopyDirectoryRecursive(subDir.FullName, Path.Combine(destinationDir, subDir.Name), ref processedFiles, totalFiles, cancellationToken);
             }
         }
-        
+
         public async Task<List<BackupModel>> GetBackupsAsync()
         {
             return await Task.Run(() =>

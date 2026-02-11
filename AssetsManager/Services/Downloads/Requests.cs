@@ -55,12 +55,12 @@ namespace AssetsManager.Services.Downloads
             }
         }
 
-        public async Task DownloadGameHashesFilesAsync(string downloadDirectory)
+        public async Task DownloadGameHashesFilesAsync()
         {
             await DownloadSpecificHashesAsync(new List<string> { "hashes.game.txt", "hashes.lcu.txt" });
         }
 
-        public async Task DownloadBinHashesFilesAsync(string downloadDirectory)
+        public async Task DownloadBinHashesFilesAsync()
         {
             await DownloadSpecificHashesAsync(new List<string>
             {
@@ -69,7 +69,7 @@ namespace AssetsManager.Services.Downloads
             });
         }
 
-        public async Task DownloadRstHashesFilesAsync(string downloadDirectory)
+        public async Task DownloadRstHashesFilesAsync()
         {
             await DownloadSpecificHashesAsync(new List<string> { "hashes.rst.xxh3.txt", "hashes.rst.xxh64.txt" });
         }
@@ -79,7 +79,7 @@ namespace AssetsManager.Services.Downloads
             var tasks = new List<Task>();
             foreach (var fileName in filesToDownload)
             {
-                tasks.Add(DownloadHashesAsync(fileName, _directoriesCreator.HashesNewPath));
+                tasks.Add(DownloadHashesAsync(fileName, _directoriesCreator.HashesPath));
             }
             await Task.WhenAll(tasks);
         }

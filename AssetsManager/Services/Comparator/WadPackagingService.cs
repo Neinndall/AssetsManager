@@ -9,6 +9,7 @@ using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Audio;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Comparator
 {
@@ -16,11 +17,13 @@ namespace AssetsManager.Services.Comparator
     {
         private readonly LogService _logService;
         private readonly HashResolverService _hashResolverService;
+        private readonly DirectoriesCreator _directoriesCreator;
 
-        public WadPackagingService(LogService logService, HashResolverService hashResolverService)
+        public WadPackagingService(LogService logService, HashResolverService hashResolverService, DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
             _hashResolverService = hashResolverService;
+            _directoriesCreator = directoriesCreator;
         }
 
         private record BinFileStrategy(string BinPath, string TargetWadName, BinType Type);
@@ -259,7 +262,15 @@ namespace AssetsManager.Services.Comparator
                     _logService.LogDebug($"[CreateLeanWadPackageAsync] Packaging {audioBankDiff.Dependencies.Count} dependencies for '{audioBankDiff.NewPath ?? audioBankDiff.OldPath}'.");
                     foreach (var dep in audioBankDiff.Dependencies)
                     {
-                        allChunks.Add(new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, SourceWadFile = dep.SourceWad, Type = ChunkDiffType.Modified });
+                        allChunks.Add(new SerializableChunkDiff 
+                        { 
+                            OldPath = dep.Path,
+                            NewPath = dep.Path,
+                            OldPathHash = dep.OldPathHash, 
+                            NewPathHash = dep.NewPathHash, 
+                            SourceWadFile = dep.SourceWad, 
+                            Type = ChunkDiffType.Modified 
+                        });
                     }
                 }
             }
@@ -276,11 +287,9 @@ namespace AssetsManager.Services.Comparator
                 {
                     var oldChunksToSave = wadGroup
                         .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.Removed)
-                        .Select(d => d.OldPathHash)
-                        .Where(h => h != 0)
-                        .Distinct();
+                        .ToList();
                     if (oldChunksToSave.Any())
-                        await SaveChunksFromWadAsync(sourceOldWadPath, targetOldWadsPath, oldChunksToSave);
+                        await SaveChunksFromWadAsync(sourceOldWadPath, targetOldWadsPath, oldChunksToSave, wadFileRelativePath, true);
                 }
 
                 string sourceNewWadPath = Path.Combine(newPbePath, wadFileRelativePath);
@@ -288,15 +297,43 @@ namespace AssetsManager.Services.Comparator
                 {
                     var newChunksToSave = wadGroup
                         .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.New)
-                        .Select(d => d.NewPathHash)
-                        .Where(h => h != 0)
-                        .Distinct();
+                        .ToList();
                     if (newChunksToSave.Any())
-                        await SaveChunksFromWadAsync(sourceNewWadPath, targetNewWadsPath, newChunksToSave);
+                        await SaveChunksFromWadAsync(sourceNewWadPath, targetNewWadsPath, newChunksToSave, wadFileRelativePath, false);
                 }
             }
 
             return finalDiffs;
+        }
+
+        public async Task<List<SerializableChunkDiff>> SaveBackupAsync(List<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string destinationPath)
+        {
+            // Use the centralized directory creator to prepare the structure
+            _directoriesCreator.PrepareComparisonDirectory(destinationPath);
+
+            string wadChunksOldDir = Path.Combine(destinationPath, "wad_chunks", "old");
+            string wadChunksNewDir = Path.Combine(destinationPath, "wad_chunks", "new");
+            string jsonFilePath = Path.Combine(destinationPath, "wadcomparison.json");
+
+            _logService.LogDebug($"[WadPackagingService] Saving full backup to {destinationPath}");
+
+            var leanDiffs = await CreateLeanWadPackageAsync(diffs, oldPbePath, newPbePath, wadChunksOldDir, wadChunksNewDir);
+
+            var comparisonData = new WadComparisonData
+            {
+                OldLolPath = oldPbePath,
+                NewLolPath = newPbePath,
+                Diffs = leanDiffs
+            };
+
+            string json = System.Text.Json.JsonSerializer.Serialize(comparisonData, new System.Text.Json.JsonSerializerOptions 
+            { 
+                WriteIndented = true,
+                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+            });
+            await File.WriteAllTextAsync(jsonFilePath, json);
+
+            return leanDiffs;
         }
 
         private async Task<AssociatedDependency> CreateDependencyAsync(string filePath, ulong fileHash, string wadRelativePath, string oldPbePath, string newPbePath, string sourceWad, SerializableChunkDiff originalDiff)
@@ -342,14 +379,15 @@ namespace AssetsManager.Services.Comparator
             });
         }
 
-        private async Task SaveChunksFromWadAsync(string sourceWadPath, string targetChunkPath, IEnumerable<ulong> chunkHashes)
+        private async Task SaveChunksFromWadAsync(string sourceWadPath, string targetChunkPath, IEnumerable<SerializableChunkDiff> chunkDiffs, string wadRelativePath, bool useOld)
         {
             try
             {
                 using var sourceWad = new WadFile(sourceWadPath);
                 
                 // Get valid chunks and ORDER BY OFFSET for high-performance sequential reading
-                var chunksToProcess = chunkHashes
+                var hashes = chunkDiffs.Select(d => useOld ? d.OldPathHash : d.NewPathHash).Distinct().ToList();
+                var chunksToProcess = hashes
                     .Select(h => sourceWad.Chunks.TryGetValue(h, out var c) ? c : (WadChunk?)null)
                     .Where(c => c.HasValue)
                     .Select(c => c.Value)
@@ -358,7 +396,9 @@ namespace AssetsManager.Services.Comparator
 
                 if (chunksToProcess.Count == 0) return;
 
-                Directory.CreateDirectory(targetChunkPath);
+                // Create a subfolder for the specific WAD to avoid hash collisions (e.g., localized files)
+                string finalTargetDir = Path.Combine(targetChunkPath, wadRelativePath);
+                _directoriesCreator.CreateDirectory(finalTargetDir);
                 
                 // Open the stream ONCE for the entire WAD file processing
                 await using var fs = new FileStream(sourceWadPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 65536, useAsync: true);
@@ -370,7 +410,7 @@ namespace AssetsManager.Services.Comparator
                     await fs.ReadExactlyAsync(rawChunkData, 0, rawChunkData.Length);
 
                     string chunkFileName = $"{chunk.PathHash:X16}.chunk";
-                    string destChunkPath = Path.Combine(targetChunkPath, chunkFileName);
+                    string destChunkPath = Path.Combine(finalTargetDir, chunkFileName);
 
                     await File.WriteAllBytesAsync(destChunkPath, rawChunkData);
                 }

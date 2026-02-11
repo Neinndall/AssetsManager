@@ -162,10 +162,6 @@ namespace AssetsManager.Views.Controls.Models
             _loadedModels.Clear();
             _activeSceneModel = null;
             
-            // Clear environment refs as they are wiped from children
-            _skyVisual = null;
-            _groundVisual = null;
-
             if (AutoRotateToggleButton != null)
             {
                 AutoRotateToggleButton.IsChecked = false;
