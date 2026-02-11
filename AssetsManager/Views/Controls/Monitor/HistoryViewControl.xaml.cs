@@ -141,7 +141,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             else
             {
-                CustomMessageBoxService.ShowInfo("Info", "Please select one or more history entries to delete.", Window.GetWindow(this), CustomMessageBoxIcon.Warning);
+                CustomMessageBoxService.ShowInfo("Information", "Please select one or more history entries to delete.", Window.GetWindow(this), CustomMessageBoxIcon.Warning);
             }
         }
 

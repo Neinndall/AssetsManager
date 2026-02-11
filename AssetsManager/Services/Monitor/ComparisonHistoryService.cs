@@ -108,8 +108,6 @@ namespace AssetsManager.Services.Monitor
                     // 2. Remove from internal list
                     _appSettings.DiffHistory.Remove(entry);
                     _appSettings.Save();
-                    
-                    _logService.LogSuccess($"{entry.FileName} and its backup files deleted.");
                 }
             }
             catch (Exception ex)

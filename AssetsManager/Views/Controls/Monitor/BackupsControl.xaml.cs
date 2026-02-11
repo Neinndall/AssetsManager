@@ -115,7 +115,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 var deletedCount = DeleteBackups(selectedBackups);
                 if(deletedCount > 0)
                 {
-                    CustomMessageBoxService.ShowInfo("Success", $"Successfully deleted {deletedCount} backup(s).", Window.GetWindow(this));
+                    CustomMessageBoxService.ShowInfo("Success", $"Successfully deleted {deletedCount} backup.", Window.GetWindow(this));
                 }
                 else
                 {

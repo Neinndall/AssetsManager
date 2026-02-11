@@ -3,6 +3,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -61,6 +62,7 @@ namespace AssetsManager.Views
         private string _extractionNewLolPath;
         private List<SerializableChunkDiff> _diffsForExtraction;
         private string _lastAssignedFolder; // Persists the folder name during the extraction process
+        private string _lastComparisonIdentity; // Identity fingerprint of the last comparison
 
         private GridLength _lastLogHeight;
         private bool _isLogMinimized = false;
@@ -279,10 +281,18 @@ namespace AssetsManager.Views
                 return;
             }
 
-            // 1. ALWAYS Save to History if enabled (Independent of other actions)
-            _lastAssignedFolder = null; // Reset for new comparison
+            // Identify if this is the same comparison as before to avoid duplicate backups
+            string currentIdentity = CalculateComparisonIdentity(serializableDiffs, oldLolPath, newLolPath);
+            bool isSameComparison = currentIdentity == _lastComparisonIdentity;
 
-            if (_appSettings.SaveWadComparisonHistory)
+            if (!isSameComparison)
+            {
+                _lastAssignedFolder = null;
+                _lastComparisonIdentity = currentIdentity;
+            }
+
+            // 1. ALWAYS Save to History if enabled (Independent of other actions)
+            if (_appSettings.SaveWadComparisonHistory && string.IsNullOrEmpty(_lastAssignedFolder))
             {
                 string displayName = "Unknown";
                 var uniqueWads = serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
@@ -340,6 +350,26 @@ namespace AssetsManager.Views
                     ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
                 });
             }
+        }
+
+        private string CalculateComparisonIdentity(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
+        {
+            // Create a fast unique identity based on paths, count and key hashes
+            var sb = new StringBuilder();
+            sb.Append(oldPath);
+            sb.Append(newPath);
+            sb.Append(diffs.Count);
+
+            if (diffs.Count > 0)
+            {
+                // Concatenate first and last entry info to differentiate between same-count diffs
+                var first = diffs[0];
+                var last = diffs[^1];
+                sb.Append(first.NewPathHash).Append(first.OldPathHash);
+                sb.Append(last.NewPathHash).Append(last.OldPathHash);
+            }
+
+            return sb.ToString();
         }
 
         private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
