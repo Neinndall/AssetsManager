@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media.Effects;
+using AssetsManager.Views.Models.Dialogs.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -11,6 +12,21 @@ namespace AssetsManager.Views.Dialogs
             InitializeComponent();
             Loaded += OnLoaded;
             Closing += OnClosing;
+        }
+
+        public void SetProgress(double value)
+        {
+            LoadingControl.SetProgress(value);
+        }
+
+        public void SetDescription(string text)
+        {
+            LoadingControl.SetDescription(text);
+        }
+
+        public void SetState(DiffLoadingState state)
+        {
+            LoadingControl.SetState(state);
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
