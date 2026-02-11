@@ -253,7 +253,7 @@ namespace AssetsManager.Services.Downloads
             }
             catch (HttpRequestException httpEx)
             {
-                _logService.LogWarning($"Unable to connect to CommunityDragon. Server might be down or busy. ({httpEx.Message})");
+                _logService.LogWarning($"Unable to connect to CommunityDragon. Server might be down or busy.");
                 return result;
             }
             catch (Exception ex)
