@@ -85,6 +85,9 @@ namespace AssetsManager.Services.Explorer
                 return;
             }
 
+            // Avoid redundant reloads of the same file
+            if (_currentlyDisplayedNode == node) return;
+
             await SetPreviewerAsync(Previewer.None); // Blank the preview area only for actual files
 
             _currentlyDisplayedNode = node;
