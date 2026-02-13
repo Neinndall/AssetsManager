@@ -152,15 +152,20 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 if (selectedPin == null)
                 {
-                    // If we are in Grid Mode and have a folder context, go back to the Grid
-                    if (ViewModel.IsGridMode && _currentFolderNode != null)
-                    {
-                        UpdateSelectedNode(_currentFolderNode, _rootNodes);
-                    }
-                    else
+                    // If no pins are left, we MUST reset the service state so it "forgets" the last file
+                    // This prevents the bug where re-opening the same file shows Welcome instead of content.
+                    if (ViewModel.PinnedFilesManager.PinnedFiles.Count == 0)
                     {
                         await ExplorerPreviewService.ResetPreviewAsync();
-                        _currentNode = null;
+
+                        if (ViewModel.IsGridMode && _currentFolderNode != null)
+                        {
+                            UpdateSelectedNode(_currentFolderNode, _rootNodes);
+                        }
+                        else
+                        {
+                            _currentNode = null;
+                        }
                     }
                     return;
                 }
@@ -190,16 +195,11 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (sender is FrameworkElement element && element.DataContext is PinnedFileModel vm)
             {
-                // Selective cleanup: only hide the panel belonging to this file type
+                // 1. First check the category logic to see if panels should hide
                 ViewModel.ClosePanelByCategory(vm.Node);
                 
+                // 2. Unpin the file. The manager will automatically select the previous tab if this was the active one.
                 ViewModel.PinnedFilesManager.UnpinFile(vm);
-
-                // If we closed the currently active file, we need to update the selection
-                if (ViewModel.PinnedFilesManager.SelectedFile == vm)
-                {
-                    ViewModel.PinnedFilesManager.SelectedFile = null;
-                }
             }
         }
 
