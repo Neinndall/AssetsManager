@@ -39,6 +39,9 @@
             <converters:ChunkDiffTypeToBrushConverter x:Key="ChunkDiffTypeToBrushConverter"/>
             <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
             <converters:ValueMultiplierConverter x:Key="ValueMultiplierConverter"/>
+
+            <!-- Material Icon Converter (Generic) -->
+            <converters:BooleanToMaterialIconConverter x:Key="BooleanToMaterialIconConverter"/>
             
         </ResourceDictionary>
     </Application.Resources>

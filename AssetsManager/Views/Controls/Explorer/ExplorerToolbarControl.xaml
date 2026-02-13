@@ -42,31 +42,11 @@
                 
                 <!-- View Mode Group -->
                 <Button x:Name="SwitchModeButton" 
-                        Style="{StaticResource TransparentIconButton}" 
+                        Style="{StaticResource TransparentIconButton}"
+                        ToolTip="{Binding SwitchModeToolTip}"
                         Margin="0,0,2,0" 
                         Click="SwitchModeButton_Click">
-                    <materialIcons:MaterialIcon x:Name="ModeIcon" Width="18" Height="18">
-                        <materialIcons:MaterialIcon.Style>
-                            <Style TargetType="materialIcons:MaterialIcon">
-                                <Setter Property="Kind" Value="ArchiveOutline"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsWadMode}" Value="True">
-                                        <Setter Property="Kind" Value="FolderOutline"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </materialIcons:MaterialIcon.Style>
-                    </materialIcons:MaterialIcon>
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-                            <Setter Property="ToolTip" Value="Switch back to LoL WAD Mode"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsWadMode}" Value="True">
-                                    <Setter Property="ToolTip" Value="Switch to Local Directory Mode"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
+                    <materialIcons:MaterialIcon Kind="{Binding IsWadMode, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='FolderOutline,ArchiveOutline'}" Width="18" Height="18"/>
                 </Button>
 
                 <ToggleButton x:Name="GridViewToggleButton" 
@@ -94,18 +74,7 @@
                               Margin="0,0,2,0"
                               IsChecked="{Binding IsFavoritesEnabled}"
                               Visibility="{Binding DataContext.IsFavoritesToggleVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <materialIcons:MaterialIcon Width="18" Height="18">
-                        <materialIcons:MaterialIcon.Style>
-                            <Style TargetType="materialIcons:MaterialIcon">
-                                <Setter Property="Kind" Value="StarOutline"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsFavoritesEnabled}" Value="True">
-                                        <Setter Property="Kind" Value="Star"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </materialIcons:MaterialIcon.Style>
-                    </materialIcons:MaterialIcon>
+                    <materialIcons:MaterialIcon Kind="{Binding IsFavoritesEnabled, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Star,StarOutline'}" Width="18" Height="18"/>
                 </ToggleButton>
 
                 <Button x:Name="ImageMergerButton" 

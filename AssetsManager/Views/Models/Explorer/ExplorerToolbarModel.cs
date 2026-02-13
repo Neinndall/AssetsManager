@@ -17,8 +17,18 @@ namespace AssetsManager.Views.Models.Explorer
         public bool IsWadMode
         {
             get => _isWadMode;
-            set { if (_isWadMode != value) { _isWadMode = value; OnPropertyChanged(); } }
+            set 
+            { 
+                if (_isWadMode != value) 
+                { 
+                    _isWadMode = value; 
+                    OnPropertyChanged(); 
+                    OnPropertyChanged(nameof(SwitchModeToolTip));
+                } 
+            }
         }
+
+        public string SwitchModeToolTip => IsWadMode ? "Switch to Local Directory Mode" : "Switch back to LoL WAD Mode";
 
         public bool IsGridMode
         {
