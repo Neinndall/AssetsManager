@@ -110,6 +110,13 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool AreBreadcrumbsVisible => IsBreadcrumbToggleOn && HasSelectedNode;
 
+        private string _unsupportedMessage;
+        public string UnsupportedMessage
+        {
+            get => _unsupportedMessage;
+            set { _unsupportedMessage = value; OnPropertyChanged(); }
+        }
+
         private bool _isWelcomeVisible = true;
         public bool IsWelcomeVisible
         {

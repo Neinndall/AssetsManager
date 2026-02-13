@@ -262,7 +262,11 @@
                             <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                                 <materialIcons:MaterialIcon Kind="FileRemoveOutline" Width="64" Height="64" Foreground="{StaticResource TextMuted}" Opacity="0.5" Margin="0,0,0,16"/>
                                 <TextBlock Text="Preview not available" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
-                                <TextBlock x:Name="UnsupportedFileSubMessage" FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="UnsupportedFileSubMessage" 
+                                           Text="{Binding UnsupportedMessage, FallbackValue='The file format is not supported to preview it'}"
+                                           FontSize="14" Foreground="{StaticResource TextSecondary}" 
+                                           HorizontalAlignment="Center" Margin="0,8,0,0" 
+                                           TextAlignment="Center" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
 
