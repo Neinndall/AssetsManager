@@ -178,7 +178,8 @@
                                          Visibility="{Binding IsRenamedInfoVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                 <!-- Welcome Panel -->
-                <Border Grid.Row="0" Grid.RowSpan="2"
+                <Border x:Name="WelcomePanel"
+                        Grid.Row="0" Grid.RowSpan="2"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Visibility="{Binding IsWelcomeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -190,8 +191,8 @@
                                                 Foreground="{StaticResource TextMuted}"
                                                 Opacity="0.5"
                                                 Margin="0,0,0,16"/>
-                        <TextBlock Text="Select a file" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="Select a file from the explorer to preview its content" FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center"/>
+                        <TextBlock Text="Select a file" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap"/>
+                        <TextBlock Text="Select a file from the explorer to preview its content" FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
 
@@ -233,9 +234,11 @@
                             <ColumnDefinition.Style>
                                 <Style TargetType="ColumnDefinition">
                                     <Setter Property="Width" Value="*"/>
+                                    <Setter Property="MinWidth" Value="150"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsImageVisible}" Value="False">
                                             <Setter Property="Width" Value="0"/>
+                                            <Setter Property="MinWidth" Value="0"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -244,7 +247,8 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Left: Content Panel -->
-                    <Grid Grid.Column="0" Visibility="{Binding IsContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid x:Name="ContentPanel" Grid.Column="0" Visibility="{Binding IsContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        
                         <avalonedit:TextEditor x:Name="TextEditorPreview" Style="{StaticResource BaseTextEditorStyle}" Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         <Grid x:Name="WebViewContainer" Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         <Border x:Name="UnsupportedFilePanel" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding IsUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}" MaxWidth="400">
@@ -276,7 +280,7 @@
                     </GridSplitter>
 
                     <!-- Right: Image Panel -->
-                    <Border Grid.Column="2" Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}" BorderBrush="{StaticResource BorderColor}">
+                    <Border x:Name="ImagePanel" Grid.Column="2" Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}" BorderBrush="{StaticResource BorderColor}">
                         <Border.Style>
                             <Style TargetType="Border">
                                 <Setter Property="BorderThickness" Value="0"/>
