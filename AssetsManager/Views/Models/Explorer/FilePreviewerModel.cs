@@ -110,7 +110,28 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool AreBreadcrumbsVisible => IsBreadcrumbToggleOn && HasSelectedNode;
 
-        private string _unsupportedMessage;
+        private string _welcomeTitle = "Select a file";
+        public string WelcomeTitle
+        {
+            get => _welcomeTitle;
+            set { _welcomeTitle = value; OnPropertyChanged(); }
+        }
+
+        private string _welcomeDescription = "Select a file from the explorer to preview its content";
+        public string WelcomeDescription
+        {
+            get => _welcomeDescription;
+            set { _welcomeDescription = value; OnPropertyChanged(); }
+        }
+
+        private string _unsupportedTitle = "Preview not available";
+        public string UnsupportedTitle
+        {
+            get => _unsupportedTitle;
+            set { _unsupportedTitle = value; OnPropertyChanged(); }
+        }
+
+        private string _unsupportedMessage = "The file format is not supported to preview it";
         public string UnsupportedMessage
         {
             get => _unsupportedMessage;
@@ -219,22 +240,33 @@ namespace AssetsManager.Views.Models.Explorer
                            SupportedFileTypes.Textures.Contains(node.Extension) || 
                            SupportedFileTypes.VectorImages.Contains(node.Extension);
 
-            if (isImage)
+            // Check if there are other pinned files of the same category remaining
+            // (excluding the one being closed right now)
+            bool hasMoreOfSameCategory = PinnedFilesManager.PinnedFiles.Any(p => 
+                p.Node != node && 
+                (SupportedFileTypes.Images.Contains(p.Node.Extension) || 
+                 SupportedFileTypes.Textures.Contains(p.Node.Extension) || 
+                 SupportedFileTypes.VectorImages.Contains(p.Node.Extension)) == isImage);
+
+            if (!hasMoreOfSameCategory)
             {
-                IsImageVisible = false;
-            }
-            else
-            {
-                IsContentVisible = false;
-                IsTextVisible = false;
-                IsWebVisible = false;
-                IsUnsupportedVisible = false;
+                if (isImage)
+                {
+                    IsImageVisible = false;
+                }
+                else
+                {
+                    IsContentVisible = false;
+                    IsTextVisible = false;
+                    IsWebVisible = false;
+                    IsUnsupportedVisible = false;
+                }
             }
 
-            // If absolutely nothing is visible after closing, we show Welcome again
-            if (!IsImageVisible && !IsContentVisible)
+            // If absolutely nothing is visible after closing AND no tabs are left, we show Welcome again
+            if (!IsImageVisible && !IsContentVisible && PinnedFilesManager.PinnedFiles.Count <= 1)
             {
-                HasEverPreviewedAFile = false; // Reset state to allow Welcome message
+                HasEverPreviewedAFile = false;
                 IsWelcomeVisible = true;
             }
         }
