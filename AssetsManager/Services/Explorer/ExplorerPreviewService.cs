@@ -71,15 +71,23 @@ namespace AssetsManager.Services.Explorer
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
-            await SetPreviewerAsync(Previewer.None); // Blank the preview area immediately
-
-            _currentlyDisplayedNode = node;
-
-            if (node == null || node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || SupportedFileTypes.AudioBank.Contains(node.Extension))
+            // If the node is a directory or container, we check if we should keep the last preview
+            if (node == null || node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent || SupportedFileTypes.AudioBank.Contains(node.Extension))
             {
+                // If we've already started browsing files, we DON'T reset. 
+                // We keep the last file visible for a smoother experience.
+                if (_viewModel.HasEverPreviewedAFile)
+                {
+                    return;
+                }
+
                 await ResetPreviewAsync();
                 return;
             }
+
+            await SetPreviewerAsync(Previewer.None); // Blank the preview area only for actual files
+
+            _currentlyDisplayedNode = node;
 
             try
             {
