@@ -92,20 +92,30 @@ namespace AssetsManager.Services.Monitor
 
                 if (updates == null || updates.Count == 0) return string.Empty;
 
-                var latestUpdate = updates[0];
-                var translations = latestUpdate?["translations"] as JArray;
+                string originalContent = null;
+                Match match = null;
 
-                if (translations == null) return string.Empty;
+                foreach (var update in updates)
+                {
+                    var translations = update?["translations"] as JArray;
+                    if (translations == null) continue;
 
-                var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
-                string originalContent = enTranslation?["content"]?.ToString();
+                    var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
+                    string content = enTranslation?["content"]?.ToString();
 
-                if (string.IsNullOrEmpty(originalContent)) return string.Empty;
+                    if (string.IsNullOrEmpty(content)) continue;
 
-                // 1. Parse Maintenance Start Time
-                var match = Regex.Match(originalContent, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                    // Check for the specific pattern
+                    var m = Regex.Match(content, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                    if (m.Success)
+                    {
+                        originalContent = content;
+                        match = m;
+                        break;
+                    }
+                }
 
-                if (!match.Success) return originalContent; // Return original message if no time is found
+                if (string.IsNullOrEmpty(originalContent) || match == null) return string.Empty;
 
                 string dateStr = match.Groups[1].Value;
                 string timeStr = match.Groups[2].Value;
@@ -181,19 +191,29 @@ namespace AssetsManager.Services.Monitor
 
                 if (updates == null || updates.Count == 0) return "ONLINE";
 
-                var latestUpdate = updates[0];
-                var translations = latestUpdate?["translations"] as JArray;
+                string originalContent = null;
+                Match match = null;
 
-                if (translations == null) return "ONLINE";
+                foreach (var update in updates)
+                {
+                    var translations = update?["translations"] as JArray;
+                    if (translations == null) continue;
 
-                var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
-                string originalContent = enTranslation?["content"]?.ToString();
+                    var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
+                    string content = enTranslation?["content"]?.ToString();
 
-                if (string.IsNullOrEmpty(originalContent)) return "ONLINE";
+                    if (string.IsNullOrEmpty(content)) continue;
 
-                var match = Regex.Match(originalContent, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                    var m = Regex.Match(content, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                    if (m.Success)
+                    {
+                        originalContent = content;
+                        match = m;
+                        break;
+                    }
+                }
 
-                if (!match.Success) return "Maintenance detected";
+                if (string.IsNullOrEmpty(originalContent) || match == null) return "ONLINE";
 
                 string dateStr = match.Groups[1].Value;
                 string timeStr = match.Groups[2].Value;
