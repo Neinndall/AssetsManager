@@ -250,17 +250,26 @@
                     <Grid x:Name="ContentPanel" Grid.Column="0" Visibility="{Binding IsContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         
                         <avalonedit:TextEditor x:Name="TextEditorPreview" Style="{StaticResource BaseTextEditorStyle}" Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        
                         <Grid x:Name="WebViewContainer" Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                        <Border x:Name="UnsupportedFilePanel" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding IsUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}" MaxWidth="400">
-                            <StackPanel HorizontalAlignment="Center">
+
+                        <!-- Error Message inside Content area -->
+                        <Border x:Name="UnsupportedFilePanel" 
+                                HorizontalAlignment="Center" 
+                                VerticalAlignment="Center" 
+                                Visibility="{Binding IsUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}" 
+                                MaxWidth="400">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                                 <materialIcons:MaterialIcon Kind="FileRemoveOutline" Width="64" Height="64" Foreground="{StaticResource TextMuted}" Opacity="0.5" Margin="0,0,0,16"/>
-                                <TextBlock Text="Preview not available" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="UnsupportedFileSubMessage" FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center"/>
+                                <TextBlock Text="Preview not available" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                                <TextBlock x:Name="UnsupportedFileSubMessage" FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
+
+                        <!-- Search inside document -->
                         <shared:FindInDocumentControl x:Name="FindInDocumentControl" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,15,0" Visibility="{Binding IsFindVisible, Converter={StaticResource BooleanToVisibilityConverter}}" TargetTextEditor="{Binding ElementName=TextEditorPreview}" Close="FindInDocumentControl_Close"/>
                     </Grid>
-
+                    
                     <!-- Middle: Splitter -->
                     <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent">
                         <GridSplitter.Style>
