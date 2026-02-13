@@ -205,7 +205,8 @@
                 Visibility="{Binding AreTabsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
         <!-- Breadcrumbs Area -->
-        <Grid DockPanel.Dock="Top">
+        <Grid DockPanel.Dock="Top" 
+              Visibility="{Binding AreBreadcrumbsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -213,14 +214,12 @@
             <local:BreadcrumbControl x:Name="Breadcrumbs" 
                                      Grid.Row="0" 
                                      Margin="5,2,5,0" 
-                                     VerticalAlignment="Center" 
-                                     Visibility="{Binding AreBreadcrumbsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                     VerticalAlignment="Center"/>
             <Border x:Name="BreadcrumbSeparator" 
                     Grid.Row="1" 
                     Height="1" 
                     Background="{StaticResource BorderColor}" 
-                    Margin="0,5,5,5" 
-                    Visibility="{Binding AreBreadcrumbsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    Margin="0,5,5,5"/>
         </Grid>
 
         <!-- Main Content Area -->
