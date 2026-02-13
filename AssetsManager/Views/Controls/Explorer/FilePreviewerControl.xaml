@@ -245,102 +245,90 @@
                     </Style>
                 </Grid.Style>
                 
-                <!-- Content Previews -->
-                <Grid x:Name="PreviewContainer" 
-                    Visibility="{Binding IsPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- Welcome Panel (Default State) -->
+                <Border x:Name="WelcomePanel"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding IsWelcomeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        MaxWidth="400">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="FileSearchOutline"
+                                                Width="64" Height="64"
+                                                HorizontalAlignment="Center"
+                                                Foreground="{StaticResource TextMuted}"
+                                                Opacity="0.5"
+                                                Margin="0,0,0,16"/>
+                        <TextBlock Text="Select a file"
+                               FontSize="18" 
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               HorizontalAlignment="Center"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"/>
+                        <TextBlock Text="Select a file from the explorer to preview its content"
+                               FontSize="14"
+                               Foreground="{StaticResource TextSecondary}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"/>
+                    </StackPanel>
+                </Border>
 
-                    <!-- Main Previewer Status -->
-                    <Grid x:Name="MainPreviewerPanel"
-                        Visibility="{Binding IsMainPreviewerVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- Unsupported File Panel -->
+                <Border x:Name="UnsupportedFilePanel"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding IsUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        MaxWidth="400">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="FileRemoveOutline" 
+                                                Width="64" Height="64"
+                                                HorizontalAlignment="Center"
+                                                Foreground="{StaticResource TextMuted}"
+                                                Opacity="0.5"
+                                                Margin="0,0,0,16"/>
+                        <TextBlock Text="Preview not available"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               HorizontalAlignment="Center"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"/>
+                        <TextBlock x:Name="UnsupportedFileSubMessage"
+                               Text="The file format is not supported to preview it."
+                               FontSize="14"
+                               Foreground="{StaticResource TextSecondary}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"/>
+                    </StackPanel>
+                </Border>
 
-                        <!-- Welcome Panel (Default State) -->
-                        <Border x:Name="WelcomePanel"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Visibility="{Binding IsWelcomeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            MaxWidth="400">
-                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                                <!-- Icon -->
-                                <materialIcons:MaterialIcon Kind="FileSearchOutline"
-                                                        Width="64" Height="64"
-                                                        HorizontalAlignment="Center"
-                                                        Foreground="{StaticResource TextMuted}"
-                                                        Opacity="0.5"
-                                                        Margin="0,0,0,16"/>
-
-                                <TextBlock x:Name="SelectFileMessage"
-                                       Text="Select a file"
-                                       FontSize="18" 
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimary}"
-                                       HorizontalAlignment="Center"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"/>
-                                <TextBlock x:Name="SelectFileSubMessage"
-                                       Text="Select a file from the explorer to preview its content"
-                                       FontSize="14"
-                                       Foreground="{StaticResource TextSecondary}"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,8,0,0"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Unsupported File Panel -->
-                        <Border x:Name="UnsupportedFilePanel"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Visibility="{Binding IsUnsupportedFileMessageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            MaxWidth="400">
-                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FileRemoveOutline" 
-                                                        Width="64" Height="64"
-                                                        HorizontalAlignment="Center"
-                                                        Foreground="{StaticResource TextMuted}"
-                                                        Opacity="0.5"
-                                                        Margin="0,0,0,16"/>
-
-                                <TextBlock x:Name="UnsupportedFileMessage"
-                                       Text="Preview not available"
-                                       FontSize="18"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimary}"
-                                       HorizontalAlignment="Center"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"/>
-                                <TextBlock x:Name="UnsupportedFileSubMessage"
-                                       Text="The file format is not supported to preview it."
-                                       FontSize="14"
-                                       Foreground="{StaticResource TextSecondary}"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,8,0,0"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-
-                    <!-- Previews -->
-                    <Image x:Name="ImagePreview" 
+                <!-- Image Preview -->
+                <Image x:Name="ImagePreview" 
                        Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}" 
                        Stretch="Uniform"/>
-                    <avalonedit:TextEditor x:Name="TextEditorPreview"
+
+                <!-- Text Preview -->
+                <avalonedit:TextEditor x:Name="TextEditorPreview"
                                        Style="{StaticResource BaseTextEditorStyle}"
                                        Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                        Margin="-4,0,0,0"/>
-                    <Grid x:Name="WebViewContainer"
+                
+                <!-- Web Preview (Audio/Video) -->
+                <Grid x:Name="WebViewContainer"
                       Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                    <!-- Search inside document -->
-                    <shared:FindInDocumentControl x:Name="FindInDocumentControl"
+                <!-- Search inside document -->
+                <shared:FindInDocumentControl x:Name="FindInDocumentControl"
                                               HorizontalAlignment="Right"
                                               VerticalAlignment="Top"
                                               Margin="0,0,15,0"
                                               Visibility="{Binding IsFindVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                               TargetTextEditor="{Binding ElementName=TextEditorPreview}"
                                               Close="FindInDocumentControl_Close"/>
-                </Grid>
             </Grid>
             
             <!-- 3. DETAILS VIEW (Renamed Info) -->

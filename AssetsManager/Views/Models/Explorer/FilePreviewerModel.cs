@@ -123,25 +123,18 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool AreBreadcrumbsVisible => IsBreadcrumbToggleOn && HasSelectedNode;
 
-        private bool _isDetailsVisible;
-        public bool IsDetailsVisible
+        private bool _isWelcomeVisible = true;
+        public bool IsWelcomeVisible
         {
-            get => _isDetailsVisible;
-            set { _isDetailsVisible = value; OnPropertyChanged(); }
+            get => _isWelcomeVisible;
+            set { _isWelcomeVisible = value; OnPropertyChanged(); }
         }
 
-        private bool _isFindVisible;
-        public bool IsFindVisible
+        private bool _isUnsupportedVisible;
+        public bool IsUnsupportedVisible
         {
-            get => _isFindVisible;
-            set { _isFindVisible = value; OnPropertyChanged(); }
-        }
-
-        private bool _isMainPreviewerVisible = true;
-        public bool IsMainPreviewerVisible
-        {
-            get => _isMainPreviewerVisible;
-            set { _isMainPreviewerVisible = value; OnPropertyChanged(); }
+            get => _isUnsupportedVisible;
+            set { _isUnsupportedVisible = value; OnPropertyChanged(); }
         }
 
         private bool _isImageVisible;
@@ -165,18 +158,11 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isWebVisible = value; OnPropertyChanged(); }
         }
 
-        private bool _isWelcomeVisible = true;
-        public bool IsWelcomeVisible
+        private bool _isFindVisible;
+        public bool IsFindVisible
         {
-            get => _isWelcomeVisible;
-            set { _isWelcomeVisible = value; OnPropertyChanged(); }
-        }
-
-        private bool _isUnsupportedFileMessageVisible;
-        public bool IsUnsupportedFileMessageVisible
-        {
-            get => _isUnsupportedFileMessageVisible;
-            set { _isUnsupportedFileMessageVisible = value; OnPropertyChanged(); }
+            get => _isFindVisible;
+            set { _isFindVisible = value; OnPropertyChanged(); }
         }
 
         private bool _canScrollLeft;
@@ -191,6 +177,17 @@ namespace AssetsManager.Views.Models.Explorer
         {
             get => _canScrollRight;
             set { _canScrollRight = value; OnPropertyChanged(); }
+        }
+
+        public void ResetAllVisibility()
+        {
+            IsWelcomeVisible = false;
+            IsUnsupportedVisible = false;
+            IsImageVisible = false;
+            IsTextVisible = false;
+            IsWebVisible = false;
+            IsFindVisible = false;
+            IsDetailsTabSelected = false; // Hide technical details when switching to a new preview
         }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

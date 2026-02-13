@@ -81,11 +81,11 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else // Preview Mode
             {
-                if (_currentNode != null && _currentNode != _currentFolderNode)
+                if (_currentNode != null && _currentNode != _currentFolderNode && !ViewModel.IsSelectedNodeContainer)
                 {
                     _ = ShowPreviewAsync(_currentNode);
                 }
-                else
+                else if (_currentNode == null || ViewModel.IsSelectedNodeContainer)
                 {
                     _ = ExplorerPreviewService.ResetPreviewAsync();
                 }
@@ -347,7 +347,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 if (!ViewModel.IsGridMode)
                 {
-                    _ = ExplorerPreviewService.ResetPreviewAsync();
+                    // Only reset preview if we are moving to a folder and no file was active
+                    if (_currentNode == null || _currentNode == node)
+                    {
+                        _ = ExplorerPreviewService.ResetPreviewAsync();
+                    }
                 }
 
                 // Sequential Loading Queue with Cancellation

@@ -216,22 +216,16 @@ namespace AssetsManager.Services.Explorer
 
         private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false)
         {
-            // Part 1: Hide all via ViewModel
-            _viewModel.IsImageVisible = false;
-            _viewModel.IsTextVisible = false;
-            _viewModel.IsWebVisible = false;
-            _viewModel.IsMainPreviewerVisible = false;
-            _viewModel.IsDetailsVisible = false;
-            _viewModel.IsWelcomeVisible = false;
-            _viewModel.IsUnsupportedFileMessageVisible = false;
+            // Part 1: Strict Destructive Cleanup via ViewModel
+            _viewModel.ResetAllVisibility();
 
+            // Nullify sources to release memory and prevent ghosting
             _imagePreview.Source = null;
             _textEditorPreview.Clear();
 
-            // Part 2: If the previous previewer was a WebView, destroy it.
+            // Part 2: If the previous previewer was a WebView, destroy it immediately.
             if (_activePreviewer == Previewer.WebView)
             {
-                // Find the WebView2 instance in the container, dispose it, and remove it.
                 var webView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
                 if (webView != null)
                 {
@@ -242,7 +236,7 @@ namespace AssetsManager.Services.Explorer
 
             _activePreviewer = newPreviewer;
 
-            // Part 3: Show the new content via ViewModel.
+            // Part 3: Show the new content via ViewModel by activating only the required panel
             switch (newPreviewer)
             {
                 case Previewer.Image:
@@ -272,20 +266,16 @@ namespace AssetsManager.Services.Explorer
                     break;
 
                 case Previewer.StatusPanel:
-                    _viewModel.IsMainPreviewerVisible = true;
                     if (content is string extension)
                     {
                         // This is for unsupported files
-                        _viewModel.IsWelcomeVisible = false;
-                        _viewModel.IsUnsupportedFileMessageVisible = true;
-                        
+                        _viewModel.IsUnsupportedVisible = true;
                         _unsupportedFileSubTextBlock.Text = $"The {extension} format is not supported to preview it.";
                     }
                     else
                     {
                         // This is for the default "Select a file" message
                         _viewModel.IsWelcomeVisible = true;
-                        _viewModel.IsUnsupportedFileMessageVisible = false;
                     }
                     break;
             }
