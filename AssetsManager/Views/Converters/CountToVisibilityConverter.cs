@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
@@ -9,16 +10,33 @@ namespace AssetsManager.Views.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is int count)
+            int count = 0;
+
+            if (value is int intValue)
             {
-                bool invert = parameter is string str && str.Equals("Invert", StringComparison.OrdinalIgnoreCase);
-                if (invert)
-                {
-                    return count <= 0 ? Visibility.Visible : Visibility.Collapsed;
-                }
-                return count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                count = intValue;
             }
-            return Visibility.Collapsed; // Default for non-int values
+            else if (value is IEnumerable collection)
+            {
+                // Efficient way to get count if possible
+                if (collection is ICollection col)
+                {
+                    count = col.Count;
+                }
+                else
+                {
+                    // Fallback for other enumerables
+                    foreach (var _ in collection) count++;
+                }
+            }
+
+            bool invert = parameter is string str && str.Equals("Invert", StringComparison.OrdinalIgnoreCase);
+            
+            if (invert)
+            {
+                return count <= 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+            return count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
