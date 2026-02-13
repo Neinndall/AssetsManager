@@ -182,8 +182,6 @@ namespace AssetsManager.Views.Controls.Explorer
             Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
             Toolbar.ImageMergerClicked += Toolbar_ImageMergerClicked;
 
-            Toolbar.SetWadMode(_viewModel.IsWadMode);
-            
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
             {
@@ -210,13 +208,12 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void SetToolbarViewMode(bool isGridMode)
         {
-            Toolbar.SetViewMode(isGridMode);
+            _viewModel.Toolbar.IsGridMode = isGridMode;
         }
 
         private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
         {
             _viewModel.IsWadMode = !_viewModel.IsWadMode;
-            Toolbar.SetWadMode(_viewModel.IsWadMode);
             // Mode switched, we keep the current view mode (Grid/Preview) preference.
             
             if (FilePreviewer != null)
@@ -306,7 +303,7 @@ namespace AssetsManager.Views.Controls.Explorer
             var cancellationToken = TaskCancellationManager.PrepareNewOperation();
 
             _viewModel.SetLoadingState(loadingState);
-            Toolbar.IsSortButtonVisible = isBackupMode;
+            _viewModel.Toolbar.IsSortButtonVisible = isBackupMode;
 
             try
             {
@@ -870,7 +867,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private async void SearchTimer_Tick(object sender, EventArgs e)
         {
             _searchTimer.Stop();
-            string searchText = Toolbar.SearchText;
+            string searchText = _viewModel.Toolbar.SearchText;
 
             if (FilePreviewer != null)
             {

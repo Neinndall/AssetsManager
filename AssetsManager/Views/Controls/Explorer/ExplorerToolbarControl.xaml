@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
-    <Grid>
+    <Grid DataContext="{Binding Toolbar}">
         <Border Background="{StaticResource CardBackground}" 
                 CornerRadius="6" 
                 Padding="4" 
@@ -34,7 +34,7 @@
                               ToolTip="Group by paths/categories"
                               Margin="0,0,2,0"
                               IsChecked="True"
-                              Visibility="Collapsed">
+                              Visibility="{Binding IsSortButtonVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                     <materialIcons:MaterialIcon Kind="SortAlphabeticalAscending" Width="18" Height="18"/>
                 </ToggleButton>
                 
@@ -43,26 +43,47 @@
                 <!-- View Mode Group -->
                 <Button x:Name="SwitchModeButton" 
                         Style="{StaticResource TransparentIconButton}" 
-                        ToolTip="Switch Mode (WAD / Directory)" 
                         Margin="0,0,2,0" 
                         Click="SwitchModeButton_Click">
-                    <materialIcons:MaterialIcon x:Name="ModeIcon" Kind="ArchiveOutline" Width="18" Height="18"/>
+                    <materialIcons:MaterialIcon x:Name="ModeIcon" Width="18" Height="18">
+                        <materialIcons:MaterialIcon.Style>
+                            <Style TargetType="materialIcons:MaterialIcon">
+                                <Setter Property="Kind" Value="ArchiveOutline"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsWadMode}" Value="True">
+                                        <Setter Property="Kind" Value="FolderOutline"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialIcons:MaterialIcon.Style>
+                    </materialIcons:MaterialIcon>
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                            <Setter Property="ToolTip" Value="Switch back to LoL WAD Mode"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsWadMode}" Value="True">
+                                    <Setter Property="ToolTip" Value="Switch to Local Directory Mode"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
                 </Button>
 
                 <ToggleButton x:Name="GridViewToggleButton" 
                               Style="{StaticResource TransparentIconToggleButton}"
                               ToolTip="Toggle Grid View"
                               Margin="0,0,2,0" 
+                              IsChecked="{Binding IsGridMode}"
                               Click="GridViewToggle_Click">
                     <materialIcons:MaterialIcon Kind="ViewGridOutline" Width="18" Height="18"/>
                 </ToggleButton>
 
                 <ToggleButton x:Name="BreadcrumbToggleButton"
                               Style="{StaticResource TransparentIconToggleButton}"
-                              Click="BreadcrumbToggleButton_Click"
                               ToolTip="Show Breadcrumb"
                               Margin="0,0,2,0"
-                              IsChecked="True">
+                              IsChecked="{Binding IsBreadcrumbVisible}"
+                              Click="BreadcrumbToggleButton_Click">
                     <materialIcons:MaterialIcon Kind="CodeTags" Width="18" Height="18"/>
                 </ToggleButton>
 
@@ -71,14 +92,14 @@
                               Click="FavoritesToggleButton_Click"
                               ToolTip="Toggle Favorites"
                               Margin="0,0,2,0"
-                              IsChecked="False"
-                              Visibility="{Binding IsFavoritesToggleVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                              IsChecked="{Binding IsFavoritesEnabled}"
+                              Visibility="{Binding DataContext.IsFavoritesToggleVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
                     <materialIcons:MaterialIcon Width="18" Height="18">
                         <materialIcons:MaterialIcon.Style>
                             <Style TargetType="materialIcons:MaterialIcon">
                                 <Setter Property="Kind" Value="StarOutline"/>
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsChecked, ElementName=FavoritesToggleButton}" Value="True">
+                                    <DataTrigger Binding="{Binding IsFavoritesEnabled}" Value="True">
                                         <Setter Property="Kind" Value="Star"/>
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -107,6 +128,7 @@
                     <TextBox x:Name="SearchTextBox" 
                              Style="{StaticResource AnimatedSearchBoxStyle}" 
                              Tag="{Binding IsChecked, ElementName=SearchToggleButton}"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                              TextChanged="SearchTextBox_TextChanged"/>
                     
                     <TextBlock Text="Search files..."

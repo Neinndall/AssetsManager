@@ -31,6 +31,7 @@ namespace AssetsManager.Views.Models.Explorer
         private string _loadingOperation = "LOADING";
         private string _loadingDetail = "Preparing the file explorer";
         private ObservableRangeCollection<FileSystemNodeModel> _rootNodes;
+        private ExplorerToolbarModel _toolbar;
 
         private string _statusTitle;
         private string _statusDescription;
@@ -39,9 +40,16 @@ namespace AssetsManager.Views.Models.Explorer
         public FileExplorerModel()
         {
             RootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
+            Toolbar = new ExplorerToolbarModel();
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true; // Start empty
+        }
+
+        public ExplorerToolbarModel Toolbar
+        {
+            get => _toolbar;
+            set { _toolbar = value; OnPropertyChanged(); }
         }
 
         public void UpdateEmptyState(bool isWadMode)
@@ -212,6 +220,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (_isWadMode != value)
                 {
                     _isWadMode = value;
+                    Toolbar.IsWadMode = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsToolbarVisible));
                     OnPropertyChanged(nameof(AreFavoritesVisible));
@@ -249,6 +258,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (_isFavoritesEnabled != value)
                 {
                     _isFavoritesEnabled = value;
+                    Toolbar.IsFavoritesEnabled = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(AreFavoritesVisible));
                 }
