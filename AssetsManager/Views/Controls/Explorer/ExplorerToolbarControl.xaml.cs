@@ -20,6 +20,22 @@ namespace AssetsManager.Views.Controls.Explorer
             InitializeComponent();
         }
 
+        private void SearchToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (SearchToggleButton.IsChecked == true)
+            {
+                // Delay focus slightly to allow the animation to start and the control to become visible
+                Dispatcher.BeginInvoke(new System.Action(() =>
+                {
+                    SearchTextBox.Focus();
+                }), System.Windows.Threading.DispatcherPriority.Input);
+            }
+            else
+            {
+                SearchTextBox.Text = string.Empty;
+            }
+        }
+
         private void GridViewToggle_Click(object sender, RoutedEventArgs e)
         {
             ViewModeChanged?.Invoke(this, new RoutedPropertyChangedEventArgs<bool>(!(GridViewToggleButton.IsChecked ?? false), GridViewToggleButton.IsChecked ?? false));

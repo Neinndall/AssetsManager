@@ -179,6 +179,14 @@
         <Setter Property="VirtualizingStackPanel.CacheLength" Value="2,2"/>
         <Setter Property="VirtualizingStackPanel.CacheLengthUnit" Value="Page"/>
         <Setter Property="VirtualizingStackPanel.ScrollUnit" Value="Pixel"/>
+        
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel />
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>

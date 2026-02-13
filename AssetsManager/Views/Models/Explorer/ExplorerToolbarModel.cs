@@ -13,6 +13,20 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isFavoritesEnabled = false;
         private string _searchText = string.Empty;
         private bool _isSortButtonVisible = false;
+        private bool _isSearchVisible = false;
+        private bool _isToolsExpanded = false;
+
+        public bool IsSearchVisible
+        {
+            get => _isSearchVisible;
+            set { if (_isSearchVisible != value) { _isSearchVisible = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsToolsExpanded
+        {
+            get => _isToolsExpanded;
+            set { if (_isToolsExpanded != value) { _isToolsExpanded = value; OnPropertyChanged(); } }
+        }
 
         public bool IsWadMode
         {
