@@ -245,7 +245,8 @@
                     </Style>
                 </Grid.Style>
                 
-                <!-- Welcome Panel (Default State) -->
+                <!-- Status Layer (Centered in full area) -->
+                <!-- Welcome Panel -->
                 <Border x:Name="WelcomePanel"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
@@ -306,15 +307,44 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Image Preview Panel -->
-                <Grid x:Name="ImagePanel"
-                      Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Image x:Name="ImagePreview" 
-                           Stretch="Uniform"/>
-                </Grid>
+                <!-- Files Layer (Adaptive Dual View) -->
+                <Grid x:Name="FilesGrid">
+                    <Grid.ColumnDefinitions>
+                        <!-- Col 0 (Content) -->
+                        <ColumnDefinition>
+                            <ColumnDefinition.Style>
+                                <Style TargetType="ColumnDefinition">
+                                    <Setter Property="Width" Value="*"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsContentVisible}" Value="False">
+                                            <Setter Property="Width" Value="0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ColumnDefinition.Style>
+                        </ColumnDefinition>
+                        
+                        <!-- Col 1 (Splitter) -->
+                        <ColumnDefinition Width="Auto"/>
+                        
+                        <!-- Col 2 (Image) -->
+                        <ColumnDefinition>
+                            <ColumnDefinition.Style>
+                                <Style TargetType="ColumnDefinition">
+                                    <Setter Property="Width" Value="*"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsImageVisible}" Value="False">
+                                            <Setter Property="Width" Value="0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ColumnDefinition.Style>
+                        </ColumnDefinition>
+                    </Grid.ColumnDefinitions>
 
-                <!-- Content Preview Panel (Text/Audio/Video) -->
+                <!-- Content Preview Panel (Col 0: Text/Audio/Video) -->
                 <Grid x:Name="ContentPanel"
+                      Grid.Column="0"
                       Visibility="{Binding IsContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <avalonedit:TextEditor x:Name="TextEditorPreview"
                                            Style="{StaticResource BaseTextEditorStyle}"
@@ -333,7 +363,51 @@
                                                   TargetTextEditor="{Binding ElementName=TextEditorPreview}"
                                                   Close="FindInDocumentControl_Close"/>
                 </Grid>
-            </Grid>
+
+                <!-- Minimal Grid Splitter (Col 1) -->
+                <GridSplitter Grid.Column="1" 
+                              Width="5" 
+                              HorizontalAlignment="Center" 
+                              VerticalAlignment="Stretch" 
+                              Background="Transparent">
+                    <GridSplitter.Style>
+                        <Style TargetType="GridSplitter">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsContentVisible}" Value="True"/>
+                                        <Condition Binding="{Binding IsImageVisible}" Value="True"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </GridSplitter.Style>
+                </GridSplitter>
+
+                <!-- Image Preview Panel (Col 2: Images) -->
+                <Border x:Name="ImagePanel"
+                        Grid.Column="2"
+                        Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        BorderBrush="{StaticResource BorderColor}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Style.Triggers>
+                                <!-- Show a 1px vertical line separating Content from Image -->
+                                <DataTrigger Binding="{Binding IsContentVisible}" Value="True">
+                                    <Setter Property="BorderThickness" Value="1,0,0,0"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Image x:Name="ImagePreview" 
+                               Stretch="Uniform"
+                               Margin="10"/>
+                </Border>
+            </Grid> <!-- Closing FilesGrid -->
+        </Grid> <!-- Closing PreviewArea -->
             
             <!-- 3. DETAILS VIEW (Renamed Info) -->
             <local:DetailsTabControl 

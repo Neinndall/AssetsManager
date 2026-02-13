@@ -227,27 +227,14 @@ namespace AssetsManager.Services.Explorer
 
         private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false)
         {
-            // Part 1: Strict Destructive Cleanup via ViewModel
-            _viewModel.ResetAllVisibility();
-
-            // Nullify sources to release memory and prevent ghosting
-            _imagePreview.Source = null;
-            _textEditorPreview.Clear();
-
-            // Part 2: If the previous previewer was a WebView, destroy it immediately.
-            if (_activePreviewer == Previewer.WebView)
-            {
-                var webView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
-                if (webView != null)
-                {
-                    webView.Dispose();
-                    _webViewContainer.Children.Remove(webView);
-                }
-            }
+            // Part 1: Selective Cleanup
+            // We always hide status panels when a real file is about to be shown
+            _viewModel.IsWelcomeVisible = false;
+            _viewModel.IsUnsupportedVisible = false;
 
             _activePreviewer = newPreviewer;
 
-            // Part 3: Show the new content via ViewModel by activating only the required panel
+            // Part 3: Show the new content via ViewModel by activating only the required panel category
             switch (newPreviewer)
             {
                 case Previewer.Image:
@@ -262,7 +249,12 @@ namespace AssetsManager.Services.Explorer
                 case Previewer.WebView:
                     if (content is string htmlContent)
                     {
+                        // Clean previous web view if any
+                        var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
+                        if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
+
                         await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
+                        _viewModel.IsTextVisible = false;
                         _viewModel.IsContentVisible = true;
                         _viewModel.IsWebVisible = true;
                         _viewModel.HasEverPreviewedAFile = true;
@@ -272,8 +264,13 @@ namespace AssetsManager.Services.Explorer
                 case Previewer.AvalonEdit:
                     if (content is ValueTuple<string, IHighlightingDefinition> textData)
                     {
+                        // Clean previous web view if any
+                        var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
+                        if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
+
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
+                        _viewModel.IsWebVisible = false;
                         _viewModel.IsContentVisible = true;
                         _viewModel.IsTextVisible = true;
                         _viewModel.HasEverPreviewedAFile = true;
@@ -285,18 +282,24 @@ namespace AssetsManager.Services.Explorer
                     if (content is string extension)
                     {
                         // This is for unsupported files
+                        // When unsupported, we DON'T hide the other categories automatically, 
+                        // but we show the error message.
                         _viewModel.IsUnsupportedVisible = true;
                         _unsupportedFileSubTextBlock.Text = $"The {extension} format is not supported to preview it.";
                     }
                     else
                     {
-                        // This is for the default "Select a file" message
-                        // We ONLY show the welcome message if the user HAS NEVER previewed a file yet.
+                        // This is for the default "Select a file" message (Reset)
                         if (!_viewModel.HasEverPreviewedAFile)
                         {
                             _viewModel.IsWelcomeVisible = true;
                         }
                     }
+                    break;
+
+                case Previewer.None:
+                    // Generic blanking (usually for transition or initial load)
+                    // We don't hide everything here to keep the "keep last file" logic
                     break;
             }
         }
