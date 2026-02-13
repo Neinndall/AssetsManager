@@ -94,8 +94,6 @@ namespace AssetsManager.Views.Controls.Explorer
         private void PinnedFiles_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             UpdateScrollButtonsVisibility();
-            // Trigger a refresh of the tabs visibility property
-            ViewModel.IsRenamedDetailsTabVisible = ViewModel.IsRenamedDetailsTabVisible;
         }
 
         private void ScrollLeftButton_Click(object sender, RoutedEventArgs e)
@@ -154,58 +152,30 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 if (selectedPin == null)
                 {
-                    if (!ViewModel.IsDetailsTabSelected)
+                    // If we are in Grid Mode and have a folder context, go back to the Grid
+                    if (ViewModel.IsGridMode && _currentFolderNode != null)
                     {
-                        // If we are in Grid Mode and have a folder context, go back to the Grid
-                        if (ViewModel.IsGridMode && _currentFolderNode != null)
-                        {
-                            UpdateSelectedNode(_currentFolderNode, _rootNodes);
-                        }
-                        else
-                        {
-                            await ExplorerPreviewService.ResetPreviewAsync();
-                            _currentNode = null;
-                        }
+                        UpdateSelectedNode(_currentFolderNode, _rootNodes);
+                    }
+                    else
+                    {
+                        await ExplorerPreviewService.ResetPreviewAsync();
+                        _currentNode = null;
                     }
                     return;
                 }
 
-                ViewModel.IsDetailsTabSelected = false;
                 _currentNode = selectedPin.Node;
                 ViewModel.HasSelectedNode = true;
                 ViewModel.IsSelectedNodeContainer = false;
 
-                if (selectedPin.Node?.ChunkDiff is SerializableChunkDiff diff && diff.Type == ChunkDiffType.Renamed)
-                {
-                    ViewModel.RenamedDiffDetails = diff;
-                    ViewModel.IsRenamedDetailsTabVisible = true;
-                }
-                else
-                {
-                    ViewModel.RenamedDiffDetails = null;
-                    ViewModel.IsRenamedDetailsTabVisible = false;
-                }
+                ViewModel.RenamedDiffDetails = selectedPin.Node?.ChunkDiff;
 
                 UpdateBreadcrumbs(selectedPin.Node);
 
                 // Important: Always call the service with the LATEST node from the pin
                 await ExplorerPreviewService.ShowPreviewAsync(selectedPin.Node);
             }
-        }
-
-        private void DetailsTab_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            ViewModel.IsDetailsTabSelected = true;
-            if (ViewModel.PinnedFilesManager.SelectedFile != null)
-            {
-                ViewModel.PinnedFilesManager.SelectedFile = null;
-            }
-        }
-
-        private void CloseDetailsTabButton_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.IsDetailsTabSelected = false;
-            ViewModel.IsRenamedDetailsTabVisible = false;
         }
 
         private void Tab_MouseDown(object sender, MouseButtonEventArgs e)
@@ -325,21 +295,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void UpdateSelectedNode(FileSystemNodeModel node, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
-            ViewModel.IsDetailsTabSelected = false;
             _currentNode = node;
             _rootNodes = rootNodes;
             ViewModel.HasSelectedNode = node != null;
 
-            if (node?.ChunkDiff is SerializableChunkDiff diff && diff.Type == ChunkDiffType.Renamed)
-            {
-                ViewModel.RenamedDiffDetails = diff;
-                ViewModel.IsRenamedDetailsTabVisible = true;
-            }
-            else
-            {
-                ViewModel.RenamedDiffDetails = null;
-                ViewModel.IsRenamedDetailsTabVisible = false;
-            }
+            ViewModel.RenamedDiffDetails = node?.ChunkDiff;
 
             UpdateBreadcrumbs(node);
 

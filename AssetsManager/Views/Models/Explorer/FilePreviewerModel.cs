@@ -21,32 +21,17 @@ namespace AssetsManager.Views.Models.Explorer
         public SerializableChunkDiff RenamedDiffDetails
         {
             get => _renamedDiffDetails;
-            set { _renamedDiffDetails = value; OnPropertyChanged(); }
-        }
-
-        private bool _isRenamedDetailsTabVisible;
-        public bool IsRenamedDetailsTabVisible
-        {
-            get => _isRenamedDetailsTabVisible;
             set 
             { 
-                if (_isRenamedDetailsTabVisible != value)
-                {
-                    _isRenamedDetailsTabVisible = value; 
-                    OnPropertyChanged(); 
-                    OnPropertyChanged(nameof(AreTabsVisible));
-                }
+                _renamedDiffDetails = value; 
+                OnPropertyChanged(); 
+                OnPropertyChanged(nameof(IsRenamedInfoVisible));
             }
         }
 
-        public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0 || IsRenamedDetailsTabVisible;
+        public bool IsRenamedInfoVisible => RenamedDiffDetails != null && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
 
-        private bool _isDetailsTabSelected;
-        public bool IsDetailsTabSelected
-        {
-            get => _isDetailsTabSelected;
-            set { _isDetailsTabSelected = value; OnPropertyChanged(); }
-        }
+        public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0;
 
         public FilePreviewerModel()
         {
@@ -256,7 +241,6 @@ namespace AssetsManager.Views.Models.Explorer
             IsTextVisible = false;
             IsWebVisible = false;
             IsFindVisible = false;
-            IsDetailsTabSelected = false;
             HasEverPreviewedAFile = false;
         }
 
