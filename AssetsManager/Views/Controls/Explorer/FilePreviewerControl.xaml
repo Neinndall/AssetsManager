@@ -245,8 +245,7 @@
                     </Style>
                 </Grid.Style>
                 
-                <!-- Status Layer (Centered in full area) -->
-                <!-- Welcome Panel -->
+                <!-- Welcome Panel (Centered in full area) -->
                 <Border x:Name="WelcomePanel"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
@@ -276,41 +275,10 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Unsupported File Panel -->
-                <Border x:Name="UnsupportedFilePanel"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Visibility="{Binding IsUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                        MaxWidth="400">
-                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <materialIcons:MaterialIcon Kind="FileRemoveOutline" 
-                                                Width="64" Height="64"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource TextMuted}"
-                                                Opacity="0.5"
-                                                Margin="0,0,0,16"/>
-                        <TextBlock Text="Preview not available"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"
-                               HorizontalAlignment="Center"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"/>
-                        <TextBlock x:Name="UnsupportedFileSubMessage"
-                               Text="The file format is not supported to preview it."
-                               FontSize="14"
-                               Foreground="{StaticResource TextSecondary}"
-                               HorizontalAlignment="Center"
-                               Margin="0,8,0,0"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"/>
-                    </StackPanel>
-                </Border>
-
                 <!-- Files Layer (Adaptive Dual View) -->
                 <Grid x:Name="FilesGrid">
                     <Grid.ColumnDefinitions>
-                        <!-- Col 0 (Content) -->
+                        <!-- Column 0: Content -->
                         <ColumnDefinition>
                             <ColumnDefinition.Style>
                                 <Style TargetType="ColumnDefinition">
@@ -324,15 +292,15 @@
                             </ColumnDefinition.Style>
                         </ColumnDefinition>
                         
-                        <!-- Col 1 (Splitter) -->
-                        <ColumnDefinition Width="Auto"/>
-                        
-                        <!-- Col 2 (Image) -->
-                        <ColumnDefinition>
+                        <!-- Column 1: Splitter -->
+                        <ColumnDefinition Width="Auto">
                             <ColumnDefinition.Style>
                                 <Style TargetType="ColumnDefinition">
-                                    <Setter Property="Width" Value="*"/>
+                                    <Setter Property="Width" Value="Auto"/>
                                     <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsContentVisible}" Value="False">
+                                            <Setter Property="Width" Value="0"/>
+                                        </DataTrigger>
                                         <DataTrigger Binding="{Binding IsImageVisible}" Value="False">
                                             <Setter Property="Width" Value="0"/>
                                         </DataTrigger>
@@ -340,74 +308,115 @@
                                 </Style>
                             </ColumnDefinition.Style>
                         </ColumnDefinition>
+                        
+                        <!-- Column 2: Image -->
+                        <ColumnDefinition>
+                            <ColumnDefinition.Style>
+                                <Style TargetType="ColumnDefinition">
+                                    <Setter Property="Width" Value="*"/>
+                                    <Setter Property="MinWidth" Value="150"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsImageVisible}" Value="False">
+                                            <Setter Property="Width" Value="0"/>
+                                            <Setter Property="MinWidth" Value="0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ColumnDefinition.Style>
+                        </ColumnDefinition>
                     </Grid.ColumnDefinitions>
 
-                <!-- Content Preview Panel (Col 0: Text/Audio/Video) -->
-                <Grid x:Name="ContentPanel"
-                      Grid.Column="0"
-                      Visibility="{Binding IsContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <avalonedit:TextEditor x:Name="TextEditorPreview"
-                                           Style="{StaticResource BaseTextEditorStyle}"
-                                           Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                           Margin="-4,0,0,0"/>
-                    
-                    <Grid x:Name="WebViewContainer"
-                          Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <!-- Left: Content Panel -->
+                    <Grid x:Name="ContentPanel" Grid.Column="0"
+                          Visibility="{Binding IsContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        
+                        <avalonedit:TextEditor x:Name="TextEditorPreview"
+                                               Style="{StaticResource BaseTextEditorStyle}"
+                                               Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                               Margin="-4,0,0,0"/>
+                        
+                        <Grid x:Name="WebViewContainer"
+                              Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                    <!-- Search inside document -->
-                    <shared:FindInDocumentControl x:Name="FindInDocumentControl"
-                                                  HorizontalAlignment="Right"
-                                                  VerticalAlignment="Top"
-                                                  Margin="0,0,15,0"
-                                                  Visibility="{Binding IsFindVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                                  TargetTextEditor="{Binding ElementName=TextEditorPreview}"
-                                                  Close="FindInDocumentControl_Close"/>
+                        <!-- Error Message inside Content area -->
+                        <Border x:Name="UnsupportedFilePanel"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding IsUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                MaxWidth="400">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="FileRemoveOutline" 
+                                                        Width="64" Height="64"
+                                                        HorizontalAlignment="Center"
+                                                        Foreground="{StaticResource TextMuted}"
+                                                        Opacity="0.5"
+                                                        Margin="0,0,0,16"/>
+                                <TextBlock Text="Preview not available"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimary}"
+                                       HorizontalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"/>
+                                <TextBlock x:Name="UnsupportedFileSubMessage"
+                                       Text="The file format is not supported to preview it."
+                                       FontSize="14"
+                                       Foreground="{StaticResource TextSecondary}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,8,0,0"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Search inside document -->
+                        <shared:FindInDocumentControl x:Name="FindInDocumentControl"
+                                                      HorizontalAlignment="Right"
+                                                      VerticalAlignment="Top"
+                                                      Margin="0,0,15,0"
+                                                      Visibility="{Binding IsFindVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                      TargetTextEditor="{Binding ElementName=TextEditorPreview}"
+                                                      Close="FindInDocumentControl_Close"/>
+                    </Grid>
+
+                    <!-- Middle: Splitter -->
+                    <GridSplitter Grid.Column="1" Width="5" 
+                                  HorizontalAlignment="Center" VerticalAlignment="Stretch" 
+                                  Background="Transparent">
+                        <GridSplitter.Style>
+                            <Style TargetType="GridSplitter">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsContentVisible}" Value="True"/>
+                                            <Condition Binding="{Binding IsImageVisible}" Value="True"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </GridSplitter.Style>
+                    </GridSplitter>
+
+                    <!-- Right: Image Panel -->
+                    <Border x:Name="ImagePanel" Grid.Column="2"
+                            Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            BorderBrush="{StaticResource BorderColor}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsContentVisible}" Value="True">
+                                        <Setter Property="BorderThickness" Value="1,0,0,0"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Image x:Name="ImagePreview" Stretch="Uniform" Margin="10"/>
+                    </Border>
                 </Grid>
-
-                <!-- Minimal Grid Splitter (Col 1) -->
-                <GridSplitter Grid.Column="1" 
-                              Width="5" 
-                              HorizontalAlignment="Center" 
-                              VerticalAlignment="Stretch" 
-                              Background="Transparent">
-                    <GridSplitter.Style>
-                        <Style TargetType="GridSplitter">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsContentVisible}" Value="True"/>
-                                        <Condition Binding="{Binding IsImageVisible}" Value="True"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </GridSplitter.Style>
-                </GridSplitter>
-
-                <!-- Image Preview Panel (Col 2: Images) -->
-                <Border x:Name="ImagePanel"
-                        Grid.Column="2"
-                        Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                        BorderBrush="{StaticResource BorderColor}">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="BorderThickness" Value="0"/>
-                            <Style.Triggers>
-                                <!-- Show a 1px vertical line separating Content from Image -->
-                                <DataTrigger Binding="{Binding IsContentVisible}" Value="True">
-                                    <Setter Property="BorderThickness" Value="1,0,0,0"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                    <Image x:Name="ImagePreview" 
-                               Stretch="Uniform"
-                               Margin="10"/>
-                </Border>
-            </Grid> <!-- Closing FilesGrid -->
-        </Grid> <!-- Closing PreviewArea -->
+            </Grid>
             
             <!-- 3. DETAILS VIEW (Renamed Info) -->
             <local:DetailsTabControl 

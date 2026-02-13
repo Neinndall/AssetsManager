@@ -75,7 +75,6 @@ namespace AssetsManager.Services.Explorer
             if (node == null || node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent || SupportedFileTypes.AudioBank.Contains(node.Extension))
             {
                 // If we've already started browsing files, we DON'T reset. 
-                // We keep the last file visible for a smoother experience.
                 if (_viewModel.HasEverPreviewedAFile)
                 {
                     return;
@@ -88,35 +87,38 @@ namespace AssetsManager.Services.Explorer
             // Avoid redundant reloads of the same file
             if (_currentlyDisplayedNode == node) return;
 
-            await SetPreviewerAsync(Previewer.None); // Blank the preview area only for actual files
+            // Step 1: Tell the ViewModel to prepare the correct slot (Image or Content)
+            _viewModel.PrepareSlotForFile(node);
+
+            // Step 2: SELECTIVE clearing to maintain Dual View
+            // Only clear the slot that is being updated to avoid flickering
+            // without affecting the other active panel.
+            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
+                           SupportedFileTypes.Textures.Contains(node.Extension) || 
+                           SupportedFileTypes.VectorImages.Contains(node.Extension);
+
+            if (isImage)
+            {
+                _imagePreview.Source = null;
+            }
+            else
+            {
+                _textEditorPreview.Clear();
+                // Note: WebView cleanup is handled inside SetPreviewerAsync 
+                // when the new media is ready to be injected.
+            }
 
             _currentlyDisplayedNode = node;
 
             try
             {
-                // This is a virtual file inside a WAD archive.
-                if (node.Type == NodeType.VirtualFile)
-                {
-                    await PreviewWadFile(node);
-                }
-                // This is a physical file on the disk, used when in Directory Mode.
-                else if (node.Type == NodeType.RealFile)
-                {
-                    await PreviewRealFile(node);
-                }
-                // This is a special node representing a WEM sound from an audio bank.
-                else if (node.Type == NodeType.WemFile)
-                {
-                    byte[] wemData = await _wadExtractionService.GetWemFileBytesAsync(node);
-                    if (wemData != null)
-                    {
-                        await DispatchPreview(wemData, ".wem", node);
-                    }
-                    else
-                    {
-                        await ShowUnsupportedPreviewAsync(node.Extension);
-                    }
-                }
+                byte[] data = null;
+                if (node.Type == NodeType.VirtualFile) { data = await _wadExtractionService.GetVirtualFileBytesAsync(node); }
+                else if (node.Type == NodeType.RealFile) { if (File.Exists(node.FullPath)) data = await File.ReadAllBytesAsync(node.FullPath); }
+                else if (node.Type == NodeType.WemFile) { data = await _wadExtractionService.GetWemFileBytesAsync(node); }
+
+                if (data != null) { await DispatchPreview(data, node.Extension, node); }
+                else { await ShowUnsupportedPreviewAsync(node.Extension); }
             }
             catch (Exception ex)
             {
@@ -227,14 +229,8 @@ namespace AssetsManager.Services.Explorer
 
         private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false)
         {
-            // Part 1: Selective Cleanup
-            // We always hide status panels when a real file is about to be shown
-            _viewModel.IsWelcomeVisible = false;
-            _viewModel.IsUnsupportedVisible = false;
-
             _activePreviewer = newPreviewer;
 
-            // Part 3: Show the new content via ViewModel by activating only the required panel category
             switch (newPreviewer)
             {
                 case Previewer.Image:
@@ -242,38 +238,31 @@ namespace AssetsManager.Services.Explorer
                     {
                         _imagePreview.Source = imageSource;
                         _viewModel.IsImageVisible = true;
-                        _viewModel.HasEverPreviewedAFile = true;
                     }
                     break;
 
                 case Previewer.WebView:
                     if (content is string htmlContent)
                     {
-                        // Clean previous web view if any
                         var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
                         if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
 
                         await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
                         _viewModel.IsTextVisible = false;
-                        _viewModel.IsContentVisible = true;
                         _viewModel.IsWebVisible = true;
-                        _viewModel.HasEverPreviewedAFile = true;
                     }
                     break;
 
                 case Previewer.AvalonEdit:
                     if (content is ValueTuple<string, IHighlightingDefinition> textData)
                     {
-                        // Clean previous web view if any
                         var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
                         if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
 
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
                         _viewModel.IsWebVisible = false;
-                        _viewModel.IsContentVisible = true;
                         _viewModel.IsTextVisible = true;
-                        _viewModel.HasEverPreviewedAFile = true;
                         _textEditorPreview.Focus();
                     }
                     break;
@@ -281,25 +270,18 @@ namespace AssetsManager.Services.Explorer
                 case Previewer.StatusPanel:
                     if (content is string extension)
                     {
-                        // This is for unsupported files
-                        // When unsupported, we DON'T hide the other categories automatically, 
-                        // but we show the error message.
                         _viewModel.IsUnsupportedVisible = true;
+                        _viewModel.IsTextVisible = false;
+                        _viewModel.IsWebVisible = false;
                         _unsupportedFileSubTextBlock.Text = $"The {extension} format is not supported to preview it.";
                     }
                     else
                     {
-                        // This is for the default "Select a file" message (Reset)
-                        if (!_viewModel.HasEverPreviewedAFile)
-                        {
-                            _viewModel.IsWelcomeVisible = true;
-                        }
+                        // Global Reset
+                        _viewModel.ResetAllVisibility();
+                        _imagePreview.Source = null;
+                        _textEditorPreview.Clear();
                     }
-                    break;
-
-                case Previewer.None:
-                    // Generic blanking (usually for transition or initial load)
-                    // We don't hide everything here to keep the "keep last file" logic
                     break;
             }
         }

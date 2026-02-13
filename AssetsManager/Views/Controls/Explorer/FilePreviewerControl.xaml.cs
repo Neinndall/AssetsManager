@@ -37,7 +37,6 @@ namespace AssetsManager.Views.Controls.Explorer
         private FileSystemNodeModel _currentNode;
         private FileSystemNodeModel _currentFolderNode;
         private ObservableRangeCollection<FileSystemNodeModel> _rootNodes;
-        private bool _isShowingTemporaryPreview = false;
         private string _currentSearchFilter = string.Empty;
         private CancellationTokenSource _thumbnailCts;
 
@@ -151,13 +150,11 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.PropertyName == nameof(PinnedFilesManager.SelectedFile))
             {
-                if (_isShowingTemporaryPreview) return;
-
                 var selectedPin = ViewModel.PinnedFilesManager.SelectedFile;
 
                 if (selectedPin == null)
                 {
-                    if (!ViewModel.IsDetailsTabSelected && !_isShowingTemporaryPreview)
+                    if (!ViewModel.IsDetailsTabSelected)
                     {
                         // If we are in Grid Mode and have a folder context, go back to the Grid
                         if (ViewModel.IsGridMode && _currentFolderNode != null)
@@ -170,12 +167,6 @@ namespace AssetsManager.Views.Controls.Explorer
                             _currentNode = null;
                         }
                     }
-                    return;
-                }
-
-                if (_isShowingTemporaryPreview) 
-                {
-                    LogService.Log("[FilePreviewer] Ignoring pin change because a temporary preview is being shown.");
                     return;
                 }
 
@@ -197,6 +188,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 UpdateBreadcrumbs(selectedPin.Node);
 
+                // Important: Always call the service with the LATEST node from the pin
                 await ExplorerPreviewService.ShowPreviewAsync(selectedPin.Node);
             }
         }
@@ -224,15 +216,20 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async void CloseTabButton_Click(object sender, RoutedEventArgs e)
+        private void CloseTabButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement element && element.DataContext is PinnedFileModel vm)
             {
+                // Selective cleanup: only hide the panel belonging to this file type
+                ViewModel.ClosePanelByCategory(vm.Node);
+                
+                ViewModel.PinnedFilesManager.UnpinFile(vm);
+
+                // If we closed the currently active file, we need to update the selection
                 if (ViewModel.PinnedFilesManager.SelectedFile == vm)
                 {
-                    await ExplorerPreviewService.ResetPreviewAsync();
+                    ViewModel.PinnedFilesManager.SelectedFile = null;
                 }
-                ViewModel.PinnedFilesManager.UnpinFile(vm);
             }
         }
 
@@ -286,28 +283,35 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
+            if (node == null) return;
+
             _currentNode = node;
 
-            var existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node);
+            // ONLY auto-pin if it's a previewable file (not a folder or container)
+            bool isContainer = node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent;
 
-            if (existingPin != null)
+            if (!isContainer)
             {
-                if (ViewModel.PinnedFilesManager.SelectedFile == existingPin)
+                // Check if the file is already pinned
+                var existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node);
+
+                if (existingPin == null)
                 {
-                    await ExplorerPreviewService.ShowPreviewAsync(node);
+                    // Auto-pin the file so it appears in the tabs and can be closed/managed
+                    ViewModel.PinnedFilesManager.PinFile(node);
+                    existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node);
                 }
-                else
+
+                // Select the tab (this will trigger PinnedFilesManager_PropertyChanged which calls the service)
+                if (existingPin != null)
                 {
                     ViewModel.PinnedFilesManager.SelectedFile = existingPin;
                 }
             }
             else
             {
-                _isShowingTemporaryPreview = true;
-                ViewModel.PinnedFilesManager.SelectedFile = null;
-
+                // For containers, we just call the service to handle potential keep-alive logic
                 await ExplorerPreviewService.ShowPreviewAsync(node);
-                _isShowingTemporaryPreview = false;
             }
         }
 
@@ -363,6 +367,12 @@ namespace AssetsManager.Views.Controls.Explorer
                 _thumbnailCts?.Cancel();
                 _thumbnailCts = new CancellationTokenSource();
                 _ = LoadThumbnailsQueueAsync(gridItems, _thumbnailCts.Token);
+            }
+            else if (node != null)
+            {
+                // If it's a file, hide status messages immediately to avoid flickers during load
+                ViewModel.IsWelcomeVisible = false;
+                ViewModel.IsUnsupportedVisible = false;
             }
         }
 
