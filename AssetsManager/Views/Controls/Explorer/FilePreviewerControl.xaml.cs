@@ -237,7 +237,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     ImagePreview,
                     WebViewContainer,
                     TextEditorPreview,
-                    UnsupportedFileMessage,
+                    UnsupportedFileSubMessage,
                     ViewModel
                 );
 

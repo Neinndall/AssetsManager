@@ -39,7 +39,7 @@ namespace AssetsManager.Services.Explorer
         private Image _imagePreview;
         private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
-        private TextBlock _unsupportedFileTextBlock;
+        private TextBlock _unsupportedFileSubTextBlock;
         private FilePreviewerModel _viewModel;
         private IHighlightingDefinition _jsonHighlightingDefinition;
 
@@ -60,12 +60,12 @@ namespace AssetsManager.Services.Explorer
             _wadExtractionService = wadExtractionService;
         }
 
-        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, TextBlock unsupportedFileTextBlock, FilePreviewerModel viewModel)
+        public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, TextBlock unsupportedFileSubTextBlock, FilePreviewerModel viewModel)
         {
             _imagePreview = imagePreview;
             _webViewContainer = webViewContainer;
             _textEditorPreview = textEditor;
-            _unsupportedFileTextBlock = unsupportedFileTextBlock;
+            _unsupportedFileSubTextBlock = unsupportedFileSubTextBlock;
             _viewModel = viewModel;
         }
 
@@ -220,9 +220,9 @@ namespace AssetsManager.Services.Explorer
             _viewModel.IsImageVisible = false;
             _viewModel.IsTextVisible = false;
             _viewModel.IsWebVisible = false;
-            _viewModel.IsPlaceholderVisible = false;
+            _viewModel.IsMainPreviewerVisible = false;
             _viewModel.IsDetailsVisible = false;
-            _viewModel.IsSelectFileMessageVisible = false;
+            _viewModel.IsWelcomeVisible = false;
             _viewModel.IsUnsupportedFileMessageVisible = false;
 
             _imagePreview.Source = null;
@@ -272,18 +272,19 @@ namespace AssetsManager.Services.Explorer
                     break;
 
                 case Previewer.StatusPanel:
-                    _viewModel.IsPlaceholderVisible = true;
+                    _viewModel.IsMainPreviewerVisible = true;
                     if (content is string extension)
                     {
                         // This is for unsupported files
-                        _viewModel.IsSelectFileMessageVisible = false;
+                        _viewModel.IsWelcomeVisible = false;
                         _viewModel.IsUnsupportedFileMessageVisible = true;
-                        _unsupportedFileTextBlock.Text = $"Preview not available for '{extension}' files.";
+                        
+                        _unsupportedFileSubTextBlock.Text = $"The {extension} format is not supported to preview it.";
                     }
                     else
                     {
                         // This is for the default "Select a file" message
-                        _viewModel.IsSelectFileMessageVisible = true;
+                        _viewModel.IsWelcomeVisible = true;
                         _viewModel.IsUnsupportedFileMessageVisible = false;
                     }
                     break;

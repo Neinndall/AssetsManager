@@ -137,11 +137,11 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isFindVisible = value; OnPropertyChanged(); }
         }
 
-        private bool _isPlaceholderVisible = true;
-        public bool IsPlaceholderVisible
+        private bool _isMainPreviewerVisible = true;
+        public bool IsMainPreviewerVisible
         {
-            get => _isPlaceholderVisible;
-            set { _isPlaceholderVisible = value; OnPropertyChanged(); }
+            get => _isMainPreviewerVisible;
+            set { _isMainPreviewerVisible = value; OnPropertyChanged(); }
         }
 
         private bool _isImageVisible;
@@ -165,11 +165,11 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isWebVisible = value; OnPropertyChanged(); }
         }
 
-        private bool _isSelectFileMessageVisible = true;
-        public bool IsSelectFileMessageVisible
+        private bool _isWelcomeVisible = true;
+        public bool IsWelcomeVisible
         {
-            get => _isSelectFileMessageVisible;
-            set { _isSelectFileMessageVisible = value; OnPropertyChanged(); }
+            get => _isWelcomeVisible;
+            set { _isWelcomeVisible = value; OnPropertyChanged(); }
         }
 
         private bool _isUnsupportedFileMessageVisible;

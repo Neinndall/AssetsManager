@@ -251,7 +251,7 @@ namespace AssetsManager.Services.Downloads
             {
                 html = await _httpClient.GetStringAsync(Requests.BaseUrl);
             }
-            catch (HttpRequestException httpEx)
+            catch (HttpRequestException)
             {
                 _logService.LogWarning($"Unable to connect to CommunityDragon. Server might be down or busy.");
                 return result;

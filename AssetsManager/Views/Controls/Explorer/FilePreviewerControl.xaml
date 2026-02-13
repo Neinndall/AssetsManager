@@ -249,15 +249,15 @@
                 <Grid x:Name="PreviewContainer" 
                     Visibility="{Binding IsPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
 
-                    <!-- Placeholders -->
-                    <Grid x:Name="PreviewStatusPanel"
-                        Visibility="{Binding IsPlaceholderVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <!-- Main Previewer Status -->
+                    <Grid x:Name="MainPreviewerPanel"
+                        Visibility="{Binding IsMainPreviewerVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
 
-                        <!-- Default State Card -->
-                        <Border x:Name="SelectFileStatusPanel"
+                        <!-- Welcome Panel (Default State) -->
+                        <Border x:Name="WelcomePanel"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            Visibility="{Binding IsSelectFileMessageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Visibility="{Binding IsWelcomeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                             MaxWidth="400">
                             <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                                 <!-- Icon -->
@@ -269,7 +269,7 @@
                                                         Margin="0,0,0,16"/>
 
                                 <TextBlock x:Name="SelectFileMessage"
-                                       Text="No file selected"
+                                       Text="Select a file"
                                        FontSize="18" 
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimary}"
@@ -287,8 +287,8 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Unsupported State Card -->
-                        <Border x:Name="UnsupportedStatusPanel"
+                        <!-- Unsupported File Panel -->
+                        <Border x:Name="UnsupportedFilePanel"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Visibility="{Binding IsUnsupportedFileMessageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -302,14 +302,15 @@
                                                         Margin="0,0,0,16"/>
 
                                 <TextBlock x:Name="UnsupportedFileMessage"
-                                       Text="Preview Unavailable"
+                                       Text="Preview not available"
                                        FontSize="18"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimary}"
                                        HorizontalAlignment="Center"
                                        TextWrapping="Wrap"
                                        TextAlignment="Center"/>
-                                <TextBlock Text="This file format is not supported for internal preview."
+                                <TextBlock x:Name="UnsupportedFileSubMessage"
+                                       Text="The file format is not supported to preview it."
                                        FontSize="14"
                                        Foreground="{StaticResource TextSecondary}"
                                        HorizontalAlignment="Center"
