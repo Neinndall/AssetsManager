@@ -1,5 +1,7 @@
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace AssetsManager.Views.Models.Explorer
@@ -193,9 +195,61 @@ namespace AssetsManager.Views.Models.Explorer
             set { _canScrollRight = value; OnPropertyChanged(); }
         }
 
+        public void PrepareSlotForFile(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+
+            // Step 1: Always hide status panels when a real file is about to be shown
+            IsWelcomeVisible = false;
+            IsUnsupportedVisible = false;
+            HasEverPreviewedAFile = true;
+
+            // Step 2: Determine category
+            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
+                           SupportedFileTypes.Textures.Contains(node.Extension) || 
+                           SupportedFileTypes.VectorImages.Contains(node.Extension);
+
+            if (isImage)
+            {
+                IsImageVisible = true;
+            }
+            else
+            {
+                IsContentVisible = true;
+            }
+        }
+
+        public void ClosePanelByCategory(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+
+            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
+                           SupportedFileTypes.Textures.Contains(node.Extension) || 
+                           SupportedFileTypes.VectorImages.Contains(node.Extension);
+
+            if (isImage)
+            {
+                IsImageVisible = false;
+            }
+            else
+            {
+                IsContentVisible = false;
+                IsTextVisible = false;
+                IsWebVisible = false;
+                IsUnsupportedVisible = false;
+            }
+
+            // If absolutely nothing is visible after closing, we show Welcome again
+            if (!IsImageVisible && !IsContentVisible)
+            {
+                HasEverPreviewedAFile = false; // Reset state to allow Welcome message
+                IsWelcomeVisible = true;
+            }
+        }
+
         public void ResetAllVisibility()
         {
-            IsWelcomeVisible = false;
+            IsWelcomeVisible = true;
             IsUnsupportedVisible = false;
             IsImageVisible = false;
             IsContentVisible = false;
@@ -203,6 +257,7 @@ namespace AssetsManager.Views.Models.Explorer
             IsWebVisible = false;
             IsFindVisible = false;
             IsDetailsTabSelected = false;
+            HasEverPreviewedAFile = false;
         }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
