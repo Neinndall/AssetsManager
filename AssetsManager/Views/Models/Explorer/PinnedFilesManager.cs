@@ -32,7 +32,7 @@ namespace AssetsManager.Views.Models.Explorer
             PinnedFiles = new ObservableRangeCollection<PinnedFileModel>();
         }
 
-        public void PinFile(FileSystemNodeModel node)
+        public void PinFile(FileSystemNodeModel node, bool isExplicitPin = false)
         {
             if (node == null) return;
 
@@ -41,31 +41,59 @@ namespace AssetsManager.Views.Models.Explorer
                            SupportedFileTypes.Textures.Contains(node.Extension) || 
                            SupportedFileTypes.VectorImages.Contains(node.Extension);
 
-            // Find an existing pin of the same category
-            var categoryPin = PinnedFiles.FirstOrDefault(p => {
+            // 1. If it's an explicit pin, find the current pin for this node and fix it
+            if (isExplicitPin)
+            {
+                var existing = PinnedFiles.FirstOrDefault(p => p.Node == node);
+                if (existing != null)
+                {
+                    existing.IsPinned = true;
+                    SelectedFile = existing;
+                    return;
+                }
+                
+                // If not even present, create it as pinned
+                var newPin = new PinnedFileModel(node) { IsPinned = true };
+                PinnedFiles.Add(newPin);
+                SelectedFile = newPin;
+                return;
+            }
+
+            // 2. If it's an auto-pin (click), look for a RECYCLABLE pin of the same category (IsPinned == false)
+            var recyclablePin = PinnedFiles.FirstOrDefault(p => {
+                if (p.IsPinned) return false; // Pinned tabs are never recycled
+                
                 bool pIsImage = SupportedFileTypes.Images.Contains(p.Node.Extension) || 
                                 SupportedFileTypes.Textures.Contains(p.Node.Extension) || 
                                 SupportedFileTypes.VectorImages.Contains(p.Node.Extension);
                 return pIsImage == isImage;
             });
 
-            if (categoryPin != null)
+            if (recyclablePin != null)
             {
-                // Recycle the existing tab slot
-                categoryPin.Node = node;
+                // Recycle the temporary slot
+                recyclablePin.Node = node;
                 
-                // Force a property change notification even if the reference is the same,
-                // to ensure the UI and PreviewService react to the new node.
+                // Force notification
                 var temp = SelectedFile;
                 _selectedFile = null; 
                 SelectedFile = temp;
             }
             else
             {
-                // Create a new slot if none exists for this category
-                var newPinnedFile = new PinnedFileModel(node);
-                PinnedFiles.Add(newPinnedFile);
-                SelectedFile = newPinnedFile;
+                // Check if the file is already open in a pinned tab
+                var pinnedVersion = PinnedFiles.FirstOrDefault(p => p.Node == node);
+                if (pinnedVersion != null)
+                {
+                    SelectedFile = pinnedVersion;
+                }
+                else
+                {
+                    // Create a new temporary slot
+                    var newPinnedFile = new PinnedFileModel(node) { IsPinned = false };
+                    PinnedFiles.Add(newPinnedFile);
+                    SelectedFile = newPinnedFile;
+                }
             }
         }
 

@@ -21,6 +21,20 @@ namespace AssetsManager.Views.Models.Explorer
 
         public string Header => Node?.Name;
 
+        private bool _isPinned;
+        public bool IsPinned
+        {
+            get => _isPinned;
+            set
+            {
+                if (_isPinned != value)
+                {
+                    _isPinned = value;
+                    OnPropertyChanged(nameof(IsPinned));
+                }
+            }
+        }
+
         private bool _isSelected;
         public bool IsSelected
         {
