@@ -57,7 +57,7 @@
             <!-- Main Content -->
             <Grid Grid.Row="1" Margin="20">
                 <!-- Empty State: Full Drop Area -->
-                <Grid Visibility="{Binding Items.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}">
+                <Grid Visibility="{Binding Items, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}">
                     <Rectangle x:Name="DropAreaUI" Stroke="{StaticResource BorderColor}" StrokeThickness="2" 
                                Fill="{StaticResource SidebarBackground}" RadiusX="10" RadiusY="10" 
                                StrokeDashArray="4 2"/>
@@ -72,7 +72,7 @@
                 </Grid>
 
                 <!-- Populated State: Files List -->
-                <Border Visibility="{Binding Items.Count, Converter={StaticResource CountToVisibilityConverter}}" 
+                <Border Visibility="{Binding Items, Converter={StaticResource CountToVisibilityConverter}}" 
                         Background="{StaticResource SidebarBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                     <Grid>
                         <ListView ItemsSource="{Binding Items}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextPrimary}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -127,7 +127,7 @@
 
             <!-- Format Selectors Section -->
             <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,12"
-                    Visibility="{Binding Items.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                    Visibility="{Binding Items, Converter={StaticResource CountToVisibilityConverter}}">
                 <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
                     <!-- Image Formats -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0"
@@ -166,7 +166,7 @@
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Content="Clear All" Style="{StaticResource SecondaryButton}" Width="100" Margin="0,0,10,0" Click="ClearAll_Click" IsEnabled="{Binding IsProcessing, Converter={StaticResource InverseBooleanConverter}}"/>
-                        <Button Content="Convert All" Width="120" Click="Convert_Click" IsEnabled="{Binding Items.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                        <Button Content="Convert All" Width="120" Click="Convert_Click" IsEnabled="{Binding Items, Converter={StaticResource CountToVisibilityConverter}}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
                                     <Style.Triggers>

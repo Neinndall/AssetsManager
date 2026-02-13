@@ -1,5 +1,7 @@
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace AssetsManager.Views.Models.Explorer
@@ -19,32 +21,17 @@ namespace AssetsManager.Views.Models.Explorer
         public SerializableChunkDiff RenamedDiffDetails
         {
             get => _renamedDiffDetails;
-            set { _renamedDiffDetails = value; OnPropertyChanged(); }
-        }
-
-        private bool _isRenamedDetailsTabVisible;
-        public bool IsRenamedDetailsTabVisible
-        {
-            get => _isRenamedDetailsTabVisible;
             set 
             { 
-                if (_isRenamedDetailsTabVisible != value)
-                {
-                    _isRenamedDetailsTabVisible = value; 
-                    OnPropertyChanged(); 
-                    OnPropertyChanged(nameof(AreTabsVisible));
-                }
+                _renamedDiffDetails = value; 
+                OnPropertyChanged(); 
+                OnPropertyChanged(nameof(IsRenamedInfoVisible));
             }
         }
 
-        public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0 || IsRenamedDetailsTabVisible;
+        public bool IsRenamedInfoVisible => RenamedDiffDetails != null && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
 
-        private bool _isDetailsTabSelected;
-        public bool IsDetailsTabSelected
-        {
-            get => _isDetailsTabSelected;
-            set { _isDetailsTabSelected = value; OnPropertyChanged(); }
-        }
+        public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0;
 
         public FilePreviewerModel()
         {
@@ -123,25 +110,46 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool AreBreadcrumbsVisible => IsBreadcrumbToggleOn && HasSelectedNode;
 
-        private bool _isDetailsVisible;
-        public bool IsDetailsVisible
+        private string _welcomeTitle = "Select a file";
+        public string WelcomeTitle
         {
-            get => _isDetailsVisible;
-            set { _isDetailsVisible = value; OnPropertyChanged(); }
+            get => _welcomeTitle;
+            set { _welcomeTitle = value; OnPropertyChanged(); }
         }
 
-        private bool _isFindVisible;
-        public bool IsFindVisible
+        private string _welcomeDescription = "Select a file from the explorer to preview its content";
+        public string WelcomeDescription
         {
-            get => _isFindVisible;
-            set { _isFindVisible = value; OnPropertyChanged(); }
+            get => _welcomeDescription;
+            set { _welcomeDescription = value; OnPropertyChanged(); }
         }
 
-        private bool _isPlaceholderVisible = true;
-        public bool IsPlaceholderVisible
+        private string _unsupportedTitle = "Preview not available";
+        public string UnsupportedTitle
         {
-            get => _isPlaceholderVisible;
-            set { _isPlaceholderVisible = value; OnPropertyChanged(); }
+            get => _unsupportedTitle;
+            set { _unsupportedTitle = value; OnPropertyChanged(); }
+        }
+
+        private string _unsupportedMessage = "The file format is not supported to preview it";
+        public string UnsupportedMessage
+        {
+            get => _unsupportedMessage;
+            set { _unsupportedMessage = value; OnPropertyChanged(); }
+        }
+
+        private bool _isWelcomeVisible = true;
+        public bool IsWelcomeVisible
+        {
+            get => _isWelcomeVisible;
+            set { _isWelcomeVisible = value; OnPropertyChanged(); }
+        }
+
+        private bool _isUnsupportedVisible;
+        public bool IsUnsupportedVisible
+        {
+            get => _isUnsupportedVisible;
+            set { _isUnsupportedVisible = value; OnPropertyChanged(); }
         }
 
         private bool _isImageVisible;
@@ -149,6 +157,13 @@ namespace AssetsManager.Views.Models.Explorer
         {
             get => _isImageVisible;
             set { _isImageVisible = value; OnPropertyChanged(); }
+        }
+
+        private bool _isContentVisible;
+        public bool IsContentVisible
+        {
+            get => _isContentVisible;
+            set { _isContentVisible = value; OnPropertyChanged(); }
         }
 
         private bool _isTextVisible;
@@ -165,18 +180,18 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isWebVisible = value; OnPropertyChanged(); }
         }
 
-        private bool _isSelectFileMessageVisible = true;
-        public bool IsSelectFileMessageVisible
+        private bool _isFindVisible;
+        public bool IsFindVisible
         {
-            get => _isSelectFileMessageVisible;
-            set { _isSelectFileMessageVisible = value; OnPropertyChanged(); }
+            get => _isFindVisible;
+            set { _isFindVisible = value; OnPropertyChanged(); }
         }
 
-        private bool _isUnsupportedFileMessageVisible;
-        public bool IsUnsupportedFileMessageVisible
+        private bool _hasEverPreviewedAFile;
+        public bool HasEverPreviewedAFile
         {
-            get => _isUnsupportedFileMessageVisible;
-            set { _isUnsupportedFileMessageVisible = value; OnPropertyChanged(); }
+            get => _hasEverPreviewedAFile;
+            set { _hasEverPreviewedAFile = value; OnPropertyChanged(); }
         }
 
         private bool _canScrollLeft;
@@ -191,6 +206,81 @@ namespace AssetsManager.Views.Models.Explorer
         {
             get => _canScrollRight;
             set { _canScrollRight = value; OnPropertyChanged(); }
+        }
+
+        public void PrepareSlotForFile(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+
+            // Step 1: Always hide status panels when a real file is about to be shown
+            IsWelcomeVisible = false;
+            IsUnsupportedVisible = false;
+            HasEverPreviewedAFile = true;
+
+            // Step 2: Determine category
+            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
+                           SupportedFileTypes.Textures.Contains(node.Extension) || 
+                           SupportedFileTypes.VectorImages.Contains(node.Extension);
+
+            if (isImage)
+            {
+                IsImageVisible = true;
+            }
+            else
+            {
+                IsContentVisible = true;
+            }
+        }
+
+        public void ClosePanelByCategory(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+
+            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
+                           SupportedFileTypes.Textures.Contains(node.Extension) || 
+                           SupportedFileTypes.VectorImages.Contains(node.Extension);
+
+            // Check if there are other pinned files of the same category remaining
+            // (excluding the one being closed right now)
+            bool hasMoreOfSameCategory = PinnedFilesManager.PinnedFiles.Any(p => 
+                p.Node != node && 
+                (SupportedFileTypes.Images.Contains(p.Node.Extension) || 
+                 SupportedFileTypes.Textures.Contains(p.Node.Extension) || 
+                 SupportedFileTypes.VectorImages.Contains(p.Node.Extension)) == isImage);
+
+            if (!hasMoreOfSameCategory)
+            {
+                if (isImage)
+                {
+                    IsImageVisible = false;
+                }
+                else
+                {
+                    IsContentVisible = false;
+                    IsTextVisible = false;
+                    IsWebVisible = false;
+                    IsUnsupportedVisible = false;
+                }
+            }
+
+            // If absolutely nothing is visible after closing AND no tabs are left, we show Welcome again
+            if (!IsImageVisible && !IsContentVisible && PinnedFilesManager.PinnedFiles.Count <= 1)
+            {
+                HasEverPreviewedAFile = false;
+                IsWelcomeVisible = true;
+            }
+        }
+
+        public void ResetAllVisibility()
+        {
+            IsWelcomeVisible = true;
+            IsUnsupportedVisible = false;
+            IsImageVisible = false;
+            IsContentVisible = false;
+            IsTextVisible = false;
+            IsWebVisible = false;
+            IsFindVisible = false;
+            HasEverPreviewedAFile = false;
         }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

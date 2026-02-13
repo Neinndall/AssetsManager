@@ -30,6 +30,8 @@ namespace AssetsManager.Views.Controls.Models
 
     public partial class ModelPanelControl : UserControl
     {
+        public ModelPanelModel ViewModel { get; } = new();
+
         private enum ModelType { Skn, MapGeometry }
         private ModelType _currentMode;
 
@@ -101,15 +103,9 @@ namespace AssetsManager.Views.Controls.Models
             LoadModelButton.IsEnabled = true;
             LoadChromaModelButton.IsEnabled = true;
 
-            if (_currentMode == ModelType.MapGeometry)
+            ViewModel.IsMapMode = (_currentMode == ModelType.MapGeometry);
+            if (!ViewModel.IsMapMode)
             {
-                LoadModelIcon.Kind = MaterialIconKind.Map;
-                LoadModelButton.ToolTip = "Load MapGeometry";
-            }
-            else
-            {
-                LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
-                LoadModelButton.ToolTip = "Load Model";
                 LoadAnimationButton.IsEnabled = true;
             }
         }
@@ -207,8 +203,7 @@ namespace AssetsManager.Views.Controls.Models
         public void ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
         {
             _currentMode = ModelType.Skn;
-            LoadModelIcon.Kind = MaterialIconKind.CubeOutline;
-            LoadModelButton.ToolTip = "Load Model";
+            ViewModel.IsMapMode = false;
 
             SceneModel newModel = null;
             string extension = Path.GetExtension(modelPath).ToLowerInvariant();
@@ -348,8 +343,7 @@ namespace AssetsManager.Views.Controls.Models
         public async Task LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
         {
             _currentMode = ModelType.MapGeometry;
-            LoadModelIcon.Kind = MaterialIconKind.Map;
-            LoadModelButton.ToolTip = "Load MapGeometry";
+            ViewModel.IsMapMode = true;
 
             SceneModel newModel;
             if (!string.IsNullOrEmpty(materialsPath))

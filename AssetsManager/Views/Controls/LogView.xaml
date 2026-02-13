@@ -32,7 +32,7 @@
                             ToolTip="Show/Hide Logger"
                             Width="28" Height="28"
                             Margin="0,0,8,0">
-                        <materialIcons:MaterialIcon x:Name="ToggleIcon" Kind="{Binding ToggleIconKind}" Width="14" Height="14"/>
+                        <materialIcons:MaterialIcon Kind="{Binding IsLogVisible, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='ChevronDown,ChevronUp'}" Width="14" Height="14"/>
                     </Button>
                     
                     <!-- Notification Hub Button -->

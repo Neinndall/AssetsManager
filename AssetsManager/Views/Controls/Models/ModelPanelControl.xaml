@@ -64,13 +64,12 @@
                                     </StackPanel>
 
                                     <ToggleButton Grid.Column="1" IsChecked="{Binding AreAllPartsVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Width="32" Height="32" Margin="0,0,4,0" ToolTip="Toggle Visibility">
-                                        <materialIcons:MaterialIcon Width="16" Height="16">
+                                        <materialIcons:MaterialIcon Kind="{Binding AreAllPartsVisible, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Eye,EyeOff'}" 
+                                                                    Width="16" Height="16">
                                             <materialIcons:MaterialIcon.Style>
                                                 <Style TargetType="materialIcons:MaterialIcon">
-                                                    <Setter Property="Kind" Value="Eye" />
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="False">
-                                                            <Setter Property="Kind" Value="EyeOff" />
+                                                        <DataTrigger Binding="{Binding AreAllPartsVisible}" Value="False">
                                                             <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
@@ -486,22 +485,8 @@
                                         <materialIcons:MaterialIcon Kind="Play" Width="16" Foreground="{StaticResource AccentGreen}"/>
                                     </Button>
                                     <ToggleButton Click="StopButton_Click" IsChecked="{Binding IsPlaying, Mode=OneWay}" Style="{StaticResource IconToggleButton}" Width="28" Height="28" Margin="4,0,0,0">
-                                        <materialIcons:MaterialIcon Width="16">
-                                            <materialIcons:MaterialIcon.Style>
-                                                <Style TargetType="materialIcons:MaterialIcon">
-                                                    <!-- Por defecto (Cuando está pausado -> Mostrar el Cuadrado para Resume) -->
-                                                    <Setter Property="Kind" Value="Stop" />
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
-                                                    <Style.Triggers>
-                                                        <!-- Cuando está reproduciendo -> Mostrar Pausa -->
-                                                        <DataTrigger Binding="{Binding IsPlaying}" Value="True">
-                                                            <Setter Property="Kind" Value="Pause" />
-                                                            <Setter Property="Foreground" Value="{StaticResource AccentRed}" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </materialIcons:MaterialIcon.Style>
-                                        </materialIcons:MaterialIcon>
+                                        <materialIcons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Pause,Stop'}" 
+                                                                    Width="16" Foreground="{StaticResource AccentRed}"/>
                                     </ToggleButton>
                                 </StackPanel>
                             </Grid>
@@ -528,10 +513,15 @@
             <!-- BOTTOM ACTIONS -->
             <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="16">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <Button x:Name="LoadModelButton" Click="LoadModelButton_Click" Style="{StaticResource SecondaryButton}" Height="56" Width="80" Margin="0,0,6,0" Padding="0">
+                    <Button x:Name="LoadModelButton" Click="LoadModelButton_Click" Style="{StaticResource SecondaryButton}" Height="56" Width="80" Margin="0,0,6,0" Padding="0"
+                            ToolTip="{Binding ViewModel.LoadButtonTooltip, RelativeSource={RelativeSource AncestorType=UserControl}}">
                         <StackPanel VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon x:Name="LoadModelIcon" Kind="CubeOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}"/>
-                            <TextBlock x:Name="LoadModelText" Text="Model" FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                            <materialIcons:MaterialIcon x:Name="LoadModelIcon" 
+                                                        Kind="{Binding ViewModel.LoadButtonIcon, RelativeSource={RelativeSource AncestorType=UserControl}}" 
+                                                        Width="20" Height="20" Foreground="{StaticResource AccentBrush}"/>
+                            <TextBlock x:Name="LoadModelText" 
+                                       Text="{Binding ViewModel.LoadButtonText, RelativeSource={RelativeSource AncestorType=UserControl}}" 
+                                       FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     <Button x:Name="LoadChromaModelButton" Click="LoadChromaModelButton_Click" Style="{StaticResource SecondaryButton}" Height="56" Width="80" Margin="3,0,3,0" Padding="0"

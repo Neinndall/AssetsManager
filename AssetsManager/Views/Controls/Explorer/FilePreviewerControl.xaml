@@ -110,79 +110,6 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-
-                    <!-- Details Tab -->
-                    <Border x:Name="DetailsTabBorder"
-                            Visibility="{Binding IsRenamedDetailsTabVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            Margin="2,0,2,0"
-                            MinHeight="28"
-                            MouseDown="DetailsTab_MouseDown">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="BorderBrush" Value="Transparent"/>
-                                <Setter Property="BorderThickness" Value="0,2,0,0"/>
-                                <Setter Property="CornerRadius" Value="4,4,0,0"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsDetailsTabSelected}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                        <Setter Property="TextElement.Foreground" Value="White"/>
-                                        <Setter Property="TextElement.FontWeight" Value="SemiBold"/>
-                                    </DataTrigger>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
-                                            <Condition Binding="{Binding IsDetailsTabSelected}" Value="False"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                                    </MultiDataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <StackPanel Orientation="Horizontal" Margin="8,4,4,4" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="InformationOutline" 
-                                                        Width="14" Height="14" 
-                                                        VerticalAlignment="Center" 
-                                                        Margin="0,0,6,0"
-                                                        Foreground="White"/>
-                            <TextBlock Text="Details" VerticalAlignment="Center">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                                        <Setter Property="FontWeight" Value="Normal"/>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <Button x:Name="CloseDetailsButton" 
-                                    Click="CloseDetailsTabButton_Click" 
-                                    Margin="8,0,0,0">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-                                        <Setter Property="Visibility" Value="Hidden"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsDetailsTabSelected}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                            <MultiDataTrigger>
-                                                <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}" Value="True"/>
-                                                </MultiDataTrigger.Conditions>
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </MultiDataTrigger>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                                <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12"/>
-                            </Button>
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
             </ScrollViewer>
 
@@ -205,7 +132,8 @@
                 Visibility="{Binding AreTabsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
         <!-- Breadcrumbs Area -->
-        <Grid DockPanel.Dock="Top">
+        <Grid DockPanel.Dock="Top" 
+              Visibility="{Binding AreBreadcrumbsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -213,14 +141,12 @@
             <local:BreadcrumbControl x:Name="Breadcrumbs" 
                                      Grid.Row="0" 
                                      Margin="5,2,5,0" 
-                                     VerticalAlignment="Center" 
-                                     Visibility="{Binding AreBreadcrumbsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                     VerticalAlignment="Center"/>
             <Border x:Name="BreadcrumbSeparator" 
                     Grid.Row="1" 
                     Height="1" 
                     Background="{StaticResource BorderColor}" 
-                    Margin="0,5,5,5" 
-                    Visibility="{Binding AreBreadcrumbsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    Margin="0,5,5,5"/>
         </Grid>
 
         <!-- Main Content Area -->
@@ -231,6 +157,11 @@
 
             <!-- 2. CONTENT PREVIEWS (Files) -->
             <Grid x:Name="PreviewArea">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- Metadata Section -->
+                    <RowDefinition Height="*"/>    <!-- Content Area -->
+                </Grid.RowDefinitions>
+
                 <Grid.Style>
                     <Style TargetType="Grid">
                         <Setter Property="Visibility" Value="Visible"/>
@@ -238,113 +169,145 @@
                             <DataTrigger Binding="{Binding IsGridVisible}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed"/>
                             </DataTrigger>
-                            <DataTrigger Binding="{Binding IsDetailsTabSelected}" Value="True">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Grid.Style>
                 
-                <!-- Content Previews -->
-                <Grid x:Name="PreviewContainer" 
-                    Visibility="{Binding IsPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- Integrated Metadata Component -->
+                <local:DetailsTabControl Grid.Row="0"
+                                         Visibility="{Binding IsRenamedInfoVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                    <!-- Placeholders -->
-                    <Grid x:Name="PreviewStatusPanel"
-                        Visibility="{Binding IsPlaceholderVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- Welcome Panel -->
+                <Border x:Name="WelcomePanel"
+                        Grid.Row="0" Grid.RowSpan="2"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding IsWelcomeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        MaxWidth="400">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="FileSearchOutline"
+                                                Width="64" Height="64"
+                                                HorizontalAlignment="Center"
+                                                Foreground="{StaticResource TextMuted}"
+                                                Opacity="0.5"
+                                                Margin="0,0,0,16"/>
+                        <TextBlock Text="{Binding WelcomeTitle}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding WelcomeDescription}" FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
 
-                        <!-- Default State Card -->
-                        <Border x:Name="SelectFileStatusPanel"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Visibility="{Binding IsSelectFileMessageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            MaxWidth="400">
+                <!-- Files Area -->
+                <Grid Grid.Row="1" x:Name="FilesGrid">
+                    <Grid.ColumnDefinitions>
+                        <!-- Content -->
+                        <ColumnDefinition>
+                            <ColumnDefinition.Style>
+                                <Style TargetType="ColumnDefinition">
+                                    <Setter Property="Width" Value="*"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsContentVisible}" Value="False">
+                                            <Setter Property="Width" Value="0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ColumnDefinition.Style>
+                        </ColumnDefinition>
+                        <!-- Splitter -->
+                        <ColumnDefinition Width="Auto">
+                            <ColumnDefinition.Style>
+                                <Style TargetType="ColumnDefinition">
+                                    <Setter Property="Width" Value="0"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsContentVisible}" Value="True"/>
+                                                <Condition Binding="{Binding IsImageVisible}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Width" Value="Auto"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ColumnDefinition.Style>
+                        </ColumnDefinition>
+                        <!-- Image -->
+                        <ColumnDefinition>
+                            <ColumnDefinition.Style>
+                                <Style TargetType="ColumnDefinition">
+                                    <Setter Property="Width" Value="*"/>
+                                    <Setter Property="MinWidth" Value="150"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsImageVisible}" Value="False">
+                                            <Setter Property="Width" Value="0"/>
+                                            <Setter Property="MinWidth" Value="0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ColumnDefinition.Style>
+                        </ColumnDefinition>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Content Panel -->
+                    <Grid x:Name="ContentPanel" Grid.Column="0" Visibility="{Binding IsContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        
+                        <avalonedit:TextEditor x:Name="TextEditorPreview" Style="{StaticResource BaseTextEditorStyle}" Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        
+                        <Grid x:Name="WebViewContainer" Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                        <!-- Error Message inside Content area -->
+                        <Border x:Name="UnsupportedFilePanel" 
+                                HorizontalAlignment="Center" 
+                                VerticalAlignment="Center" 
+                                Visibility="{Binding IsUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}" 
+                                MaxWidth="400">
                             <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                                <!-- Icon -->
-                                <materialIcons:MaterialIcon Kind="FileSearchOutline"
-                                                        Width="64" Height="64"
-                                                        HorizontalAlignment="Center"
-                                                        Foreground="{StaticResource TextMuted}"
-                                                        Opacity="0.5"
-                                                        Margin="0,0,0,16"/>
-
-                                <TextBlock x:Name="SelectFileMessage"
-                                       Text="No file selected"
-                                       FontSize="18" 
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimary}"
-                                       HorizontalAlignment="Center"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"/>
-                                <TextBlock x:Name="SelectFileSubMessage"
-                                       Text="Select a file from the explorer to preview its content"
-                                       FontSize="14"
-                                       Foreground="{StaticResource TextSecondary}"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,8,0,0"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"/>
+                                <materialIcons:MaterialIcon Kind="FileRemoveOutline" Width="64" Height="64" Foreground="{StaticResource TextMuted}" Opacity="0.5" Margin="0,0,0,16"/>
+                                <TextBlock Text="{Binding UnsupportedTitle}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                                <TextBlock x:Name="UnsupportedFileSubMessage" 
+                                           Text="{Binding UnsupportedMessage}"
+                                           FontSize="14" Foreground="{StaticResource TextSecondary}" 
+                                           HorizontalAlignment="Center" Margin="0,8,0,0" 
+                                           TextAlignment="Center" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- Unsupported State Card -->
-                        <Border x:Name="UnsupportedStatusPanel"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Visibility="{Binding IsUnsupportedFileMessageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            MaxWidth="400">
-                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FileRemoveOutline" 
-                                                        Width="64" Height="64"
-                                                        HorizontalAlignment="Center"
-                                                        Foreground="{StaticResource TextMuted}"
-                                                        Opacity="0.5"
-                                                        Margin="0,0,0,16"/>
-
-                                <TextBlock x:Name="UnsupportedFileMessage"
-                                       Text="Preview Unavailable"
-                                       FontSize="18"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimary}"
-                                       HorizontalAlignment="Center"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"/>
-                                <TextBlock Text="This file format is not supported for internal preview."
-                                       FontSize="14"
-                                       Foreground="{StaticResource TextSecondary}"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,8,0,0"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
+                        <!-- Search inside document -->
+                        <shared:FindInDocumentControl x:Name="FindInDocumentControl" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,15,0" Visibility="{Binding IsFindVisible, Converter={StaticResource BooleanToVisibilityConverter}}" TargetTextEditor="{Binding ElementName=TextEditorPreview}" Close="FindInDocumentControl_Close"/>
                     </Grid>
+                    
+                    <!-- Middle: Splitter -->
+                    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent">
+                        <GridSplitter.Style>
+                            <Style TargetType="GridSplitter">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsContentVisible}" Value="True"/>
+                                            <Condition Binding="{Binding IsImageVisible}" Value="True"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </GridSplitter.Style>
+                    </GridSplitter>
 
-                    <!-- Previews -->
-                    <Image x:Name="ImagePreview" 
-                       Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}" 
-                       Stretch="Uniform"/>
-                    <avalonedit:TextEditor x:Name="TextEditorPreview"
-                                       Style="{StaticResource BaseTextEditorStyle}"
-                                       Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                       Margin="-4,0,0,0"/>
-                    <Grid x:Name="WebViewContainer"
-                      Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-
-                    <!-- Search inside document -->
-                    <shared:FindInDocumentControl x:Name="FindInDocumentControl"
-                                              HorizontalAlignment="Right"
-                                              VerticalAlignment="Top"
-                                              Margin="0,0,15,0"
-                                              Visibility="{Binding IsFindVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                              TargetTextEditor="{Binding ElementName=TextEditorPreview}"
-                                              Close="FindInDocumentControl_Close"/>
+                    <!-- Right: Image Panel -->
+                    <Border x:Name="ImagePanel" Grid.Column="2" Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}" BorderBrush="{StaticResource BorderColor}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsContentVisible}" Value="True">
+                                        <Setter Property="BorderThickness" Value="1,0,0,0"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Image x:Name="ImagePreview" Stretch="Uniform" Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
                 </Grid>
             </Grid>
-            
-            <!-- 3. DETAILS VIEW (Renamed Info) -->
-            <local:DetailsTabControl 
-                Visibility="{Binding IsDetailsTabSelected, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}"/>
         </Grid>
     </DockPanel>
 </UserControl>

@@ -15,39 +15,24 @@ namespace AssetsManager.Views.Controls.Explorer
         public event RoutedPropertyChangedEventHandler<bool> ViewModeChanged; // True for Grid, False for Preview
         public event RoutedEventHandler ImageMergerClicked;
 
-        public string SearchText => SearchTextBox.Text;
-
-        public bool IsSortButtonVisible
-        {
-            get => SortToggleButton.Visibility == Visibility.Visible;
-            set => SortToggleButton.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        public bool IsBreadcrumbChecked => BreadcrumbToggleButton.IsChecked ?? false;
-
         public ExplorerToolbarControl()
         {
             InitializeComponent();
         }
 
-        public void SetViewMode(bool isGridMode)
+        private void SearchToggleButton_Click(object sender, RoutedEventArgs e)
         {
-            GridViewToggleButton.IsChecked = isGridMode;
-        }
-
-        public void SetWadMode(bool isWadMode)
-        {
-            if (isWadMode)
+            if (SearchToggleButton.IsChecked == true)
             {
-                // Current: WAD -> Action: Go to Directory
-                ModeIcon.Kind = Material.Icons.MaterialIconKind.FolderMultipleOutline;
-                SwitchModeButton.ToolTip = "Switch to Local Directory Mode";
+                // Delay focus slightly to allow the animation to start and the control to become visible
+                Dispatcher.BeginInvoke(new System.Action(() =>
+                {
+                    SearchTextBox.Focus();
+                }), System.Windows.Threading.DispatcherPriority.Input);
             }
             else
             {
-                // Current: Directory -> Action: Go back to WAD
-                ModeIcon.Kind = Material.Icons.MaterialIconKind.ArchiveOutline;
-                SwitchModeButton.ToolTip = "Switch back to LoL WAD Mode";
+                SearchTextBox.Text = string.Empty;
             }
         }
 

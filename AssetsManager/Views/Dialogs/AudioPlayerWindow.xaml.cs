@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using AssetsManager.Services.Audio;
+using AssetsManager.Views.Models.Dialogs;
 using System.Windows.Threading;
 using System.Windows.Controls.Primitives;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,7 @@ namespace AssetsManager.Views.Dialogs
         private readonly AudioPlayerService _audioPlayerService;
         private readonly IServiceProvider _serviceProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
+        private readonly AudioPlayerModel _viewModel;
         private readonly MediaPlayer _mediaPlayer = new MediaPlayer();
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private bool _isDragging = false;
@@ -33,7 +35,9 @@ namespace AssetsManager.Views.Dialogs
             _audioPlayerService = audioPlayerService;
             _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
-            this.DataContext = _audioPlayerService;
+            
+            _viewModel = new AudioPlayerModel(_audioPlayerService);
+            this.DataContext = _viewModel;
 
             _timer.Interval = TimeSpan.FromMilliseconds(500);
             _timer.Tick += Timer_Tick;
@@ -111,7 +115,7 @@ namespace AssetsManager.Views.Dialogs
             _timer.Stop();
             AudioSlider.Value = 0;
             CurrentTimeText.Text = "0:00";
-            PlayIcon.Kind = Material.Icons.MaterialIconKind.Play;
+            _viewModel.IsPlaying = false;
         }
 
         private void PlayPause_Click(object sender, RoutedEventArgs e)
@@ -119,7 +123,7 @@ namespace AssetsManager.Views.Dialogs
             var selectedItem = PlaylistListBox.SelectedItem as AudioPlaylistItem;
             if (selectedItem == null) return;
 
-            if (PlayIcon.Kind == Material.Icons.MaterialIconKind.Play)
+            if (!_viewModel.IsPlaying)
             {
                 if (CurrentTrackName.Text != selectedItem.Name)
                 {
@@ -127,12 +131,12 @@ namespace AssetsManager.Views.Dialogs
                     CurrentTrackName.Text = selectedItem.Name;
                 }
                 _mediaPlayer.Play();
-                PlayIcon.Kind = Material.Icons.MaterialIconKind.Pause;
+                _viewModel.IsPlaying = true;
             }
             else
             {
                 _mediaPlayer.Pause();
-                PlayIcon.Kind = Material.Icons.MaterialIconKind.Play;
+                _viewModel.IsPlaying = false;
             }
         }
 
@@ -186,12 +190,9 @@ namespace AssetsManager.Views.Dialogs
                 _mediaPlayer.Volume = e.NewValue;
             }
 
-            if (VolumeIcon != null)
+            if (_viewModel != null)
             {
-                if (e.NewValue == 0) VolumeIcon.Kind = Material.Icons.MaterialIconKind.VolumeMute;
-                else if (e.NewValue < 0.3) VolumeIcon.Kind = Material.Icons.MaterialIconKind.VolumeLow;
-                else if (e.NewValue < 0.7) VolumeIcon.Kind = Material.Icons.MaterialIconKind.VolumeMedium;
-                else VolumeIcon.Kind = Material.Icons.MaterialIconKind.VolumeHigh;
+                _viewModel.Volume = e.NewValue;
             }
         }
 
@@ -210,7 +211,7 @@ namespace AssetsManager.Views.Dialogs
             CurrentTrackName.Text = "No track selected";
             CurrentTimeText.Text = "0:00";
             TotalTimeText.Text = "0:00";
-            PlayIcon.Kind = Material.Icons.MaterialIconKind.Play;
+            _viewModel.IsPlaying = false;
         }
 
         private void DropArea_DragEnter(object sender, DragEventArgs e)

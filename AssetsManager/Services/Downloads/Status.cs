@@ -59,11 +59,11 @@ namespace AssetsManager.Services.Downloads
 
         public async Task<bool> SyncHashesIfNeeds(bool syncHashesWithCDTB, bool silent = false, Action onUpdateFound = null)
         {
-            var outdatedFiles = await GetOutdatedHashFilesAsync(silent, onUpdateFound);
-            if (outdatedFiles.Any())
+            await HashResolverService._hashFileAccessLock.WaitAsync();
+            try
             {
-                await HashResolverService._hashFileAccessLock.WaitAsync();
-                try
+                var outdatedFiles = await GetOutdatedHashFilesAsync(silent, onUpdateFound);
+                if (outdatedFiles.Any())
                 {
                     if (!silent) _logService.Log("Server updated or local files out of date. Starting hash synchronization...");
 
@@ -76,15 +76,15 @@ namespace AssetsManager.Services.Downloads
                     UpdateConfigWithLocalFileSizes();
 
                     if (!silent) _logService.LogSuccess("Synchronization completed.");
-                }
-                finally
-                {
-                    HashResolverService._hashFileAccessLock.Release();
-                    IsSyncing = false;
-                    HashSyncCompleted?.Invoke();
-                }
 
-                return true;
+                    return true;
+                }
+            }
+            finally
+            {
+                HashResolverService._hashFileAccessLock.Release();
+                IsSyncing = false;
+                HashSyncCompleted?.Invoke();
             }
 
             if (!silent) _logService.Log("No server updates found. Local hashes are up-to-date.");
@@ -251,9 +251,9 @@ namespace AssetsManager.Services.Downloads
             {
                 html = await _httpClient.GetStringAsync(Requests.BaseUrl);
             }
-            catch (HttpRequestException httpEx)
+            catch (HttpRequestException)
             {
-                _logService.LogWarning($"Unable to connect to CommunityDragon. Server might be down or busy. ({httpEx.Message})");
+                _logService.LogWarning($"Unable to connect to CommunityDragon. Server might be down or busy.");
                 return result;
             }
             catch (Exception ex)

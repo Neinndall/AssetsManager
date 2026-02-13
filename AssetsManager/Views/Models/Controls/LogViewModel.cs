@@ -15,7 +15,6 @@ namespace AssetsManager.Views.Models.Controls
         private int _notificationCount;
         private bool _isLogVisible = true;
         private bool _hasActiveStatus;
-        private MaterialIconKind _toggleIconKind = MaterialIconKind.ChevronDown;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -72,25 +71,11 @@ namespace AssetsManager.Views.Models.Controls
                 {
                     _isLogVisible = value;
                     OnPropertyChanged();
-                    UpdateIcon();
                 }
             }
         }
 
         public Visibility LogVisibility => IsLogVisible ? Visibility.Visible : Visibility.Collapsed;
-
-        public MaterialIconKind ToggleIconKind
-        {
-            get => _toggleIconKind;
-            private set
-            {
-                if (_toggleIconKind != value)
-                {
-                    _toggleIconKind = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
 
         public void ToggleLog()
         {
@@ -100,11 +85,6 @@ namespace AssetsManager.Views.Models.Controls
         public void SetLogVisibility(bool isVisible)
         {
             IsLogVisible = isVisible;
-        }
-
-        private void UpdateIcon()
-        {
-            ToggleIconKind = IsLogVisible ? MaterialIconKind.ChevronDown : MaterialIconKind.ChevronUp;
         }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
