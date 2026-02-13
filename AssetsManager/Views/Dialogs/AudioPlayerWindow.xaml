@@ -62,7 +62,7 @@
             <!-- 2. Content Area -->
             <Grid Grid.Row="1" Margin="15">
                 <!-- Empty State: Full Drop Area -->
-                <Grid Visibility="{Binding Playlist.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}">
+                <Grid Visibility="{Binding Service.Playlist.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}">
                     <Rectangle x:Name="DropAreaUI" Stroke="{StaticResource BorderColor}" StrokeThickness="2" 
                                Fill="{StaticResource SidebarBackground}" RadiusX="10" RadiusY="10" 
                                StrokeDashArray="4 2"/>
@@ -77,9 +77,9 @@
                 </Grid>
 
                 <!-- Populated State: Playlist Area -->
-                <Grid Visibility="{Binding Playlist.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                <Grid Visibility="{Binding Service.Playlist.Count, Converter={StaticResource CountToVisibilityConverter}}">
                     <ListBox x:Name="PlaylistListBox" 
-                             ItemsSource="{Binding Playlist}"
+                             ItemsSource="{Binding Service.Playlist}"
                              Background="Transparent" BorderThickness="0"
                              ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}">
                         <ListBox.ItemTemplate>
@@ -149,7 +149,7 @@
                             </Button>
                             
                             <Button x:Name="PlayPauseButton" Style="{StaticResource PrimaryButton}" Width="46" Height="46" Margin="10,0" Click="PlayPause_Click">
-                                <icons:MaterialIcon x:Name="PlayIcon" Kind="Play" Width="22" Height="22"/>
+                                <icons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Pause,Play'}" Width="22" Height="22"/>
                             </Button>
                             
                             <Button Style="{StaticResource IconButton}" Width="36" Height="36" Margin="5,0" Click="SkipForward_Click">
@@ -170,7 +170,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="35"/>
                         </Grid.ColumnDefinitions>
-                        <icons:MaterialIcon x:Name="VolumeIcon" Kind="VolumeMedium" Width="16" Height="16" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <icons:MaterialIcon Kind="{Binding IsMuted, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='VolumeMute,VolumeMedium'}" Width="16" Height="16" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <Slider x:Name="VolumeSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center" Height="18" ValueChanged="VolumeSlider_ValueChanged"/>
                         <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=VolumeSlider, StringFormat={}{0:P0}}" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Right" Width="25"/>
                     </Grid>
