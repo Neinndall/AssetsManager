@@ -144,6 +144,13 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isImageVisible = value; OnPropertyChanged(); }
         }
 
+        private bool _isContentVisible;
+        public bool IsContentVisible
+        {
+            get => _isContentVisible;
+            set { _isContentVisible = value; OnPropertyChanged(); }
+        }
+
         private bool _isTextVisible;
         public bool IsTextVisible
         {
@@ -165,6 +172,13 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isFindVisible = value; OnPropertyChanged(); }
         }
 
+        private bool _hasEverPreviewedAFile;
+        public bool HasEverPreviewedAFile
+        {
+            get => _hasEverPreviewedAFile;
+            set { _hasEverPreviewedAFile = value; OnPropertyChanged(); }
+        }
+
         private bool _canScrollLeft;
         public bool CanScrollLeft
         {
@@ -184,10 +198,11 @@ namespace AssetsManager.Views.Models.Explorer
             IsWelcomeVisible = false;
             IsUnsupportedVisible = false;
             IsImageVisible = false;
+            IsContentVisible = false;
             IsTextVisible = false;
             IsWebVisible = false;
             IsFindVisible = false;
-            IsDetailsTabSelected = false; // Hide technical details when switching to a new preview
+            IsDetailsTabSelected = false;
         }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

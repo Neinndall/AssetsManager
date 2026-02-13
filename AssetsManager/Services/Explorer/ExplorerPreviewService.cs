@@ -244,6 +244,7 @@ namespace AssetsManager.Services.Explorer
                     {
                         _imagePreview.Source = imageSource;
                         _viewModel.IsImageVisible = true;
+                        _viewModel.HasEverPreviewedAFile = true;
                     }
                     break;
 
@@ -251,7 +252,9 @@ namespace AssetsManager.Services.Explorer
                     if (content is string htmlContent)
                     {
                         await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
+                        _viewModel.IsContentVisible = true;
                         _viewModel.IsWebVisible = true;
+                        _viewModel.HasEverPreviewedAFile = true;
                     }
                     break;
 
@@ -260,7 +263,9 @@ namespace AssetsManager.Services.Explorer
                     {
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
+                        _viewModel.IsContentVisible = true;
                         _viewModel.IsTextVisible = true;
+                        _viewModel.HasEverPreviewedAFile = true;
                         _textEditorPreview.Focus();
                     }
                     break;
@@ -275,7 +280,11 @@ namespace AssetsManager.Services.Explorer
                     else
                     {
                         // This is for the default "Select a file" message
-                        _viewModel.IsWelcomeVisible = true;
+                        // We ONLY show the welcome message if the user HAS NEVER previewed a file yet.
+                        if (!_viewModel.HasEverPreviewedAFile)
+                        {
+                            _viewModel.IsWelcomeVisible = true;
+                        }
                     }
                     break;
             }

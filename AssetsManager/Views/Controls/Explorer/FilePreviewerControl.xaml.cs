@@ -85,7 +85,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     _ = ShowPreviewAsync(_currentNode);
                 }
-                else if (_currentNode == null || ViewModel.IsSelectedNodeContainer)
+                else if (!ViewModel.HasEverPreviewedAFile)
                 {
                     _ = ExplorerPreviewService.ResetPreviewAsync();
                 }
@@ -159,7 +159,16 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     if (!ViewModel.IsDetailsTabSelected && !_isShowingTemporaryPreview)
                     {
-                        await ExplorerPreviewService.ResetPreviewAsync();
+                        // If we are in Grid Mode and have a folder context, go back to the Grid
+                        if (ViewModel.IsGridMode && _currentFolderNode != null)
+                        {
+                            UpdateSelectedNode(_currentFolderNode, _rootNodes);
+                        }
+                        else
+                        {
+                            await ExplorerPreviewService.ResetPreviewAsync();
+                            _currentNode = null;
+                        }
                     }
                     return;
                 }
@@ -345,13 +354,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 FileGridControl.ItemsSource = gridItems;
 
-                if (!ViewModel.IsGridMode)
+                if (!ViewModel.IsGridMode && !ViewModel.HasEverPreviewedAFile)
                 {
-                    // Only reset preview if we are moving to a folder and no file was active
-                    if (_currentNode == null || _currentNode == node)
-                    {
-                        _ = ExplorerPreviewService.ResetPreviewAsync();
-                    }
+                    _ = ExplorerPreviewService.ResetPreviewAsync();
                 }
 
                 // Sequential Loading Queue with Cancellation

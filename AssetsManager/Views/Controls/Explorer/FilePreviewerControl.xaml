@@ -306,29 +306,33 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Image Preview -->
-                <Image x:Name="ImagePreview" 
-                       Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}" 
-                       Stretch="Uniform"/>
+                <!-- Image Preview Panel -->
+                <Grid x:Name="ImagePanel"
+                      Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Image x:Name="ImagePreview" 
+                           Stretch="Uniform"/>
+                </Grid>
 
-                <!-- Text Preview -->
-                <avalonedit:TextEditor x:Name="TextEditorPreview"
-                                       Style="{StaticResource BaseTextEditorStyle}"
-                                       Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                       Margin="-4,0,0,0"/>
-                
-                <!-- Web Preview (Audio/Video) -->
-                <Grid x:Name="WebViewContainer"
-                      Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <!-- Content Preview Panel (Text/Audio/Video) -->
+                <Grid x:Name="ContentPanel"
+                      Visibility="{Binding IsContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <avalonedit:TextEditor x:Name="TextEditorPreview"
+                                           Style="{StaticResource BaseTextEditorStyle}"
+                                           Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                           Margin="-4,0,0,0"/>
+                    
+                    <Grid x:Name="WebViewContainer"
+                          Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                <!-- Search inside document -->
-                <shared:FindInDocumentControl x:Name="FindInDocumentControl"
-                                              HorizontalAlignment="Right"
-                                              VerticalAlignment="Top"
-                                              Margin="0,0,15,0"
-                                              Visibility="{Binding IsFindVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                              TargetTextEditor="{Binding ElementName=TextEditorPreview}"
-                                              Close="FindInDocumentControl_Close"/>
+                    <!-- Search inside document -->
+                    <shared:FindInDocumentControl x:Name="FindInDocumentControl"
+                                                  HorizontalAlignment="Right"
+                                                  VerticalAlignment="Top"
+                                                  Margin="0,0,15,0"
+                                                  Visibility="{Binding IsFindVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                  TargetTextEditor="{Binding ElementName=TextEditorPreview}"
+                                                  Close="FindInDocumentControl_Close"/>
+                </Grid>
             </Grid>
             
             <!-- 3. DETAILS VIEW (Renamed Info) -->
