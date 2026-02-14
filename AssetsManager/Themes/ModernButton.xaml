@@ -565,7 +565,7 @@
         </Setter>
     </Style>
 
-    <!-- Global Selection Card Style (Used in Model Viewer landing, etc.) -->
+    <!-- Global Selection Card Style -->
     <Style x:Key="SelectionCardButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>

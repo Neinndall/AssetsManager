@@ -12,49 +12,43 @@
         WindowStartupLocation="CenterScreen"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True"
-        WindowStyle="SingleBorderWindow"
-        ResizeMode="CanResize"
-        AllowsTransparency="False">
+        WindowStyle="None"
+        AllowsTransparency="True">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="40"  
                       ResizeBorderThickness="5"
-                      GlassFrameThickness="1" 
+                      GlassFrameThickness="0" 
                       CornerRadius="0" 
                       UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
 
     <Border BorderBrush="{StaticResource BorderColor}" 
             Background="{StaticResource SidebarBackground}"
-            BorderThickness="0" 
-            CornerRadius="0" 
-            Margin="0">
+            BorderThickness="1" 
+            CornerRadius="12" 
+            Margin="1">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
-                <RowDefinition Height="Auto"/> <!-- 1: Stats & Actions Toolbar -->
-                <RowDefinition Height="*"/>    <!-- 2: Main Content Area -->
+                <RowDefinition Height="Auto"/> <!-- 0: Title Bar -->
+                <RowDefinition Height="Auto"/> <!-- 1: Toolbar (Stats) -->
+                <RowDefinition Height="Auto"/> <!-- 2: Dashboard -->
+                <RowDefinition Height="*"/>    <!-- 3: Main Content -->
+                <RowDefinition Height="Auto"/> <!-- 4: Footer (Actions & Summary) -->
             </Grid.RowDefinitions>
 
-            <!-- 1. Custom Title Bar -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="Black" Opacity="0.15" Direction="270"/>
-                </Border.Effect>
+            <!-- 1. Standard Title Bar (40px) -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/> <!-- Icon/Title -->
-                        <ColumnDefinition Width="*"/>    <!-- Spacer (Drag Area) -->
-                        <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
-                        <icons:MaterialIcon Kind="Compare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
-                        <TextBlock Text="Comparison Results" 
-                                   FontSize="13" 
-                                   FontWeight="Normal"
-                                   Foreground="{StaticResource TextPrimary}"
-                                   VerticalAlignment="Center"/>
+                        <icons:MaterialIcon Kind="Compare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Comparison Results" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
@@ -71,97 +65,134 @@
                 </Grid>
             </Border>
 
-            <!-- 2. Professional Toolbar Area (Stats & Actions) -->
-            <Border Grid.Row="1" 
-                    Background="{StaticResource CardBackground}" 
-                    BorderBrush="{StaticResource BorderColor}" 
-                    BorderThickness="0,0,0,1" 
-                    Padding="24,10">
+            <!-- 2. Stats Toolbar (Aligned Right) -->
+            <Border Grid.Row="1" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="24,10">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/> <!-- 0: Summary -->
-                        <ColumnDefinition Width="*"/>    <!-- 1: Stats (Centered) -->
-                        <ColumnDefinition Width="Auto"/> <!-- 2: Actions (Right) -->
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Left: Summary -->
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="WAD ANALYSIS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
-                        <TextBlock x:Name="summaryTextBlock"
-                                   Text="{Binding SummaryText}" 
-                                   FontSize="11" 
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextPrimary}"
-                                   Opacity="0.9"/>
+                    <!-- Left: Header Info -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <TextBlock Text="DIAGNOSTIC OVERVIEW" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                        <TextBlock Text="Asset Distribution &amp; Payload Analysis" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                     </StackPanel>
-
-                    <!-- Center: Stats Dashboard -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    
+                    <!-- Right: Stats -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <!-- New -->
-                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,4" Margin="0,0,8,0">
+                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="#1A00E676" BorderBrush="{StaticResource AccentGreen}">
                             <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="Plus" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0"/>
-                                <TextBlock Text="NEW:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0" Opacity="0.8"/>
-                                <TextBlock x:Name="CountNewText" Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="NEW:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                <TextBlock Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Modified -->
-                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,4" Margin="0,0,8,0">
+                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="#1AFFB74D" BorderBrush="{StaticResource AccentOrange}">
                             <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="Pencil" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,8,0"/>
-                                <TextBlock Text="MODIFIED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0" Opacity="0.8"/>
-                                <TextBlock x:Name="CountModifiedText" Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="MODIFIED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                <TextBlock Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Removed -->
-                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,4" Margin="0,0,8,0">
+                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="#1AF44336" BorderBrush="{StaticResource AccentRed}">
                             <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="Minus" Width="14" Height="14" Foreground="{StaticResource AccentRed}" Margin="0,0,8,0"/>
-                                <TextBlock Text="REMOVED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0" Opacity="0.8"/>
-                                <TextBlock x:Name="CountRemovedText" Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="REMOVED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                <TextBlock Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Renamed -->
-                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,4">
+                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="#1A2196F3" BorderBrush="{StaticResource AccentBlue}" Margin="0">
                             <StackPanel Orientation="Horizontal">
-                                <icons:MaterialIcon Kind="Rename" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0"/>
-                                <TextBlock Text="RENAMED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0" Opacity="0.8"/>
-                                <TextBlock x:Name="CountRenamedText" Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="RENAMED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                <TextBlock Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
-                    </StackPanel>
-
-                    <!-- Right: Actions -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Border Width="1" Height="24" Background="{StaticResource BorderColor}" Margin="8,0,20,0"/>
-                        
-                        <Button x:Name="reloadHashesButton"
-                                Content="Reload Hashes" 
-                                Style="{StaticResource SecondaryButton}"
-                                Height="30" Padding="12,0"
-                                Margin="0,0,8,0"
-                                Click="ReloadHashesButton_Click"
-                                ToolTip="Reloads hashes from the default application path"/>
-                        <Button x:Name="saveButton"
-                                Content="Save Report" 
-                                Style="{StaticResource PrimaryButton}"
-                                Height="30" Padding="16,0"
-                                Click="SaveButton_Click"
-                                ToolTip="Save the full list of differences to a JSON file"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- 3. Main Content Area -->
-            <Grid Grid.Row="2" Margin="24">
+            <!-- 3. Dashboard (Same logic, but cleaner) -->
+            <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" 
+                    Visibility="{Binding IsChecked, ElementName=ResultsTree, Path=DashboardToggleChecked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid Margin="24,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.5*"/>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="1*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,30,0">
+                        <TextBlock Text="CATEGORY DISTRIBUTION" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,12"/>
+                        <ItemsControl ItemsSource="{Binding TreeModel.CategoryDistribution}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                        <Grid Margin="0,0,0,4">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                                <TextBlock Text="{Binding Name}" FontSize="11" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding SizeChangeText}" FontSize="10" Foreground="{StaticResource AccentBrush}" Margin="8,0,0,0" VerticalAlignment="Bottom"/>
+                                            </StackPanel>
+                                            <!-- File Count pushed to the right correctly -->
+                                            <TextBlock Text="{Binding Count, StringFormat='({0} files)'}" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                                        </Grid>
+                                        <ProgressBar Grid.Row="1" Height="4" Value="{Binding Percentage}" Foreground="{StaticResource AccentBrush}" Background="{StaticResource BorderColor}" BorderThickness="0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,30,0">
+                        <TextBlock Text="TOP SIZE IMPACT" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,12"/>
+                        <ItemsControl ItemsSource="{Binding TreeModel.TopImpactFiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource DashboardCardStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Path}" FontSize="9" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding SizeDiffText}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="AFFECTED AREAS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,12"/>
+                        <ItemsControl ItemsSource="{Binding TreeModel.AffectedAreas}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="8,4" Margin="0,0,6,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Name}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
+                                            <!-- Sub-badge for count in areas -->
+                                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="2" Margin="6,0,0,0" Padding="4,0">
+                                                <TextBlock Text="{Binding Count}" FontSize="9" Foreground="{StaticResource AccentBrush}" FontWeight="Bold"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 4. Main Workspace -->
+            <Grid Grid.Row="3" Margin="24">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="*" MinWidth="300"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="3*"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
+                
                 <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0"
                                                 DataContext="{Binding TreeModel}"
                                                 SelectedItemChanged="ResultsTree_SelectedItemChanged"
@@ -172,8 +203,25 @@
                 <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
 
                 <controls:WadDiffDetailsControl x:Name="DiffDetails" Grid.Column="2" 
-                                                DataContext="{Binding SelectedDiff}"/>
+                                                DataContext="{Binding DetailsModel.SelectedDiff}"/>
             </Grid>
+
+            <!-- 5. Footer (Actions & Summary) -->
+            <Border Grid.Row="4" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,12">
+                <Grid>
+                    <!-- Left: Summary Info -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <icons:MaterialIcon Kind="InformationOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding SummaryText}" FontSize="11" Foreground="{StaticResource TextSecondary}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Right: Action Buttons -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Content="Reload Hashes" Click="ReloadHashesButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Margin="0,0,10,0" Padding="15,0"/>
+                        <Button Content="Save Report" Click="SaveButton_Click" Style="{StaticResource PrimaryButton}" Height="32" Padding="20,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
         </Grid>
     </Border>
 </Window>

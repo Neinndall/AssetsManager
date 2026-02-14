@@ -25,6 +25,24 @@
         </Setter>
     </Style>
 
+    <!-- 1. Diagnostic Badge Styles (Stats Bar & Status) -->
+    <Style x:Key="DiagnosticBadgeStyle" TargetType="Border">
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="8,2"/>
+        <Setter Property="Margin" Value="0,0,8,0"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- 2. Dashboard Card Style (Compact Informational Tile) -->
+    <Style x:Key="DashboardCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="8,5"/>
+        <Setter Property="Margin" Value="0,0,0,5"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
     <!-- Settings GroupBox Style -->
     <Style x:Key="SettingsGroupBoxStyle" TargetType="GroupBox">
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
