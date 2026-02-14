@@ -7,8 +7,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
-using AssetsManager.Views.Models.Models3D;
-using AssetsManager.Services.Models;
+using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Core;
 using Material.Icons;
 using System.Threading.Tasks;
@@ -19,24 +19,24 @@ using System.Windows.Media;
 using System.Windows.Controls.Primitives;
 using System.Linq;
 
-namespace AssetsManager.Views.Controls.Models
+namespace AssetsManager.Views.Controls.Viewer
 {
-    public class ModelTransformData
+    public class ViewerTransformData
     {
         public Vector3D Position { get; set; } = new Vector3D(0, 0, 0);
         public Vector3D Rotation { get; set; } = new Vector3D(0, 0, 0);
         public double Scale { get; set; } = 1.0;
     }
 
-    public partial class ModelPanelControl : UserControl
+    public partial class ViewerPanelControl : UserControl
     {
-        public ModelPanelModel ViewModel { get; } = new();
+        public ViewerPanelModel ViewModel { get; } = new();
 
-        private enum ModelType { Skn, MapGeometry }
-        private ModelType _currentMode;
+        private enum ViewerType { Skn, MapGeometry }
+        private ViewerType _currentMode;
 
-        public SknModelLoadingService SknModelLoadingService { get; set; }
-        public ScoModelLoadingService ScoModelLoadingService { get; set; }
+        public SknLoadingService SknLoadingService { get; set; }
+        public ScoLoadingService ScoLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
@@ -48,7 +48,7 @@ namespace AssetsManager.Views.Controls.Models
         public event EventHandler SceneClearRequested;
         public event EventHandler MapGeometryLoadRequested;
 
-        public ModelViewportControl Viewport { get; set; }
+        public ViewerViewportControl Viewport { get; set; }
 
         public event Action<SceneModel> ModelReadyForViewport;
         public event Action<SceneModel> ActiveModelChanged;
@@ -61,11 +61,11 @@ namespace AssetsManager.Views.Controls.Models
 
         private readonly ObservableCollection<SceneModel> _loadedModels = new();
         private readonly ObservableCollection<AnimationModel> _animationModels = new();
-        private readonly Dictionary<SceneModel, ModelTransformData> _transformData = new();
+        private readonly Dictionary<SceneModel, ViewerTransformData> _transformData = new();
         private SceneModel _selectedModel;
         private AnimationModel _currentlyPlayingAnimation;
 
-        public ModelPanelControl()
+        public ViewerPanelControl()
         {
             InitializeComponent();
             ModelsListBox.ItemsSource = _loadedModels;
@@ -103,7 +103,7 @@ namespace AssetsManager.Views.Controls.Models
             LoadModelButton.IsEnabled = true;
             LoadChromaModelButton.IsEnabled = true;
 
-            ViewModel.IsMapMode = (_currentMode == ModelType.MapGeometry);
+            ViewModel.IsMapMode = (_currentMode == ViewerType.MapGeometry);
             if (!ViewModel.IsMapMode)
             {
                 LoadAnimationButton.IsEnabled = true;
@@ -135,7 +135,7 @@ namespace AssetsManager.Views.Controls.Models
 
         private void LoadModelButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentMode == ModelType.Skn)
+            if (_currentMode == ViewerType.Skn)
             {
                 var openFileDialog = new CommonOpenFileDialog
                 {
@@ -202,7 +202,7 @@ namespace AssetsManager.Views.Controls.Models
 
         public void ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
         {
-            _currentMode = ModelType.Skn;
+            _currentMode = ViewerType.Skn;
             ViewModel.IsMapMode = false;
 
             SceneModel newModel = null;
@@ -210,17 +210,17 @@ namespace AssetsManager.Views.Controls.Models
 
             if (extension == ".sco" || extension == ".scb")
             {
-                newModel = ScoModelLoadingService.LoadModel(modelPath);
+                newModel = ScoLoadingService.LoadModel(modelPath);
             }
             else
             {
                 if (string.IsNullOrEmpty(texturePath))
                 {
-                    newModel = SknModelLoadingService.LoadModel(modelPath);
+                    newModel = SknLoadingService.LoadModel(modelPath);
                 }
                 else
                 {
-                    newModel = SknModelLoadingService.LoadModel(modelPath, texturePath);
+                    newModel = SknLoadingService.LoadModel(modelPath, texturePath);
                 }
             }
 
@@ -246,7 +246,7 @@ namespace AssetsManager.Views.Controls.Models
                     MainContentVisibilityChanged?.Invoke(Visibility.Visible);
                 }
 
-                var transformData = new ModelTransformData { Position = new Vector3D(0, SceneElements.GroundLevel, 0) };
+                var transformData = new ViewerTransformData { Position = new Vector3D(0, SceneElements.GroundLevel, 0) };
                 _transformData.Add(newModel, transformData);
                 UpdateTransform(newModel, transformData);
 
@@ -342,7 +342,7 @@ namespace AssetsManager.Views.Controls.Models
 
         public async Task LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
         {
-            _currentMode = ModelType.MapGeometry;
+            _currentMode = ViewerType.MapGeometry;
             ViewModel.IsMapMode = true;
 
             SceneModel newModel;
@@ -455,7 +455,7 @@ namespace AssetsManager.Views.Controls.Models
             }
         }
 
-        private void UpdateTransform(SceneModel model, ModelTransformData data)
+        private void UpdateTransform(SceneModel model, ViewerTransformData data)
         {
             var transformGroup = new Transform3DGroup();
 

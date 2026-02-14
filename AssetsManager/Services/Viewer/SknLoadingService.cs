@@ -16,15 +16,15 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Models
+namespace AssetsManager.Services.Viewer
 {
-    public class SknModelLoadingService
+    public class SknLoadingService
     {
         private readonly LogService _logService;
 
-        public SknModelLoadingService(LogService logService)
+        public SknLoadingService(LogService logService)
         {
             _logService = logService;
         }

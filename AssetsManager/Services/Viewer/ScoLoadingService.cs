@@ -8,16 +8,16 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Mesh;
 
-namespace AssetsManager.Services.Models
+namespace AssetsManager.Services.Viewer
 {
-    public class ScoModelLoadingService
+    public class ScoLoadingService
     {
         private readonly LogService _logService;
 
-        public ScoModelLoadingService(LogService logService)
+        public ScoLoadingService(LogService logService)
         {
             _logService = logService;
         }

@@ -1,9 +1,9 @@
-<UserControl x:Class="AssetsManager.Views.ModelWindow"
+<UserControl x:Class="AssetsManager.Views.Viewer.ViewerWindow"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:models="clr-namespace:AssetsManager.Views.Controls.Models"
+             xmlns:viewer="clr-namespace:AssetsManager.Views.Controls.Viewer"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
     <Grid>
@@ -159,7 +159,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Column 0: Viewport -->
-                <models:ModelViewportControl Grid.Column="0" x:Name="ViewportControl" MaximizeClicked="ViewportControl_MaximizeClicked"/>
+                <viewer:ViewerViewportControl Grid.Column="0" x:Name="ViewportControl" MaximizeClicked="ViewportControl_MaximizeClicked"/>
 
                 <!-- Column 1: Splitter -->
                 <GridSplitter Grid.Column="1"
@@ -172,7 +172,7 @@
                               ResizeDirection="Columns"/>
                 
                 <!-- Column 2: Controls Panel -->
-                <models:ModelPanelControl Grid.Column="2" x:Name="PanelControl"/>
+                <viewer:ViewerPanelControl Grid.Column="2" x:Name="PanelControl"/>
             </Grid>
         </Grid>
     </Grid>

@@ -25,6 +25,7 @@ using AssetsManager.Views.Controls;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
+using AssetsManager.Views.Viewer;
 
 namespace AssetsManager.Views
 {
@@ -447,9 +448,9 @@ namespace AssetsManager.Views
                 {
                     explorerWindow.CleanupResources();
                 }
-                else if (MainContentArea.Content is ModelWindow modelWindow)
+                else if (MainContentArea.Content is ViewerWindow viewerWindow)
                 {
-                    modelWindow.CleanupResources();
+                    viewerWindow.CleanupResources();
                 }
             }
 
@@ -458,7 +459,7 @@ namespace AssetsManager.Views
                 case "Home": LoadHomeWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
-                case "Models": LoadModelWindow(); break;
+                case "Viewer": LoadViewerWindow(); break;
                 case "Monitor": LoadMonitorWindow(); break;
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
@@ -487,9 +488,9 @@ namespace AssetsManager.Views
             MainContentArea.Content = comparatorWindow;
         }
 
-        private void LoadModelWindow()
+        private void LoadViewerWindow()
         {
-            MainContentArea.Content = _serviceProvider.GetRequiredService<ModelWindow>();
+            MainContentArea.Content = _serviceProvider.GetRequiredService<ViewerWindow>();
         }
 
         private void LoadMonitorWindow()

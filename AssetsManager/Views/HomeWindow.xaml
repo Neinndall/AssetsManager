@@ -214,11 +214,11 @@
                         
                         <!-- Models -->
                         <Button Grid.Column="1" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentPurple}">
-                            <Button.CommandParameter>Models</Button.CommandParameter>
+                            <Button.CommandParameter>Viewer</Button.CommandParameter>
                             <Grid Margin="16">
                                 <StackPanel VerticalAlignment="Center">
                                      <materialIcons:MaterialIcon Kind="CubeOutline" Width="28" Height="28" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
-                                    <TextBlock Text="3D Viewer" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Viewer" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                                     <TextBlock Text="View models, particles &amp; maps" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Grid>

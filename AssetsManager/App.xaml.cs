@@ -6,6 +6,7 @@ using System.Windows;
 using Serilog.Events;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views;
+using AssetsManager.Views.Viewer;
 using AssetsManager.Services.Updater;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
@@ -20,7 +21,7 @@ using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Models;
+using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
@@ -151,8 +152,8 @@ namespace AssetsManager
       services.AddSingleton<ReportGenerationService>();
 
       // Models Services
-      services.AddSingleton<SknModelLoadingService>();
-      services.AddSingleton<ScoModelLoadingService>();
+      services.AddSingleton<SknLoadingService>();
+      services.AddSingleton<ScoLoadingService>();
       services.AddSingleton<MapGeometryLoadingService>();
 
       // Audio Services
@@ -165,7 +166,7 @@ namespace AssetsManager
       services.AddTransient<HomeWindow>();
       services.AddTransient<ExplorerWindow>();
       services.AddTransient<ComparatorWindow>();
-      services.AddTransient<ModelWindow>();
+      services.AddTransient<ViewerWindow>();
       services.AddTransient<MonitorWindow>();
       services.AddTransient<HelpWindow>();
       services.AddTransient<SettingsWindow>();

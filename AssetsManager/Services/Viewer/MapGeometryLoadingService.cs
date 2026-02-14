@@ -15,10 +15,10 @@ using LeagueToolkit.Core.Memory;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Utils;
 
-namespace AssetsManager.Services.Models
+namespace AssetsManager.Services.Viewer
 {
     public class MapGeometryLoadingService
     {

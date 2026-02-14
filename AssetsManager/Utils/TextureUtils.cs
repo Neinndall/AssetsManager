@@ -12,7 +12,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Views.Models.Viewer;
 
 using AssetsManager.Views.Models.Settings;
 

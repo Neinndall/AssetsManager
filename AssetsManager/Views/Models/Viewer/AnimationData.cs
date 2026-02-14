@@ -1,6 +1,6 @@
 using LeagueToolkit.Core.Animation;
 
-namespace AssetsManager.Views.Models.Models3D
+namespace AssetsManager.Views.Models.Viewer
 {
     public class AnimationData
     {
