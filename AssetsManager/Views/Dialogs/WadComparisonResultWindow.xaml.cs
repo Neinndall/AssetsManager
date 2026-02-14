@@ -17,6 +17,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Views.Models.Dialogs;
+using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services;
@@ -276,7 +277,14 @@ namespace AssetsManager.Views.Dialogs
 
         private void ResultsTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            _viewModel.SelectedDiff = e.NewValue as SerializableChunkDiff;
+            if (e.NewValue is SerializableChunkDiff diff)
+            {
+                _viewModel.DetailsModel = new WadDiffDetailsModel { SelectedDiff = diff };
+            }
+            else
+            {
+                _viewModel.DetailsModel = null;
+            }
         }
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)

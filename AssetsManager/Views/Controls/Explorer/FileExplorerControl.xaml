@@ -107,7 +107,7 @@
                                                 </DataTrigger.EnterActions>
                                             </DataTrigger>
                                             
-                                            <!-- Status Colors ONLY for Grouping Folders (e.g. [+] New) -->
+                                            <!-- Status Colors ONLY for Grouping Folders -->
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
                                                     <Condition Binding="{Binding Status}" Value="New"/>
@@ -135,6 +135,13 @@
                                                     <Condition Binding="{Binding IsGroupingFolder}" Value="True"/>
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Status}" Value="Dependency"/>
+                                                    <Condition Binding="{Binding IsGroupingFolder}" Value="True"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Foreground" Value="{StaticResource AccentTeal}"/>
                                             </MultiDataTrigger>
                                             
                                             <!-- Selection Override -->
@@ -172,6 +179,9 @@
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Status}" Value="Renamed">
                                                 <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Dependency">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentTeal}"/>
                                             </DataTrigger>
 
                                             <!-- Selection and Loading overrides -->

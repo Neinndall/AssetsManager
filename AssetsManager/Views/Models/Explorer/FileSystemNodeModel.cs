@@ -10,7 +10,7 @@ using AssetsManager.Views.Models.Wad;
 namespace AssetsManager.Views.Models.Explorer
 {
     public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, WemFile, SoundBank }
-    public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted }
+    public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted, Dependency }
     public enum AudioSourceType { Wpk, Bnk }
 
     public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable
@@ -35,7 +35,7 @@ namespace AssetsManager.Views.Models.Explorer
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
         public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();
-        public bool IsGroupingFolder => Name != null && Name.StartsWith("[");
+        public bool IsGroupingFolder { get; set; }
 
         public string DisplayName
         {
@@ -62,11 +62,6 @@ namespace AssetsManager.Views.Models.Explorer
             get
             {
                 var name = DisplayName;
-
-                if (name.StartsWith("[") && name.Length > 4 && name[3] == ' ')
-                {
-                    name = name.Substring(4);
-                }
 
                 int parenthesisIndex = name.LastIndexOf(" (");
                 if (parenthesisIndex > 0)

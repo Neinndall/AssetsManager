@@ -130,7 +130,15 @@ namespace AssetsManager.Services.Explorer
             {
                 SourceChunkPathHash = (diff.Type == ChunkDiffType.Removed) ? diff.OldPathHash : diff.NewPathHash,
                 ChunkDiff = diff,
-                Status = (DiffStatus)diff.Type
+                Status = diff.Type switch
+                {
+                    ChunkDiffType.New => DiffStatus.New,
+                    ChunkDiffType.Modified => DiffStatus.Modified,
+                    ChunkDiffType.Renamed => DiffStatus.Renamed,
+                    ChunkDiffType.Removed => DiffStatus.Deleted,
+                    ChunkDiffType.Dependency => DiffStatus.Dependency,
+                    _ => DiffStatus.Unchanged
+                }
             };
 
             await ProcessAndSaveAsync(node, destinationPath, null, basePath, cancellationToken);

@@ -842,7 +842,7 @@ namespace AssetsManager.Views.Controls.Explorer
             if (containerNode == null && path.Count > 0)
             {
                 var rootNode = path[0];
-                bool isBackupRoot = rootNode.Children.Any(c => c.Name.StartsWith("["));
+                bool isBackupRoot = rootNode.Children.Any(c => c.IsGroupingFolder);
                 if (isBackupRoot)
                 {
                     containerNode = rootNode;

@@ -5,6 +5,7 @@ using System.IO;
 using Material.Icons;
 using System.Windows.Data;
 using AssetsManager.Views.Models.Dialogs;
+using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
 
@@ -68,11 +69,11 @@ namespace AssetsManager.Views.Converters
             if (node.Type == NodeType.VirtualDirectory)
             {
                 string name = node.Name;
-                if (name.StartsWith("[+]")) return MaterialIconKind.FilePlusOutline;
-                if (name.StartsWith("[~]")) return MaterialIconKind.FileEditOutline;
-                if (name.StartsWith("[»]")) return MaterialIconKind.FileMoveOutline;
-                if (name.StartsWith("[-]")) return MaterialIconKind.FileRemoveOutline;
-                if (name.StartsWith("[=]")) return MaterialIconKind.Link;
+                if (name == "New") return MaterialIconKind.PlusCircleOutline;
+                if (name == "Modified") return MaterialIconKind.PencilCircleOutline;
+                if (name == "Renamed") return MaterialIconKind.SwapHorizontalCircleOutline;
+                if (name == "Deleted") return MaterialIconKind.MinusCircleOutline;
+                if (name == "Dependency") return MaterialIconKind.LinkCircleOutline;
             }
 
             switch (node.Type)
@@ -99,11 +100,11 @@ namespace AssetsManager.Views.Converters
         {
             return type switch
             {
-                ChunkDiffType.New => MaterialIconKind.FilePlusOutline,
-                ChunkDiffType.Removed => MaterialIconKind.FileRemoveOutline,
-                ChunkDiffType.Modified => MaterialIconKind.FileEditOutline,
-                ChunkDiffType.Renamed => MaterialIconKind.FileMoveOutline,
-                ChunkDiffType.Dependency => MaterialIconKind.Link,
+                ChunkDiffType.New => MaterialIconKind.PlusCircleOutline,
+                ChunkDiffType.Removed => MaterialIconKind.MinusCircleOutline,
+                ChunkDiffType.Modified => MaterialIconKind.PencilCircleOutline,
+                ChunkDiffType.Renamed => MaterialIconKind.SwapHorizontalCircleOutline,
+                ChunkDiffType.Dependency => MaterialIconKind.LinkCircleOutline,
                 _ => MaterialIconKind.FileQuestionOutline,
             };
         }

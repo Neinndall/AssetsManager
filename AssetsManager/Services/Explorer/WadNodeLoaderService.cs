@@ -126,13 +126,19 @@ namespace AssetsManager.Services.Explorer
                         }
                     }
 
+                    // Set grouping folder flag for top level folders in sorting mode
+                    foreach (var statusFolder in wadNode.Children)
+                    {
+                        statusFolder.IsGroupingFolder = true;
+                    }
+
                     SortChildrenRecursively(wadNode);
                     PostProcessAudioNodes(wadNode);
                 }
                 else
                 {
                     var statusGroups = wadGroup.GroupBy(d => d.Type).ToDictionary(g => g.Key, g => g.ToList());
-                    var statusOrder = new[] { ChunkDiffType.New, ChunkDiffType.Modified, ChunkDiffType.Renamed, ChunkDiffType.Removed };
+                    var statusOrder = new[] { ChunkDiffType.New, ChunkDiffType.Modified, ChunkDiffType.Renamed, ChunkDiffType.Removed, ChunkDiffType.Dependency };
 
                     foreach (var statusType in statusOrder)
                     {
@@ -140,6 +146,7 @@ namespace AssetsManager.Services.Explorer
                         {
                             var statusNode = new FileSystemNodeModel(GetStatusPrefix(statusType), true, GetStatusPrefix(statusType), wadGroup.Key);
                             statusNode.Status = GetDiffStatus(statusType);
+                            statusNode.IsGroupingFolder = true;
                             wadNode.Children.Add(statusNode);
 
                             var nodesToAdd = new List<FileSystemNodeModel>();
@@ -229,12 +236,12 @@ namespace AssetsManager.Services.Explorer
 
         private string GetStatusPrefix(ChunkDiffType type) => type switch
         {
-            ChunkDiffType.New => "[+] New",
-            ChunkDiffType.Modified => "[~] Modified",
-            ChunkDiffType.Renamed => "[»] Renamed",
-            ChunkDiffType.Removed => "[-] Deleted",
-            ChunkDiffType.Dependency => "[=] Dependency",
-            _ => "[?] Unknown"
+            ChunkDiffType.New => "New",
+            ChunkDiffType.Modified => "Modified",
+            ChunkDiffType.Renamed => "Renamed",
+            ChunkDiffType.Removed => "Deleted",
+            ChunkDiffType.Dependency => "Dependency",
+            _ => "Unknown"
         };
 
         private string RestoreExtension(string original, string resolved, ulong hash)
@@ -272,7 +279,7 @@ namespace AssetsManager.Services.Explorer
                 ChunkDiffType.Removed => DiffStatus.Deleted,
                 ChunkDiffType.Modified => DiffStatus.Modified,
                 ChunkDiffType.Renamed => DiffStatus.Renamed,
-                ChunkDiffType.Dependency => DiffStatus.Unchanged,
+                ChunkDiffType.Dependency => DiffStatus.Dependency,
                 _ => DiffStatus.Unchanged,
             };
         }
