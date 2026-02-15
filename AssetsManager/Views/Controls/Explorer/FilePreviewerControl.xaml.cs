@@ -320,9 +320,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 FileGridControl.ItemsSource = gridItems;
                 
-                // Calculate and set folder analytics
-                UpdateFolderAnalytics(node);
-
                 if (!ViewModel.IsGridMode && !ViewModel.HasEverPreviewedAFile)
                 {
                     _ = ExplorerPreviewService.ResetPreviewAsync();
@@ -339,60 +336,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.IsWelcomeVisible = false;
                 ViewModel.IsUnsupportedVisible = false;
             }
-        }
-
-        private void UpdateFolderAnalytics(FileSystemNodeModel folderNode)
-        {
-            if (folderNode == null || folderNode.Children == null) return;
-
-            var analytics = new FileGridAnalyticsModel();
-            var children = folderNode.Children;
-
-            int total = 0;
-            int imgCount = 0, audioCount = 0, modelCount = 0, dataCount = 0;
-            long imgSize = 0, audioSize = 0, dataSize = 0;
-
-            foreach (var c in children)
-            {
-                if (c.Name.Equals("Loading...")) continue;
-                total++;
-
-                string ext = c.Extension;
-                long size = (long)(c.ChunkDiff?.NewUncompressedSize ?? 0);
-
-                if (SupportedFileTypes.Images.Contains(ext) || SupportedFileTypes.Textures.Contains(ext) || SupportedFileTypes.VectorImages.Contains(ext))
-                {
-                    imgCount++;
-                    imgSize += size;
-                }
-                else if (SupportedFileTypes.AudioBank.Contains(ext) || SupportedFileTypes.Media.Contains(ext))
-                {
-                    audioCount++;
-                    audioSize += size;
-                }
-                else if (SupportedFileTypes.Viewer3D.Contains(ext))
-                {
-                    modelCount++;
-                }
-                else if (SupportedFileTypes.Bin.Contains(ext) || SupportedFileTypes.Json.Contains(ext) || SupportedFileTypes.StringTable.Contains(ext) || 
-                         SupportedFileTypes.PlainText.Contains(ext) || SupportedFileTypes.Css.Contains(ext) || SupportedFileTypes.JavaScript.Contains(ext) ||
-                         SupportedFileTypes.Troybin.Contains(ext) || SupportedFileTypes.Preload.Contains(ext))
-                {
-                    dataCount++;
-                    dataSize += size;
-                }
-            }
-
-            analytics.TotalFiles = total;
-            analytics.ImageCount = imgCount;
-            analytics.ImageSize = imgSize;
-            analytics.AudioCount = audioCount;
-            analytics.AudioSize = audioSize;
-            analytics.ModelCount = modelCount;
-            analytics.DataCount = dataCount;
-            analytics.DataSize = dataSize;
-
-            FileGridControl.Analytics = analytics;
         }
 
         private async Task LoadThumbnailsQueueAsync(ObservableRangeCollection<FileGridViewModel> items, CancellationToken ct)

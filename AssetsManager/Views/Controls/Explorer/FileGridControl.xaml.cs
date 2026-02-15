@@ -22,15 +22,6 @@ namespace AssetsManager.Views.Controls.Explorer
             set { SetValue(ItemsSourceProperty, value); }
         }
 
-        public static readonly DependencyProperty AnalyticsProperty =
-            DependencyProperty.Register("Analytics", typeof(FileGridAnalyticsModel), typeof(FileGridControl), new PropertyMetadata(null));
-
-        public FileGridAnalyticsModel Analytics
-        {
-            get { return (FileGridAnalyticsModel)GetValue(AnalyticsProperty); }
-            set { SetValue(AnalyticsProperty, value); }
-        }
-
         public event EventHandler<NodeClickedEventArgs> NodeClicked;
         public event EventHandler<SelectionActionEventArgs> SelectionActionRequested;
 

@@ -32,14 +32,19 @@
                     </Grid.RowDefinitions>
 
                     <!-- Thumbnail Area -->
-                    <Border Grid.Row="0" CornerRadius="9,9,0,0" Background="{StaticResource SidebarBackground}" Opacity="0.5" ClipToBounds="True">
+                    <Border Grid.Row="0" CornerRadius="9,9,0,0" Background="{StaticResource SidebarBackground}" Opacity="0.5">
                         <Grid>
+                            <!-- Thumbnail Area -->
                             <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
                                                         Width="48" Height="48" Foreground="{StaticResource TextMuted}"
                                                         Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
                             
-                            <Image Source="{Binding ImagePreview}" Stretch="UniformToFill" 
-                                   Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}"/>
+                            <!-- Real Image Preview using ImageBrush (Perfect Clipping) -->
+                            <Border CornerRadius="9,9,0,0" Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
+                                <Border.Background>
+                                    <ImageBrush ImageSource="{Binding ImagePreview}" Stretch="UniformToFill"/>
+                                </Border.Background>
+                            </Border>
 
                             <!-- Top Type Badge -->
                             <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6" 
@@ -112,51 +117,11 @@
             <RowDefinition Height="*"/>    <!-- Main Grid -->
         </Grid.RowDefinitions>
 
-        <!-- 1. Header: Folder Insights & Filters -->
+        <!-- 1. Header: Quick Filters ONLY -->
         <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" Margin="0,0,5,0">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,15,0">
-                    <TextBlock Text="FOLDER CONTENTS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
-                    <StackPanel Orientation="Horizontal" Margin="0">
-                        <TextBlock Text="{Binding Analytics.TotalFiles, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Opacity="0.9" VerticalAlignment="Center"/>
-                        <TextBlock Text="Assets detected" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8" Margin="4,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- Detailed Category Analytics (Center) -->
-                <Border Grid.Column="1" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        <!-- Images -->
-                        <StackPanel Margin="0,0,16,0" ToolTip="Images &amp; Textures" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="TextureBox" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,3"/>
-                            <TextBlock Text="{Binding Analytics.ImageCount, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                        </StackPanel>
-                        <!-- Audio -->
-                        <StackPanel Margin="0,0,16,0" ToolTip="Audio Banks &amp; WEMs" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="VolumeHigh" Width="16" Height="16" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" Margin="0,0,0,3"/>
-                            <TextBlock Text="{Binding Analytics.AudioCount, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                        </StackPanel>
-                        <!-- Models -->
-                        <StackPanel Margin="0,0,16,0" ToolTip="3D Models &amp; Animations" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="16" Height="16" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,3"/>
-                            <TextBlock Text="{Binding Analytics.ModelCount, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                        </StackPanel>
-                        <!-- Text -->
-                        <StackPanel ToolTip="Text &amp; Data" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,3"/>
-                            <TextBlock Text="{Binding Analytics.DataCount, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Quick Filters (Right) -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Quick Filters (Now the main element) -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <TextBlock Text="FILTER BY" Style="{StaticResource ToolSectionLabel}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
