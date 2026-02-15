@@ -32,15 +32,6 @@
                         <RowDefinition Height="Auto"/> <!-- Label -->
                     </Grid.RowDefinitions>
 
-                    <!-- Selection Overlay -->
-                    <Border Grid.RowSpan="2" BorderThickness="2" CornerRadius="10" 
-                            BorderBrush="{StaticResource AccentBrush}" 
-                            Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <materialIcons:MaterialIcon Grid.RowSpan="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" 
-                                                Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
-                                                Margin="0,0,12,12" 
-                                                Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-
                     <!-- Thumbnail Area -->
                     <Border Grid.Row="0" CornerRadius="9,9,0,0" Background="{StaticResource SidebarBackground}" Opacity="0.5">
                         <Grid>
@@ -101,23 +92,18 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+
+                    <!-- Selection Overlay (Now at the top of the Z-stack) -->
+                    <Border Grid.RowSpan="2" BorderThickness="2" CornerRadius="10" 
+                            BorderBrush="{StaticResource AccentBrush}" IsHitTestVisible="False"
+                            Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <materialIcons:MaterialIcon Grid.RowSpan="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" 
+                                                Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
+                                                Margin="0,0,12,12" 
+                                                Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
             </Border>
         </DataTemplate>
-
-        <!-- ListBox Item Container Style -->
-        <Style x:Key="FileGridItemStyle" TargetType="ListBoxItem">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <ContentPresenter />
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -127,7 +113,7 @@
         </Grid.RowDefinitions>
 
         <!-- 1. Header -->
-        <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12">
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" Margin="1,0,5,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock Text="FILTER BY" Style="{StaticResource ToolSectionLabel}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                 <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
@@ -152,23 +138,12 @@
             </StackPanel>
         </Border>
 
-        <!-- 2. Main Grid: VirtualizingWrapPanel ListBox -->
+        <!-- 2. Main Grid: Simplified ListBox -->
         <ListBox Grid.Row="1" x:Name="FileGridListBox"
-                 Background="Transparent" BorderThickness="0"
-                 SelectionMode="Extended"
-                 Padding="10"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 VirtualizingPanel.IsVirtualizing="True"
-                 VirtualizingPanel.VirtualizationMode="Recycling"
-                 ScrollViewer.CanContentScroll="True"
+                 Style="{StaticResource ModernFileGridListBoxStyle}"
                  ItemTemplate="{StaticResource FileGridItemTemplate}"
                  ItemContainerStyle="{StaticResource FileGridItemStyle}"
                  SelectionChanged="FileGridListBox_SelectionChanged">
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="Uniform" ScrollUnit="Pixel"/>
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
         </ListBox>
 
         <!-- 3. Floating Action Bar (Visible on Multi-selection) -->

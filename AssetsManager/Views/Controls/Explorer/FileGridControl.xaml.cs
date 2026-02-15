@@ -14,6 +14,9 @@ namespace AssetsManager.Views.Controls.Explorer
 {
     public partial class FileGridControl : UserControl
     {
+        private ObservableRangeCollection<FileGridViewModel> _allItems = new ObservableRangeCollection<FileGridViewModel>();
+        public ObservableRangeCollection<FileGridViewModel> DisplayItems { get; } = new ObservableRangeCollection<FileGridViewModel>();
+
         public static readonly DependencyProperty ItemsSourceProperty =
             DependencyProperty.Register("ItemsSource", typeof(ObservableRangeCollection<FileGridViewModel>), typeof(FileGridControl), new PropertyMetadata(null, OnItemsSourceChanged));
 
@@ -31,6 +34,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public FileGridControl()
         {
             InitializeComponent();
+            FileGridListBox.ItemsSource = DisplayItems;
         }
 
         private static void OnItemsSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -38,13 +42,10 @@ namespace AssetsManager.Views.Controls.Explorer
             if (d is FileGridControl control)
             {
                 var newItems = (ObservableRangeCollection<FileGridViewModel>)e.NewValue;
-                control.FileGridListBox.ItemsSource = newItems;
+                control._allItems = newItems ?? new ObservableRangeCollection<FileGridViewModel>();
                 
                 // Re-apply current filter when folder or search changes
-                if (newItems != null)
-                {
-                    control.ApplyFilter(control._currentFilter);
-                }
+                control.ApplyFilter(control._currentFilter);
             }
         }
 
@@ -87,13 +88,17 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void ApplyFilter(string type)
         {
-            if (ItemsSource == null) return;
+            if (_allItems == null) return;
 
-            foreach (var item in ItemsSource)
+            if (type == "All")
             {
-                if (type == "All") { item.Node.IsVisible = true; continue; }
-                
-                bool match = type switch
+                DisplayItems.ReplaceRange(_allItems);
+                return;
+            }
+
+            var filtered = _allItems.Where(item =>
+            {
+                return type switch
                 {
                     "Images" => SupportedFileTypes.Images.Contains(item.Node.Extension) || SupportedFileTypes.Textures.Contains(item.Node.Extension) || SupportedFileTypes.VectorImages.Contains(item.Node.Extension),
                     "Audio" => SupportedFileTypes.AudioBank.Contains(item.Node.Extension) || SupportedFileTypes.Media.Contains(item.Node.Extension),
@@ -101,8 +106,9 @@ namespace AssetsManager.Views.Controls.Explorer
                     "Data" => SupportedFileTypes.Bin.Contains(item.Node.Extension) || SupportedFileTypes.Json.Contains(item.Node.Extension) || SupportedFileTypes.StringTable.Contains(item.Node.Extension) || SupportedFileTypes.PlainText.Contains(item.Node.Extension) || SupportedFileTypes.Css.Contains(item.Node.Extension) || SupportedFileTypes.JavaScript.Contains(item.Node.Extension) || SupportedFileTypes.Troybin.Contains(item.Node.Extension) || SupportedFileTypes.Preload.Contains(item.Node.Extension),
                     _ => true
                 };
-                item.Node.IsVisible = match;
-            }
+            }).ToList();
+
+            DisplayItems.ReplaceRange(filtered);
         }
 
         private void ActionBar_Action_Click(object sender, RoutedEventArgs e)
