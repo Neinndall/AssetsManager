@@ -25,6 +25,7 @@
         <Setter Property="VirtualizingPanel.CacheLengthUnit" Value="Page"/>
         <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel"/>
         <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource FileGridItemStyle}"/>
         
         <Setter Property="ItemsPanel">
             <Setter.Value>
