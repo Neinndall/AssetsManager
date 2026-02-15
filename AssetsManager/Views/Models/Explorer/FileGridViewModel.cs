@@ -15,17 +15,14 @@ namespace AssetsManager.Views.Models.Explorer
 
         public string DisplayNameShort => PathUtils.TruncateForDisplay(Node.DisplayName, 50);
 
-        public string SubfolderCount => IsUnloadedSoundBank 
-            ? "N/A" 
-            : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
+        private string _subfolderCount;
+        public string SubfolderCount => _subfolderCount ?? (_subfolderCount = IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
 
-        public string FolderCount => IsUnloadedSoundBank 
-            ? "0" 
-            : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
+        private string _folderCount;
+        public string FolderCount => _folderCount ?? (_folderCount = IsUnloadedSoundBank ? "0" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
 
-        public string AssetCount => IsUnloadedSoundBank 
-            ? "N/A" 
-            : (Node.Children?.Count(c => !IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
+        private string _assetCount;
+        public string AssetCount => _assetCount ?? (_assetCount = IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => !IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
 
         private bool IsUnloadedSoundBank => Node.Type == NodeType.SoundBank && 
                                             Node.Children?.Count == 1 && 

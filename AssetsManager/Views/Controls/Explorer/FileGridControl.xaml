@@ -5,10 +5,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
              mc:Ignorable="d">
     
     <UserControl.Resources>
-        <!-- Modern Grid Item Template -->
+        <!-- Modern Grid Item Template (Card) -->
         <DataTemplate x:Key="FileGridItemTemplate">
             <Border Margin="6" Width="130" Height="160" CornerRadius="10"
                     Background="{StaticResource CardBackground}"
@@ -31,10 +32,19 @@
                         <RowDefinition Height="Auto"/> <!-- Label -->
                     </Grid.RowDefinitions>
 
+                    <!-- Selection Overlay -->
+                    <Border Grid.RowSpan="2" BorderThickness="2" CornerRadius="10" 
+                            BorderBrush="{StaticResource AccentBrush}" 
+                            Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <materialIcons:MaterialIcon Grid.RowSpan="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" 
+                                                Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
+                                                Margin="0,0,12,12" 
+                                                Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
                     <!-- Thumbnail Area -->
                     <Border Grid.Row="0" CornerRadius="9,9,0,0" Background="{StaticResource SidebarBackground}" Opacity="0.5">
                         <Grid>
-                            <!-- Thumbnail Area -->
+                            <!-- Placeholder/Loading Icon -->
                             <materialIcons:MaterialIcon DataContext="{Binding Node}"
                                                         Kind="{Binding Converter={StaticResource PathToIconConverter}}" 
                                                         Width="48" Height="48" 
@@ -42,7 +52,7 @@
                                                         Visibility="{Binding DataContext.ImagePreview, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}">
                             </materialIcons:MaterialIcon>
                             
-                            <!-- Real Image Preview using ImageBrush (Perfect Clipping) -->
+                            <!-- Real Image Preview -->
                             <Border CornerRadius="9,9,0,0" Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
                                 <Border.Background>
                                     <ImageBrush ImageSource="{Binding ImagePreview}" Stretch="UniformToFill"/>
@@ -65,15 +75,12 @@
                                        TextWrapping="Wrap" Height="36" LineHeight="14"
                                        TextAlignment="Center" HorizontalAlignment="Center"/>
                             
-                            <!-- Small indicators for folders -->
+                            <!-- Small indicators -->
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsFolder, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,4,0,0" HorizontalAlignment="Center">
-                                <!-- Folders Count -->
                                 <StackPanel Orientation="Horizontal" Visibility="{Binding FolderCount, Converter={StaticResource CountToVisibilityConverter}}" Margin="0,0,8,0">
                                     <materialIcons:MaterialIcon Kind="FolderOutline" Width="10" Height="10" Foreground="{StaticResource AccentOrange}" Margin="0,0,3,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding FolderCount}" FontSize="9" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                
-                                <!-- Files Count -->
                                 <StackPanel Orientation="Horizontal" Visibility="{Binding AssetCount, Converter={StaticResource CountToVisibilityConverter}}">
                                     <materialIcons:MaterialIcon Kind="CubeOutline" Width="10" Height="10" Foreground="{StaticResource AccentGreen}" Margin="0,0,3,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding AssetCount}" FontSize="9" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
@@ -93,21 +100,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Grid>
-                            <ContentPresenter />
-                            <!-- Selection Overlay -->
-                            <Border x:Name="SelectionBorder" BorderThickness="2" CornerRadius="10" Margin="6" 
-                                    BorderBrush="{StaticResource AccentBrush}" Visibility="Collapsed"/>
-                            <materialIcons:MaterialIcon x:Name="CheckIcon" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" 
-                                                        Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
-                                                        Margin="0,0,12,12" Visibility="Collapsed"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="SelectionBorder" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
+                        <ContentPresenter />
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -120,51 +113,47 @@
             <RowDefinition Height="*"/>    <!-- Main Grid -->
         </Grid.RowDefinitions>
 
-        <!-- 1. Header: Quick Filters ONLY -->
-        <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" Margin="0,0,5,0">
-            <Grid>
-                <!-- Quick Filters (Now the main element) -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
-                    <TextBlock Text="FILTER BY" Style="{StaticResource ToolSectionLabel}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" IsChecked="True" Tag="All" Click="FilterButton_Click" ToolTip="Show All Assets" Padding="10,4">
-                                <materialIcons:MaterialIcon Kind="BorderAll" Width="16" Height="16"/>
-                            </RadioButton>
-                            <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Images" Click="FilterButton_Click" ToolTip="Images &amp; Textures" Padding="10,4">
-                                <materialIcons:MaterialIcon Kind="TextureBox" Width="16" Height="16"/>
-                            </RadioButton>
-                            <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Audio" Click="FilterButton_Click" ToolTip="Audio Banks &amp; Media" Padding="10,4">
-                                <materialIcons:MaterialIcon Kind="VolumeHigh" Width="16" Height="16"/>
-                            </RadioButton>
-                            <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="3D" Click="FilterButton_Click" ToolTip="3D Models &amp; Animations" Padding="10,4">
-                                <materialIcons:MaterialIcon Kind="CubeOutline" Width="16" Height="16"/>
-                            </RadioButton>
-                            <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Data" Click="FilterButton_Click" ToolTip="Text &amp; Data" Padding="10,4">
-                                <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="16" Height="16"/>
-                            </RadioButton>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Grid>
+        <!-- 1. Header -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <TextBlock Text="FILTER BY" Style="{StaticResource ToolSectionLabel}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" IsChecked="True" Tag="All" Click="FilterButton_Click" ToolTip="Show All Assets" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="BorderAll" Width="16" Height="16"/>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Images" Click="FilterButton_Click" ToolTip="Images &amp; Textures" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="TextureBox" Width="16" Height="16"/>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Audio" Click="FilterButton_Click" ToolTip="Audio Banks &amp; Media" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="VolumeHigh" Width="16" Height="16"/>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="3D" Click="FilterButton_Click" ToolTip="3D Models &amp; Animations" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="16" Height="16"/>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Data" Click="FilterButton_Click" ToolTip="Text &amp; Data" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="16" Height="16"/>
+                        </RadioButton>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
         </Border>
 
-        <!-- 2. Main Grid: ListBox with WrapPanel -->
+        <!-- 2. Main Grid: VirtualizingWrapPanel ListBox -->
         <ListBox Grid.Row="1" x:Name="FileGridListBox"
                  Background="Transparent" BorderThickness="0"
                  SelectionMode="Extended"
                  Padding="10"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 VirtualizingPanel.IsVirtualizing="True"
+                 VirtualizingPanel.VirtualizationMode="Recycling"
+                 ScrollViewer.CanContentScroll="True"
                  ItemTemplate="{StaticResource FileGridItemTemplate}"
+                 ItemContainerStyle="{StaticResource FileGridItemStyle}"
                  SelectionChanged="FileGridListBox_SelectionChanged">
-            <ListBox.ItemContainerStyle>
-                <Style TargetType="ListBoxItem" BasedOn="{StaticResource FileGridItemStyle}">
-                    <Setter Property="Visibility" Value="{Binding Node.IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </Style>
-            </ListBox.ItemContainerStyle>
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left"/>
+                    <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="Uniform" ScrollUnit="Pixel"/>
                 </ItemsPanelTemplate>
             </ListBox.ItemsPanel>
         </ListBox>

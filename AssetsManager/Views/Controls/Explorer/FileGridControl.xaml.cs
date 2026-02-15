@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Controls.Explorer
@@ -49,13 +50,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void FileGridListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Sync selection state to ViewModels
-            if (ItemsSource != null)
-            {
-                foreach (FileGridViewModel item in e.RemovedItems) item.IsSelected = false;
-                foreach (FileGridViewModel item in e.AddedItems) item.IsSelected = true;
-            }
-            
+            // Sync selection state to ViewModels for multi-select consistency
+            foreach (FileGridViewModel item in e.RemovedItems) item.IsSelected = false;
+            foreach (FileGridViewModel item in e.AddedItems) item.IsSelected = true;
+
             UpdateActionBarVisibility();
         }
 
@@ -134,3 +132,4 @@ namespace AssetsManager.Views.Controls.Explorer
         }
     }
 }
+
