@@ -22,27 +22,10 @@
                 <ResourceDictionary Source="/Themes/CustomScrollbarStyles.xaml"/> 
                 <ResourceDictionary Source="/Themes/TreeViewStyles.xaml"/> 
                 <ResourceDictionary Source="/Themes/ModernListView.xaml"/>
+                <ResourceDictionary Source="/Themes/Converters.xaml"/>
                 <ResourceDictionary Source="/Themes/ApiTemplates.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- Global WPF Standard Converters -->
-            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
-            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-
-            <!-- Global Custom Converters -->
-            <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
-            <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
-            <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
-            <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
-            <converters:EqualityToVisibilityConverter x:Key="EqualityToVisibilityConverter"/>
-            <converters:PathToIconConverter x:Key="PathToIconConverter"/>
-            <converters:ChunkDiffTypeToBrushConverter x:Key="ChunkDiffTypeToBrushConverter"/>
-            <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" TrueBrush="{StaticResource CardBackground}" FalseBrush="Transparent"/>
-            <converters:ValueMultiplierConverter x:Key="ValueMultiplierConverter"/>
-
-            <!-- Material Icon Converter (Generic) -->
-            <converters:BooleanToMaterialIconConverter x:Key="BooleanToMaterialIconConverter"/>
-            
         </ResourceDictionary>
     </Application.Resources>
 </Application>
