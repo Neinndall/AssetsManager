@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Utils;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -19,7 +22,19 @@ namespace AssetsManager.Views.Controls.Explorer
             set { SetValue(ItemsSourceProperty, value); }
         }
 
+        public static readonly DependencyProperty AnalyticsProperty =
+            DependencyProperty.Register("Analytics", typeof(FileGridAnalyticsModel), typeof(FileGridControl), new PropertyMetadata(null));
+
+        public FileGridAnalyticsModel Analytics
+        {
+            get { return (FileGridAnalyticsModel)GetValue(AnalyticsProperty); }
+            set { SetValue(AnalyticsProperty, value); }
+        }
+
         public event EventHandler<NodeClickedEventArgs> NodeClicked;
+        public event EventHandler<SelectionActionEventArgs> SelectionActionRequested;
+
+        private string _currentFilter = "All";
 
         public FileGridControl()
         {
@@ -30,16 +45,101 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (d is FileGridControl control)
             {
-                control.FileGridViewItemsControl.ItemsSource = (ObservableRangeCollection<FileGridViewModel>)e.NewValue;
+                var newItems = (ObservableRangeCollection<FileGridViewModel>)e.NewValue;
+                control.FileGridListBox.ItemsSource = newItems;
+                
+                // Re-apply current filter when folder or search changes
+                if (newItems != null)
+                {
+                    control.ApplyFilter(control._currentFilter);
+                }
             }
         }
 
-        private void FileGridControl_Item_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void FileGridListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Sync selection state to ViewModels
+            if (ItemsSource != null)
+            {
+                foreach (FileGridViewModel item in e.RemovedItems) item.IsSelected = false;
+                foreach (FileGridViewModel item in e.AddedItems) item.IsSelected = true;
+            }
+            
+            UpdateActionBarVisibility();
+        }
+
+        private void UpdateActionBarVisibility()
+        {
+            int selectedCount = FileGridListBox.SelectedItems.Count;
+            ActionBarBorder.Visibility = selectedCount > 1 ? Visibility.Visible : Visibility.Collapsed;
+            SelectedCountText.Text = $"{selectedCount} items selected";
+        }
+
+        private void FileGridControl_Item_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (sender is FrameworkElement element && element.DataContext is FileGridViewModel item)
             {
-                NodeClicked?.Invoke(this, new NodeClickedEventArgs(item.Node));
+                // Uses the global interaction rules
+                if (InteractionHelper.IsPrimaryActionIntent())
+                {
+                    NodeClicked?.Invoke(this, new NodeClickedEventArgs(item.Node));
+                }
             }
+        }
+
+        private void FilterButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is RadioButton rb && rb.Tag is string filterType)
+            {
+                _currentFilter = filterType;
+                ApplyFilter(filterType);
+            }
+        }
+
+        private void ApplyFilter(string type)
+        {
+            if (ItemsSource == null) return;
+
+            foreach (var item in ItemsSource)
+            {
+                if (type == "All") { item.Node.IsVisible = true; continue; }
+                
+                bool match = type switch
+                {
+                    "Images" => SupportedFileTypes.Images.Contains(item.Node.Extension) || SupportedFileTypes.Textures.Contains(item.Node.Extension) || SupportedFileTypes.VectorImages.Contains(item.Node.Extension),
+                    "Audio" => SupportedFileTypes.AudioBank.Contains(item.Node.Extension) || SupportedFileTypes.Media.Contains(item.Node.Extension),
+                    "3D" => SupportedFileTypes.Viewer3D.Contains(item.Node.Extension),
+                    "Data" => SupportedFileTypes.Bin.Contains(item.Node.Extension) || SupportedFileTypes.Json.Contains(item.Node.Extension) || SupportedFileTypes.StringTable.Contains(item.Node.Extension) || SupportedFileTypes.PlainText.Contains(item.Node.Extension) || SupportedFileTypes.Css.Contains(item.Node.Extension) || SupportedFileTypes.JavaScript.Contains(item.Node.Extension) || SupportedFileTypes.Troybin.Contains(item.Node.Extension) || SupportedFileTypes.Preload.Contains(item.Node.Extension),
+                    _ => true
+                };
+                item.Node.IsVisible = match;
+            }
+        }
+
+        private void ActionBar_Action_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string action)
+            {
+                if (action == "Close")
+                {
+                    FileGridListBox.UnselectAll();
+                    return;
+                }
+
+                var selectedNodes = FileGridListBox.SelectedItems.Cast<FileGridViewModel>().Select(i => i.Node).ToList();
+                SelectionActionRequested?.Invoke(this, new SelectionActionEventArgs(action, selectedNodes));
+            }
+        }
+    }
+
+    public class SelectionActionEventArgs : EventArgs
+    {
+        public string Action { get; }
+        public List<FileSystemNodeModel> Nodes { get; }
+        public SelectionActionEventArgs(string action, List<FileSystemNodeModel> nodes)
+        {
+            Action = action;
+            Nodes = nodes;
         }
     }
 }

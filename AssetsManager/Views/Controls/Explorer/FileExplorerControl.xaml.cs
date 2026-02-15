@@ -387,6 +387,24 @@ namespace AssetsManager.Views.Controls.Explorer
                 true);
         }
 
+        public async void TriggerExtractNodes(List<FileSystemNodeModel> nodes)
+        {
+            if (WadExtractionService == null || nodes == null || nodes.Count == 0) return;
+            await ExecuteExtractionAsync(nodes);
+        }
+
+        public async void TriggerSaveNodes(List<FileSystemNodeModel> nodes)
+        {
+            if (WadSavingService == null || nodes == null || nodes.Count == 0) return;
+            await ExecuteSaveAsync(nodes);
+        }
+
+        public async void TriggerAddToMerger(List<FileSystemNodeModel> nodes)
+        {
+            if (ImageMergerService == null || nodes == null || nodes.Count == 0) return;
+            await ExecuteAddToMergerAsync(nodes);
+        }
+
         private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
         {
             if (WadExtractionService == null)
@@ -402,6 +420,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
+            await ExecuteExtractionAsync(selectedNodes);
+        }
+
+        private async Task ExecuteExtractionAsync(List<FileSystemNodeModel> selectedNodes)
+        {
             string destinationPath = null;
 
             if (!string.IsNullOrEmpty(AppSettings.DefaultExtractedSelectDirectory) && Directory.Exists(AppSettings.DefaultExtractedSelectDirectory))
@@ -454,12 +477,12 @@ namespace AssetsManager.Views.Controls.Explorer
                         {
                             logPath = Path.Combine(destinationPath, node.Name);
                         }
-                        LogService.LogInteractiveSuccess($"Successfully extracted {node.Name}.", logPath, node.Name);
+                        LogService.LogInteractiveSuccess($"Successfully extracted {node.Name} in", logPath, node.Name);
                     }
                     else
                     {
                         string folderName = Path.GetFileName(destinationPath);
-                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items in {folderName}.", destinationPath, folderName);
+                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items in", destinationPath, "Extracted Assets");
                     }
                     
                     TaskCancellationManager.CompleteCurrentOperation();
@@ -498,6 +521,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
+            await ExecuteSaveAsync(selectedNodes);
+        }
+
+        private async Task ExecuteSaveAsync(List<FileSystemNodeModel> selectedNodes)
+        {
             string destinationPath = null;
 
             if (!string.IsNullOrEmpty(AppSettings.DefaultExtractedSelectDirectory) && Directory.Exists(AppSettings.DefaultExtractedSelectDirectory))
@@ -571,13 +599,13 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         if (singleSavedPath != null)
                         {
-                            LogService.LogInteractiveSuccess($"Successfully saved {singleDisplayName}.", singleSavedPath, singleDisplayName);
+                            LogService.LogInteractiveSuccess($"Successfully saved {singleDisplayName} in", singleSavedPath, singleDisplayName);
                         }
                     }
                     else
                     {
                         string folderName = Path.GetFileName(destinationPath);
-                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items in {folderName}.", destinationPath, folderName);
+                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items in", destinationPath, "Saved Assets");
                     }
 
                     TaskCancellationManager.CompleteCurrentOperation();
@@ -646,7 +674,12 @@ namespace AssetsManager.Views.Controls.Explorer
         private async void AddToImageMerger_Click(object sender, RoutedEventArgs e)
         {
             var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
-            if (selectedNodes.Count == 0) return;
+            await ExecuteAddToMergerAsync(selectedNodes);
+        }
+
+        private async Task ExecuteAddToMergerAsync(List<FileSystemNodeModel> selectedNodes)
+        {
+            if (selectedNodes == null || selectedNodes.Count == 0) return;
 
             int addedCount = 0;
             foreach (var node in selectedNodes)
@@ -705,6 +738,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     LogService.LogError(ex, $"Failed to add image '{node.Name}' to merger.");
                 }
+            }
+
+            if (addedCount > 0)
+            {
+                LogService.LogSuccess($"Added {addedCount} images to collection tray.");
             }
         }
 

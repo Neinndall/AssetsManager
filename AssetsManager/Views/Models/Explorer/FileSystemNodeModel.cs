@@ -34,7 +34,21 @@ namespace AssetsManager.Views.Models.Explorer
         public string BackupChunkPath { get; set; } // Only for nodes from a backup
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
-        public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();
+        private string _extension;
+        public string Extension
+        {
+            get
+            {
+                if (_extension == null)
+                {
+                    if (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory)
+                        _extension = "";
+                    else
+                        _extension = Path.GetExtension(FullPath ?? "").ToLowerInvariant();
+                }
+                return _extension;
+            }
+        }
         public bool IsGroupingFolder { get; set; }
 
         public string DisplayName

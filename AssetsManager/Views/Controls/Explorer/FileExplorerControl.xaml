@@ -35,7 +35,7 @@
                     <materialIcons:MaterialIcon Kind="ViewGridPlus"/>
                 </MenuItem.Icon>
             </MenuItem>
-            <MenuItem Header="Pin to Preview" x:Name="PinMenuItem" Click="PinSelected_Click">
+            <MenuItem Header="Pin to Tabs" x:Name="PinMenuItem" Click="PinSelected_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="Pin"/>
                 </MenuItem.Icon>
@@ -83,28 +83,15 @@
                                                         Width="18" Height="18" 
                                                         VerticalAlignment="Center" 
                                                         Margin="0,0,6,0" 
-                                                        RenderTransformOrigin="0.5, 0.5"
                                                         Kind="{Binding Converter={StaticResource PathToIconConverter}}">
-                                <materialIcons:MaterialIcon.RenderTransform>
-                                    <RotateTransform Angle="0"/>
-                                </materialIcons:MaterialIcon.RenderTransform>
                                 <materialIcons:MaterialIcon.Style>
-                                        <Style TargetType="materialIcons:MaterialIcon">
+                                    <Style TargetType="materialIcons:MaterialIcon">
                                         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                                         <Style.Triggers>
-                                            <!-- Loading State Spinner -->
+                                            <!-- Loading State (Static for performance) -->
                                             <DataTrigger Binding="{Binding Name}" Value="Loading...">
                                                 <Setter Property="Kind" Value="Loading"/>
                                                 <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" 
-                                                                             From="0" To="360" Duration="0:0:1" 
-                                                                             RepeatBehavior="Forever"/>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.EnterActions>
                                             </DataTrigger>
                                             
                                             <!-- Status Colors ONLY for Grouping Folders -->
