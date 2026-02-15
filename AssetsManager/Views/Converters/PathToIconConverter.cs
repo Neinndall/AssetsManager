@@ -66,6 +66,8 @@ namespace AssetsManager.Views.Converters
                 return MaterialIconKind.FileQuestionOutline;
             }
 
+            if (node.Name == "Loading...") return MaterialIconKind.Loading;
+
             if (node.Type == NodeType.VirtualDirectory)
             {
                 string name = node.Name;
