@@ -65,16 +65,25 @@ namespace AssetsManager.Views.Controls.Explorer
             SelectedCountText.Text = $"{selectedCount} items selected";
         }
 
-        private void FileGridControl_Item_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void FileGridListBox_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender is FrameworkElement element && element.DataContext is FileGridViewModel item)
+            if (e.OriginalSource is DependencyObject obj)
             {
-                // Uses the global interaction rules
-                if (InteractionHelper.IsPrimaryActionIntent())
+                var container = FileGridListBox.ContainerFromElement(obj) as ListBoxItem;
+                if (container != null && container.DataContext is FileGridViewModel item)
                 {
-                    NodeClicked?.Invoke(this, new NodeClickedEventArgs(item.Node));
+                    // Uses the global interaction rules
+                    if (InteractionHelper.IsPrimaryActionIntent())
+                    {
+                        NodeClicked?.Invoke(this, new NodeClickedEventArgs(item.Node));
+                    }
                 }
             }
+        }
+
+        private void FileGridControl_Item_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // This is kept for backward compatibility if needed, but the ListBox event is now the primary handler
         }
 
         private void FilterButton_Click(object sender, RoutedEventArgs e)
