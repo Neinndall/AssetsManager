@@ -45,7 +45,7 @@
 
         <!-- 2. Main Grid: Simplified ListBox -->
         <ListBox Grid.Row="1" x:Name="FileGridListBox"
-                 Style="{StaticResource ModernFileGridListBoxStyle}"
+                 Style="{StaticResource ModernFileGridListBox}"
                  ItemTemplate="{StaticResource FileGridItemTemplate}"
                  ItemContainerStyle="{StaticResource FileGridItemStyle}"
                  SelectionChanged="FileGridListBox_SelectionChanged"
