@@ -5,8 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             mc:Ignorable="d" 
-             d:DesignHeight="800" d:DesignWidth="900">
+             mc:Ignorable="d">
 
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
@@ -118,7 +117,7 @@
         </Border>
 
         <!-- 2. ACTION BUTTONS (Now below Configuration) -->
-        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,24">
+        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,20">
             <Button Name="CheckButton" Click="CheckButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,6,0" Height="86" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="Radar" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
@@ -156,30 +155,26 @@
         <ItemsControl Grid.Row="2" Name="AssetsItemsControl">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <UniformGrid IsItemsHost="True" Columns="4"/>
+                    <WrapPanel Margin="0,0,0,10" />
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="12" Margin="8" Padding="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Width="220" Background="{StaticResource CardBackground}" CornerRadius="16" Margin="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Top">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="15" ShadowDepth="4" Opacity="0.2" Color="Black"/>
+                        </Border.Effect>
                         <StackPanel>
-                            <Border Margin="12,12,12,0" Height="140">
+                            <!-- Image Header -->
+                            <Border Margin="10,10,10,0" Height="140" CornerRadius="12" Background="{StaticResource SidebarBackground}" ClipToBounds="True">
                                 <Grid>
-                                    <Border CornerRadius="12" Background="{StaticResource SidebarBackground}">
-                                        <Border.Effect>
-                                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" Color="Black"/>
-                                        </Border.Effect>
-                                        <Border CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
-                                            <Grid>
-                                                <materialIcons:MaterialIcon Kind="ImageOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                <Border CornerRadius="12">
-                                                    <Border.Background>
-                                                        <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill"/>
-                                                    </Border.Background>
-                                                </Border>
-                                            </Grid>
-                                        </Border>
-                                    </Border>
+                                    <!-- Placeholder Icon -->
+                                    <materialIcons:MaterialIcon Kind="ImageOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    
+                                    <!-- Thumbnail -->
+                                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" Opacity="0.9"/>
+                                    
+                                    <!-- Status Overlay (Top-Right Badge) -->
                                     <Border VerticalAlignment="Top" HorizontalAlignment="Right" Margin="8" Padding="8,4" CornerRadius="6" Background="#CC18181B">
                                         <StackPanel Orientation="Horizontal">
                                             <materialIcons:MaterialIcon Width="12" Height="12" Margin="0,0,6,0">
@@ -206,22 +201,46 @@
                                                     </Style>
                                                 </materialIcons:MaterialIcon.Style>
                                             </materialIcons:MaterialIcon>
-                                            <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Opacity="0.9"/>
                                         </StackPanel>
                                     </Border>
                                 </Grid>
                             </Border>
-                            <Border Padding="12">
+
+                            <!-- Content Area -->
+                            <Border Padding="12,14">
                                 <StackPanel>
-                                    <TextBlock Text="{Binding DisplayName}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,0,12"/>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <Button Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource PrimaryButton}" Width="32" Height="32" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip="Save to Disk">
-                                            <materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="16" Height="16" Foreground="White"/>
+                                    <TextBlock Text="{Binding DisplayName}" 
+                                               FontSize="13" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="{StaticResource TextPrimary}" 
+                                               TextAlignment="Center" 
+                                               TextTrimming="CharacterEllipsis" 
+                                               Margin="0,0,0,14"
+                                               Height="18"/>
+                                    
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Save Button -->
+                                        <Button Grid.Column="0" Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,4,0" ToolTip="Save Asset">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="SAVE" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            </StackPanel>
                                         </Button>
-                                        <Button Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Opacity="0.8" Width="32" Height="32" MinWidth="0" Padding="0" Margin="6,0,0,0" ToolTip="Ignore Asset">
-                                            <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="White"/>
+                                        
+                                        <!-- Ignore Button -->
+                                        <Button Grid.Column="1" Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Height="34" Margin="4,0,0,0" ToolTip="Ignore Asset">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="IGNORE" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            </StackPanel>
                                         </Button>
-                                    </StackPanel>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
