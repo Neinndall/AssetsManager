@@ -45,11 +45,24 @@
                     <Border Grid.Row="0" CornerRadius="9,9,0,0" Background="{StaticResource SidebarBackground}" Opacity="0.5">
                         <Grid>
                             <!-- Placeholder/Loading Icon -->
-                            <materialIcons:MaterialIcon DataContext="{Binding Node}"
-                                                        Kind="{Binding Converter={StaticResource PathToIconConverter}}" 
-                                                        Width="48" Height="48" 
-                                                        Style="{StaticResource LoadingNodeIconStyle}"
-                                                        Visibility="{Binding DataContext.ImagePreview, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}">
+                            <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
+                                                        Width="48" Height="48" Foreground="{StaticResource TextMuted}"
+                                                        RenderTransformOrigin="0.5,0.5"
+                                                        Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}">
+                                <materialIcons:MaterialIcon.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </materialIcons:MaterialIcon.RenderTransform>
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Node.Name}" Value="Loading...">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard Storyboard="{StaticResource SpinningIconAnimation}"/>
+                                                </DataTrigger.EnterActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialIcons:MaterialIcon.Style>
                             </materialIcons:MaterialIcon>
                             
                             <!-- Real Image Preview -->

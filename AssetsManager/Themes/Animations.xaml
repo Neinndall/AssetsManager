@@ -127,28 +127,5 @@
             </EventTrigger>
         </Style.Triggers>
     </Style>
-
-    <!-- CENTRALIZED LOADING STATE STYLE FOR ICONS -->
-    <Style x:Key="LoadingNodeIconStyle" TargetType="materialIcons:MaterialIcon">
-        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-        <Setter Property="RenderTransform">
-            <Setter.Value>
-                <RotateTransform Angle="0"/>
-            </Setter.Value>
-        </Setter>
-        <Style.Triggers>
-            <DataTrigger Binding="{Binding Name}" Value="Loading...">
-                <Setter Property="Kind" Value="Loading"/>
-                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-                <DataTrigger.EnterActions>
-                    <BeginStoryboard x:Name="SpinningLoading" Storyboard="{StaticResource SpinningIconAnimation}"/>
-                </DataTrigger.EnterActions>
-                <DataTrigger.ExitActions>
-                    <StopStoryboard BeginStoryboardName="SpinningLoading"/>
-                </DataTrigger.ExitActions>
-            </DataTrigger>
-        </Style.Triggers>
-    </Style>
         
 </ResourceDictionary>

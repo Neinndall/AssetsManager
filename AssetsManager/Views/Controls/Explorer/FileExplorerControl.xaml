@@ -83,11 +83,24 @@
                                                         Width="18" Height="18" 
                                                         VerticalAlignment="Center" 
                                                         Margin="0,0,6,0" 
-                                                        Kind="{Binding Converter={StaticResource PathToIconConverter}}"
-                                                        Style="{StaticResource LoadingNodeIconStyle}">
-                                <materialIcons:MaterialIcon.Resources>
-                                    <Style TargetType="materialIcons:MaterialIcon" BasedOn="{StaticResource LoadingNodeIconStyle}">
+                                                        RenderTransformOrigin="0.5,0.5"
+                                                        Kind="{Binding Converter={StaticResource PathToIconConverter}}">
+                                <materialIcons:MaterialIcon.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </materialIcons:MaterialIcon.RenderTransform>
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon">
+                                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                                         <Style.Triggers>
+                                            <!-- Loading State Spinner -->
+                                            <DataTrigger Binding="{Binding Name}" Value="Loading...">
+                                                <Setter Property="Kind" Value="Loading"/>
+                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard Storyboard="{StaticResource SpinningIconAnimation}"/>
+                                                </DataTrigger.EnterActions>
+                                            </DataTrigger>
+                                            
                                             <!-- Status Colors ONLY for Grouping Folders -->
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
@@ -124,14 +137,14 @@
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Foreground" Value="{StaticResource AccentTeal}"/>
                                             </MultiDataTrigger>
-
+                                            
                                             <!-- Selection Override -->
                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
                                                 <Setter Property="Foreground" Value="White"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </materialIcons:MaterialIcon.Resources>
+                                </materialIcons:MaterialIcon.Style>
                             </materialIcons:MaterialIcon>
                             
                             <!-- Standard Text -->
