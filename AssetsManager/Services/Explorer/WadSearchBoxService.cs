@@ -2,6 +2,7 @@
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -210,3 +211,4 @@ namespace AssetsManager.Services.Explorer
         }
     }
 }
+

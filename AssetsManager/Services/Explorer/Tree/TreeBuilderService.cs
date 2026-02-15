@@ -1,20 +1,18 @@
 using System;
+using System.Windows;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using AssetsManager.Services.Core;
-using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models.Explorer;
-using AssetsManager.Utils;
-
+using System.Collections.Generic;
 using System.Threading;
-
 using AssetsManager.Services.Audio;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Wad;
-using System.Collections.Generic;
-using System.Windows;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Services.Explorer.Tree
 {

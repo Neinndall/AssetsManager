@@ -4,7 +4,7 @@ using System.Linq;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Windows.Media;
-using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Models.Explorer

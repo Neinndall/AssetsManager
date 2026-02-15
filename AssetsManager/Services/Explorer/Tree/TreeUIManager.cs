@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Threading.Tasks;
 using AssetsManager.Views.Models.Explorer;
-using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Services.Explorer.Tree
 {
