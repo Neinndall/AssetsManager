@@ -10,7 +10,21 @@
 
     <!-- #region FILE EXPLORER GRID MODE STYLES -->
 
-    <!-- 1. Master ListBox Style: The Virtualization Engine -->
+    <!-- 1. Individual Card Container Style -->
+    <Style x:Key="FileGridItemStyle" TargetType="ListBoxItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <ContentPresenter />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 2. Master ListBox Style: The Virtualization Engine -->
     <Style x:Key="ModernFileGridListBox" TargetType="ListBox">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -32,20 +46,6 @@
                 <ItemsPanelTemplate>
                     <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="Uniform" />
                 </ItemsPanelTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- 2. Individual Card Container Style -->
-    <Style x:Key="FileGridItemStyle" TargetType="ListBoxItem">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ListBoxItem">
-                    <ContentPresenter />
-                </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
