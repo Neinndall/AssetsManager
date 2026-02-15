@@ -61,12 +61,17 @@ namespace AssetsManager.Views.Converters
 
         private static MaterialIconKind GetNodeIcon(FileSystemNodeModel node)
         {
-            if (node == null || string.IsNullOrEmpty(node.FullPath))
+            if (node == null)
             {
                 return MaterialIconKind.FileQuestionOutline;
             }
 
             if (node.Name == "Loading...") return MaterialIconKind.Loading;
+
+            if (string.IsNullOrEmpty(node.FullPath))
+            {
+                return MaterialIconKind.FileQuestionOutline;
+            }
 
             if (node.Type == NodeType.VirtualDirectory)
             {
