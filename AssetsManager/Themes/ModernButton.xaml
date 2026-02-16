@@ -5,7 +5,7 @@
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
-    <!-- Nuevo Estilo Moderno con Indicador Lateral -->
+    <!-- [SidebarView.xaml] Navegación principal izquierda -->
     <Style x:Key="ModernSidebarNavigationStyle" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
@@ -71,7 +71,7 @@
         </Setter>
     </Style>
 
-    <!-- Estilo para Pestañas de Configuración (Settings) -->
+    <!-- [HelpWindow.xaml, SettingsWindow.xaml] Pestañas verticales de navegación interna -->
     <Style x:Key="SettingsTabStyle" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
@@ -135,7 +135,7 @@
         </Setter>
     </Style>
 
-    <!-- 1. PRIMARY BUTTON (Elastic Action) -->
+    <!-- [General] Botón de acción principal (color Accent) -->
     <Style x:Key="PrimaryButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         <Setter Property="Foreground" Value="White"/>
@@ -191,7 +191,7 @@
         </Setter>
     </Style>
 
-    <!-- 2. SECONDARY BUTTON (Elastic Style) -->
+    <!-- [General] Botón secundario con borde -->
     <Style x:Key="SecondaryButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
@@ -240,7 +240,7 @@
         </Setter>
     </Style>
 
-    <!-- 3. BROWSE / INPUT SECONDARY BUTTON -->
+    <!-- [Settings] Botón de búsqueda de rutas (Browse) -->
     <Style x:Key="BrowseButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
@@ -293,7 +293,7 @@
         </Setter>
     </Style>
 
-    <!-- Destructive Button Style -->
+    <!-- [AssetTrackerControl.xaml] Botón de acción destructiva (color Rojo) -->
     <Style x:Key="DestructiveButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource AccentRed}"/>
         <Setter Property="Foreground" Value="White"/>
@@ -323,7 +323,7 @@
         </Setter>
     </Style>
 
-    <!-- Estilo para iconos, se usará para iconos con un borde (ej: Asset Tracker icons) -->
+    <!-- [ViewerPanelControl.xaml] Botones de iconos circulares con fondo (ej: Play/Stop) -->
     <Style x:Key="IconButton" TargetType="Button">
         <Setter Property="Width" Value="21"/>
         <Setter Property="Height" Value="21"/>
@@ -351,7 +351,7 @@
         </Setter>
     </Style>
 
-    <!-- Estilo para iconos, se usará togles buttons (ej: hide/show fps del ModelViewportControl) -->
+    <!-- [ViewerPanelControl.xaml] Botón toggle circular con fondo -->
     <Style x:Key="IconToggleButton" TargetType="ToggleButton">
         <Setter Property="Width" Value="21"/>
         <Setter Property="Height" Value="21"/>
@@ -382,7 +382,7 @@
         </Setter>
     </Style>
 
-    <!-- Estilo para iconos, se usará para iconos planos (ej: ToolBar del Explorer) -->
+    <!-- [Toolbars] Botón de icono plano transparente -->
     <Style x:Key="TransparentIconButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -404,7 +404,7 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Estilo para ToggleButtons que deben parecer iconos planos, sin borde y con fondo transparente -->
+    <!-- [Toolbars] Botón toggle de icono plano transparente -->
     <Style x:Key="TransparentIconToggleButton" TargetType="ToggleButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -429,7 +429,7 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Style for the search ToggleButton, which switches content on IsChecked -->
+    <!-- [ExplorerToolbarControl.xaml] Botón toggle de búsqueda (Lupa/Cerrar) -->
     <Style x:Key="SearchToggleStyle" TargetType="ToggleButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -464,6 +464,7 @@
         </Style.Triggers>
     </Style>
 
+    <!-- [All Windows] Botones de control de ventana (Min/Max/Close) -->
     <Style x:Key="TitleBarButtonStyle" TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
@@ -472,7 +473,7 @@
         </Style.Triggers>
     </Style>
 
-    <!-- High-Fidelity Segmented Radio Button Style (Professional Technical UI) -->
+    <!-- [MonitorWindow.xaml, ViewerPanelControl.xaml, FileGridControl.xaml] Selector segmentado (Tabs horizontales) -->
     <Style x:Key="SegmentedRadioButtonStyle" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
@@ -565,7 +566,7 @@
         </Setter>
     </Style>
 
-    <!-- Global Selection Card Style -->
+    <!-- [ViewerWindow.xaml, BugReportsView.xaml] Tarjeta de selección grande con borde reactivo -->
     <Style x:Key="SelectionCardButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
@@ -608,7 +609,7 @@
         </Setter>
     </Style>
 
-    <!-- Destructive Variation of Selection Card -->
+    <!-- [Monitor (Backups, Versions, Tracker)] Tarjeta de selección destructiva (roja) -->
     <Style x:Key="DestructiveSelectionCardButtonStyle" TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
         <Setter Property="BorderBrush" Value="{StaticResource AccentRed}"/>
         <Setter Property="Template">
@@ -641,6 +642,7 @@
         </Setter>
     </Style>
 
+    <!-- [ViewerPanelControl.xaml] Botón toggle estilo baldosa (ej: Grid, Lightning) -->
     <Style x:Key="ModernTileToggleButton" TargetType="ToggleButton">
         <Setter Property="Background" Value="{StaticResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
@@ -682,6 +684,7 @@
         </Setter>
     </Style>
 
+    <!-- [ManageVersionsControl.xaml] Botón toggle estilo Chip (Filtros regionales) -->
     <Style x:Key="ModernChipToggleButton" TargetType="CheckBox">
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
@@ -735,7 +738,7 @@
         </Setter>
     </Style>
 
-    <!-- Estilo para botones de iconos limpios (Utilizado en Toolbars de Comparación) -->
+    <!-- [ImageDiffWindow.xaml] Botón de icono circular para modos de comparación -->
     <Style x:Key="ModernIconRadioButton" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
