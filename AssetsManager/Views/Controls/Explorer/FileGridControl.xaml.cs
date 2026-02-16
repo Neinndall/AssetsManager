@@ -67,13 +67,19 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void FileGridControl_Item_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender is FrameworkElement element && element.DataContext is FileGridViewModel item)
+            if (sender is ListBoxItem itemContainer && itemContainer.DataContext is FileGridViewModel item)
             {
-                // Uses the global interaction rules
+                // We use Preview event to intercept the click before ListBox selection logic
                 if (InteractionHelper.IsPrimaryActionIntent())
                 {
+                    // Primary action = Navigation
                     NodeClicked?.Invoke(this, new NodeClickedEventArgs(item.Node));
+                    
+                    // Mark as handled to prevent ListBox from selecting/focusing
+                    e.Handled = true;
                 }
+                // If it's NOT primary (Ctrl/Shift), we DON'T set Handled=true 
+                // so the ListBox can perform its normal multi-selection logic.
             }
         }
 

@@ -22,6 +22,7 @@
                 <ResourceDictionary Source="/Themes/CustomScrollbarStyles.xaml"/> 
                 <ResourceDictionary Source="/Themes/TreeViewStyles.xaml"/> 
                 <ResourceDictionary Source="/Themes/ModernListView.xaml"/>
+                <ResourceDictionary Source="/Themes/GridView.xaml"/>
                 <ResourceDictionary Source="/Themes/Converters.xaml"/>
                 <ResourceDictionary Source="/Themes/ApiTemplates.xaml"/>
             </ResourceDictionary.MergedDictionaries>

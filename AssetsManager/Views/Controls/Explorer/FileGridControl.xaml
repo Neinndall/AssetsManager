@@ -8,104 +8,6 @@
              xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
              mc:Ignorable="d">
     
-    <UserControl.Resources>
-        <!-- Modern Grid Item Template (Card) -->
-        <DataTemplate x:Key="FileGridItemTemplate">
-            <Border Margin="6" Width="130" Height="160" CornerRadius="10"
-                    Background="{StaticResource CardBackground}"
-                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                    MouseLeftButtonDown="FileGridControl_Item_MouseLeftButtonDown">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>   <!-- Thumbnail -->
-                        <RowDefinition Height="Auto"/> <!-- Label -->
-                    </Grid.RowDefinitions>
-
-                    <!-- Thumbnail Area -->
-                    <Border Grid.Row="0" CornerRadius="9,9,0,0" Background="{StaticResource SidebarBackground}" Opacity="0.5">
-                        <Grid>
-                            <!-- Placeholder/Loading Icon -->
-                            <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
-                                                        Width="48" Height="48" Foreground="{StaticResource TextMuted}"
-                                                        RenderTransformOrigin="0.5,0.5"
-                                                        Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}">
-                                <materialIcons:MaterialIcon.RenderTransform>
-                                    <RotateTransform Angle="0"/>
-                                </materialIcons:MaterialIcon.RenderTransform>
-                                <materialIcons:MaterialIcon.Style>
-                                    <Style TargetType="materialIcons:MaterialIcon">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Node.Name}" Value="Loading...">
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard Storyboard="{StaticResource SpinningIconAnimation}"/>
-                                                </DataTrigger.EnterActions>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </materialIcons:MaterialIcon.Style>
-                            </materialIcons:MaterialIcon>
-                            
-                            <!-- Real Image Preview -->
-                            <Border CornerRadius="9,9,0,0" Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
-                                <Border.Background>
-                                    <ImageBrush ImageSource="{Binding ImagePreview}" Stretch="UniformToFill"/>
-                                </Border.Background>
-                            </Border>
-
-                            <!-- Top Type Badge -->
-                            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6" 
-                                    Background="#CC000000" CornerRadius="3" Padding="4,1">
-                                <TextBlock Text="{Binding FileExtensionDisplay}" FontSize="8" FontWeight="SemiBold" Foreground="White"/>
-                            </Border>
-                        </Grid>
-                    </Border>
-
-                    <!-- Label Area -->
-                    <Border Grid.Row="1" Padding="8,4,8,8">
-                        <StackPanel HorizontalAlignment="Center">
-                            <TextBlock Text="{Binding DisplayNameShort}" FontSize="11" FontWeight="SemiBold" 
-                                       Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" 
-                                       TextWrapping="Wrap" Height="36" LineHeight="14"
-                                       TextAlignment="Center" HorizontalAlignment="Center"/>
-                            
-                            <!-- Small indicators -->
-                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsFolder, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,4,0,0" HorizontalAlignment="Center">
-                                <StackPanel Orientation="Horizontal" Visibility="{Binding FolderCount, Converter={StaticResource CountToVisibilityConverter}}" Margin="0,0,8,0">
-                                    <materialIcons:MaterialIcon Kind="FolderOutline" Width="10" Height="10" Foreground="{StaticResource AccentOrange}" Margin="0,0,3,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding FolderCount}" FontSize="9" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Visibility="{Binding AssetCount, Converter={StaticResource CountToVisibilityConverter}}">
-                                    <materialIcons:MaterialIcon Kind="CubeOutline" Width="10" Height="10" Foreground="{StaticResource AccentGreen}" Margin="0,0,3,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding AssetCount}" FontSize="9" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Selection Overlay (Now at the top of the Z-stack) -->
-                    <Border Grid.RowSpan="2" BorderThickness="1.5" CornerRadius="10" 
-                            BorderBrush="{StaticResource AccentBrush}" IsHitTestVisible="False"
-                            Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <materialIcons:MaterialIcon Grid.RowSpan="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" 
-                                                Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
-                                                Margin="0,0,12,12" 
-                                                Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </Grid>
-            </Border>
-        </DataTemplate>
-    </UserControl.Resources>
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Folder Insights & Filters -->
@@ -143,6 +45,11 @@
                  Style="{StaticResource ModernFileGridListBox}"
                  ItemTemplate="{StaticResource FileGridItemTemplate}"
                  SelectionChanged="FileGridListBox_SelectionChanged">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem" BasedOn="{StaticResource FileGridItemStyle}">
+                    <EventSetter Event="PreviewMouseLeftButtonDown" Handler="FileGridControl_Item_MouseLeftButtonDown"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
         </ListBox>
 
         <!-- 3. Floating Action Bar (Visible on Multi-selection) -->

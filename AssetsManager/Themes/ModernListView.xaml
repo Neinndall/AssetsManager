@@ -2,58 +2,13 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
                     xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel">
-    <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="/Themes/Colors.xaml"/>
-        <ResourceDictionary Source="/Themes/Converters.xaml"/>
-    </ResourceDictionary.MergedDictionaries>
-
-
-    <!-- #region FILE EXPLORER GRID MODE STYLES -->
-
-    <!-- 1. Individual Card Container Style -->
-    <Style x:Key="FileGridItemStyle" TargetType="ListBoxItem">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ListBoxItem">
-                    <ContentPresenter />
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- 2. Master ListBox Style: The Virtualization Engine -->
-    <Style x:Key="ModernFileGridListBox" TargetType="ListBox">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="SelectionMode" Value="Extended"/>
-        <Setter Property="Padding" Value="0,5,0,0"/>
-        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
-        
-        <!-- Core Virtualization Settings -->
-        <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
-        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
-        <Setter Property="VirtualizingPanel.CacheLength" Value="2,2"/>
-        <Setter Property="VirtualizingPanel.CacheLengthUnit" Value="Page"/>
-        <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel"/>
-        <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
-        <Setter Property="ItemContainerStyle" Value="{StaticResource FileGridItemStyle}"/>
-        
-        <Setter Property="ItemsPanel">
-            <Setter.Value>
-                <ItemsPanelTemplate>
-                    <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="Uniform" />
-                </ItemsPanelTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- #endregion -->
-
-    <!-- Estilo para las filas -->
-    <Style x:Key="ModernListViewItem" TargetType="ListViewItem">
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="/Themes/Colors.xaml"/>
+            <ResourceDictionary Source="/Themes/Converters.xaml"/>
+        </ResourceDictionary.MergedDictionaries>
+    
+    
+        <!-- Estilo para las filas -->    <Style x:Key="ModernListViewItem" TargetType="ListViewItem">
         <Setter Property="ClipToBounds" Value="True"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0,0,0,1"/>
