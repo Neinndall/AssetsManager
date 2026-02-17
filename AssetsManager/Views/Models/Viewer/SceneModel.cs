@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -18,8 +19,8 @@ namespace AssetsManager.Views.Models.Viewer
         public ModelVisual3D RootVisual { get; set; }
         public TranslateTransform3D Transform { get; set; }
 
-        private ObservableCollection<ModelPart> _parts;
-        public ObservableCollection<ModelPart> Parts
+        private ObservableRangeCollection<ModelPart> _parts;
+        public ObservableRangeCollection<ModelPart> Parts
         {
             get => _parts;
             set
@@ -37,7 +38,7 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        public ObservableCollection<AnimationData> Animations { get; set; }
+        public ObservableRangeCollection<AnimationData> Animations { get; set; }
 
         public RigResource Skeleton { get; set; }
         public IAnimationAsset CurrentAnimation { get; set; }
@@ -81,8 +82,8 @@ namespace AssetsManager.Views.Models.Viewer
             RootVisual = new ModelVisual3D();
             Transform = new TranslateTransform3D();
             RootVisual.Transform = this.Transform;
-            Parts = new ObservableCollection<ModelPart>();
-            Animations = new ObservableCollection<AnimationData>();
+            Parts = new ObservableRangeCollection<ModelPart>();
+            Animations = new ObservableRangeCollection<AnimationData>();
         }
 
         private void Parts_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)

@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Media;
 using System.Collections.Generic;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -51,19 +52,19 @@ namespace AssetsManager.Views.Models.Viewer
             set
             {
                 _allTextures = value;
-                AvailableTextureNames.Clear();
                 if (_allTextures != null)
                 {
-                    foreach (var name in _allTextures.Keys)
-                    {
-                        AvailableTextureNames.Add(name);
-                    }
+                    AvailableTextureNames.ReplaceRange(_allTextures.Keys);
+                }
+                else
+                {
+                    AvailableTextureNames.Clear();
                 }
             }
         }
         private Dictionary<string, BitmapSource> _allTextures = new Dictionary<string, BitmapSource>();
 
-        public ObservableCollection<string> AvailableTextureNames { get; set; } = new ObservableCollection<string>();
+        public ObservableRangeCollection<string> AvailableTextureNames { get; set; } = new ObservableRangeCollection<string>();
 
         private string _selectedTextureName;
         public string SelectedTextureName
