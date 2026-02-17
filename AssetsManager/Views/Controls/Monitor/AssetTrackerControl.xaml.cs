@@ -328,7 +328,7 @@ namespace AssetsManager.Views.Controls.Monitor
             var assetToRemove = button?.Tag as TrackedAsset;
             if (assetToRemove == null || SelectedCategory == null) return;
 
-            var result = CustomMessageBoxService.ShowYesNo("Info", $"Are you sure you want to remove '{assetToRemove.DisplayName}'? This action is permanent and the asset will not appear again in this category.", Window.GetWindow(this));
+            var result = CustomMessageBoxService.ShowYesNo("Information", $"Are you sure you want to remove '{assetToRemove.DisplayName}'? This action is permanent and the asset will not appear again in this category.", Window.GetWindow(this));
             if (result == true)
             {
                 MonitorService.RemoveAsset(SelectedCategory, assetToRemove);
@@ -340,7 +340,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (SelectedCategory == null || !Assets.Any(a => a.Status == "OK"))
             {
-                CustomMessageBoxService.ShowInfo("Info", "There are no found assets to remove in this category.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowInfo("Information", "There are no found assets to remove in this category.", Window.GetWindow(this));
                 return;
             }
 
