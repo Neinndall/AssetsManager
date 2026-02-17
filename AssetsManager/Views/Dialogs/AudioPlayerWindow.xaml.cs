@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -237,13 +238,27 @@ namespace AssetsManager.Views.Dialogs
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                var itemsToAdd = new List<AudioPlaylistItem>();
+
                 foreach (string file in files)
                 {
                     string ext = Path.GetExtension(file).ToLower();
                     if (ext == ".mp3" || ext == ".wav" || ext == ".ogg")
                     {
-                        _audioPlayerService.AddToPlaylist(Path.GetFileName(file), file);
+                        if (_audioPlayerService.Playlist.Any(x => x.Url == file)) continue;
+
+                        itemsToAdd.Add(new AudioPlaylistItem
+                        {
+                            Name = Path.GetFileName(file),
+                            Url = file,
+                            AddedAt = DateTime.Now
+                        });
                     }
+                }
+
+                if (itemsToAdd.Any())
+                {
+                    _audioPlayerService.Playlist.AddRange(itemsToAdd);
                 }
             }
         }

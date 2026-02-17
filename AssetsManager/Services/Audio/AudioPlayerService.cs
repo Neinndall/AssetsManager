@@ -1,13 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using AssetsManager.Views.Models.Audio;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Services.Audio
 {
     public class AudioPlayerService
     {
-        public ObservableCollection<AudioPlaylistItem> Playlist { get; } = new ObservableCollection<AudioPlaylistItem>();
+        public ObservableRangeCollection<AudioPlaylistItem> Playlist { get; } = new ObservableRangeCollection<AudioPlaylistItem>();
         
         public event EventHandler<AudioPlaylistItem> RequestPlay;
 

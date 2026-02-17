@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using AssetsManager.Views.Models.Viewer;
@@ -57,10 +58,10 @@ namespace AssetsManager.Views.Controls.Viewer
         public event Action<Visibility> EmptyStateVisibilityChanged;
         public event Action<Visibility> MainContentVisibilityChanged;
 
-        public ObservableCollection<AnimationModel> AnimationModels => _animationModels;
+        public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
 
-        private readonly ObservableCollection<SceneModel> _loadedModels = new();
-        private readonly ObservableCollection<AnimationModel> _animationModels = new();
+        private readonly ObservableRangeCollection<SceneModel> _loadedModels = new();
+        private readonly ObservableRangeCollection<AnimationModel> _animationModels = new();
         private readonly Dictionary<SceneModel, ViewerTransformData> _transformData = new();
         private SceneModel _selectedModel;
         private AnimationModel _currentlyPlayingAnimation;
@@ -312,8 +313,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (!_animationModels.Any(a => a.Name == animationName))
                 {
                     var animationData = new AnimationData { AnimationAsset = animationAsset, Name = animationName };
-                    _selectedModel.Animations.Add(animationData);
-                    _animationModels.Add(new AnimationModel(animationData));
+                    var animationModel = new AnimationModel(animationData);
+
+                    _selectedModel.Animations.AddRange(new[] { animationData });
+                    _animationModels.AddRange(new[] { animationModel });
                 }
             }
         }
@@ -393,13 +396,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 ActiveModelChanged?.Invoke(selectedModel);
                 MeshesListBox.ItemsSource = selectedModel.Parts;
 
-                _animationModels.Clear();
                 if (selectedModel.Animations != null)
                 {
-                    foreach (var animData in selectedModel.Animations)
-                    {
-                        _animationModels.Add(new AnimationModel(animData));
-                    }
+                    var animModels = selectedModel.Animations.Select(a => new AnimationModel(a));
+                    _animationModels.ReplaceRange(animModels);
+                }
+                else
+                {
+                    _animationModels.Clear();
                 }
 
                 if (_transformData.TryGetValue(selectedModel, out var transformData))
