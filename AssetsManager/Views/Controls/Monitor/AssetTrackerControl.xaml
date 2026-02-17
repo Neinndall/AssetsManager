@@ -229,7 +229,7 @@
                                         <Button Grid.Column="0" Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,4,0" ToolTip="Save Asset">
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                                 <materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="SAVE" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                <TextBlock Text="SAVE" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
                                         
@@ -237,7 +237,7 @@
                                         <Button Grid.Column="1" Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Height="34" Margin="4,0,0,0" ToolTip="Ignore Asset">
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                                 <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="IGNORE" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                <TextBlock Text="REMOVE" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
                                     </Grid>
