@@ -13,6 +13,7 @@ using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Views.Dialogs;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -27,7 +28,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
 
-        public ObservableCollection<MonitoredUrl> MonitoredItems => MonitorService.MonitoredItems;
+        public ObservableRangeCollection<MonitoredUrl> MonitoredItems => MonitorService.MonitoredItems;
 
         public FileWatcherControl()
         {

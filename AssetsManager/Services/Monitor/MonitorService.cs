@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Monitor;
 
@@ -22,7 +23,7 @@ namespace AssetsManager.Services.Monitor
         private readonly LogService _logService;
         private readonly HttpClient _httpClient;
 
-        public ObservableCollection<MonitoredUrl> MonitoredItems { get; } = new ObservableCollection<MonitoredUrl>();
+        public ObservableRangeCollection<MonitoredUrl> MonitoredItems { get; } = new ObservableRangeCollection<MonitoredUrl>();
 
         public event Action<AssetCategory> CategoryCheckStarted;
         public event Action<AssetCategory> CategoryCheckCompleted;
@@ -167,12 +168,11 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        public ObservableCollection<TrackedAsset> GetAssetListForCategory(AssetCategory category)
+        public List<TrackedAsset> GetAssetListForCategory(AssetCategory category)
         {
-            if (category == null) return new ObservableCollection<TrackedAsset>();
+            if (category == null) return new List<TrackedAsset>();
 
-            var assets = GenerateNewAssetList(category);
-            return new ObservableCollection<TrackedAsset>(assets);
+            return GenerateNewAssetList(category);
         }
 
         private List<TrackedAsset> GenerateNewAssetList(AssetCategory category)
