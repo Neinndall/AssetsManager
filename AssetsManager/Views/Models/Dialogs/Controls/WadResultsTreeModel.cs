@@ -16,9 +16,9 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public ObservableRangeCollection<WadGroupViewModel> WadGroups { get; set; } = new ObservableRangeCollection<WadGroupViewModel>();
 
         // 2. Analytical Insights (The Dashboard)
-        public ObservableCollection<AssetCategoryStats> CategoryDistribution { get; } = new ObservableCollection<AssetCategoryStats>();
-        public ObservableCollection<TopImpactFile> TopImpactFiles { get; } = new ObservableCollection<TopImpactFile>();
-        public ObservableCollection<AffectedArea> AffectedAreas { get; } = new ObservableCollection<AffectedArea>();
+        public ObservableRangeCollection<AssetCategoryStats> CategoryDistribution { get; } = new ObservableRangeCollection<AssetCategoryStats>();
+        public ObservableRangeCollection<TopImpactFile> TopImpactFiles { get; } = new ObservableRangeCollection<TopImpactFile>();
+        public ObservableRangeCollection<AffectedArea> AffectedAreas { get; } = new ObservableRangeCollection<AffectedArea>();
     }
 
     public class WadGroupViewModel

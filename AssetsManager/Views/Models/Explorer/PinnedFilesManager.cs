@@ -55,7 +55,7 @@ namespace AssetsManager.Views.Models.Explorer
                 
                 // If not even present, create it as pinned
                 var newPin = new PinnedFileModel(node) { IsPinned = true };
-                PinnedFiles.Add(newPin);
+                PinnedFiles.AddRange(new[] { newPin });
                 SelectedFile = newPin;
                 return;
             }
@@ -75,10 +75,10 @@ namespace AssetsManager.Views.Models.Explorer
                 // Recycle the temporary slot
                 recyclablePin.Node = node;
                 
-                // Force notification
-                var temp = SelectedFile;
+                // Force notification by resetting SelectedFile to trigger property change
+                var current = SelectedFile;
                 _selectedFile = null; 
-                SelectedFile = temp;
+                SelectedFile = current;
             }
             else
             {
@@ -92,7 +92,7 @@ namespace AssetsManager.Views.Models.Explorer
                 {
                     // Create a new temporary slot
                     var newPinnedFile = new PinnedFileModel(node) { IsPinned = false };
-                    PinnedFiles.Add(newPinnedFile);
+                    PinnedFiles.AddRange(new[] { newPinnedFile });
                     SelectedFile = newPinnedFile;
                 }
             }

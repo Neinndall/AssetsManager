@@ -212,7 +212,7 @@ namespace AssetsManager.Views.Models.Explorer
             if (Directory.Exists(path))
             {
                 Type = NodeType.RealDirectory;
-                Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
             }
             else
             {
@@ -220,12 +220,12 @@ namespace AssetsManager.Views.Models.Explorer
                 if (lowerPath.EndsWith(".wad") || lowerPath.EndsWith(".wad.client"))
                 {
                     Type = NodeType.WadFile;
-                    Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                    Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
                 }
                 else if (lowerPath.EndsWith(".wpk") || lowerPath.EndsWith(".bnk"))
                 {
                     Type = NodeType.SoundBank;
-                    Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                    Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
                 }
                 else
                 {
@@ -252,7 +252,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (lowerName.EndsWith(".wpk") || lowerName.EndsWith(".bnk"))
                 {
                     Type = NodeType.SoundBank;
-                    Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                    Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
                 }
                 else
                 {

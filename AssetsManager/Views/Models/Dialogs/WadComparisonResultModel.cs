@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Dialogs
 {
@@ -151,20 +152,25 @@ namespace AssetsManager.Views.Models.Dialogs
             int total = diffs.Count;
             if (total > 0)
             {
-                foreach (var cat in categories.Where(c => c.Value.Count > 0).OrderByDescending(c => c.Value.Count))
-                {
-                    TreeModel.CategoryDistribution.Add(new AssetCategoryStats 
+                var statsToAdd = categories
+                    .Where(c => c.Value.Count > 0)
+                    .OrderByDescending(c => c.Value.Count)
+                    .Select(cat => new AssetCategoryStats 
                     { 
                         Name = cat.Key, 
                         Count = cat.Value.Count,
                         Percentage = (double)cat.Value.Count / total * 100,
                         TotalSizeChange = cat.Value.Size
                     });
-                }
+                
+                TreeModel.CategoryDistribution.ReplaceRange(statsToAdd);
+            }
+            else
+            {
+                TreeModel.CategoryDistribution.Clear();
             }
 
             // Top Impact Analysis
-            TreeModel.TopImpactFiles.Clear();
             var topFiles = diffs
                 .Where(d => d.OldUncompressedSize != null || d.NewUncompressedSize != null)
                 .Select(d => new TopImpactFile
@@ -177,12 +183,12 @@ namespace AssetsManager.Views.Models.Dialogs
                     SizeDiff = (long)(d.NewUncompressedSize ?? 0) - (long)(d.OldUncompressedSize ?? 0)
                 })
                 .OrderByDescending(f => Math.Abs(f.SizeDiff))
-                .Take(5);
+                .Take(5)
+                .ToList();
 
-            foreach (var f in topFiles) TreeModel.TopImpactFiles.Add(f);
+            TreeModel.TopImpactFiles.ReplaceRange(topFiles);
 
             // Area Analysis
-            TreeModel.AffectedAreas.Clear();
             var areas = diffs
                 .Select(d => {
                     var parts = d.Path.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
@@ -191,9 +197,10 @@ namespace AssetsManager.Views.Models.Dialogs
                 .GroupBy(a => a)
                 .Select(g => new AffectedArea { Name = g.Key, Count = g.Count() })
                 .OrderByDescending(a => a.Count)
-                .Take(6);
+                .Take(6)
+                .ToList();
 
-            foreach (var a in areas) TreeModel.AffectedAreas.Add(a);
+            TreeModel.AffectedAreas.ReplaceRange(areas);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
