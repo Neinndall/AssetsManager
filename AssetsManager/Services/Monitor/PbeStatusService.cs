@@ -87,86 +87,88 @@ namespace AssetsManager.Services.Monitor
 
                 if (maintenances == null || maintenances.Count == 0) return string.Empty;
 
-                var firstMaintenance = maintenances[0];
-                var updates = firstMaintenance?["updates"] as JArray;
-
-                if (updates == null || updates.Count == 0) return string.Empty;
-
-                string originalContent = null;
-                Match match = null;
-
-                foreach (var update in updates)
+                foreach (var maintenance in maintenances)
                 {
-                    var translations = update?["translations"] as JArray;
-                    if (translations == null) continue;
+                    var updates = maintenance?["updates"] as JArray;
+                    if (updates == null || updates.Count == 0) continue;
 
-                    var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
-                    string content = enTranslation?["content"]?.ToString();
+                    string originalContent = null;
+                    Match match = null;
 
-                    if (string.IsNullOrEmpty(content)) continue;
-
-                    // Check for the specific pattern
-                    var m = Regex.Match(content, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
-                    if (m.Success)
+                    foreach (var update in updates)
                     {
-                        originalContent = content;
-                        match = m;
-                        break;
-                    }
-                }
+                        var translations = update?["translations"] as JArray;
+                        if (translations == null) continue;
 
-                if (string.IsNullOrEmpty(originalContent) || match == null) return string.Empty;
+                        var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
+                        string content = enTranslation?["content"]?.ToString();
 
-                string dateStr = match.Groups[1].Value;
-                string timeStr = match.Groups[2].Value;
-                string tzAbbr = match.Groups[3].Value;
+                        if (string.IsNullOrEmpty(content)) continue;
 
-                if (!DateTime.TryParseExact($"{dateStr} {timeStr}", "MM/dd/yyyy HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime))
-                {
-                    return originalContent; // Return original if parsing fails
-                }
-
-                if (!TimeZoneAbbreviations.TryGetValue(tzAbbr, out var offset))
-                {
-                    return originalContent; // Return original if timezone is unknown
-                }
-
-                var maintenanceStartTime = new DateTimeOffset(maintenanceDateTime, offset);
-
-                // 2. Parse Maintenance Duration
-                TimeSpan duration = TimeSpan.FromHours(3); // Default grace period of 3 hours
-                var durationMatch = Regex.Match(originalContent, @"for approximately (\d+)\s+(hour|minute)s?", RegexOptions.IgnoreCase);
-
-                if (durationMatch.Success)
-                {
-                    if (int.TryParse(durationMatch.Groups[1].Value, out int durationValue))
-                    {
-                        string unit = durationMatch.Groups[2].Value.ToLower();
-                        if (unit.StartsWith("hour"))
+                        // Check for the specific pattern
+                        var m = Regex.Match(content, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                        if (m.Success)
                         {
-                            duration = TimeSpan.FromHours(durationValue);
-                        }
-                        else if (unit.StartsWith("minute"))
-                        {
-                            duration = TimeSpan.FromMinutes(durationValue);
+                            originalContent = content;
+                            match = m;
+                            break;
                         }
                     }
+
+                    if (string.IsNullOrEmpty(originalContent) || match == null) continue;
+
+                    string dateStr = match.Groups[1].Value;
+                    string timeStr = match.Groups[2].Value;
+                    string tzAbbr = match.Groups[3].Value;
+
+                    if (!DateTime.TryParseExact($"{dateStr} {timeStr}", "MM/dd/yyyy HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime))
+                    {
+                        return originalContent; // Return original if parsing fails
+                    }
+
+                    if (!TimeZoneAbbreviations.TryGetValue(tzAbbr, out var offset))
+                    {
+                        return originalContent; // Return original if timezone is unknown
+                    }
+
+                    var maintenanceStartTime = new DateTimeOffset(maintenanceDateTime, offset);
+
+                    // 2. Parse Maintenance Duration
+                    TimeSpan duration = TimeSpan.FromHours(3); // Default grace period of 3 hours
+                    var durationMatch = Regex.Match(originalContent, @"for approximately (\d+)\s+(hour|minute)s?", RegexOptions.IgnoreCase);
+
+                    if (durationMatch.Success)
+                    {
+                        if (int.TryParse(durationMatch.Groups[1].Value, out int durationValue))
+                        {
+                            string unit = durationMatch.Groups[2].Value.ToLower();
+                            if (unit.StartsWith("hour"))
+                            {
+                                duration = TimeSpan.FromHours(durationValue);
+                            }
+                            else if (unit.StartsWith("minute"))
+                            {
+                                duration = TimeSpan.FromMinutes(durationValue);
+                            }
+                        }
+                    }
+
+                    // 3. Calculate End Time and Check if Expired
+                    var maintenanceEndTime = maintenanceStartTime.Add(duration);
+
+                    if (maintenanceEndTime.ToUniversalTime() < DateTime.UtcNow)
+                    {
+                        continue; // This specific maintenance window has passed, look for others
+                    }
+
+                    // 4. Format the final message by injecting the user's local time.
+                    var localMaintenanceTime = maintenanceStartTime.ToLocalTime();
+                    string newDateTimeString = $"{match.Value} ({localMaintenanceTime:HH:mm} your timezone)";
+
+                    return originalContent.Replace(match.Value, newDateTimeString);
                 }
 
-                // 3. Calculate End Time and Check if Expired
-                var maintenanceEndTime = maintenanceStartTime.Add(duration);
-
-                if (maintenanceEndTime.ToUniversalTime() < DateTime.UtcNow)
-                {
-                    return string.Empty; // Maintenance window has passed
-                }
-
-                // 4. Format the final message by injecting the user's local time.
-                var localMaintenanceTime = maintenanceStartTime.ToLocalTime();
-                string newDateTimeString = $"{match.Value} ({localMaintenanceTime:HH:mm} your timezone)";
-
-                return originalContent.Replace(match.Value, newDateTimeString);
-
+                return string.Empty;
             }
             catch (Exception ex)
             {
@@ -186,65 +188,68 @@ namespace AssetsManager.Services.Monitor
 
                 if (maintenances == null || maintenances.Count == 0) return "ONLINE";
 
-                var firstMaintenance = maintenances[0];
-                var updates = firstMaintenance?["updates"] as JArray;
-
-                if (updates == null || updates.Count == 0) return "ONLINE";
-
-                string originalContent = null;
-                Match match = null;
-
-                foreach (var update in updates)
+                foreach (var maintenance in maintenances)
                 {
-                    var translations = update?["translations"] as JArray;
-                    if (translations == null) continue;
+                    var updates = maintenance?["updates"] as JArray;
+                    if (updates == null || updates.Count == 0) continue;
 
-                    var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
-                    string content = enTranslation?["content"]?.ToString();
+                    string originalContent = null;
+                    Match match = null;
 
-                    if (string.IsNullOrEmpty(content)) continue;
-
-                    var m = Regex.Match(content, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
-                    if (m.Success)
+                    foreach (var update in updates)
                     {
-                        originalContent = content;
-                        match = m;
-                        break;
+                        var translations = update?["translations"] as JArray;
+                        if (translations == null) continue;
+
+                        var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
+                        string content = enTranslation?["content"]?.ToString();
+
+                        if (string.IsNullOrEmpty(content)) continue;
+
+                        var m = Regex.Match(content, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                        if (m.Success)
+                        {
+                            originalContent = content;
+                            match = m;
+                            break;
+                        }
                     }
+
+                    if (string.IsNullOrEmpty(originalContent) || match == null) continue;
+
+                    string dateStr = match.Groups[1].Value;
+                    string timeStr = match.Groups[2].Value;
+                    string tzAbbr = match.Groups[3].Value;
+
+                    if (!DateTime.TryParseExact($"{dateStr} {timeStr}", "MM/dd/yyyy HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime) || !TimeZoneAbbreviations.TryGetValue(tzAbbr, out var offset))
+                    {
+                        return "Maintenance detected";
+                    }
+
+                    var maintenanceStartTime = new DateTimeOffset(maintenanceDateTime, offset);
+
+                    TimeSpan duration = TimeSpan.FromHours(3);
+                    var durationMatch = Regex.Match(originalContent, @"for approximately (\d+)\s+(hour|minute)s?", RegexOptions.IgnoreCase);
+
+                    if (durationMatch.Success && int.TryParse(durationMatch.Groups[1].Value, out int durationValue))
+                    {
+                        string unit = durationMatch.Groups[2].Value.ToLower();
+                        if (unit.StartsWith("hour")) duration = TimeSpan.FromHours(durationValue);
+                        else if (unit.StartsWith("minute")) duration = TimeSpan.FromMinutes(durationValue);
+                    }
+
+                    var maintenanceEndTime = maintenanceStartTime.Add(duration);
+
+                    if (maintenanceEndTime.ToUniversalTime() < DateTime.UtcNow)
+                    {
+                        continue; // This maintenance passed, check others
+                    }
+
+                    var localMaintenanceStartTime = maintenanceStartTime.ToLocalTime();
+                    return $"Maintenance started at {localMaintenanceStartTime:HH:mm}";
                 }
 
-                if (string.IsNullOrEmpty(originalContent) || match == null) return "ONLINE";
-
-                string dateStr = match.Groups[1].Value;
-                string timeStr = match.Groups[2].Value;
-                string tzAbbr = match.Groups[3].Value;
-
-                if (!DateTime.TryParseExact($"{dateStr} {timeStr}", "MM/dd/yyyy HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime) || !TimeZoneAbbreviations.TryGetValue(tzAbbr, out var offset))
-                {
-                    return "Maintenance detected";
-                }
-
-                var maintenanceStartTime = new DateTimeOffset(maintenanceDateTime, offset);
-
-                TimeSpan duration = TimeSpan.FromHours(3);
-                var durationMatch = Regex.Match(originalContent, @"for approximately (\d+)\s+(hour|minute)s?", RegexOptions.IgnoreCase);
-
-                if (durationMatch.Success && int.TryParse(durationMatch.Groups[1].Value, out int durationValue))
-                {
-                    string unit = durationMatch.Groups[2].Value.ToLower();
-                    if (unit.StartsWith("hour")) duration = TimeSpan.FromHours(durationValue);
-                    else if (unit.StartsWith("minute")) duration = TimeSpan.FromMinutes(durationValue);
-                }
-
-                var maintenanceEndTime = maintenanceStartTime.Add(duration);
-
-                if (maintenanceEndTime.ToUniversalTime() < DateTime.UtcNow)
-                {
-                    return "ONLINE";
-                }
-
-                var localMaintenanceEndTime = maintenanceEndTime.ToLocalTime();
-                return $"Maintenance until {localMaintenanceEndTime:HH:mm}";
+                return "ONLINE";
             }
             catch (Exception ex)
             {
