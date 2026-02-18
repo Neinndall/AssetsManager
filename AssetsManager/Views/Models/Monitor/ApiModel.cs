@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows;
 using System.Collections.Generic;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework; // Added for ObservableRangeCollection
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Monitor;
 
