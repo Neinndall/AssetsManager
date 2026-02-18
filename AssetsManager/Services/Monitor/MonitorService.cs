@@ -189,9 +189,8 @@ namespace AssetsManager.Services.Monitor
                 string url = category.FoundUrlOverrides.TryGetValue(id, out var overrideUrl) ? overrideUrl : $"{category.BaseUrl}{id}.{category.Extension}";
                 try
                 {
-                    string displayName = Path.GetFileName(new Uri(url).AbsolutePath);
+                    string displayName = Path.GetFileNameWithoutExtension(new Uri(url).AbsolutePath);
                     if (string.IsNullOrEmpty(displayName)) displayName = $"Asset ID: {id}";
-
                     assets.Add(new TrackedAsset
                     {
                         Url = url,
@@ -216,13 +215,14 @@ namespace AssetsManager.Services.Monitor
                 string url = $"{category.BaseUrl}{id}.{category.Extension}";
                 try
                 {
-                    string displayName = Path.GetFileName(new Uri(url).AbsolutePath);
+                    string displayName = Path.GetFileNameWithoutExtension(new Uri(url).AbsolutePath);
                     if (string.IsNullOrEmpty(displayName)) displayName = $"Asset ID: {id}";
                     checkableAssets.Add(new TrackedAsset
                     {
                         Url = url,
                         DisplayName = displayName,
-                        Status = "Not Found"
+                        Status = "Not Found",
+                        Thumbnail = url
                     });
                 }
                 catch (UriFormatException) { /* Skip invalid URLs */ }
@@ -232,7 +232,6 @@ namespace AssetsManager.Services.Monitor
             int needed = 10 - checkableAssets.Count;
             if (needed > 0)
             {
-                // We start looking for new IDs from the custom Start point or the last known overall ID
                 long lastKnownId = 0;
                 if (category.Start > 0)
                 {
@@ -250,14 +249,12 @@ namespace AssetsManager.Services.Monitor
                 while (count < needed)
                 {
                     lastKnownId++;
-                    // We skip if it's already found, already in the failed list (because it's already added as Not Found), 
-                    // or removed by the user.
                     if (foundIds.Contains(lastKnownId) || failedIds.Contains(lastKnownId) || category.UserRemovedUrls.Contains(lastKnownId)) continue;
 
                     string url = $"{category.BaseUrl}{lastKnownId}.{category.Extension}";
                     try
                     {
-                        string displayName = Path.GetFileName(new Uri(url).AbsolutePath);
+                        string displayName = Path.GetFileNameWithoutExtension(new Uri(url).AbsolutePath);
                         if (string.IsNullOrEmpty(displayName)) displayName = $"Asset ID: {lastKnownId}";
                         checkableAssets.Add(new TrackedAsset { Url = url, DisplayName = displayName, Status = "Pending" });
                         count++;
@@ -305,7 +302,7 @@ namespace AssetsManager.Services.Monitor
                 var url = $"{category.BaseUrl}{lastNumber}.{category.Extension}";
                 try
                 {
-                    newAssets.Add(new TrackedAsset { Url = url, DisplayName = Path.GetFileName(new Uri(url).AbsolutePath), Status = "Pending" });
+                    newAssets.Add(new TrackedAsset { Url = url, DisplayName = Path.GetFileNameWithoutExtension(new Uri(url).AbsolutePath), Status = "Pending" });
                     count++;
                 }
                 catch (UriFormatException)
