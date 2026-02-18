@@ -166,13 +166,17 @@
                         </Border.Effect>
                         <StackPanel>
                             <!-- Image Header -->
-                            <Border Margin="10,10,10,0" Height="140" CornerRadius="12" Background="{StaticResource SidebarBackground}" ClipToBounds="True">
+                            <Border Margin="10,10,10,0" Height="140" CornerRadius="12" Background="{StaticResource SidebarBackground}">
                                 <Grid>
                                     <!-- Placeholder Icon -->
                                     <materialIcons:MaterialIcon Kind="ImageOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     
-                                    <!-- Thumbnail -->
-                                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" Opacity="0.9"/>
+                                    <!-- Thumbnail with proper Rounded Corners -->
+                                    <Border CornerRadius="12">
+                                        <Border.Background>
+                                            <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill" Opacity="0.9"/>
+                                        </Border.Background>
+                                    </Border>
                                     
                                     <!-- Status Overlay (Top-Right Badge) -->
                                     <Border VerticalAlignment="Top" HorizontalAlignment="Right" Margin="8" Padding="8,4" CornerRadius="6" Background="#CC18181B">
