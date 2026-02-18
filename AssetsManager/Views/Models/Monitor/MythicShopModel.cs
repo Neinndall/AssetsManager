@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Monitor
 {
@@ -64,11 +65,11 @@ namespace AssetsManager.Views.Models.Monitor
     public class MythicShopCategory : INotifyPropertyChanged
     {
         public string CategoryName { get; set; }
-        public ObservableCollection<MythicShopModel> Items { get; set; }
+        public ObservableRangeCollection<MythicShopModel> Items { get; set; }
 
         public MythicShopCategory()
         {
-            Items = new ObservableCollection<MythicShopModel>();
+            Items = new ObservableRangeCollection<MythicShopModel>();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

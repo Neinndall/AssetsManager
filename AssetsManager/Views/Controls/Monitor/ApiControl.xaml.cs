@@ -370,6 +370,7 @@ namespace AssetsManager.Views.Controls.Monitor
                         var categoryKey = sectionNameParts[2].ToUpper();
                         if (categories.TryGetValue(categoryKey, out var categoryViewModel))
                         {
+                            var itemsToAdd = new List<MythicShopModel>();
                             foreach (var entry in section.CatalogEntries)
                             {
                                 var purchaseUnit = entry.PurchaseUnits.FirstOrDefault();
@@ -378,26 +379,25 @@ namespace AssetsManager.Views.Controls.Monitor
                                 var payment = purchaseUnit.PaymentOptions.FirstOrDefault()?.Payments.FirstOrDefault();
                                 if (payment == null) continue;
 
-                                var itemViewModel = new MythicShopModel
+                                itemsToAdd.Add(new MythicShopModel
                                 {
                                     Name = purchaseUnit.Fulfillment.Name,
                                     Price = payment.Delta,
                                     EndTime = FormatUtils.FormatTimeRemaining(entry.EndTime)
-                                };
-                                categoryViewModel.Items.Add(itemViewModel);
+                                });
                             }
+                            categoryViewModel.Items.AddRange(itemsToAdd);
                         }
                     }
                 }
 
-                // Add to observable collection in the correct order
-                foreach (var catName in categoryOrder)
-                {
-                    if (categories.TryGetValue(catName, out var categoryVm) && categoryVm.Items.Any())
-                    {
-                        Status.MythicShopCategories.Add(categoryVm);
-                    }
-                }
+                // Add to observable collection in the correct order using ReplaceRange
+                var finalCategories = categoryOrder
+                    .Where(catName => categories.ContainsKey(catName) && categories[catName].Items.Any())
+                    .Select(catName => categories[catName])
+                    .ToList();
+
+                Status.MythicShopCategories.ReplaceRange(finalCategories);
             }
             catch (Exception ex)
             {
