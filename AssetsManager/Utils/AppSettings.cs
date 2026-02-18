@@ -241,7 +241,8 @@ namespace AssetsManager.Utils
             AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
             FavoritePaths = defaultSettings.FavoritePaths;
             ApiSettings = defaultSettings.ApiSettings;
-            // SyncHashesWithCDTB and HashesSizes are intentionally not reset.
+            SyncHashesWithCDTB = defaultSettings.SyncHashesWithCDTB;
+            // HashesSizes is intentionally not reset to preserve local cache state.
         }
     }
 }
