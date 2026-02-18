@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel; // Added for INotifyPropertyChanged
+using System.Runtime.CompilerServices; // Added for CallerMemberName
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
@@ -10,7 +12,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
     /// <summary>
     /// Model for the results data, including the hierarchy and analytical insights.
     /// </summary>
-    public class WadResultsTreeModel
+    public class WadResultsTreeModel : INotifyPropertyChanged
     {
         // 1. Data Hierarchy (The Tree)
         public ObservableRangeCollection<WadGroupViewModel> WadGroups { get; set; } = new ObservableRangeCollection<WadGroupViewModel>();
@@ -19,6 +21,18 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public ObservableRangeCollection<AssetCategoryStats> CategoryDistribution { get; } = new ObservableRangeCollection<AssetCategoryStats>();
         public ObservableRangeCollection<TopImpactFile> TopImpactFiles { get; } = new ObservableRangeCollection<TopImpactFile>();
         public ObservableRangeCollection<AffectedArea> AffectedAreas { get; } = new ObservableRangeCollection<AffectedArea>();
+        
+        // Dashboard Toggle State
+        private bool _dashboardToggleChecked = false;
+        public bool DashboardToggleChecked
+        {
+            get => _dashboardToggleChecked;
+            set { _dashboardToggleChecked = value; OnPropertyChanged(); }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
     }
 
     public class WadGroupViewModel

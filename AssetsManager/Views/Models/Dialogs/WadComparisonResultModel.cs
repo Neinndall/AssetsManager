@@ -41,6 +41,27 @@ namespace AssetsManager.Views.Models.Dialogs
             set { _detailsModel = value; OnPropertyChanged(); }
         }
 
+        private bool _isDashboardVisible;
+        public bool IsDashboardVisible
+        {
+            get => _isDashboardVisible;
+            set { _isDashboardVisible = value; OnPropertyChanged(); }
+        }
+
+        public WadComparisonResultModel()
+        {
+            TreeModel.PropertyChanged += (sender, e) =>
+            {
+                if (e.PropertyName == nameof(TreeModel.DashboardToggleChecked))
+                {
+                    IsDashboardVisible = TreeModel.DashboardToggleChecked;
+                }
+            };
+            IsDashboardVisible = TreeModel.DashboardToggleChecked; // Set initial state
+        }
+
+
+
         // Window Global State
         public bool IsLoading
         {

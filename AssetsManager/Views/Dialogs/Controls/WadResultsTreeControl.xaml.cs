@@ -16,16 +16,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         public event RoutedEventHandler WadContextMenuOpening;
         public object SelectedItem => resultsTreeView.SelectedItem;
 
-        // Dashboard Toggle Dependency Property
-        public static readonly DependencyProperty DashboardToggleCheckedProperty =
-            DependencyProperty.Register("DashboardToggleChecked", typeof(bool), typeof(WadResultsTreeControl), new PropertyMetadata(true));
-
-        public bool DashboardToggleChecked
-        {
-            get { return (bool)GetValue(DashboardToggleCheckedProperty); }
-            set { SetValue(DashboardToggleCheckedProperty, value); }
-        }
-
         public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
 
         public static readonly RoutedEvent ViewDifferencesClickEvent = EventManager.RegisterRoutedEvent(
@@ -42,9 +32,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             InitializeComponent();
             Loaded += WadResultsTreeControl_Loaded;
             Unloaded += WadResultsTreeControl_Unloaded;
-
-            // Bind the internal ToggleButton to the DependencyProperty
-            DashboardToggle.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty, new System.Windows.Data.Binding("DashboardToggleChecked") { Source = this, Mode = System.Windows.Data.BindingMode.TwoWay });
         }
 
         public void Cleanup()
