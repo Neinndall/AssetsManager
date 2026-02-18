@@ -4,6 +4,7 @@ using DiffPlex.DiffBuilder.Model;
 using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Encodings.Web; // Needed for JavaScriptEncoder
 
 namespace AssetsManager.Services.Formatting
 {
@@ -35,6 +36,8 @@ namespace AssetsManager.Services.Formatting
 
             var localOptions = options ?? new JsonSerializerOptions();
             localOptions.WriteIndented = true;
+            // Ensure Unicode characters are unescaped for readability in the UI
+            localOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
 
             return Task.Run(() =>
             {
