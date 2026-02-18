@@ -171,8 +171,8 @@
                                     <!-- Placeholder Icon -->
                                     <materialIcons:MaterialIcon Kind="ImageOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     
-                                    <!-- Thumbnail with proper Rounded Corners and Border -->
-                                    <Border CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <!-- Thumbnail with proper Rounded Corners and Subtle Border -->
+                                    <Border CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Opacity="0.5">
                                         <Border.Background>
                                             <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill" Opacity="0.9"/>
                                         </Border.Background>
