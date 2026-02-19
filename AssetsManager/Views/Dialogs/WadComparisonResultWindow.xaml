@@ -77,33 +77,37 @@
                     <!-- Right: Stats -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <!-- New -->
-                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="#1A00E676" BorderBrush="{StaticResource AccentGreen}">
+                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="NEW:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                <icons:MaterialIcon Kind="PlusCircleOutline" Foreground="{StaticResource AccentGreen}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
                                 <TextBlock Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Modified -->
-                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="#1AFFB74D" BorderBrush="{StaticResource AccentOrange}">
+                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="MODIFIED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                <icons:MaterialIcon Kind="PencilCircleOutline" Foreground="{StaticResource AccentOrange}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="MODIFIED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
                                 <TextBlock Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Removed -->
-                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="#1AF44336" BorderBrush="{StaticResource AccentRed}">
+                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="REMOVED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                <icons:MaterialIcon Kind="MinusCircleOutline" Foreground="{StaticResource AccentRed}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="REMOVED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
                                 <TextBlock Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Renamed -->
-                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="#1A2196F3" BorderBrush="{StaticResource AccentBlue}" Margin="0">
+                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" Margin="0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="RENAMED:" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                <icons:MaterialIcon Kind="SwapHorizontalCircleOutline" Foreground="{StaticResource AccentBlue}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="RENAMED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
                                 <TextBlock Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
