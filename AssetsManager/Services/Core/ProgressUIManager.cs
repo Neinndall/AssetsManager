@@ -88,7 +88,14 @@ namespace AssetsManager.Services.Core
         /// </summary>
         private void UpdateOperation(string statusMessage, int current, int total, string currentFileDetail, bool success = true, string errorMessage = null)
         {
-            UpdateStatusBar(statusMessage, current, total);
+            // Clean statusMessage for StatusBar (remove anything after '|')
+            string cleanStatus = statusMessage;
+            if (cleanStatus != null && cleanStatus.Contains("|"))
+            {
+                cleanStatus = cleanStatus.Split('|')[0].Trim();
+            }
+
+            UpdateStatusBar(cleanStatus, current, total);
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(current, total, currentFileDetail, success, errorMessage);

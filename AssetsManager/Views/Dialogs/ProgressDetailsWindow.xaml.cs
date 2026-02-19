@@ -101,6 +101,15 @@ namespace AssetsManager.Views.Dialogs
                 CurrentFileTextBlock.Text = currentFileName ?? "...";
             }
 
+            // 1.5. Advanced Sub-Parser for pipe-separated data (File|FileProgress)
+            string fileSpecificProgress = null;
+            if (CurrentFileTextBlock.Text.Contains("|"))
+            {
+                var pipeParts = CurrentFileTextBlock.Text.Split('|');
+                CurrentFileTextBlock.Text = pipeParts[0].Trim();
+                if (pipeParts.Length > 1) fileSpecificProgress = pipeParts[1].Trim();
+            }
+
             // 2. Technical Sub-progress (Visibility Logic)
             // - Comparing/Updating: Show Chunks (Deep technical progress)
             // - Verifying: Hide Chunks (Simple file count progress)
@@ -109,7 +118,16 @@ namespace AssetsManager.Views.Dialogs
             if (showChunks)
             {
                 SubProgressRow.Visibility = Visibility.Visible;
-                SubProgressTextBlock.Text = $"Chunks: {completedFiles} of {totalFiles}";
+                if (!string.IsNullOrEmpty(fileSpecificProgress))
+                {
+                    // Clean mixed format: Chunks: x of x (A/B)
+                    string formattedFileProgress = fileSpecificProgress.Replace("/", " of ");
+                    SubProgressTextBlock.Text = $"Chunks: {formattedFileProgress} ({completedFiles}/{totalFiles})";
+                }
+                else
+                {
+                    SubProgressTextBlock.Text = $"Chunks: {completedFiles} of {totalFiles}";
+                }
             }
             else
             {
