@@ -79,7 +79,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     {
                         selectedEntry.FileName = newName;
                         AppSettings.Save();
-                        LogService.LogSuccess($"Renamed: {newName}");
+                        LogService.LogSuccess("Comparison renamed successfully.");
                     }
                 }
             }

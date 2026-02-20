@@ -39,6 +39,8 @@ namespace AssetsManager.Views.Converters
             { ".preload", MaterialIconKind.FormatListBulleted },
             { ".skl", MaterialIconKind.HumanMale }, 
             { ".skn", MaterialIconKind.HumanMale },
+            { ".sco", MaterialIconKind.CubeOutline },
+            { ".scb", MaterialIconKind.CubeOutline },
             { ".wpk", MaterialIconKind.FolderMusicOutline },
             { ".bnk", MaterialIconKind.FolderMusicOutline },
             { ".wasm", MaterialIconKind.CodeBraces },
