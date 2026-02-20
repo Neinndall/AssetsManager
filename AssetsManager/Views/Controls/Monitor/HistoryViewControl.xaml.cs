@@ -62,6 +62,29 @@ namespace AssetsManager.Views.Controls.Monitor
             });
         }
 
+        private void btnEditName_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedEntry = (sender as FrameworkElement)?.DataContext as HistoryEntry;
+
+            if (selectedEntry != null)
+            {
+                var inputDialog = new InputDialog();
+                inputDialog.Initialize("Rename Comparison", "Enter a new name for this comparison:", selectedEntry.FileName);
+                inputDialog.Owner = Window.GetWindow(this);
+
+                if (inputDialog.ShowDialog() == true)
+                {
+                    string newName = inputDialog.InputText;
+                    if (!string.IsNullOrWhiteSpace(newName) && newName != selectedEntry.FileName)
+                    {
+                        selectedEntry.FileName = newName;
+                        AppSettings.Save();
+                        LogService.LogSuccess($"Renamed: {newName}");
+                    }
+                }
+            }
+        }
+
         private async void btnViewDiff_Click(object sender, RoutedEventArgs e)
         {
             var selectedEntry = (sender as FrameworkElement)?.DataContext as HistoryEntry ?? DiffHistoryListView.SelectedItem as HistoryEntry;
