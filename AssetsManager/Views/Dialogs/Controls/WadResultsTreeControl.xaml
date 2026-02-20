@@ -14,48 +14,84 @@
             </MenuItem>
         </ContextMenu>
 
-        <!-- Template para Archivos (Limpio, sin badges) -->
+        <!-- Template para Archivos -->
         <HierarchicalDataTemplate x:Key="DiffItemTemplate">
-            <Grid Height="24">
+            <Grid Margin="0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}" 
-                                             Width="16" Height="16" Margin="0,0,10,0" Foreground="{StaticResource TextSecondary}"/>
-                <TextBlock Grid.Column="1" Text="{Binding FileName}" FontSize="13" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                             Width="18" Height="18"
+                                             VerticalAlignment="Center" 
+                                             Margin="0,0,6,0"
+                                             Foreground="{StaticResource TextSecondary}"/>
+                <TextBlock Grid.Column="1" Text="{Binding FileName}" VerticalAlignment="Center" FontSize="13">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                    <Setter Property="Foreground" Value="White"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
         </HierarchicalDataTemplate>
 
         <!-- Template para Tipos -->
         <HierarchicalDataTemplate x:Key="DiffTypeTemplate" ItemsSource="{Binding Diffs}" ItemTemplate="{StaticResource DiffItemTemplate}">
-            <Grid Height="26">
+            <Grid Margin="0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                
-                <!-- Icono simplificado: Ahora el Converter se encarga de todo -->
-                <materialIcons:MaterialIcon Grid.Column="0" 
-                                             Kind="{Binding Converter={StaticResource PathToIconConverter}}" 
-                                             Width="18" Height="18" Margin="0,0,10,0" 
-                                             Foreground="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}"/>
-
-                <!-- Colored Category Text -->
-                <TextBlock Grid.Column="1" Text="{Binding TypeNameWithCount}" FontSize="13" FontWeight="Normal" VerticalAlignment="Center" 
-                           Foreground="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}"/>
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}"
+                                            Width="18" Height="18"
+                                            VerticalAlignment="Center" 
+                                            Margin="0,0,6,0" 
+                                            Foreground="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}"/>
+                <TextBlock Grid.Column="1" Text="{Binding TypeNameWithCount}" VerticalAlignment="Center" FontSize="13">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                    <Setter Property="Foreground" Value="White"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
         </HierarchicalDataTemplate>
 
         <!-- Template para WAD -->
         <HierarchicalDataTemplate x:Key="WadGroupTemplate" ItemsSource="{Binding Types}" ItemTemplate="{StaticResource DiffTypeTemplate}">
-            <Grid Height="28">
+            <Grid Margin="0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Grid.Column="0" Kind="PackageVariantClosed" Width="20" Height="20" Margin="0,0,10,0" Foreground="{StaticResource AccentBrush}"/>
-                <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" FontSize="13" FontWeight="Normal" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}"
+                                             Width="18" Height="18"
+                                             VerticalAlignment="Center" 
+                                             Margin="0,0,6,0"
+                                             Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" VerticalAlignment="Center" FontSize="13">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                    <Setter Property="Foreground" Value="White"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
         </HierarchicalDataTemplate>
     </UserControl.Resources>
