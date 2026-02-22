@@ -13,24 +13,26 @@
         Width="1100" Height="900"
         MinWidth="1100" MinHeight="900"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="SingleBorderWindow"
+        WindowStyle="None"
         ResizeMode="CanResize"
         AllowsTransparency="False"
-        Background="Transparent"
+        Background="{StaticResource SidebarBackground}"
         FontFamily="{StaticResource AppFontFamily}">
 
-    <WindowChrome.WindowChrome>
+        <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="40" 
                       ResizeBorderThickness="5" 
-                      GlassFrameThickness="1" 
-                      CornerRadius="0" 
+                      GlassFrameThickness="0" 
+                      CornerRadius="11" 
                       UseAeroCaptionButtons="False"/>
-    </WindowChrome.WindowChrome>
+        </WindowChrome.WindowChrome>
 
     <Border BorderBrush="{StaticResource BorderColor}" 
             Background="{StaticResource SidebarBackground}"
-            BorderThickness="0" 
-            CornerRadius="0" 
+            BorderThickness="1" 
+            CornerRadius="11" 
+            SnapsToDevicePixels="True"
+            ClipToBounds="True"
             Margin="0">
         <Grid>
             <Grid.RowDefinitions>
@@ -150,10 +152,9 @@
 
                     <!-- LogView -->
                     <Border Grid.Row="2"
-                            Background="{StaticResource SidebarBackground}"
+                            Background="Transparent"
                             BorderBrush="{StaticResource BorderColor}"
                             BorderThickness="0,1,0,0"
-                            CornerRadius="0,0,11,0"
                             Padding="0">
                         <controls:LogView x:Name="LogView" 
                                           StatusText="{Binding ViewModel.StatusText, ElementName=StatusBar}"/>
