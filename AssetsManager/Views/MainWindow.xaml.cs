@@ -7,9 +7,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
+using System.Windows.Controls; // Added for ContextMenu/MenuItem if needed, though they are in System.Windows.Controls
 using System.Windows.Input;
-using Hardcodet.Wpf.TaskbarNotification;
+using Hardcodet.Wpf.TaskbarNotification; // Hardcodet Namespace
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
@@ -57,12 +57,15 @@ namespace AssetsManager.Views
 
         private string _latestAppVersionAvailable;
         private NotificationHubWindow _notificationHubWindow;
+        
+        // New fields to manage the state of the extraction after comparison
         private bool _isExtractingAfterComparison = false;
         private string _extractionOldLolPath;
         private string _extractionNewLolPath;
         private List<SerializableChunkDiff> _diffsForExtraction;
-        private string _lastAssignedFolder;
-        private string _lastComparisonIdentity;
+        private string _lastAssignedFolder; // Persists the folder name during the extraction process
+        private string _lastComparisonIdentity; // Identity fingerprint of the last comparison
+
         private GridLength _lastLogHeight;
         private bool _isLogMinimized = false;
 
@@ -116,7 +119,10 @@ namespace AssetsManager.Views
             _wadPackagingService = wadPackagingService;
 
             _progressUIManager.Initialize(StatusBar.ViewModel, this);
+            
+            // Subscribe to Status Bar events
             StatusBar.ProgressSummaryClicked += (s, e) => _progressUIManager.ShowDetails();
+            
             _logService.SetLogOutput(LogView.LogRichTextBox);
             LogView.ToggleLogSizeRequested += OnToggleLogSizeRequested;
             LogView.ClearStatusBarRequested += (s, e) => ClearStatusBar();
@@ -161,6 +167,8 @@ namespace AssetsManager.Views
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
+
+            // Register window hook to handle single instance restoration message
             var source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
             source?.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
             {
@@ -171,7 +179,12 @@ namespace AssetsManager.Views
                 }
                 return IntPtr.Zero;
             });
+            
+            // SingleInstance registration removed as it is no longer needed for basic notifications
+            // If advanced command line handling is needed for the tray icon, it can be re-added here.
         }
+
+        // --- Taskbar / NotifyIcon Logic ---
 
         private void TrayIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)
         {
@@ -198,39 +211,30 @@ namespace AssetsManager.Views
 
         private void MainWindow_StateChanged(object sender, EventArgs e)
         {
-            if (this.WindowState == WindowState.Maximized)
-            {
-                MainWindowBorder.CornerRadius = new CornerRadius(0);
-                MainWindowBorder.BorderThickness = new Thickness(0);
-                // When maximized, a 1px border can sometimes appear. 
-                // We ensure it's flush with the screen.
-                this.Padding = new Thickness(8); 
-            }
-            else
-            {
-                MainWindowBorder.CornerRadius = new CornerRadius(11);
-                MainWindowBorder.BorderThickness = new Thickness(1);
-                this.Padding = new Thickness(0);
-            }
-
             if (WindowState == WindowState.Minimized && _appSettings.MinimizeToTrayOnClose)
             {
                 TrayIcon.Visibility = Visibility.Visible;
                 Hide();
+                // Show a balloon tip when minimized to tray
                 TrayIcon.ShowBalloonTip("AssetsManager", "The application has been minimized to the tray.", BalloonIcon.Info);
             }
         }
 
+        // --- End Taskbar Logic ---
         private void OnUpdatesFound(string message, string latestVersion)
         {
             if (!string.IsNullOrEmpty(latestVersion))
             {
                 _latestAppVersionAvailable = latestVersion;
             }
+
+            // Show System Tray Balloon Notification if window is not visible
             if (Visibility != Visibility.Visible)
             {
                 TrayIcon.ShowBalloonTip("AssetsManager", message, BalloonIcon.Info);
             }
+
+            // Always update internal notification system
             ShowNotification(true, message);
         }
         
@@ -242,7 +246,7 @@ namespace AssetsManager.Views
                 if (_isExtractingAfterComparison)
                 {
                     ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath);
-                    _isExtractingAfterComparison = false;
+                    _isExtractingAfterComparison = false; // Reset flag
                 }
             });
         }
@@ -273,6 +277,7 @@ namespace AssetsManager.Views
 
             if (!serializableDiffs.Any()) return;
 
+            // Identify if this is the same comparison as before to avoid duplicate backups
             string currentIdentity = CalculateComparisonIdentity(serializableDiffs, oldLolPath, newLolPath);
             bool isSameComparison = currentIdentity == _lastComparisonIdentity;
 
@@ -282,10 +287,12 @@ namespace AssetsManager.Views
                 _lastComparisonIdentity = currentIdentity;
             }
 
+            // 1. ALWAYS Save to History if enabled (Independent of other actions)
             if (_appSettings.SaveWadComparisonHistory && string.IsNullOrEmpty(_lastAssignedFolder))
             {
                 string displayName = "Unknown";
                 var uniqueWads = serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
+
                 if (uniqueWads.Count == 1) displayName = Path.GetFileName(uniqueWads[0]).Split('.')[0];
                 else
                 {
@@ -295,39 +302,65 @@ namespace AssetsManager.Views
 
                 try
                 {
+                    // Unified Flow:
+                    // 1. Physical Save (WadPackagingService)
                     var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
-                    _lastAssignedFolder = folderInfo.FolderName;
+                    _lastAssignedFolder = folderInfo.FolderName; // Store for follow-up actions
+                    
+                    // We run this without awaiting to not block UI thread, but we log errors inside the services
                     _ = Task.Run(async () => 
                     {
                         await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.FullPath);
+                        // 2. Metadata Registration (ComparisonHistoryService)
                         _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, $"Comparison from {displayName}", oldLolPath, newLolPath);
                     });
                 }
-                catch (Exception ex) { _logService.LogError(ex, "Failed to auto-save comparison history."); }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "Failed to auto-save comparison history.");
+                }
             }
 
-            if (_appSettings.ReportGeneration.Enabled) await _reportGenerationService.GenerateReportAsync(serializableDiffs, oldLolPath, newLolPath);
+            // 2. Handle follow-up actions (Report, Extraction, or View)
+            if (_appSettings.ReportGeneration.Enabled)
+            {
+                await _reportGenerationService.GenerateReportAsync(serializableDiffs, oldLolPath, newLolPath);
+            }
             else if (_appSettings.EnableExtraction)
             {
                 _isExtractingAfterComparison = true;
                 _diffsForExtraction = serializableDiffs;
                 _extractionOldLolPath = oldLolPath;
                 _extractionNewLolPath = newLolPath;
+
                 Dispatcher.Invoke(StartExtractionAsync);
             }
-            else Dispatcher.Invoke(() => ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath));
+            else
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
+                });
+            }
         }
 
         private string CalculateComparisonIdentity(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
         {
+            // Create a fast unique identity based on paths, count and key hashes
             var sb = new StringBuilder();
-            sb.Append(oldPath).Append(newPath).Append(diffs.Count);
+            sb.Append(oldPath);
+            sb.Append(newPath);
+            sb.Append(diffs.Count);
+
             if (diffs.Count > 0)
             {
+                // Concatenate first and last entry info to differentiate between same-count diffs
                 var first = diffs[0];
                 var last = diffs[^1];
-                sb.Append(first.NewPathHash).Append(first.OldPathHash).Append(last.NewPathHash).Append(last.OldPathHash);
+                sb.Append(first.NewPathHash).Append(first.OldPathHash);
+                sb.Append(last.NewPathHash).Append(last.OldPathHash);
             }
+
             return sb.ToString();
         }
 
@@ -339,27 +372,40 @@ namespace AssetsManager.Views
             resultWindow.Show();
         }
 
-        public void ShowNotification(bool show, string message = "Updates have been detected.")
+        public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
         {
-            if (show) _notificationService.AddNotification("System Notification", message, NotificationType.Info);
+            if (show)
+            {
+                _notificationService.AddNotification("System Notification", message, NotificationType.Info);
+            }
         }
 
         public void ClearStatusBar()
         {
             _progressUIManager.ClearStatusText();
+            // Delegate to StatusBar
             StatusBar.ClearStatusBar();
         }
 
         private void OnToggleLogSizeRequested(object sender, EventArgs e)
         {
+            // If the log is currently showing only the toolbar (effectively hidden by manual resize)
+            // or is explicitly minimized, we want to expand it.
             if (_isLogMinimized || LogRowDefinition.ActualHeight <= 45)
             {
-                if (!_lastLogHeight.IsAbsolute || _lastLogHeight.Value <= 45) _lastLogHeight = new GridLength(180);
+                // Restore / Expand
+                // If the last height was too small (due to manual resize), use a default height
+                if (!_lastLogHeight.IsAbsolute || _lastLogHeight.Value <= 45)
+                {
+                    _lastLogHeight = new GridLength(180);
+                }
+
                 LogRowDefinition.Height = _lastLogHeight;
                 _isLogMinimized = false;
             }
             else
             {
+                // Minimize
                 _lastLogHeight = LogRowDefinition.Height;
                 LogRowDefinition.Height = GridLength.Auto;
                 _isLogMinimized = true;
@@ -373,7 +419,9 @@ namespace AssetsManager.Views
                 _notificationHubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
                 _notificationHubWindow.Owner = this;
             }
+
             _notificationHubWindow.ShowHub(this);
+
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
             {
                 await _updateManager.CheckForUpdatesAsync(this, true);
@@ -383,11 +431,20 @@ namespace AssetsManager.Views
 
         private void OnSidebarNavigationRequested(string viewTag)
         {
+            // Only clean up the current view if we are navigating to a *main content view*
+            // Dialogs (Settings, Help) do not replace the main content, so no cleanup is needed.
             if (viewTag != "Settings" && viewTag != "Help")
             {
-                if (MainContentArea.Content is ExplorerWindow explorerWindow) explorerWindow.CleanupResources();
-                else if (MainContentArea.Content is ViewerWindow viewerWindow) viewerWindow.CleanupResources();
+                if (MainContentArea.Content is ExplorerWindow explorerWindow)
+                {
+                    explorerWindow.CleanupResources();
+                }
+                else if (MainContentArea.Content is ViewerWindow viewerWindow)
+                {
+                    viewerWindow.CleanupResources();
+                }
             }
+
             switch (viewTag)
             {
                 case "Home": LoadHomeWindow(); break;
@@ -403,7 +460,11 @@ namespace AssetsManager.Views
         private void LoadHomeWindow()
         {
             var homeWindow = _serviceProvider.GetRequiredService<HomeWindow>();
-            homeWindow.NavigationRequested += (tag) => { Sidebar.SelectNavigationItem(tag); OnSidebarNavigationRequested(tag); };
+            homeWindow.NavigationRequested += (tag) =>
+            {
+                Sidebar.SelectNavigationItem(tag);
+                OnSidebarNavigationRequested(tag);
+            };
             MainContentArea.Content = homeWindow;
         }
 
@@ -412,7 +473,11 @@ namespace AssetsManager.Views
         private void LoadViewerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ViewerWindow>();
         private void LoadMonitorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<MonitorWindow>();
 
-        private void btnHelp_Click(object sender, RoutedEventArgs e) => _serviceProvider.GetRequiredService<HelpWindow>().ShowDialog();
+        private void btnHelp_Click(object sender, RoutedEventArgs e)
+        {
+            var helpWindow = _serviceProvider.GetRequiredService<HelpWindow>();
+            helpWindow.ShowDialog();
+        }
 
         private void btnSettings_Click(object sender, RoutedEventArgs e)
         {
@@ -422,32 +487,35 @@ namespace AssetsManager.Views
             settingsWindow.ShowDialog();
         }
 
-        private void OnSettingsChanged(object sender, SettingsChangedEventArgs e) { _updateCheckService.Stop(); _updateCheckService.Start(); }
-        private void MainWindow_Closing(object sender, CancelEventArgs e) { StateChanged -= MainWindow_StateChanged; TrayIcon?.Dispose(); }
+        private void OnSettingsChanged(object sender, SettingsChangedEventArgs e)
+        {
+            _updateCheckService.Stop();
+            _updateCheckService.Start();
+        }
+
+        private void MainWindow_Closing(object sender, CancelEventArgs e)
+        {
+            StateChanged -= MainWindow_StateChanged;
+            TrayIcon?.Dispose();
+        }
 
         private void Close_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            SystemCommands.CloseWindow(this);
         }
 
         private void Maximize_Click(object sender, RoutedEventArgs e)
         {
-            if (this.WindowState == WindowState.Maximized)
-            {
-                SystemCommands.RestoreWindow(this);
-            }
-            else
-            {
-                SystemCommands.MaximizeWindow(this);
-            }
+            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
         }
 
         private void Minimize_Click(object sender, RoutedEventArgs e)
         {
-            this.WindowState = WindowState.Minimized;
+            SystemCommands.MinimizeWindow(this);
         }
 
-        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton == MouseButton.Left)
             {
