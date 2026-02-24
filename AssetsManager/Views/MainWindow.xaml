@@ -15,32 +15,22 @@
         MinWidth="1100" MinHeight="900"
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico"
-        
         Background="Transparent"
         AllowsTransparency="True"
         WindowStyle="None"
         WindowTransitionsEnabled="False"
-        
         ShowTitleBar="False"
         ShowIconOnTitleBar="False"
         ShowMinButton="False"
         ShowMaxRestoreButton="False"
         ShowCloseButton="False"
-        
         GlowBrush="{x:Null}"
         NonActiveGlowBrush="{x:Null}"
         BorderThickness="0"
-        
         ResizeMode="CanResize"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         FontFamily="{StaticResource AppFontFamily}">
-
-    <Controls:MetroWindow.Resources>
-        <Style TargetType="{x:Type ResizeGrip}">
-            <Setter Property="Visibility" Value="Collapsed" />
-        </Style>
-    </Controls:MetroWindow.Resources>
 
     <Border Margin="5"
             CornerRadius="12" 
