@@ -6,6 +6,7 @@
     <Version>3.2.1.0</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <UseWPF>true</UseWPF>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
   <PropertyGroup>
     <Product>AssetsManager</Product>
