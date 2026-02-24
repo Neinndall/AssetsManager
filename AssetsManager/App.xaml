@@ -6,6 +6,11 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <!-- Essential MahApps resources for MetroWindow -->
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
+
+                <!-- Original Project Styles -->
                 <ResourceDictionary Source="/Themes/Font.xaml"/>
                 <ResourceDictionary Source="/Themes/Colors.xaml"/>
                 <ResourceDictionary Source="/Themes/TextStyles.xaml"/>
@@ -26,7 +31,6 @@
                 <ResourceDictionary Source="/Themes/Converters.xaml"/>
                 <ResourceDictionary Source="/Themes/ApiTemplates.xaml"/>
             </ResourceDictionary.MergedDictionaries>
-
         </ResourceDictionary>
     </Application.Resources>
 </Application>

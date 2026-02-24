@@ -7,7 +7,7 @@
              mc:Ignorable="d" 
              d:DesignHeight="32" d:DesignWidth="1000">
 
-    <Border Background="Transparent" 
+    <Border Background="{StaticResource SidebarBackground}" 
             BorderBrush="{StaticResource BorderColor}" 
             Height="32"
             Padding="16,0"

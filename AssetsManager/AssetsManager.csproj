@@ -18,6 +18,7 @@
     <PackageReference Include="DiffPlex" Version="1.9.0" />
     <PackageReference Include="HelixToolkit.Core.Wpf" Version="2.27.3" />
     <PackageReference Include="LeagueToolkit" Version="4.1.0-beta.53" />
+    <PackageReference Include="MahApps.Metro" Version="2.4.11" />
     <PackageReference Include="Material.Icons.WPF" Version="2.4.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3650.58" />
@@ -52,21 +53,16 @@
   </ItemGroup>
 
   <Target Name="MoveWebView2Loader" AfterTargets="Build;Publish">
-    <!-- Mover WebView2Loader.dll desde runtimes\win-x64\native -->
     <ItemGroup>
       <WebView2NativeDlls Include="$(OutputPath)runtimes\win-x64\native\*.dll" />
       <WebView2NativeDllsPublish Include="$(PublishDir)runtimes\win-x64\native\*.dll" />
       <OtherNativeDlls Include="$(OutputPath)native\*.dll" />
       <OtherNativeDllsPublish Include="$(PublishDir)native\*.dll" />
     </ItemGroup>
-    
-    <!-- Para Build -->
     <Copy SourceFiles="@(WebView2NativeDlls)" DestinationFolder="$(OutputPath)" Condition="Exists('$(OutputPath)runtimes\win-x64\native')" />
     <Copy SourceFiles="@(OtherNativeDlls)" DestinationFolder="$(OutputPath)" Condition="Exists('$(OutputPath)native')" />
     <RemoveDir Directories="$(OutputPath)runtimes" Condition="Exists('$(OutputPath)runtimes')" />
     <RemoveDir Directories="$(OutputPath)native" Condition="Exists('$(OutputPath)native')" />
-    
-    <!-- Para Publish -->
     <Copy SourceFiles="@(WebView2NativeDllsPublish)" DestinationFolder="$(PublishDir)" Condition="Exists('$(PublishDir)runtimes\win-x64\native')" />
     <Copy SourceFiles="@(OtherNativeDllsPublish)" DestinationFolder="$(PublishDir)" Condition="Exists('$(PublishDir)native')" />
     <RemoveDir Directories="$(PublishDir)runtimes" Condition="Exists('$(PublishDir)runtimes')" />
