@@ -1,14 +1,15 @@
 using System.Windows;
 using System.Windows.Input;
+using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class InputDialog : Window
+    public partial class InputDialog : MetroWindow
     {
         public string InputText
         {
-            get { return textBoxInput.Text; }
-            set { textBoxInput.Text = value; }
+            get => textBoxInput.Text;
+            set => textBoxInput.Text = value;
         }
 
         public InputDialog()
@@ -24,25 +25,15 @@ namespace AssetsManager.Views.Dialogs
             InputText = defaultAnswer;
         }
 
-        private void btnOk_Click(object sender, RoutedEventArgs e)
+        private void btnOk_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+
+        private void btnCancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            DialogResult = true;
+            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
 
-        private void btnCancel_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
-        }
-
-        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left)
-                this.DragMove();
-        }
-
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
-        }
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     }
 }
