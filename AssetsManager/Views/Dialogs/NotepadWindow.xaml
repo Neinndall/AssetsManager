@@ -62,18 +62,14 @@
             </Border>
 
             <!-- 2. Content Area -->
-            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,11" ClipToBounds="True">
-                <Grid Margin="10">
-                    <Border Background="{StaticResource DarkBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <avalonEdit:TextEditor x:Name="NotesEditor" 
-                                             Style="{StaticResource BaseTextEditorStyle}"
-                                             IsReadOnly="False"
-                                             ShowLineNumbers="True"
-                                             Padding="10"
-                                             Margin="4"/>
-                    </Border>
-                </Grid>
-            </Border>
+            <Grid Grid.Row="1" Margin="1">
+                <avalonEdit:TextEditor x:Name="NotesEditor" 
+                                     Style="{StaticResource BaseTextEditorStyle}"
+                                     IsReadOnly="False"
+                                     ShowLineNumbers="True"
+                                     Padding="10"
+                                     Margin="4"/>
+            </Grid>
         </Grid>
     </Border>
 </Controls:MetroWindow>
