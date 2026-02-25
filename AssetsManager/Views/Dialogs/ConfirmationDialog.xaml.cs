@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using Material.Icons;
+using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -20,7 +21,7 @@ namespace AssetsManager.Views.Dialogs
         OK
     }
 
-    public partial class ConfirmationDialog : Window
+    public partial class ConfirmationDialog : MetroWindow
     {
         public ConfirmationDialog()
         {
@@ -66,30 +67,17 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void btnYes_Click(object sender, RoutedEventArgs e)
+        private void btnYes_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+
+        private void btnNo_Click(object sender, RoutedEventArgs e) => DialogResult = false;
+
+        private void btnOk_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            DialogResult = true;
+            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
 
-        private void btnNo_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
-        }
-
-        private void btnOk_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = true;
-        }
-
-        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left)
-                this.DragMove();
-        }
-
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
-        }
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     }
 }
