@@ -1,4 +1,4 @@
-<Window x:Class="AssetsManager.Views.Dialogs.JsonDiffWindow"
+<Controls:MetroWindow x:Class="AssetsManager.Views.Dialogs.JsonDiffWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,34 +6,32 @@
         xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:localUtils="clr-namespace:AssetsManager.Utils"
+        xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Difference Viewer" Height="900" Width="1400" MinHeight="900" MinWidth="1400"
         WindowStartupLocation="CenterScreen"
-        SnapsToDevicePixels="True"
-        UseLayoutRounding="True"
-        WindowStyle="SingleBorderWindow"
+        
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        WindowTransitionsEnabled="False"
+        ShowTitleBar="False"
+        ShowMinButton="False"
+        ShowMaxRestoreButton="False"
+        ShowCloseButton="False"
+        GlowBrush="{x:Null}"
+        NonActiveGlowBrush="{x:Null}"
+        BorderThickness="0"
         ResizeMode="CanResize"
-        AllowsTransparency="False"
-        Background="Transparent">
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
 
     <Window.InputBindings>
         <KeyBinding Command="{x:Static localUtils:ShortKeys.NextDifference}" Key="Down" Modifiers="Alt" />
         <KeyBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Key="Up" Modifiers="Alt" />
     </Window.InputBindings>
 
-    <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="40"  
-                      ResizeBorderThickness="5"
-                      GlassFrameThickness="1" 
-                      CornerRadius="0" 
-                      UseAeroCaptionButtons="False"/>
-    </WindowChrome.WindowChrome>
-
-    <Border BorderBrush="{StaticResource BorderColor}" 
-            Background="{StaticResource SidebarBackground}"
-            BorderThickness="0" 
-            CornerRadius="0" 
-            Margin="0">
+    <Border Margin="5" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Background="{StaticResource SidebarBackground}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
@@ -41,7 +39,7 @@
                 <RowDefinition Height="Auto"/> <!-- 2: Status Bar -->
             </Grid.RowDefinitions>
 
-            <!-- 1. Custom Title Bar -->
+            <!-- 1. Custom Title Bar (HUD Style: 40px) -->
             <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="Black" Opacity="0.15" Direction="270"/>
@@ -55,14 +53,12 @@
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
                         <icons:MaterialIcon Kind="FileDocumentEditOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
-                        <TextBlock Text="Text Comparison" 
-                                   FontSize="13" 
-                                   FontWeight="Normal"
-                                   Foreground="{StaticResource TextPrimary}"
-                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="Text Comparison" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
                         <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="34" Height="40">
                             <icons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
                         </Button>
@@ -81,8 +77,8 @@
                 <controls:JsonDiffControl x:Name="JsonDiffControl"/>
             </Grid>
 
-            <!-- 3. Slim Status Bar -->
-            <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,6" CornerRadius="0">
+            <!-- 3. Slim Status Bar (With bottom rounding) -->
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,6" CornerRadius="0,0,11,11">
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <icons:MaterialIcon Kind="KeyboardOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
@@ -99,4 +95,4 @@
             </Border>
         </Grid>
     </Border>
-</Window>
+</Controls:MetroWindow>
