@@ -1,16 +1,12 @@
-// AssetsManager/UI/UpdateProgressWindow.xaml.cs
 using System;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using Serilog;
+using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    /// <summary>
-    /// Interaction logic for UpdateProgressWindow.xaml
-    /// </summary>
-    public partial class UpdateProgressWindow : Window
+    public partial class UpdateProgressWindow : MetroWindow
     {
         public UpdateProgressWindow()
         {
@@ -26,7 +22,6 @@ namespace AssetsManager.Views.Dialogs
             }
 
             Log.Debug($"UpdateProgressWindow: Setting progress to {percentage}% with message: {message}");
-            // Update the progress bar value directly
             DownloadProgressBar.Value = percentage;
             MessageTextBlock.Text = message;
         }
@@ -37,14 +32,8 @@ namespace AssetsManager.Views.Dialogs
                 this.DragMove();
         }
 
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
-        }
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
 
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
+        private void CloseButton_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
     }
 }
