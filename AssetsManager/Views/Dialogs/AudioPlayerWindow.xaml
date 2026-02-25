@@ -112,20 +112,23 @@
                 </Grid>
             </Grid>
 
-            <!-- 3. Player Controls Area (HUD Style with bottom rounding) -->
-            <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,15">
+            <!-- 3. Player Controls Area (Pro HUD Redesign) -->
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,20">
                 <StackPanel>
-                    <!-- Track Info -->
-                    <TextBlock x:Name="CurrentTrackName" Text="No track selected" HorizontalAlignment="Center" 
-                               Foreground="{StaticResource AccentBrush}" FontWeight="Bold" FontSize="13" 
-                               Margin="0,0,0,12" TextTrimming="CharacterEllipsis"/>
+                    <!-- Row 1: Now Playing Info -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,15">
+                        <icons:MaterialIcon Kind="MusicNote" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock x:Name="CurrentTrackName" Text="No track selected" 
+                                   Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="12" 
+                                   TextTrimming="CharacterEllipsis" MaxWidth="300" VerticalAlignment="Center"/>
+                    </StackPanel>
                     
-                    <!-- Progress Slider -->
-                    <Grid Margin="0,0,0,15">
+                    <!-- Row 2: Timeline (Minimalist) -->
+                    <Grid Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="45"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="45"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="CurrentTimeText" Text="0:00" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                         <Slider x:Name="AudioSlider" Grid.Column="1" Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center" 
@@ -133,48 +136,50 @@
                         <TextBlock x:Name="TotalTimeText" Text="0:00" Grid.Column="2" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
                     </Grid>
 
-                    <!-- Main Actions Bar -->
+                    <!-- Row 3: Command Center -->
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/> <!-- Utils Left -->
+                            <ColumnDefinition Width="Auto"/> <!-- Main Buttons -->
+                            <ColumnDefinition Width="*"/> <!-- Utils Right -->
                         </Grid.ColumnDefinitions>
 
-                        <Button HorizontalAlignment="Left" Style="{StaticResource TransparentIconButton}" Click="AddUrl_Click" ToolTip="Add Audio from URL">
-                            <icons:MaterialIcon Kind="Youtube" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                        <!-- Secondary: Add URL -->
+                        <Button HorizontalAlignment="Left" Style="{StaticResource TitleBarButtonStyle}" Click="AddUrl_Click" ToolTip="Add YouTube URL" Width="34" Height="34">
+                            <icons:MaterialIcon Kind="Youtube" Width="20" Height="20" Foreground="#FFFF0000"/>
                         </Button>
 
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Button Style="{StaticResource IconButton}" Width="36" Height="36" Margin="5,0" Click="SkipBackward_Click">
-                                <icons:MaterialIcon Kind="SkipPrevious" Width="18" Height="18"/>
+                        <!-- Primary: Playback (All 38px) -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Style="{StaticResource IconButton}" Background="White" Width="38" Height="38" Click="SkipBackward_Click">
+                                <icons:MaterialIcon Kind="SkipPrevious" Width="20" Height="20" Foreground="{StaticResource SidebarBackground}"/>
                             </Button>
                             
-                            <Button x:Name="PlayPauseButton" Style="{StaticResource PrimaryButton}" Width="46" Height="46" Margin="10,0" Click="PlayPause_Click">
-                                <icons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Pause,Play'}" Width="22" Height="22"/>
+                            <Button x:Name="PlayPauseButton" Style="{StaticResource PrimaryButton}" Width="38" Height="38" Margin="15,0" Click="PlayPause_Click">
+                                <icons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Pause,Play'}" Width="20" Height="20"/>
                             </Button>
                             
-                            <Button Style="{StaticResource IconButton}" Width="36" Height="36" Margin="5,0" Click="SkipForward_Click">
-                                <icons:MaterialIcon Kind="SkipNext" Width="18" Height="18"/>
+                            <Button Style="{StaticResource IconButton}" Background="White" Width="38" Height="38" Click="SkipForward_Click">
+                                <icons:MaterialIcon Kind="SkipNext" Width="20" Height="20" Foreground="{StaticResource SidebarBackground}"/>
                             </Button>
                         </StackPanel>
                         
-                        <Button Grid.Column="2" HorizontalAlignment="Right" Style="{StaticResource TransparentIconButton}" Click="ClearPlaylist_Click" ToolTip="Clear Playlist">
-                            <icons:MaterialIcon Kind="PlaylistRemove" Width="18" Height="18" Foreground="{StaticResource TextMuted}"/>
+                        <!-- Secondary: Clear -->
+                        <Button Grid.Column="2" HorizontalAlignment="Right" Style="{StaticResource TitleBarButtonStyle}" Click="ClearPlaylist_Click" ToolTip="Clear Playlist" Width="34" Height="34">
+                            <icons:MaterialIcon Kind="DeleteSweepOutline" Width="20" Height="20" Foreground="{StaticResource TextMuted}"/>
                         </Button>
                     </Grid>
 
-                    <!-- Volume Control -->
-                    <Grid Margin="0,15,0,5" HorizontalAlignment="Center" Width="220">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="35"/>
-                        </Grid.ColumnDefinitions>
-                        <icons:MaterialIcon Kind="{Binding IsMuted, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='VolumeMute,VolumeMedium'}" Width="16" Height="16" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <Slider x:Name="VolumeSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center" Height="18" ValueChanged="VolumeSlider_ValueChanged"/>
-                        <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=VolumeSlider, StringFormat={}{0:P0}}" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Right" Width="25"/>
-                    </Grid>
+                    <!-- Row 4: Volume (Compact & Centered) -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="15" Padding="12,4" Margin="0,20,0,0" HorizontalAlignment="Center" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <icons:MaterialIcon Kind="{Binding IsMuted, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='VolumeMute,VolumeMedium'}" 
+                                                Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <Slider x:Name="VolumeSlider" Width="120" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
+                            <TextBlock Text="{Binding Value, ElementName=VolumeSlider, StringFormat={}{0:P0}}" 
+                                       FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0" Width="30"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
         </Grid>
