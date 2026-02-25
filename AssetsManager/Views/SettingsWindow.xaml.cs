@@ -1,10 +1,12 @@
 using System;
 using System.Windows;
+using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Settings;
 using Microsoft.Extensions.DependencyInjection;
+using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views
 {
@@ -13,7 +15,7 @@ namespace AssetsManager.Views
         public bool WasResetToDefaults { get; set; }
     }
 
-    public partial class SettingsWindow : Window
+    public partial class SettingsWindow : MetroWindow
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly AppSettings _appSettings;
@@ -57,20 +59,9 @@ namespace AssetsManager.Views
             NavAdvanced.Checked += NavAdvanced_Checked;
         }
 
-        private void NavGeneral_Checked(object sender, RoutedEventArgs e)
-        {
-            NavigateToView(_generalSettingsView);
-        }
-
-        private void NavDefaultPaths_Checked(object sender, RoutedEventArgs e)
-        {
-            NavigateToView(_defaultPathsSettingsView);
-        }
-
-        private void NavAdvanced_Checked(object sender, RoutedEventArgs e)
-        {
-            NavigateToView(_advancedSettingsView);
-        }
+        private void NavGeneral_Checked(object sender, RoutedEventArgs e) => NavigateToView(_generalSettingsView);
+        private void NavDefaultPaths_Checked(object sender, RoutedEventArgs e) => NavigateToView(_defaultPathsSettingsView);
+        private void NavAdvanced_Checked(object sender, RoutedEventArgs e) => NavigateToView(_advancedSettingsView);
 
         private void NavigateToView(object view)
         {
@@ -91,12 +82,9 @@ namespace AssetsManager.Views
             if (result == true)
             {
                 _appSettings.ResetToDefaults();
-
                 _appSettings.Save();
                 _customMessageBoxService.ShowInfo("Info", "Settings have been reset to default values.", this);
-
                 _settingsModel.Settings = _appSettings;
-
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = true });
             }
         }
@@ -104,35 +92,24 @@ namespace AssetsManager.Views
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
             _advancedSettingsView.SaveSettings();
-
             _appSettings.Save();
-
             _customMessageBoxService.ShowSuccess("Success", "Settings have been saved successfully.", this);
-
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = false });
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
+        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
 
         private void Maximize_Click(object sender, RoutedEventArgs e)
         {
-            if (this.WindowState == WindowState.Maximized)
-            {
-                this.WindowState = WindowState.Normal;
-            }
-            else
-            {
-                this.WindowState = WindowState.Maximized;
-            }
+            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
         }
 
-        private void Minimize_Click(object sender, RoutedEventArgs e)
+        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            this.WindowState = WindowState.Minimized;
+            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
-
     }
 }

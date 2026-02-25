@@ -1,30 +1,41 @@
-<Window x:Class="AssetsManager.Views.SettingsWindow"
+<Controls:MetroWindow x:Class="AssetsManager.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+        mc:Ignorable="d"
         Title="Settings" Height="750" Width="950"
         MinHeight="750" MinWidth="950"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResize"
-        WindowStyle="SingleBorderWindow"
-        AllowsTransparency="False"
+        
         Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        WindowTransitionsEnabled="False"
+        
+        ShowTitleBar="False"
+        ShowIconOnTitleBar="False"
+        ShowMinButton="False"
+        ShowMaxRestoreButton="False"
+        ShowCloseButton="False"
+        
+        GlowBrush="{x:Null}"
+        NonActiveGlowBrush="{x:Null}"
+        BorderThickness="0"
+        
+        ResizeMode="CanResize"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
         FontFamily="{StaticResource AppFontFamily}">
 
-    <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="40" 
-                      ResizeBorderThickness="5" 
-                      GlassFrameThickness="1" 
-                      CornerRadius="0" 
-                      UseAeroCaptionButtons="False"/>
-    </WindowChrome.WindowChrome>
-
-    <Border BorderBrush="{StaticResource BorderColor}" 
-            Background="{StaticResource SidebarBackground}"
-            BorderThickness="0" 
-            CornerRadius="0" 
-            Margin="0">
+    <Border Margin="5"
+            CornerRadius="12" 
+            Background="{StaticResource SidebarBackground}" 
+            BorderBrush="{StaticResource BorderColor}" 
+            BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
@@ -32,7 +43,7 @@
             </Grid.RowDefinitions>
 
             <!-- 1. Custom Title Bar -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="Black" Opacity="0.15" Direction="270"/>
                 </Border.Effect>
@@ -52,7 +63,9 @@
                                    VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
                         <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="34" Height="40">
                             <icons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
                         </Button>
@@ -66,145 +79,149 @@
                 </Grid>
             </Border>
 
-            <!-- 2. Original Content (Moved to Row 1) -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="240"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+            <!-- 2. Original Content Area (With bottom rounding) -->
+            <Border Grid.Row="1" CornerRadius="0,0,11,11" ClipToBounds="True">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="240"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <!-- Sidebar Navigation -->
-                <Border Grid.Column="0" 
-                        Background="{StaticResource SidebarBackground}"
-                        BorderBrush="{StaticResource BorderColor}"
-                        BorderThickness="0,0,1,0">
-                    <StackPanel Margin="0,0,0,0">
-                        <!-- Header Elaborado -->
-                        <Border Padding="16,32,12,24" 
-                                BorderBrush="{StaticResource BorderColor}" 
-                                BorderThickness="0,0,0,1"
-                                Margin="0,0,0,16">
-                            <StackPanel Orientation="Horizontal">
-                                <!-- Icon Box -->
-                                <Border Background="{StaticResource CardBackground}" 
-                                        CornerRadius="8" 
-                                        Width="44" Height="44"
-                                        BorderBrush="{StaticResource BorderColor}"
-                                        BorderThickness="1">
-                                    <materialIcons:MaterialIcon Kind="CogOutline" 
-                                                               Width="22" Height="22" 
-                                                               Foreground="{StaticResource AccentBrush}"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"/>
-                                </Border>
+                    <!-- Sidebar Navigation -->
+                    <Border Grid.Column="0" 
+                            Background="{StaticResource SidebarBackground}"
+                            BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="0,0,1,0"
+                            CornerRadius="0,0,0,11">
+                        <StackPanel Margin="0,0,0,0">
+                            <!-- Header Elaborado -->
+                            <Border Padding="16,32,12,24" 
+                                    BorderBrush="{StaticResource BorderColor}" 
+                                    BorderThickness="0,0,0,1"
+                                    Margin="0,0,0,16">
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- Icon Box -->
+                                    <Border Background="{StaticResource CardBackground}" 
+                                            CornerRadius="8" 
+                                            Width="44" Height="44"
+                                            BorderBrush="{StaticResource BorderColor}"
+                                            BorderThickness="1">
+                                        <materialIcons:MaterialIcon Kind="CogOutline" 
+                                                                   Width="22" Height="22" 
+                                                                   Foreground="{StaticResource AccentBrush}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"/>
+                                    </Border>
 
-                                <!-- Titles -->
-                                <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
-                                    <TextBlock Text="SETTINGS" 
-                                               FontWeight="Bold" 
-                                               FontSize="14" 
-                                               Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Configuration Panel" 
-                                               FontSize="11" 
-                                               Foreground="{StaticResource TextSecondary}" 
-                                               Margin="0,2,0,0"/>
+                                    <!-- Titles -->
+                                    <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <TextBlock Text="SETTINGS" 
+                                                   FontWeight="Bold" 
+                                                   FontSize="14" 
+                                                   Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="Configuration Panel" 
+                                                   FontSize="11" 
+                                                   Foreground="{StaticResource TextSecondary}" 
+                                                   Margin="0,2,0,0"/>
+                                    </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
+                            </Border>
 
-                        <!-- Navigation Items -->
-                        <StackPanel>
-                            <RadioButton x:Name="NavGeneral" 
-                                       Content="General" 
-                                       Tag="Wrench"
-                                       GroupName="Navigation" 
-                                       IsChecked="True" 
-                                       Style="{StaticResource SettingsTabStyle}"/>
-                            
-                            <RadioButton x:Name="NavAdvanced" 
-                                       Content="Advanced" 
-                                       Tag="Flash"
-                                       GroupName="Navigation" 
-                                       Style="{StaticResource SettingsTabStyle}"/>
-                            
-                            <RadioButton x:Name="NavDefaultPaths" 
-                                       Content="Default Paths" 
-                                       Tag="Folder"
-                                       GroupName="Navigation" 
-                                       Style="{StaticResource SettingsTabStyle}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Main Content -->
-                <Grid Grid.Column="1">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Content Area -->
-                    <ScrollViewer Grid.Row="0" 
-                                VerticalScrollBarVisibility="Auto"
-                                HorizontalScrollBarVisibility="Disabled"
-                                Padding="32,24">
-
-                        <ContentControl x:Name="SettingsContentArea" HorizontalAlignment="Stretch"/>
-                        
-                    </ScrollViewer>
-
-                    <!-- Bottom Action Bar (Improved Style) -->
-                    <Border Grid.Row="1" 
-                          Background="{StaticResource CardBackground}"
-                          BorderBrush="{StaticResource BorderColor}"
-                          BorderThickness="0,1,0,0"
-                          Padding="24,16">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Left: Status/Info with Icon -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Border Background="{StaticResource HoverColor}" CornerRadius="16" Width="32" Height="32" Margin="0,0,12,0">
-                                    <materialIcons:MaterialIcon Kind="Tune" 
-                                                               Width="16" Height="16" 
-                                                               Foreground="{StaticResource AccentBrush}"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"/>
-                                </Border>
+                            <!-- Navigation Items -->
+                            <StackPanel>
+                                <RadioButton x:Name="NavGeneral" 
+                                           Content="General" 
+                                           Tag="Wrench"
+                                           GroupName="Navigation" 
+                                           IsChecked="True" 
+                                           Style="{StaticResource SettingsTabStyle}"/>
                                 
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Configuration Manager"
-                                             FontWeight="SemiBold"
-                                             Foreground="{StaticResource TextPrimary}" 
-                                             FontSize="13"/>
-                                    <TextBlock Text="Manage your application preferences and defaults"
-                                             Foreground="{StaticResource TextMuted}" 
-                                             FontSize="11"/>
-                                </StackPanel>
+                                <RadioButton x:Name="NavAdvanced" 
+                                           Content="Advanced" 
+                                           Tag="Flash"
+                                           GroupName="Navigation" 
+                                           Style="{StaticResource SettingsTabStyle}"/>
+                                
+                                <RadioButton x:Name="NavDefaultPaths" 
+                                           Content="Default Paths" 
+                                           Tag="Folder"
+                                           GroupName="Navigation" 
+                                           Style="{StaticResource SettingsTabStyle}"/>
                             </StackPanel>
-
-                            <!-- Right: Action Buttons -->
-                            <StackPanel Grid.Column="1" 
-                                        Orientation="Horizontal" 
-                                        HorizontalAlignment="Right">
-                                <Button x:Name="BtnResetDefaults" 
-                                        Content="Reset Defaults"
-                                        Click="BtnResetDefaults_Click"
-                                        Style="{StaticResource SecondaryButton}"/>
-
-                                <Button x:Name="btnSave" 
-                                        Content="Save Changes"
-                                        Margin="12,0,0,0"
-                                        Click="btnSave_Click"
-                                        Style="{StaticResource PrimaryButton}"/>
-                            </StackPanel>
-                        </Grid>
+                        </StackPanel>
                     </Border>
+
+                    <!-- Main Content -->
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Content Area -->
+                        <ScrollViewer Grid.Row="0" 
+                                    VerticalScrollBarVisibility="Auto"
+                                    HorizontalScrollBarVisibility="Disabled"
+                                    Padding="32,24">
+
+                            <ContentControl x:Name="SettingsContentArea" HorizontalAlignment="Stretch"/>
+                            
+                        </ScrollViewer>
+
+                        <!-- Bottom Action Bar (Improved Style) -->
+                        <Border Grid.Row="1" 
+                              Background="{StaticResource CardBackground}"
+                              BorderBrush="{StaticResource BorderColor}"
+                              BorderThickness="0,1,0,0"
+                              Padding="24,16"
+                              CornerRadius="0,0,11,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Left: Status/Info with Icon -->
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="16" Width="32" Height="32" Margin="0,0,12,0">
+                                        <materialIcons:MaterialIcon Kind="Tune" 
+                                                                   Width="16" Height="16" 
+                                                                   Foreground="{StaticResource AccentBrush}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Configuration Manager"
+                                                 FontWeight="SemiBold"
+                                                 Foreground="{StaticResource TextPrimary}" 
+                                                 FontSize="13"/>
+                                        <TextBlock Text="Manage your application preferences and defaults"
+                                                 Foreground="{StaticResource TextMuted}" 
+                                                 FontSize="11"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Right: Action Buttons -->
+                                <StackPanel Grid.Column="1" 
+                                            Orientation="Horizontal" 
+                                            HorizontalAlignment="Right">
+                                    <Button x:Name="BtnResetDefaults" 
+                                            Content="Reset Defaults"
+                                            Click="BtnResetDefaults_Click"
+                                            Style="{StaticResource SecondaryButton}"/>
+
+                                    <Button x:Name="btnSave" 
+                                            Content="Save Changes"
+                                            Margin="12,0,0,0"
+                                            Click="btnSave_Click"
+                                            Style="{StaticResource PrimaryButton}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </Grid>
-            </Grid>
+            </Border>
         </Grid>
     </Border>
-</Window>
+</Controls:MetroWindow>
