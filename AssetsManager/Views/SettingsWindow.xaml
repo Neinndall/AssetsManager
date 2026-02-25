@@ -16,11 +16,9 @@
         WindowStyle="None"
         WindowTransitionsEnabled="False"
         ShowTitleBar="False"
-        ShowIconOnTitleBar="False"
         ShowMinButton="False"
         ShowMaxRestoreButton="False"
         ShowCloseButton="False"
-        
         GlowBrush="{x:Null}"
         NonActiveGlowBrush="{x:Null}"
         BorderThickness="0"
