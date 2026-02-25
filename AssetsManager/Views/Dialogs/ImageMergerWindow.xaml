@@ -1,40 +1,38 @@
-<Window x:Class="AssetsManager.Views.Dialogs.ImageMergerWindow"
+<Controls:MetroWindow x:Class="AssetsManager.Views.Dialogs.ImageMergerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Image Merger" Height="700" Width="1100"
         MinHeight="700" MinWidth="1100"
         WindowStartupLocation="CenterOwner"
-        WindowStyle="None"
-        ResizeMode="CanResize"
-        AllowsTransparency="True"
+        
         Background="Transparent"
-        SnapsToDevicePixels="True"
-        UseLayoutRounding="True">
+        AllowsTransparency="True"
+        WindowStyle="None"
+        WindowTransitionsEnabled="False"
+        ShowTitleBar="False"
+        ShowMinButton="False"
+        ShowMaxRestoreButton="False"
+        ShowCloseButton="False"
+        GlowBrush="{x:Null}"
+        NonActiveGlowBrush="{x:Null}"
+        BorderThickness="0"
+        ResizeMode="CanResize"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
 
-    <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="40" 
-                      ResizeBorderThickness="5" 
-                      GlassFrameThickness="0" 
-                      CornerRadius="0" 
-                      UseAeroCaptionButtons="False"/>
-    </WindowChrome.WindowChrome>
-
-    <Border BorderBrush="{StaticResource BorderColor}" 
-            Background="{StaticResource CardBackground}"
-            BorderThickness="1" 
-            CornerRadius="12" 
-            Margin="1">
+    <Border Margin="5" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Background="{StaticResource SidebarBackground}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- 1. Custom Title Bar -->
+            <!-- 1. Custom Title Bar (HUD Style: 40px) -->
             <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="Black" Opacity="0.15" Direction="270"/>
@@ -48,14 +46,13 @@
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
                         <icons:MaterialIcon Kind="ViewGridPlus" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
-                        <TextBlock Text="Image Merger" 
-                                   FontSize="13" 
-                                   FontWeight="Normal"
-                                   Foreground="{StaticResource TextPrimary}"
-                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="Image Merger" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                    <!-- Drag Area -->
+                    <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
                         <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="34" Height="40">
                             <icons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
                         </Button>
@@ -72,7 +69,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Panel: Management -->
+                <!-- Left Panel: Management (Rounded bottom-left) -->
                 <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0" CornerRadius="0,0,0,11">
                     <Grid Margin="15">
                         <Grid.RowDefinitions>
@@ -122,9 +119,7 @@
                                                        FontWeight="SemiBold" FontSize="12"
                                                        Foreground="{StaticResource TextPrimary}"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="Image Asset" 
-                                                       FontSize="10" 
-                                                       Foreground="{StaticResource TextSecondary}"/>
+                                            <TextBlock Text="Image Asset" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
                                         </StackPanel>
                                         
                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
@@ -166,7 +161,7 @@
                     </Grid>
                 </Border>
 
-                <!-- Right Panel: Preview -->
+                <!-- Right Panel: Preview (Rounded bottom-right) -->
                 <Grid Grid.Column="1">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -188,7 +183,7 @@
                     </Border>
 
                     <!-- Preview Area -->
-                    <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,0">
+                    <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,0" ClipToBounds="True">
                         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="Transparent">
                             <Grid Margin="40">
                                 <Image Source="{Binding PreviewImage}" Stretch="None" VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -206,4 +201,4 @@
             </Grid>
         </Grid>
     </Border>
-</Window>
+</Controls:MetroWindow>
