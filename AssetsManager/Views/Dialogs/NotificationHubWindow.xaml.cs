@@ -3,10 +3,11 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Notifications;
+using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class NotificationHubWindow : Window
+    public partial class NotificationHubWindow : MetroWindow
     {
         public NotificationHubModel ViewModel => DataContext as NotificationHubModel;
 
@@ -20,9 +21,7 @@ namespace AssetsManager.Views.Dialogs
         {
             if (this.IsVisible)
             {
-                // Return focus to the owner window when toggling off BEFORE hiding to prevent flicker
                 if (owner != null) owner.Activate();
-
                 this.Hide();
                 if (ViewModel != null) ViewModel.IsOpen = false;
                 return;
@@ -44,7 +43,6 @@ namespace AssetsManager.Views.Dialogs
 
         private void Close_Click(object sender, RoutedEventArgs e)
         {
-            // Return focus to the owner window BEFORE hiding to prevent background apps from jumping/flickering
             if (this.Owner != null)
             {
                 this.Owner.Activate();
@@ -56,7 +54,7 @@ namespace AssetsManager.Views.Dialogs
 
         private void Minimize_Click(object sender, RoutedEventArgs e)
         {
-            this.WindowState = WindowState.Minimized;
+            SystemCommands.MinimizeWindow(this);
         }
 
         private void MarkAllRead_Click(object sender, RoutedEventArgs e)
