@@ -34,11 +34,12 @@
             </Border>
 
             <!-- Splitter -->
-            <GridSplitter Grid.Column="1" 
-                          Width="5" 
-                          HorizontalAlignment="Center" 
-                          VerticalAlignment="Stretch" 
+            <GridSplitter Grid.Column="1"
+                          Width="8"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Stretch"
                           Background="Transparent"
+                          ShowsPreview="False"
                           Visibility="{Binding ElementName=FileExplorer, Path=DataContext.IsTreeReady, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
             <!-- Panel Derecho: Previsualizador -->

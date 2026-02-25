@@ -5,10 +5,11 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ImageDiffWindow : Window
+    public partial class ImageDiffWindow : MetroWindow
     {
         private bool _isInitialized = false;
         private Point _lastMousePosition;
@@ -111,6 +112,9 @@ namespace AssetsManager.Views.Dialogs
 
         private void ImageDiffWindow_MouseDown(object sender, MouseButtonEventArgs e)
         {
+            // Abort if the click comes from the title bar drag area
+            if (e.OriginalSource == TitleBarDragArea) return;
+
             if (e.ChangedButton == MouseButton.Left || e.ChangedButton == MouseButton.Middle)
             {
                 _isDragging = true;
@@ -148,7 +152,8 @@ namespace AssetsManager.Views.Dialogs
             UpdateTransformGroup(OldOverlayScale, OldOverlayTranslate, scale, deltaX, deltaY);
             UpdateTransformGroup(NewOverlayScale, NewOverlayTranslate, scale, deltaX, deltaY);
             UpdateTransformGroup(DiffOverlayScale, DiffOverlayTranslate, scale, deltaX, deltaY);
-            UpdateTransformGroup(SliderSeparatorScale, SliderSeparatorTranslate, scale, deltaX, deltaY);
+            if (SliderSeparatorScale != null && SliderSeparatorTranslate != null)
+                UpdateTransformGroup(SliderSeparatorScale, SliderSeparatorTranslate, scale, deltaX, deltaY);
             UpdateSliderEffect();
         }
 
@@ -232,26 +237,19 @@ namespace AssetsManager.Views.Dialogs
             _diffMap = null;
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
+        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
 
         private void Maximize_Click(object sender, RoutedEventArgs e)
         {
-            if (this.WindowState == WindowState.Maximized)
-            {
-                this.WindowState = WindowState.Normal;
-            }
-            else
-            {
-                this.WindowState = WindowState.Maximized;
-            }
+            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
         }
 
-        private void Minimize_Click(object sender, RoutedEventArgs e)
+        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            this.WindowState = WindowState.Minimized;
+            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
     }
 }
