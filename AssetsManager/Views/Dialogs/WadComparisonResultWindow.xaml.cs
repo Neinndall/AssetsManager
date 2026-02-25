@@ -25,10 +25,11 @@ using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Wad;
+using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class WadComparisonResultWindow : Window
+    public partial class WadComparisonResultWindow : MetroWindow
     {
         private List<SerializableChunkDiff> _serializableDiffs;
         private readonly IServiceProvider _serviceProvider;
@@ -388,26 +389,19 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
+        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
 
         private void Maximize_Click(object sender, RoutedEventArgs e)
         {
-            if (this.WindowState == WindowState.Maximized)
-            {
-                this.WindowState = WindowState.Normal;
-            }
-            else
-            {
-                this.WindowState = WindowState.Maximized;
-            }
+            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
         }
 
-        private void Minimize_Click(object sender, RoutedEventArgs e)
+        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            this.WindowState = WindowState.Minimized;
+            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
     }
 }

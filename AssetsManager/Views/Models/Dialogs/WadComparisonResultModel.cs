@@ -60,8 +60,6 @@ namespace AssetsManager.Views.Models.Dialogs
             IsDashboardVisible = TreeModel.DashboardToggleChecked; // Set initial state
         }
 
-
-
         // Window Global State
         public bool IsLoading
         {
