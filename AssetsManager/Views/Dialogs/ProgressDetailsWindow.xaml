@@ -1,68 +1,76 @@
-<Window x:Class="AssetsManager.Views.Dialogs.ProgressDetailsWindow"
+<Controls:MetroWindow x:Class="AssetsManager.Views.Dialogs.ProgressDetailsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Background="Transparent"
-        Height="Auto" Width="600" 
+        Title="Progress Details" Height="Auto" Width="600" 
         SizeToContent="Height"
-        WindowStyle="None" AllowsTransparency="True"
         WindowStartupLocation="CenterOwner"
-        TextOptions.TextFormattingMode="Display" 
-        SnapsToDevicePixels="True"
-        UseLayoutRounding="True">
         
-    <Border Background="{StaticResource CardBackground}"
-            BorderBrush="{StaticResource BorderColor}"
-            BorderThickness="1"
-            CornerRadius="12"
-            Margin="12">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="25" ShadowDepth="10" Direction="270" Opacity="0.25" Color="Black"/>
-        </Border.Effect>
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        WindowTransitionsEnabled="False"
+        ShowTitleBar="False"
+        ShowMinButton="False"
+        ShowMaxRestoreButton="False"
+        ShowCloseButton="False"
+        GlowBrush="{x:Null}"
+        NonActiveGlowBrush="{x:Null}"
+        BorderThickness="0"
+        ResizeMode="CanResize"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
         
+    <Border Margin="5" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Background="{StaticResource SidebarBackground}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
+                <RowDefinition Height="*"/>    <!-- 1: Content -->
             </Grid.RowDefinitions>
 
-            <!-- Header -->
-            <Grid Grid.Row="0" Height="40" Margin="16,0,10,0" MouseLeftButtonDown="TitleBar_MouseDown" Background="Transparent">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <!-- 1. Custom Title Bar (HUD Style: 40px) -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="Black" Opacity="0.15" Direction="270"/>
+                </Border.Effect>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- Icon/Title -->
+                        <ColumnDefinition Width="*"/>    <!-- Spacer (Drag Area) -->
+                        <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
+                    </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" 
-                                                Width="18" Height="18" 
-                                                Foreground="{StaticResource AccentBrush}" 
-                                                VerticalAlignment="Center" 
-                                                Margin="0,0,10,0"/>
-                    <TextBlock Text="{Binding HeaderText}" 
-                               FontWeight="Normal" FontSize="13" 
-                               Foreground="{StaticResource TextPrimary}" 
-                               VerticalAlignment="Center"/>
-                </StackPanel>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
+                        <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" 
+                                                    Width="18" Height="18" 
+                                                    Foreground="{StaticResource AccentBrush}" 
+                                                    VerticalAlignment="Center" 
+                                                    Margin="0,0,10,0"/>
+                        <TextBlock Text="{Binding HeaderText}" 
+                                   FontWeight="Normal" FontSize="13" 
+                                   Foreground="{StaticResource TextPrimary}" 
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click" Width="34" Height="40">
-                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
-                    </Button>
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Width="34" Height="40">
-                        <materialIcons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
-                    </Button>
-                </StackPanel>
-            </Grid>
-            
-            <!-- Separator -->
-            <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Opacity="0.1"/>
+                    <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True" MouseLeftButtonDown="TitleBar_MouseDown"/>
 
-            <!-- Dark Body Area -->
-            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,12,12" Padding="0">
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click" Width="34" Height="40">
+                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
+                        </Button>
+                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click" Width="34" Height="40" Margin="0,0,2,0">
+                            <materialIcons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 2. Dark Body Area (With bottom rounding) -->
+            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,11" ClipToBounds="True">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
@@ -75,7 +83,7 @@
                             <!-- Technical Status Card -->
                             <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                 <StackPanel>
-                                    <!-- 1. Operation and Progress (e.g. Comparing: 1 of 30) -->
+                                    <!-- 1. Operation and Progress -->
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                         <TextBlock x:Name="VerbTextBlock" 
                                                    Text="{Binding OperationVerb}" 
@@ -93,7 +101,7 @@
                                                    FontFamily="Consolas"/>
                                     </StackPanel>
 
-                                    <!-- 2. Current File Name (Standalone and small) -->
+                                    <!-- 2. Current File Name -->
                                     <Grid Margin="0,0,0,12">
                                         <TextBlock x:Name="CurrentFileTextBlock" 
                                                    Text="..." 
@@ -103,7 +111,7 @@
                                                    FontWeight="Medium"/>
                                     </Grid>
 
-                                    <!-- 3. Visual Progress Bar (HUD Style) -->
+                                    <!-- 3. Visual Progress Bar -->
                                     <Grid Margin="0,0,0,12">
                                         <ProgressBar x:Name="MainProgressBar" 
                                                      Height="8" 
@@ -114,7 +122,7 @@
                                     
                                     <!-- 4. technical Data Area -->
                                     <StackPanel>
-                                        <!-- Sub-progress Row (Chunks/Assets) -->
+                                        <!-- Sub-progress Row -->
                                         <StackPanel x:Name="SubProgressRow" Orientation="Horizontal" Margin="0,0,0,10">
                                             <materialIcons:MaterialIcon Kind="ChartBubble" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                             <TextBlock x:Name="SubProgressTextBlock" 
@@ -151,4 +159,4 @@
             </Border>
         </Grid>
     </Border>
-</Window>
+</Controls:MetroWindow>
