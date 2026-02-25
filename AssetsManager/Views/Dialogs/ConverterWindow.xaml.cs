@@ -11,10 +11,11 @@ using AssetsManager.Utils;
 using AssetsManager.Views.Models.Home;
 using AssetsManager.Views.Models.Settings;
 using Microsoft.Win32;
+using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ConverterWindow : Window
+    public partial class ConverterWindow : MetroWindow
     {
         public ConverterModel ViewModel { get; set; }
         private readonly CustomMessageBoxService _customMessageBox;
@@ -37,8 +38,8 @@ namespace AssetsManager.Views.Dialogs
                 this.DragMove();
         }
 
-        private void Minimize_Click(object sender, RoutedEventArgs e) => this.WindowState = WindowState.Minimized;
-        private void Close_Click(object sender, RoutedEventArgs e) => this.Close();
+        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
 
         private void DropArea_DragEnter(object sender, DragEventArgs e)
         {

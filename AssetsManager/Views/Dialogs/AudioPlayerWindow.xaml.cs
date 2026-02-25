@@ -14,10 +14,12 @@ using System.Net.Http;
 using System.Linq;
 using VideoLibrary;
 using AssetsManager.Services.Core;
+using MahApps.Metro.Controls;
+using System.Windows.Input;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class AudioPlayerWindow : Window
+    public partial class AudioPlayerWindow : MetroWindow
     {
         private readonly AudioPlayerService _audioPlayerService;
         private readonly IServiceProvider _serviceProvider;
@@ -65,7 +67,6 @@ namespace AssetsManager.Views.Dialogs
                     if (url.Contains("youtube.com") || url.Contains("youtu.be"))
                     {
                         var youtube = YouTube.Default;
-                        // VideoLibrary handles the 403 bypass internally in v3.3.1
                         var video = await youtube.GetVideoAsync(url);
                         
                         if (video != null)
@@ -263,11 +264,17 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+        
         private void Close_Click(object sender, RoutedEventArgs e)
         {
             _mediaPlayer.Stop();
-            this.Close();
+            SystemCommands.CloseWindow(this);
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
     }
 }
