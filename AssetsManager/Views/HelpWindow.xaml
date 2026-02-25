@@ -15,7 +15,6 @@
         AllowsTransparency="True"
         WindowStyle="None"
         WindowTransitionsEnabled="False"
-        
         ShowTitleBar="False"
         ShowIconOnTitleBar="False"
         ShowMinButton="False"
@@ -27,8 +26,6 @@
         BorderThickness="0"
         
         ResizeMode="CanResize"
-        UseLayoutRounding="True"
-        SnapsToDevicePixels="True"
         FontFamily="{StaticResource AppFontFamily}">
 
     <Border Margin="5"

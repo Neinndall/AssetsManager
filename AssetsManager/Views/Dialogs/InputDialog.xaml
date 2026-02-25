@@ -10,18 +10,18 @@
         Title="Input" Height="Auto" Width="480"
         SizeToContent="Height" WindowStyle="None" AllowsTransparency="True" 
         WindowStartupLocation="CenterOwner" Background="Transparent"
-        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True"
-        
+        WindowTransitionsEnabled="False"
         ShowTitleBar="False"
         ShowIconOnTitleBar="False"
         ShowMinButton="False"
         ShowMaxRestoreButton="False"
         ShowCloseButton="False"
+        
         GlowBrush="{x:Null}"
         NonActiveGlowBrush="{x:Null}"
         BorderThickness="0"
-        ResizeMode="CanMinimize"
-        WindowTransitionsEnabled="False">
+        
+        ResizeMode="CanMinimize">
         
     <Border Margin="5" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Background="{StaticResource SidebarBackground}">
         <Grid>

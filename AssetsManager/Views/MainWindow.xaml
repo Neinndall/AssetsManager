@@ -24,12 +24,13 @@
         ShowMinButton="False"
         ShowMaxRestoreButton="False"
         ShowCloseButton="False"
+        
         GlowBrush="{x:Null}"
         NonActiveGlowBrush="{x:Null}"
         BorderThickness="0"
+        
         ResizeMode="CanResize"
-        UseLayoutRounding="True"
-        SnapsToDevicePixels="True"
+        WindowTransitionsEnabled="False"
         FontFamily="{StaticResource AppFontFamily}">
 
     <Border Margin="5"
