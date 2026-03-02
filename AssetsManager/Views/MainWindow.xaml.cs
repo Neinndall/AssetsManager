@@ -26,11 +26,11 @@ using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Viewer;
-using MahApps.Metro.Controls;
+using Wpf.Ui.Controls;
 
 namespace AssetsManager.Views
 {
-    public partial class MainWindow : MetroWindow
+    public partial class MainWindow : FluentWindow
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly LogService _logService;
@@ -497,14 +497,6 @@ namespace AssetsManager.Views
         {
             StateChanged -= MainWindow_StateChanged;
             TrayIcon?.Dispose();
-        }
-
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left)
-            {
-                this.DragMove();
-            }
         }
     }
 }

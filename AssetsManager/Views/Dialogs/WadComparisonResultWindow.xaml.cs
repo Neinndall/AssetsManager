@@ -25,11 +25,13 @@ using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Wad;
-using MahApps.Metro.Controls;
+using Wpf.Ui.Controls;
+using TextBox = System.Windows.Controls.TextBox;
+using MenuItem = System.Windows.Controls.MenuItem;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class WadComparisonResultWindow : MetroWindow
+    public partial class WadComparisonResultWindow : FluentWindow
     {
         private List<SerializableChunkDiff> _serializableDiffs;
         private readonly IServiceProvider _serviceProvider;
@@ -387,21 +389,6 @@ namespace AssetsManager.Views.Dialogs
                     viewDiffMenuItem.IsEnabled = true;
                 }
             }
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
-
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
-            else SystemCommands.MaximizeWindow(this);
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
     }
 }

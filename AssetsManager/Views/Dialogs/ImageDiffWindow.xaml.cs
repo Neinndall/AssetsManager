@@ -5,11 +5,11 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using MahApps.Metro.Controls;
+using Wpf.Ui.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ImageDiffWindow : MetroWindow
+    public partial class ImageDiffWindow : FluentWindow
     {
         private bool _isInitialized = false;
         private Point _lastMousePosition;
@@ -112,8 +112,8 @@ namespace AssetsManager.Views.Dialogs
 
         private void ImageDiffWindow_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            // Abort if the click comes from the title bar drag area
-            if (e.OriginalSource == TitleBarDragArea) return;
+            // Abort if the click comes from the title bar area (36px)
+            if (e.GetPosition(this).Y < 36) return;
 
             if (e.ChangedButton == MouseButton.Left || e.ChangedButton == MouseButton.Middle)
             {
@@ -235,21 +235,6 @@ namespace AssetsManager.Views.Dialogs
             NewImageOverlay.Source = null;
             DiffImageOverlay.Source = null;
             _diffMap = null;
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
-
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
-            else SystemCommands.MaximizeWindow(this);
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
     }
 }

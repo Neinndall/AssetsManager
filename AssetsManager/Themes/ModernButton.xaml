@@ -464,7 +464,7 @@
         </Style.Triggers>
     </Style>
 
-    <!-- [All Windows] Botones de control de ventana (Min/Max/Close) -->
+    <!-- [All Windows] Botones de control de ventana HUD (Refactorización definitiva) -->
     <Style x:Key="HUDWindowButtonStyle" TargetType="Button">
         <Setter Property="Width" Value="46"/>
         <Setter Property="Height" Value="40"/>
@@ -477,19 +477,38 @@
                     <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="8" Margin="1,2">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center">
                             <ContentPresenter.Resources>
-                                <!-- Iconos nativos de MahApps un poco más grandes -->
                                 <Style TargetType="Path">
-                                    <Setter Property="Width" Value="12"/>
-                                    <Setter Property="Height" Value="12"/>
+                                    <Setter Property="Width" Value="10"/>
+                                    <Setter Property="Height" Value="10"/>
                                     <Setter Property="Stretch" Value="Uniform"/>
                                 </Style>
                             </ContentPresenter.Resources>
                         </ContentPresenter>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <!-- Hover Estándar -->
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bg" Property="Background" Value="{StaticResource HoverColor}"/>
                         </Trigger>
+
+                        <!-- Especialización del Botón de CERRAR -->
+                        <!-- Detectamos por Command o por Nombre (cubriendo todas las versiones de MahApps) -->
+                        <Trigger Property="Name" Value="PART_Close">
+                            <Setter Property="Tag" Value="IsClose"/>
+                        </Trigger>
+                        
+                        <!-- Si el ratón está encima del botón de cerrar: Rojo + Redondeado de 11px -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="Name" Value="PART_Close"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Bg" Property="Background" Value="#E81123"/>
+                            <Setter TargetName="Bg" Property="CornerRadius" Value="0,11,0,0"/>
+                            <Setter TargetName="Bg" Property="Margin" Value="0,0,0,1"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </MultiTrigger>
+
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bg" Property="Opacity" Value="0.7"/>
                         </Trigger>

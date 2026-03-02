@@ -14,12 +14,12 @@ using System.Net.Http;
 using System.Linq;
 using VideoLibrary;
 using AssetsManager.Services.Core;
-using MahApps.Metro.Controls;
-using System.Windows.Input;
+using Wpf.Ui.Controls;
+using Button = System.Windows.Controls.Button;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class AudioPlayerWindow : MetroWindow
+    public partial class AudioPlayerWindow : FluentWindow
     {
         private readonly AudioPlayerService _audioPlayerService;
         private readonly IServiceProvider _serviceProvider;
@@ -262,19 +262,6 @@ namespace AssetsManager.Views.Dialogs
                     _audioPlayerService.Playlist.AddRange(itemsToAdd);
                 }
             }
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-        
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            _mediaPlayer.Stop();
-            SystemCommands.CloseWindow(this);
-        }
-
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
     }
 }

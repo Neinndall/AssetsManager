@@ -6,7 +6,6 @@
     <Version>3.2.1.0</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <UseWPF>true</UseWPF>
-    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
   <PropertyGroup>
     <Product>AssetsManager</Product>
@@ -37,6 +36,7 @@
     <PackageReference Include="VirtualizingWrapPanel" Version="2.3.2" />
     <PackageReference Include="WindowsAPICodePack" Version="8.0.14" />
     <PackageReference Include="WindowsAPICodePackShell" Version="8.0.14" />
+    <PackageReference Include="WPF-UI" Version="4.2.0" />
     <PackageReference Include="ZstdSharp.Port" Version="0.8.7" />
   </ItemGroup>
   

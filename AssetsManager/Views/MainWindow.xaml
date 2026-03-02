@@ -1,4 +1,4 @@
-<Controls:MetroWindow x:Class="AssetsManager.Views.MainWindow"
+<ui:FluentWindow x:Class="AssetsManager.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -8,7 +8,7 @@
         xmlns:dialogControls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:tb="http://www.hardcodet.net/taskbar"
-        xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+        xmlns:ui="clr-namespace:Wpf.Ui.Controls;assembly=Wpf.Ui"
         mc:Ignorable="d"
         Title="AssetsManager"
         Width="1100" Height="900"
@@ -16,41 +16,20 @@
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico"
         Background="Transparent"
-        AllowsTransparency="True"
-        WindowStyle="None"
-        ShowTitleBar="False"
-        ShowMinButton="True"
-        ShowMaxRestoreButton="True"
-        ShowCloseButton="True"
-        GlowBrush="{x:Null}"
-        NonActiveGlowBrush="{x:Null}"
-        BorderThickness="0"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
         
         ResizeMode="CanResize"
-        WindowTransitionsEnabled="False"
         FontFamily="{StaticResource AppFontFamily}">
 
-    <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="0" ResizeBorderThickness="5" GlassFrameThickness="0" CornerRadius="0"/>
-    </WindowChrome.WindowChrome>
-
-    <Controls:MetroWindow.WindowButtonCommands>
-        <Controls:WindowButtonCommands Visibility="Collapsed" />
-    </Controls:MetroWindow.WindowButtonCommands>
-
-    <Border Background="{StaticResource SidebarBackground}" 
-            BorderBrush="{StaticResource BorderColor}" 
-            BorderThickness="1">
+    <Border Background="{StaticResource SidebarBackground}">
         <Border.Style>
             <Style TargetType="Border">
-                <Setter Property="Margin" Value="5"/>
-                <Setter Property="CornerRadius" Value="12"/>
+                <Setter Property="CornerRadius" Value="8"/>
                 <Style.Triggers>
-                    <!-- Cuando la ventana está maximizada, quitamos el margen y el redondeado -->
+                    <!-- Cuando la ventana está maximizada, quitamos el redondeado -->
                     <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
-                        <Setter Property="Margin" Value="0"/>
                         <Setter Property="CornerRadius" Value="0"/>
-                        <Setter Property="BorderThickness" Value="0"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -61,8 +40,8 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Title Bar -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
+            <!-- Modern Title Bar (WPF-UI) -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -70,16 +49,18 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
+                    
                     <Image Grid.Column="0" Source="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" Width="18" Height="18" Margin="15,0,0,0" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" Text="AssetsManager" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                    <Rectangle Grid.Column="2" Fill="Transparent" IsHitTestVisible="True" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
                     
-                    <!-- Botones HUD de la librería (Ocupando los 40px de alto para una selección perfecta) -->
-                    <Controls:WindowButtonCommands Grid.Column="3" Height="40" Margin="0,0,5,0" Panel.ZIndex="11">
-                        <Controls:WindowButtonCommands.Resources>
-                            <Style TargetType="Button" BasedOn="{StaticResource HUDWindowButtonStyle}"/>
-                        </Controls:WindowButtonCommands.Resources>
-                    </Controls:WindowButtonCommands>
+                    <!-- Title Bar Control handles dragging, maximize, minimize and close -->
+                    <ui:TitleBar Grid.Column="2" Grid.ColumnSpan="2" 
+                                 Title="" 
+                                 Icon="{x:Null}"
+                                 Height="36"
+                                 Padding="0"
+                                 VerticalAlignment="Stretch"
+                                 Background="Transparent"/>
                 </Grid>
             </Border>
 
@@ -174,4 +155,4 @@
             </tb:TaskbarIcon>
         </Grid>
     </Border>
-</Controls:MetroWindow>
+</ui:FluentWindow>
