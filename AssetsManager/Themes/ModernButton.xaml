@@ -465,6 +465,40 @@
     </Style>
 
     <!-- [All Windows] Botones de control de ventana (Min/Max/Close) -->
+    <Style x:Key="HUDWindowButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="46"/>
+        <Setter Property="Height" Value="40"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="8" Margin="1,2">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <ContentPresenter.Resources>
+                                <!-- Iconos nativos de MahApps un poco más grandes -->
+                                <Style TargetType="Path">
+                                    <Setter Property="Width" Value="12"/>
+                                    <Setter Property="Height" Value="12"/>
+                                    <Setter Property="Stretch" Value="Uniform"/>
+                                </Style>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource HoverColor}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bg" Property="Opacity" Value="0.7"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="TitleBarButtonStyle" TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">

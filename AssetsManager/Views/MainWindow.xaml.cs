@@ -499,22 +499,6 @@ namespace AssetsManager.Views
             TrayIcon?.Dispose();
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            SystemCommands.CloseWindow(this);
-        }
-
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
-            else SystemCommands.MaximizeWindow(this);
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            SystemCommands.MinimizeWindow(this);
-        }
-
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton == MouseButton.Left)

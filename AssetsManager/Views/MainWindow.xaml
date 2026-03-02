@@ -19,9 +19,9 @@
         AllowsTransparency="True"
         WindowStyle="None"
         ShowTitleBar="False"
-        ShowMinButton="False"
-        ShowMaxRestoreButton="False"
-        ShowCloseButton="False"
+        ShowMinButton="True"
+        ShowMaxRestoreButton="True"
+        ShowCloseButton="True"
         GlowBrush="{x:Null}"
         NonActiveGlowBrush="{x:Null}"
         BorderThickness="0"
@@ -30,11 +30,31 @@
         WindowTransitionsEnabled="False"
         FontFamily="{StaticResource AppFontFamily}">
 
-    <Border Margin="5"
-            CornerRadius="12" 
-            Background="{StaticResource SidebarBackground}" 
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="5" GlassFrameThickness="0" CornerRadius="0"/>
+    </WindowChrome.WindowChrome>
+
+    <Controls:MetroWindow.WindowButtonCommands>
+        <Controls:WindowButtonCommands Visibility="Collapsed" />
+    </Controls:MetroWindow.WindowButtonCommands>
+
+    <Border Background="{StaticResource SidebarBackground}" 
             BorderBrush="{StaticResource BorderColor}" 
             BorderThickness="1">
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Margin" Value="5"/>
+                <Setter Property="CornerRadius" Value="12"/>
+                <Style.Triggers>
+                    <!-- Cuando la ventana está maximizada, quitamos el margen y el redondeado -->
+                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="CornerRadius" Value="0"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -53,17 +73,13 @@
                     <Image Grid.Column="0" Source="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" Width="18" Height="18" Margin="15,0,0,0" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" Text="AssetsManager" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     <Rectangle Grid.Column="2" Fill="Transparent" IsHitTestVisible="True" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
-                    <StackPanel Grid.Column="3" Orientation="Horizontal">
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="34" Height="40">
-                            <icons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
-                        </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Maximize_Click" Width="34" Height="40">
-                            <icons:MaterialIcon Kind="WindowMaximize" Width="15" Height="15"/>
-                        </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="34" Height="40" Margin="0,0,2,0">
-                            <icons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
-                        </Button>
-                    </StackPanel>
+                    
+                    <!-- Botones HUD de la librería (Ocupando los 40px de alto para una selección perfecta) -->
+                    <Controls:WindowButtonCommands Grid.Column="3" Height="40" Margin="0,0,5,0" Panel.ZIndex="11">
+                        <Controls:WindowButtonCommands.Resources>
+                            <Style TargetType="Button" BasedOn="{StaticResource HUDWindowButtonStyle}"/>
+                        </Controls:WindowButtonCommands.Resources>
+                    </Controls:WindowButtonCommands>
                 </Grid>
             </Border>
 
