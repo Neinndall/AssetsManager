@@ -129,7 +129,7 @@
                             <ColumnDefinition Width="45"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="CurrentTimeText" Text="0:00" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-                        <Slider x:Name="AudioSlider" Grid.Column="1" Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center" 
+                        <Slider x:Name="AudioSlider" Style="{StaticResource HUDSliderStyle}" Grid.Column="1" Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center" 
                                 Thumb.DragStarted="AudioSlider_DragStarted" Thumb.DragCompleted="AudioSlider_DragCompleted" ValueChanged="AudioSlider_ValueChanged"/>
                         <TextBlock x:Name="TotalTimeText" Text="0:00" Grid.Column="2" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
                     </Grid>
@@ -173,7 +173,7 @@
                         <StackPanel Orientation="Horizontal">
                             <icons:MaterialIcon Kind="{Binding IsMuted, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='VolumeMute,VolumeMedium'}" 
                                                 Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <Slider x:Name="VolumeSlider" Width="120" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
+                            <Slider x:Name="VolumeSlider" Style="{StaticResource HUDSliderStyle}" Width="120" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
                             <TextBlock Text="{Binding Value, ElementName=VolumeSlider, StringFormat={}{0:P0}}" 
                                        FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0" Width="30"/>
                         </StackPanel>

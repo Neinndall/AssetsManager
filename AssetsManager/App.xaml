@@ -16,6 +16,7 @@
                 <ResourceDictionary Source="/Themes/ModernBorder.xaml"/>
                 <ResourceDictionary Source="/Themes/ModernCheckBox.xaml"/>
                 <ResourceDictionary Source="/Themes/ModernTextBox.xaml"/>
+                <ResourceDictionary Source="/Themes/ModernSlider.xaml"/>
                 <ResourceDictionary Source="/Themes/ModernComboBox.xaml"/>
                 <ResourceDictionary Source="/Themes/ModernMenu.xaml"/>
                 <ResourceDictionary Source="/Themes/ModernProgressBar.xaml"/>
