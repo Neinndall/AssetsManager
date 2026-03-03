@@ -1,13 +1,11 @@
 using System;
 using System.Windows;
-using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views.Help;
-using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views
 {
-    public partial class HelpWindow : MetroWindow
+    public partial class HelpWindow : Window
     {
         private readonly IServiceProvider _serviceProvider;
 
@@ -50,7 +48,7 @@ namespace AssetsManager.Views
             NavUpdates.Checked -= NavUpdates_Checked;
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
         private void Maximize_Click(object sender, RoutedEventArgs e)
         {
@@ -59,10 +57,5 @@ namespace AssetsManager.Views
         }
 
         private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left) this.DragMove();
-        }
     }
 }

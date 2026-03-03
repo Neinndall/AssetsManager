@@ -6,10 +6,6 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- WPF-UI Resources (Modern Windows 11 Style) -->
-                <ResourceDictionary Source="pack://application:,,,/Wpf.Ui;component/Resources/Theme/Dark.xaml" />
-                <ResourceDictionary Source="pack://application:,,,/Wpf.Ui;component/Resources/Wpf.Ui.xaml" />
-
                 <!-- App Themes -->
                 <ResourceDictionary Source="/Themes/Font.xaml"/>
                 <ResourceDictionary Source="/Themes/Colors.xaml"/>

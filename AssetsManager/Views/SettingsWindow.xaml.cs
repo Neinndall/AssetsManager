@@ -1,12 +1,10 @@
 using System;
 using System.Windows;
-using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Settings;
 using Microsoft.Extensions.DependencyInjection;
-using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views
 {
@@ -15,7 +13,7 @@ namespace AssetsManager.Views
         public bool WasResetToDefaults { get; set; }
     }
 
-    public partial class SettingsWindow : MetroWindow
+    public partial class SettingsWindow : Window
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly AppSettings _appSettings;
@@ -97,7 +95,7 @@ namespace AssetsManager.Views
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = false });
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
         private void Maximize_Click(object sender, RoutedEventArgs e)
         {
@@ -106,10 +104,5 @@ namespace AssetsManager.Views
         }
 
         private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left) this.DragMove();
-        }
     }
 }
