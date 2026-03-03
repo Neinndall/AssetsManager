@@ -25,13 +25,12 @@ using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Wad;
-using Wpf.Ui.Controls;
 using TextBox = System.Windows.Controls.TextBox;
 using MenuItem = System.Windows.Controls.MenuItem;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class WadComparisonResultWindow : FluentWindow
+    public partial class WadComparisonResultWindow : Window
     {
         private List<SerializableChunkDiff> _serializableDiffs;
         private readonly IServiceProvider _serviceProvider;
@@ -390,5 +389,15 @@ namespace AssetsManager.Views.Dialogs
                 }
             }
         }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
     }
 }
