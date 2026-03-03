@@ -26,7 +26,6 @@ using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Viewer;
-using Wpf.Ui.Controls;
 
 namespace AssetsManager.Views
 {
@@ -497,12 +496,6 @@ namespace AssetsManager.Views
         {
             StateChanged -= MainWindow_StateChanged;
             TrayIcon?.Dispose();
-        }
-
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ClickCount == 2) MaximizeButton_Click(null, null);
-            else if (e.LeftButton == MouseButtonState.Pressed) DragMove();
         }
 
         private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);

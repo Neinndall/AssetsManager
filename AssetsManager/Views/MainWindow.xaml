@@ -69,8 +69,7 @@
                     <Image Grid.Column="0" Source="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" Width="18" Height="18" Margin="15,0,0,0" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" Text="AssetsManager" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                     
-                    <Rectangle Grid.Column="2" Fill="Transparent" IsHitTestVisible="True"/>
-
+                    <!-- HUD Window Controls -->
                     <StackPanel Grid.Column="3" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="MinimizeButton_Click">
                             <icons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
@@ -90,7 +89,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Sidebar (Bottom-Left Rounding) -->
+                <!-- Sidebar -->
                 <Border Grid.Column="0" Background="{StaticResource SidebarBackground}">
                     <Border.Style>
                         <Style TargetType="Border">
@@ -141,7 +140,7 @@
                         <controls:LogView x:Name="LogView" StatusText="{Binding ViewModel.StatusText, ElementName=StatusBar}"/>
                     </Border>
                     
-                    <!-- StatusBar (Bottom-Right Rounding) -->
+                    <!-- StatusBar -->
                     <Border Grid.Row="3" Background="{StaticResource SidebarBackground}" ClipToBounds="True">
                         <Border.Style>
                             <Style TargetType="Border">
