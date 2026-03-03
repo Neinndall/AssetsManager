@@ -543,11 +543,50 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bg" Property="Background" Value="{StaticResource HoverColor}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bg" Property="Opacity" Value="0.7"/>
                         </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- [HUD Windows] Botón de maximizar cuadrado HUD -->
+    <Style x:Key="HUDTitleBarMaximizeButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Width" Value="46"/>
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Content">
+            <Setter.Value>
+                <materialIcons:MaterialIcon Kind="WindowMaximize" Width="14" Height="14"/>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource HoverColor}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bg" Property="Opacity" Value="0.7"/>
+                        </Trigger>
+                        <!-- Cambio dinámico de icono basado en el estado de la ventana -->
+                        <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                            <Setter Property="Content">
+                                <Setter.Value>
+                                    <materialIcons:MaterialIcon Kind="WindowRestore" Width="14" Height="14"/>
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

@@ -30,7 +30,7 @@ using Wpf.Ui.Controls;
 
 namespace AssetsManager.Views
 {
-    public partial class MainWindow : FluentWindow
+    public partial class MainWindow : Window
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly LogService _logService;
@@ -498,5 +498,21 @@ namespace AssetsManager.Views
             StateChanged -= MainWindow_StateChanged;
             TrayIcon?.Dispose();
         }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2) MaximizeButton_Click(null, null);
+            else if (e.LeftButton == MouseButtonState.Pressed) DragMove();
+        }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
     }
 }
