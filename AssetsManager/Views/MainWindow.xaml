@@ -18,7 +18,6 @@
         Background="Transparent"
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica"
-        
         ResizeMode="CanResize"
         FontFamily="{StaticResource AppFontFamily}">
 

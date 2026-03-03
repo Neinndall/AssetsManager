@@ -1,10 +1,9 @@
 using System.Windows;
 using System.Windows.Input;
-using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class InputDialog : MetroWindow
+    public partial class InputDialog : Window
     {
         public string InputText
         {
@@ -31,9 +30,12 @@ namespace AssetsManager.Views.Dialogs
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ChangedButton == MouseButton.Left) this.DragMove();
+            if (e.ClickCount == 1) DragMove();
         }
 
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            SystemCommands.MinimizeWindow(this);
+        }
     }
 }

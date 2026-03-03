@@ -20,7 +20,7 @@ namespace AssetsManager.Views.Dialogs
         OK
     }
 
-    public partial class ConfirmationDialog : FluentWindow
+    public partial class ConfirmationDialog : Window
     {
         public ConfirmationDialog()
         {
@@ -64,6 +64,16 @@ namespace AssetsManager.Views.Dialogs
                     iconType.Visibility = Visibility.Collapsed;
                     break;
             }
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 1) DragMove();
+        }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            SystemCommands.MinimizeWindow(this);
         }
 
         private void btnYes_Click(object sender, RoutedEventArgs e) => DialogResult = true;
