@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
 using AssetsManager.Services.Audio;
 using AssetsManager.Views.Models.Dialogs;
 using System.Windows.Threading;
@@ -14,12 +15,11 @@ using System.Net.Http;
 using System.Linq;
 using VideoLibrary;
 using AssetsManager.Services.Core;
-using Wpf.Ui.Controls;
 using Button = System.Windows.Controls.Button;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class AudioPlayerWindow : FluentWindow
+    public partial class AudioPlayerWindow : Window
     {
         private readonly AudioPlayerService _audioPlayerService;
         private readonly IServiceProvider _serviceProvider;
@@ -263,5 +263,8 @@ namespace AssetsManager.Views.Dialogs
                 }
             }
         }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+        private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
     }
 }

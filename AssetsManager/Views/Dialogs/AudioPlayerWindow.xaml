@@ -1,53 +1,63 @@
-<ui:FluentWindow x:Class="AssetsManager.Views.Dialogs.AudioPlayerWindow"
+<Window x:Class="AssetsManager.Views.Dialogs.AudioPlayerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        xmlns:ui="clr-namespace:Wpf.Ui.Controls;assembly=Wpf.Ui"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Title="Audio Player" Height="600" Width="400"
+        Title="Audio Player" Height="600" Width="440"
         MinWidth="350" MinHeight="500"
         WindowStartupLocation="CenterOwner"
-        
         Background="Transparent"
-        ExtendsContentIntoTitleBar="True"
-        WindowBackdropType="Mica"
-        
+        AllowsTransparency="True"
+        WindowStyle="None"
         ResizeMode="CanResize"
-        UseLayoutRounding="True"
-        SnapsToDevicePixels="True"
         AllowDrop="True" Drop="Window_Drop">
 
-    <Border CornerRadius="8" Background="{StaticResource SidebarBackground}">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="36" 
+                      ResizeBorderThickness="8" 
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" />
+    </WindowChrome.WindowChrome>
+
+    <!-- Borde Principal HUD con Sombra -->
+    <Border Margin="10" Background="{StaticResource SidebarBackground}" 
+            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
+            CornerRadius="12">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="15" ShadowDepth="2" Color="Black" Opacity="0.4"/>
+        </Border.Effect>
+        
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> <!-- Title Bar -->
-                <RowDefinition Height="*"/>    <!-- Playlist -->
-                <RowDefinition Height="Auto"/> <!-- Player Controls -->
+                <RowDefinition Height="Auto"/> <!-- 0: Title Bar -->
+                <RowDefinition Height="*"/>    <!-- 1: Playlist -->
+                <RowDefinition Height="Auto"/> <!-- 2: Player Controls -->
             </Grid.RowDefinitions>
 
-            <!-- 1. Modern Title Bar (WPF-UI) -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
+            <!-- 1. Custom Title Bar (HUD Style 36px) -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10" ClipToBounds="True">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/> <!-- Icon -->
                         <ColumnDefinition Width="Auto"/> <!-- Title -->
-                        <ColumnDefinition Width="*"/>    <!-- Drag Area -->
+                        <ColumnDefinition Width="*"/>    <!-- Spacer -->
                         <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
                     </Grid.ColumnDefinitions>
 
                     <icons:MaterialIcon Grid.Column="0" Kind="Waveform" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="15,0,0,0" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" Text="Audio Player" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
 
-                    <ui:TitleBar Grid.Column="2" Grid.ColumnSpan="2" 
-                                 Title="" 
-                                 Icon="{x:Null}"
-                                 Height="36"
-                                 Padding="0"
-                                 VerticalAlignment="Stretch"
-                                 Background="Transparent"
-                                 ShowMaximize="False"/>
+                    <!-- HUD Window Controls -->
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="MinimizeButton_Click">
+                            <icons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
+                        </Button>
+                        <Button x:Name="PART_Close" Style="{StaticResource HUDTitleBarCloseButtonStyle}" Click="CloseButton_Click">
+                            <icons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -100,8 +110,8 @@
                 </Grid>
             </Grid>
 
-            <!-- 3. Player Controls Area (Pro HUD Redesign) -->
-            <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,20">
+            <!-- 3. Player Controls Area -->
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,20" ClipToBounds="True">
                 <StackPanel>
                     <!-- Row 1: Now Playing Info -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,15">
@@ -111,7 +121,7 @@
                                    TextTrimming="CharacterEllipsis" MaxWidth="300" VerticalAlignment="Center"/>
                     </StackPanel>
                     
-                    <!-- Row 2: Timeline (Minimalist) -->
+                    <!-- Row 2: Timeline -->
                     <Grid Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="45"/>
@@ -133,11 +143,11 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- Secondary: Add URL -->
-                        <Button HorizontalAlignment="Left" Style="{StaticResource TitleBarButtonStyle}" Click="AddUrl_Click" ToolTip="Add YouTube URL" Width="34" Height="34">
+                        <Button HorizontalAlignment="Left" Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="AddUrl_Click" ToolTip="Add YouTube URL" Width="34" Height="34">
                             <icons:MaterialIcon Kind="Youtube" Width="20" Height="20" Foreground="#FFFF0000"/>
                         </Button>
 
-                        <!-- Primary: Playback (All 38px) -->
+                        <!-- Primary: Playback -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
                             <Button Style="{StaticResource IconButton}" Background="White" Width="38" Height="38" Click="SkipBackward_Click">
                                 <icons:MaterialIcon Kind="SkipPrevious" Width="20" Height="20" Foreground="{StaticResource SidebarBackground}"/>
@@ -153,12 +163,12 @@
                         </StackPanel>
                         
                         <!-- Secondary: Clear -->
-                        <Button Grid.Column="2" HorizontalAlignment="Right" Style="{StaticResource TitleBarButtonStyle}" Click="ClearPlaylist_Click" ToolTip="Clear Playlist" Width="34" Height="34">
+                        <Button Grid.Column="2" HorizontalAlignment="Right" Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="ClearPlaylist_Click" ToolTip="Clear Playlist" Width="34" Height="34">
                             <icons:MaterialIcon Kind="DeleteSweepOutline" Width="20" Height="20" Foreground="{StaticResource TextMuted}"/>
                         </Button>
                     </Grid>
 
-                    <!-- Row 4: Volume (Compact & Centered) -->
+                    <!-- Row 4: Volume -->
                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="15" Padding="12,4" Margin="0,20,0,0" HorizontalAlignment="Center" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
                             <icons:MaterialIcon Kind="{Binding IsMuted, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='VolumeMute,VolumeMedium'}" 
@@ -172,4 +182,4 @@
             </Border>
         </Grid>
     </Border>
-</ui:FluentWindow>
+</Window>
