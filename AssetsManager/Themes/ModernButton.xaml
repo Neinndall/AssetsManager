@@ -601,11 +601,13 @@
         <Setter Property="Width" Value="46"/>
         <Setter Property="Height" Value="36"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <!-- Forzamos el redondeado de la esquina superior derecha directamente en el estilo -->
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="0,11,0,0">
+                    <!-- Forzamos el redondeado de la esquina superior derecha directamente en el estilo (11px para encajar en marco de 12px) -->
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="0,11,0,0" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
