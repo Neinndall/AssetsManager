@@ -12,11 +12,10 @@ using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Services.Core;
-using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ImageMergerWindow : MetroWindow
+    public partial class ImageMergerWindow : Window
     {
         public ImageMergerModel ViewModel { get; set; }
         private readonly CustomMessageBoxService _customMessageBox;
@@ -191,8 +190,8 @@ namespace AssetsManager.Views.Dialogs
             var item = (sender as Button)?.Tag as ImageMergerItem;
             if (item == null) return;
 
-            int index = ViewModel.Items.IndexOf(item);
-            if (index < ViewModel.Items.Count - 1)
+            int index = ViewModel.Items.Count > 0 ? ViewModel.Items.IndexOf(item) : -1;
+            if (index != -1 && index < ViewModel.Items.Count - 1)
             {
                 _imageMergerService.Items.Move(index, index + 1);
             }
@@ -237,13 +236,14 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+        private void Maximize_Click(object sender, RoutedEventArgs e)
         {
-            if (e.ChangedButton == MouseButton.Left) this.DragMove();
+            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
-
-        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
     }
 }

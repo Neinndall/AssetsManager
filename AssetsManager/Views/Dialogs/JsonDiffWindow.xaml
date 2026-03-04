@@ -1,4 +1,4 @@
-<Controls:MetroWindow x:Class="AssetsManager.Views.Dialogs.JsonDiffWindow"
+<Window x:Class="AssetsManager.Views.Dialogs.JsonDiffWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,22 +6,12 @@
         xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:localUtils="clr-namespace:AssetsManager.Utils"
-        xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Title="Difference Viewer" Height="900" Width="1400" MinHeight="900" MinWidth="1400"
         WindowStartupLocation="CenterScreen"
-        
         Background="Transparent"
         AllowsTransparency="True"
         WindowStyle="None"
-        WindowTransitionsEnabled="False"
-        ShowTitleBar="False"
-        ShowMinButton="False"
-        ShowMaxRestoreButton="False"
-        ShowCloseButton="False"
-        GlowBrush="{x:Null}"
-        NonActiveGlowBrush="{x:Null}"
-        BorderThickness="0"
         ResizeMode="CanResize"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
@@ -31,7 +21,21 @@
         <KeyBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Key="Up" Modifiers="Alt" />
     </Window.InputBindings>
 
-    <Border Margin="5" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Background="{StaticResource SidebarBackground}">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="36" 
+                      ResizeBorderThickness="8" 
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" />
+    </WindowChrome.WindowChrome>
+
+    <!-- Borde Principal HUD con Sombra -->
+    <Border Margin="10" Background="{StaticResource SidebarBackground}" 
+            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
+            CornerRadius="12">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="15" ShadowDepth="2" Color="Black" Opacity="0.4"/>
+        </Border.Effect>
+        
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
@@ -39,15 +43,12 @@
                 <RowDefinition Height="Auto"/> <!-- 2: Status Bar -->
             </Grid.RowDefinitions>
 
-            <!-- 1. Custom Title Bar (HUD Style: 40px) -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="40" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="Black" Opacity="0.15" Direction="270"/>
-                </Border.Effect>
+            <!-- 1. Custom Title Bar (HUD Style: 36px) -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10" ClipToBounds="True">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/> <!-- Icon/Title -->
-                        <ColumnDefinition Width="*"/>    <!-- Spacer (Drag Area) -->
+                        <ColumnDefinition Width="*"/>    <!-- Spacer -->
                         <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
                     </Grid.ColumnDefinitions>
 
@@ -56,17 +57,14 @@
                         <TextBlock Text="Text Comparison" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
-
-                    <StackPanel Grid.Column="2" Orientation="Horizontal">
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Minimize_Click" Width="34" Height="40">
-                            <icons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
+                    <!-- HUD Window Controls -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="MinimizeButton_Click">
+                            <icons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
                         </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Maximize_Click" Width="34" Height="40">
-                            <icons:MaterialIcon Kind="WindowMaximize" Width="15" Height="15"/>
-                        </Button>
-                        <Button Style="{StaticResource TitleBarButtonStyle}" Click="Close_Click" Width="34" Height="40" Margin="0,0,2,0">
-                            <icons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
+                        <Button Style="{StaticResource HUDTitleBarMaximizeButtonStyle}" Click="MaximizeButton_Click"/>
+                        <Button x:Name="PART_Close" Style="{StaticResource HUDTitleBarCloseButtonStyle}" Click="CloseButton_Click">
+                            <icons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -78,7 +76,7 @@
             </Grid>
 
             <!-- 3. Slim Status Bar (With bottom rounding) -->
-            <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,6" CornerRadius="0,0,11,11">
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,6" CornerRadius="0,0,11,11" ClipToBounds="True">
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <icons:MaterialIcon Kind="KeyboardOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
@@ -95,4 +93,4 @@
             </Border>
         </Grid>
     </Border>
-</Controls:MetroWindow>
+</Window>
