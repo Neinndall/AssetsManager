@@ -392,6 +392,13 @@ namespace AssetsManager.Services.Explorer
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // If user wants the original format, we don't load or convert the texture
+            if (_appSettings.ImageExportFormat == ImageExportFormat.Original)
+            {
+                await HandleRawFileExtractionAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                return;
+            }
+
             var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null)
             {
