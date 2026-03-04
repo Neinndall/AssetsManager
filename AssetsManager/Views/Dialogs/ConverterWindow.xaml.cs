@@ -11,11 +11,10 @@ using AssetsManager.Utils;
 using AssetsManager.Views.Models.Home;
 using AssetsManager.Views.Models.Settings;
 using Microsoft.Win32;
-using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ConverterWindow : MetroWindow
+    public partial class ConverterWindow : Window
     {
         public ConverterModel ViewModel { get; set; }
         private readonly CustomMessageBoxService _customMessageBox;
@@ -32,14 +31,8 @@ namespace AssetsManager.Views.Dialogs
             this.DataContext = ViewModel;
         }
 
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-                this.DragMove();
-        }
-
         private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-        private void Close_Click(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
         private void DropArea_DragEnter(object sender, DragEventArgs e)
         {
@@ -162,7 +155,7 @@ namespace AssetsManager.Views.Dialogs
                                     await ProcessAudioItem(item, destinationPath);
                                 }
                             }
-                            catch
+                            catch (Exception)
                             {
                                 item.Status = "Error";
                             }
