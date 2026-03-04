@@ -54,7 +54,7 @@
                     <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
 
                     <!-- Botones HUD centralizados -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="MinimizeButton_Click">
                             <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
                         </Button>
