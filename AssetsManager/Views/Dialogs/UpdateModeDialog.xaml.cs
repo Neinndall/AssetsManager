@@ -1,6 +1,4 @@
 using System.Windows;
-using System.Windows.Input;
-using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -11,7 +9,7 @@ namespace AssetsManager.Views.Dialogs
         CleanWithSaving
     }
 
-    public partial class UpdateModeDialog : MetroWindow
+    public partial class UpdateModeDialog : Window
     {
         public UpdateMode SelectedMode { get; private set; } = UpdateMode.None;
 
@@ -35,11 +33,6 @@ namespace AssetsManager.Views.Dialogs
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
-        }
-
-        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left) this.DragMove();
         }
 
         private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
