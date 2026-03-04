@@ -1,19 +1,13 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
-using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using System.Threading;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using MahApps.Metro.Controls;
-using System.Linq;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ProgressDetailsWindow : MetroWindow
+    public partial class ProgressDetailsWindow : Window
     {
         private readonly LogService _logService;
         private DateTime _startTime;
@@ -183,11 +177,6 @@ namespace AssetsManager.Views.Dialogs
             _timer?.Stop();
             _timer.Tick -= Timer_Tick;
             base.OnClosing(e);
-        }
-
-        private void TitleBar_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == System.Windows.Input.MouseButton.Left) this.DragMove();
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
