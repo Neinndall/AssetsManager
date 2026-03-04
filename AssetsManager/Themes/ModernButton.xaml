@@ -553,7 +553,7 @@
         </Setter>
     </Style>
 
-    <!-- [HUD Windows] Botón de maximizar cuadrado HUD -->
+    <!-- [HUD Windows] Botón de maximizar cuadrado HUD (Fix: Inmune a pérdida de foco entre ventanas) -->
     <Style x:Key="HUDTitleBarMaximizeButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
@@ -561,16 +561,16 @@
         <Setter Property="Width" Value="46"/>
         <Setter Property="Height" Value="36"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Content">
-            <Setter.Value>
-                <materialIcons:MaterialIcon Kind="WindowMaximize" Width="14" Height="14"/>
-            </Setter.Value>
-        </Setter>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Bg" Background="{TemplateBinding Background}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Grid>
+                            <!-- Icono Maximizar (Por defecto) -->
+                            <materialIcons:MaterialIcon x:Name="MaximizeIcon" Kind="WindowMaximize" Width="14" Height="14" Visibility="Visible"/>
+                            <!-- Icono Restaurar (Oculto por defecto) -->
+                            <materialIcons:MaterialIcon x:Name="RestoreIcon" Kind="WindowRestore" Width="14" Height="14" Visibility="Collapsed"/>
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -579,13 +579,11 @@
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bg" Property="Opacity" Value="0.7"/>
                         </Trigger>
-                        <!-- Cambio dinámico de icono basado en el estado de la ventana -->
-                        <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
-                            <Setter Property="Content">
-                                <Setter.Value>
-                                    <materialIcons:MaterialIcon Kind="WindowRestore" Width="14" Height="14"/>
-                                </Setter.Value>
-                            </Setter>
+                        
+                        <!-- Cambio de Icono según el estado de la ventana (Sin compartir visuales) -->
+                        <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}}" Value="Maximized">
+                            <Setter TargetName="MaximizeIcon" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="RestoreIcon" Property="Visibility" Value="Visible"/>
                         </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -735,13 +733,12 @@
                                 CornerRadius="12"/>
 
                         <!-- 2. Content Layer (Fixed) -->
-                        <!-- 2. Content Layer (Fixed) -->
                         <Border Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
                                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
 
-                        <!-- 3. Border Overlay (Changes thickness to 1.5 without moving content) -->
+                        <!-- 3. Border Overlay -->
                         <Border x:Name="CardBorder"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
@@ -781,9 +778,7 @@
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <!-- Red Tint Background -->
                             <Setter TargetName="BackgroundBorder" Property="Background" Value="#1AFF0000"/> 
-                            <!-- Red Border -->
                             <Setter TargetName="CardBorder" Property="BorderBrush" Value="{StaticResource AccentRed}"/>
                             <Setter TargetName="CardBorder" Property="BorderThickness" Value="1.5"/>
                         </Trigger>
@@ -849,20 +844,15 @@
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
                     <Grid>
-                        <!-- Layer 1: Main background and base border -->
                         <Border x:Name="BackgroundBorder"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="12"/>
-
-                        <!-- Layer 2: Hover/Focus Border (overlays without shifting content) -->
                         <Border x:Name="HoverBorder"
                                 CornerRadius="12"
                                 BorderBrush="Transparent"
                                 BorderThickness="1.5"/>
-
-                        <!-- Layer 3: Content -->
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
                     </Grid>
                     <ControlTemplate.Triggers>
