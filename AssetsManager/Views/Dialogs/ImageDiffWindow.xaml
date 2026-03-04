@@ -187,6 +187,7 @@
                                     <TextBlock Text="OLD" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
                                     <Slider x:Name="OverlaySlider" Width="120" Minimum="0" Maximum="100" Value="50" 
                                             VerticalAlignment="Center" Margin="0"
+                                            Style="{StaticResource HUDSliderStyle}"
                                             ValueChanged="OverlaySlider_ValueChanged"
                                             IsMoveToPointEnabled="True"/>
                                     <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="8,0,8,0" Opacity="0.8"/>
