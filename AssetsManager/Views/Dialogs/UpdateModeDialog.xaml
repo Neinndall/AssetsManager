@@ -11,7 +11,7 @@
         Background="Transparent"
         AllowsTransparency="True"
         WindowStyle="None"
-        ResizeMode="CanMinimize"
+        ResizeMode="NoResize"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
 
@@ -29,7 +29,8 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
-                <RowDefinition Height="*"/>    <!-- 1: Body -->
+                <RowDefinition Height="*"/>    <!-- 1: Body (Info & Options) -->
+                <RowDefinition Height="Auto"/> <!-- 2: Footer Area -->
             </Grid.RowDefinitions>
 
             <!-- 1. Custom Title Bar (HUD Style: 36px) -->
@@ -42,17 +43,10 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
-                        <materialIcons:MaterialIcon x:Name="iconType" Kind="Update" 
-                                                    Foreground="{StaticResource AccentBrush}" 
-                                                    Width="18" Height="18" Margin="0,0,10,0"
-                                                    VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" 
-                                   FontWeight="Normal" FontSize="13" 
-                                   Foreground="{StaticResource TextPrimary}" 
-                                   VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="Update" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Update Selection" FontWeight="Normal" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- Drag Area -->
                     <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True"/>
 
                     <!-- HUD Window Controls -->
@@ -60,90 +54,76 @@
                         <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="MinimizeButton_Click">
                             <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
                         </Button>
-                        <Button Style="{StaticResource HUDTitleBarCloseButtonStyle}" Click="CancelButton_Click">
+                        <Button x:Name="PART_Close" Style="{StaticResource HUDTitleBarCloseButtonStyle}" Click="CancelButton_Click">
                             <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
                         </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- 2. Dark Body Area (With bottom rounding) -->
-            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,11" ClipToBounds="True">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Options Content -->
-                    <Grid Grid.Row="0" Margin="24">
-                        <StackPanel>
-                            <TextBlock Text="Choose Update Method" Foreground="{StaticResource TextPrimary}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,20"/>
-                            
-                            <!-- Option 1: Save Settings -->
-                            <Button x:Name="CleanUpdateWithSaveButton" 
-                                    Style="{StaticResource SecondaryButton}" 
-                                    Background="{StaticResource CardBackground}"
-                                    Margin="0,0,0,16" 
-                                    Click="CleanUpdateWithSaveButton_Click" 
-                                    Height="Auto" 
-                                    HorizontalContentAlignment="Stretch" 
-                                    Padding="20"
-                                    BorderThickness="1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    
-                                    <Border Grid.Column="0" Width="48" Height="48" Background="{StaticResource SidebarBackground}" CornerRadius="24" Margin="0,0,20,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                        <materialIcons:MaterialIcon Kind="CloudDownloadOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Border>
-                                    
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Standard Update" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="Updates the app while preserving your settings, paths, and configurations." 
-                                                   TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" LineHeight="18"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Button>
-                            
-                            <!-- Option 2: Fresh Install -->
-                            <Button x:Name="CleanUpdateNoSaveButton" 
-                                    Style="{StaticResource SecondaryButton}" 
-                                    Background="{StaticResource CardBackground}"
-                                    Click="CleanUpdateNoSaveButton_Click" 
-                                    Height="Auto" 
-                                    HorizontalContentAlignment="Stretch" 
-                                    Padding="20"
-                                    BorderThickness="1">
-                                 <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    
-                                    <Border Grid.Column="0" Width="48" Height="48" Background="{StaticResource SidebarBackground}" CornerRadius="24" Margin="0,0,20,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                        <materialIcons:MaterialIcon Kind="DeleteRestore" Width="24" Height="24" Foreground="{StaticResource AccentRed}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Border>
-                                    
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Fresh Install" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="Performs a clean installation. All local settings and configurations will be reset." 
-                                                   TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" LineHeight="18"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Button>
+            <!-- 2. Body Area (SidebarBackground) -->
+            <StackPanel Grid.Row="1" Margin="24">
+                <TextBlock Text="Update Available" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <TextBlock Text="A new version is ready to be installed. Please choose your preferred installation method below to proceed." 
+                           Foreground="{StaticResource TextSecondary}" FontSize="12" TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,24"/>
+                
+                <!-- Option Cards -->
+                <!-- Option 1: Save Settings -->
+                <Button x:Name="CleanUpdateWithSaveButton" 
+                        Style="{StaticResource SecondaryButton}" 
+                        Background="{StaticResource CardBackground}"
+                        Margin="0,0,0,12" 
+                        Click="CleanUpdateWithSaveButton_Click" 
+                        Height="Auto" 
+                        HorizontalContentAlignment="Stretch" 
+                        Padding="16"
+                        BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Width="40" Height="40" Background="{StaticResource SidebarBackground}" CornerRadius="20" Margin="0,0,16,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                            <materialIcons:MaterialIcon Kind="CloudDownloadOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Standard Update (Recommended)" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Preserves your settings and configurations." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </Grid>
-
-                    <!-- Footer -->
-                    <Grid Grid.Row="1" Margin="24,0,24,24">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource PrimaryButton}" Click="CancelButton_Click"/>
+                </Button>
+                
+                <!-- Option 2: Fresh Install -->
+                <Button x:Name="CleanUpdateNoSaveButton" 
+                        Style="{StaticResource SecondaryButton}" 
+                        Background="{StaticResource CardBackground}"
+                        Click="CleanUpdateNoSaveButton_Click" 
+                        Height="Auto" 
+                        HorizontalContentAlignment="Stretch" 
+                        Padding="16"
+                        BorderThickness="1">
+                     <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Width="40" Height="40" Background="{StaticResource SidebarBackground}" CornerRadius="20" Margin="0,0,16,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                            <materialIcons:MaterialIcon Kind="DeleteRestore" Width="20" Height="20" Foreground="{StaticResource AccentRed}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="Fresh Install" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Resets all local settings to factory defaults." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </Grid>
-                </Grid>
+                </Button>
+            </StackPanel>
+
+            <!-- 3. Footer Area (CardBackground) -->
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" 
+                    Padding="20,14" CornerRadius="0,0,11,11">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                     <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource SecondaryButton}" Click="CancelButton_Click" Width="100" Height="32"/>
+                </StackPanel>
             </Border>
         </Grid>
     </Border>
