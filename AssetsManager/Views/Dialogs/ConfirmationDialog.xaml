@@ -13,6 +13,13 @@
         AllowsTransparency="True"
         WindowStyle="None">
 
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="36" 
+                      ResizeBorderThickness="0" 
+                      GlassFrameThickness="0" 
+                      CornerRadius="0" />
+    </WindowChrome.WindowChrome>
+
     <!-- Margen para la sombra HUD -->
     <Border Margin="10" Background="{StaticResource SidebarBackground}" 
             BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
@@ -43,15 +50,15 @@
                                    VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- Área de arrastre -->
-                    <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
+                    <!-- Área de arrastre nativa -->
+                    <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True"/>
 
-                    <!-- Botones HUD centralizados -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Botones HUD centralizados con fix de hitbox -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="MinimizeButton_Click">
                             <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
                         </Button>
-                        <Button Style="{StaticResource HUDTitleBarCloseButtonStyle}" Click="btnNo_Click">
+                        <Button x:Name="PART_Close" Style="{StaticResource HUDTitleBarCloseButtonStyle}" Click="btnNo_Click">
                             <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
                         </Button>
                     </StackPanel>
@@ -88,7 +95,7 @@
                         <Button x:Name="btnYes" Content="Yes" Style="{StaticResource SecondaryButton}" Click="btnYes_Click" Width="85" Height="32"/>
                         <Button x:Name="btnNoBottom" Content="No" Style="{StaticResource SecondaryButton}" Margin="12,0,0,0" Click="btnNo_Click" Width="85" Height="32"/>
                     </StackPanel>
-                    <Button x:Name="btnOk" Content="OK" Style="{StaticResource SecondaryButton}" Click="btnOk_Click" Visibility="Collapsed" Width="85" Height="32"/>
+                    <Button x:Name="btnOk" Content="OK" Style="{StaticResource PrimaryButton}" Click="btnOk_Click" Visibility="Collapsed" Width="85" Height="32"/>
                 </StackPanel>
             </Border>
         </StackPanel>
