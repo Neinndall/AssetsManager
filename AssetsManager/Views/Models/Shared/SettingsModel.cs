@@ -37,9 +37,9 @@ namespace AssetsManager.Views.Models.Shared
 
         public List<AudioFormatOption> AudioFormatOptions { get; } = new List<AudioFormatOption>
         {
-            new AudioFormatOption { Name = "OGG (Default)", Value = AudioExportFormat.Ogg },
-            new AudioFormatOption { Name = "WAV (Lossless)", Value = AudioExportFormat.Wav },
-            new AudioFormatOption { Name = "MP3 Audio", Value = AudioExportFormat.Mp3 }
+            new AudioFormatOption { Name = "OGG", Value = AudioExportFormat.Ogg },
+            new AudioFormatOption { Name = "WAV", Value = AudioExportFormat.Wav },
+            new AudioFormatOption { Name = "MP3", Value = AudioExportFormat.Mp3 }
         };
 
         public ImageExportFormat ImageExportFormat
