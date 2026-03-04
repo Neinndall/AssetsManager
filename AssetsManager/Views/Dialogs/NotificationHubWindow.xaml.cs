@@ -1,13 +1,11 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Notifications;
-using MahApps.Metro.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class NotificationHubWindow : MetroWindow
+    public partial class NotificationHubWindow : Window
     {
         public NotificationHubModel ViewModel => DataContext as NotificationHubModel;
 
@@ -31,14 +29,6 @@ namespace AssetsManager.Views.Dialogs
             this.Show();
             this.Activate();
             if (ViewModel != null) ViewModel.IsOpen = true;
-        }
-
-        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-            {
-                this.DragMove();
-            }
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
