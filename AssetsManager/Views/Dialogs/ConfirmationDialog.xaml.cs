@@ -1,6 +1,5 @@
 using System.Windows;
 using Material.Icons;
-using Wpf.Ui.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -66,15 +65,7 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (e.ClickCount == 1) DragMove();
-        }
-
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            SystemCommands.MinimizeWindow(this);
-        }
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
 
         private void btnYes_Click(object sender, RoutedEventArgs e) => DialogResult = true;
 
