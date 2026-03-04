@@ -478,12 +478,12 @@ namespace AssetsManager.Views.Controls.Explorer
                         {
                             logPath = Path.Combine(destinationPath, node.Name);
                         }
-                        LogService.LogInteractiveSuccess($"Successfully extracted {node.Name} in", logPath, node.Name);
+                        LogService.LogInteractiveSuccess($"Successfully extracted {node.Name}", logPath, node.Name);
                     }
                     else
                     {
                         string folderName = Path.GetFileName(destinationPath);
-                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items in", destinationPath, "Extracted Assets");
+                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items", destinationPath, "Extracted Assets");
                     }
                     
                     TaskCancellationManager.CompleteCurrentOperation();
@@ -600,13 +600,13 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         if (singleSavedPath != null)
                         {
-                            LogService.LogInteractiveSuccess($"Successfully saved {singleDisplayName} in", singleSavedPath, singleDisplayName);
+                            LogService.LogInteractiveSuccess($"Successfully saved {singleDisplayName}", singleSavedPath, singleDisplayName);
                         }
                     }
                     else
                     {
                         string folderName = Path.GetFileName(destinationPath);
-                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items in", destinationPath, "Saved Assets");
+                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items", destinationPath, "Saved Assets");
                     }
 
                     TaskCancellationManager.CompleteCurrentOperation();
