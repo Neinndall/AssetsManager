@@ -28,12 +28,12 @@ using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Viewer;
-
+using AssetsManager.Views.Helpers;
 using AssetsManager.Utils.Win;
 
 namespace AssetsManager.Views
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow : HudWindow
     {
         // ──────────────────────────────────────────────────────────────────────
         // Fields
@@ -174,18 +174,9 @@ namespace AssetsManager.Views
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-
-            var hwnd = new WindowInteropHelper(this).Handle;
-
-            // Hook único que gestiona: SingleInstance, WM_ERASEBKGND y WM_NCCALCSIZE
-            var source = HwndSource.FromHwnd(hwnd);
-            source?.AddHook(WndProc);
-
-            // Rounded corners nativas en Windows 11 (no-op silencioso en Win10)
-            WindowNativeHelper.ApplyDwmRoundedCorners(hwnd);
         }
 
-        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        protected override IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             // Single instance: restaurar desde tray cuando otra instancia intenta arrancar
             if (msg == SingleInstance.WM_SHOW_APP)
@@ -195,8 +186,7 @@ namespace AssetsManager.Views
                 return IntPtr.Zero;
             }
 
-            // Delegar mensajes de redimensionado fluido y anti-flicker a la utilidad
-            return WindowNativeHelper.HandleWindowMessage(msg, wParam, ref handled);
+            return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
         }
 
 
@@ -407,7 +397,7 @@ namespace AssetsManager.Views
         {
             // If the log is currently showing only the toolbar (effectively hidden by manual resize)
             // or is explicitly minimized, we want to expand it.
-            if (_isLogMinimized || LogRowDefinition.ActualHeight <= 45)
+            if (_isLogMinimized || LogViewRow.ActualHeight <= 45)
             {
                 // Restore / Expand
                 // If the last height was too small (due to manual resize), use a default height
@@ -416,14 +406,14 @@ namespace AssetsManager.Views
                     _lastLogHeight = new GridLength(180);
                 }
 
-                LogRowDefinition.Height = _lastLogHeight;
+                LogViewRow.Height = _lastLogHeight;
                 _isLogMinimized = false;
             }
             else
             {
                 // Minimize
-                _lastLogHeight = LogRowDefinition.Height;
-                LogRowDefinition.Height = GridLength.Auto;
+                _lastLogHeight = LogViewRow.Height;
+                LogViewRow.Height = GridLength.Auto;
                 _isLogMinimized = true;
             }
         }

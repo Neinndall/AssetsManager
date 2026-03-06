@@ -1,4 +1,4 @@
-<Window x:Class="AssetsManager.Views.MainWindow"
+<base:HudWindow x:Class="AssetsManager.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -8,6 +8,7 @@
         xmlns:dialogControls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:tb="http://www.hardcodet.net/taskbar"
+        xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
         mc:Ignorable="d"
         Title="AssetsManager"
         Width="1100" Height="900"
@@ -15,166 +16,62 @@
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico"
         Background="{StaticResource SidebarBackground}"
-        WindowStyle="SingleBorderWindow"
-        ResizeMode="CanResize"
+        HeaderTitle="AssetsManager"
+        HeaderIcon="PackageVariant"
+        Style="{StaticResource HudWindowStyle}"
         FontFamily="{StaticResource AppFontFamily}">
 
-    <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="36"
-                      ResizeBorderThickness="8"
-                      GlassFrameThickness="0"
-                      CornerRadius="0" />
-    </WindowChrome.WindowChrome>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-    <!-- Sin AllowsTransparency: las esquinas redondeadas las gestiona DWM via code-behind (Win11).
-         En Win10 la ventana tendrá esquinas rectas, pero sin flicker y con animaciones nativas. -->
-    <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-        <Border.Style>
-            <Style TargetType="Border">
-                <Setter Property="CornerRadius" Value="12"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
-                        <Setter Property="CornerRadius" Value="0"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
-        </Border.Style>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="SidebarColumn" Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-            <!-- Custom HUD Title Bar -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="CornerRadius" Value="11,11,0,0"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
-                                <Setter Property="CornerRadius" Value="0"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+            <!-- Sidebar -->
+            <controls:SidebarView x:Name="Sidebar" Grid.Column="0"/>
 
-                    <Image Grid.Column="0" Source="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" Width="18" Height="18" Margin="15,0,0,0" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Text="AssetsManager" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+            <!-- Main Content -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition x:Name="LogViewRow" Height="200"/>
+                </Grid.RowDefinitions>
 
-                    <!-- HUD Window Controls -->
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="MinimizeButton_Click">
-                            <icons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
-                        </Button>
-                        <Button Style="{StaticResource HUDTitleBarMaximizeButtonStyle}" Click="MaximizeButton_Click"/>
-                        <Button x:Name="PART_Close" Style="{StaticResource HUDTitleBarCloseButtonStyle}" Click="CloseButton_Click">
-                            <icons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
-                        </Button>
-                    </StackPanel>
+                <Grid Grid.Row="0">
+                    <ContentControl x:Name="MainContentArea"/>
                 </Grid>
-            </Border>
 
-            <!-- Main Content Area -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="SidebarColumn" Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Sidebar -->
-                <Border Grid.Column="0" Background="{StaticResource SidebarBackground}">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="0,0,0,11"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
-                                    <Setter Property="CornerRadius" Value="0"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                    <controls:SidebarView x:Name="Sidebar"/>
-                </Border>
-
-                <!-- Área derecha -->
-                <Grid Grid.Column="1">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition x:Name="LogRowDefinition" Height="180" MinHeight="38"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <Border Grid.Row="0" Background="Transparent" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
-                        <ContentControl x:Name="MainContentArea" Background="Transparent"/>
-                    </Border>
-
-                    <GridSplitter Grid.Row="1" Height="8" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="Transparent" Cursor="SizeNS" ShowsPreview="False">
-                        <GridSplitter.Template>
-                            <ControlTemplate TargetType="GridSplitter">
-                                <Border Background="Transparent"><Border Width="36" Height="4" Background="{StaticResource BorderColor}" CornerRadius="2" Opacity="0.6"/></Border>
-                            </ControlTemplate>
-                        </GridSplitter.Template>
-                    </GridSplitter>
-
-                    <!-- LogView -->
-                    <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" ClipToBounds="True">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="CornerRadius" Value="0,0,11,0"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
-                                        <Setter Property="CornerRadius" Value="0"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <controls:LogView x:Name="LogView" StatusText="{Binding ViewModel.StatusText, ElementName=StatusBar}"/>
-                    </Border>
-
-                    <!-- StatusBar -->
-                    <Border Grid.Row="3" Background="{StaticResource SidebarBackground}" ClipToBounds="True">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="CornerRadius" Value="0,0,11,0"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
-                                        <Setter Property="CornerRadius" Value="0"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <controls:StatusBarView x:Name="StatusBar"/>
-                    </Border>
-                </Grid>
+                <GridSplitter Grid.Row="1" Height="2" HorizontalAlignment="Stretch" VerticalAlignment="Top" Background="Transparent" ShowsPreview="False"/>
+                <controls:LogView x:Name="LogView" Grid.Row="1"/>
             </Grid>
-
-            <!-- Taskbar Icon -->
-            <tb:TaskbarIcon x:Name="TrayIcon" Visibility="Collapsed" ToolTipText="AssetsManager" IconSource="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
-                <tb:TaskbarIcon.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="Show" Click="MenuItem_Show_Click">
-                            <MenuItem.Icon>
-                                <icons:MaterialIcon Kind="WindowRestore" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
-                            </MenuItem.Icon>
-                        </MenuItem>
-                        <Separator Background="{StaticResource BorderColor}" Margin="0,2"/>
-                        <MenuItem Header="Exit" Click="MenuItem_Exit_Click">
-                            <MenuItem.Icon>
-                                <icons:MaterialIcon Kind="ExitToApp" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
-                            </MenuItem.Icon>
-                        </MenuItem>
-                    </ContextMenu>
-                </tb:TaskbarIcon.ContextMenu>
-            </tb:TaskbarIcon>
         </Grid>
-    </Border>
-</Window>
+
+        <!-- Status Bar -->
+        <controls:StatusBarView x:Name="StatusBar" Grid.Row="1"/>
+
+        <!-- Taskbar Icon -->
+        <tb:TaskbarIcon x:Name="TrayIcon" Visibility="Collapsed" ToolTipText="AssetsManager" IconSource="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Show" Click="MenuItem_Show_Click">
+                        <MenuItem.Icon>
+                            <icons:MaterialIcon Kind="WindowRestore" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator Background="{StaticResource BorderColor}" Margin="0,2"/>
+                    <MenuItem Header="Exit" Click="MenuItem_Exit_Click">
+                        <MenuItem.Icon>
+                            <icons:MaterialIcon Kind="ExitToApp" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+    </Grid>
+</base:HudWindow>
