@@ -9,7 +9,7 @@
     </ResourceDictionary.MergedDictionaries>
 
     <Style x:Key="HudWindowStyle" TargetType="{x:Type base:HudWindow}">
-        <Setter Property="WindowStyle" Value="None"/>
+        <Setter Property="WindowStyle" Value="SingleBorderWindow"/>
         <Setter Property="WindowChrome.WindowChrome">
             <Setter.Value>
                 <WindowChrome CaptionHeight="36" 
@@ -25,7 +25,6 @@
                             Background="{TemplateBinding Background}" 
                             BorderBrush="{StaticResource BorderColor}" 
                             BorderThickness="1"
-                            Margin="0"
                             SnapsToDevicePixels="True"
                             UseLayoutRounding="True">
                         <Border.Style>
@@ -47,13 +46,14 @@
                             </Grid.RowDefinitions>
 
                             <!-- 1. Custom Title Bar -->
-                            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="100">
+                            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="100" Margin="-1.5,-1.5,-1.5,0">
                                 <Border.Style>
                                     <Style TargetType="Border">
-                                        <Setter Property="CornerRadius" Value="11,11,0,0"/>
+                                        <Setter Property="CornerRadius" Value="10,10,0,0"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}}" Value="Maximized">
                                                 <Setter Property="CornerRadius" Value="0"/>
+                                                <Setter Property="Margin" Value="0"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -142,13 +142,14 @@
                             </Border>
 
                             <!-- 2. Main Content Area -->
-                            <Border Grid.Row="1" ClipToBounds="True">
+                            <Border Grid.Row="1" ClipToBounds="True" Margin="-0.5,0,-0.5,-0.5">
                                 <Border.Style>
                                     <Style TargetType="Border">
-                                        <Setter Property="CornerRadius" Value="0,0,11,11"/>
+                                        <Setter Property="CornerRadius" Value="0,0,11.5,11.5"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}}" Value="Maximized">
                                                 <Setter Property="CornerRadius" Value="0"/>
+                                                <Setter Property="Margin" Value="0"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

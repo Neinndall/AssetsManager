@@ -16,7 +16,7 @@
         Style="{StaticResource HudWindowStyle}"
         AllowDrop="True" Drop="Window_Drop">
 
-    <Grid Background="{StaticResource SidebarBackground}">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>    <!-- 0: Playlist Area -->
             <RowDefinition Height="Auto"/> <!-- 1: Player Controls -->
@@ -24,7 +24,6 @@
 
         <!-- 1. Content Area (Playlist) -->
         <Grid Grid.Row="0" Margin="15">
-            <!-- Empty State: Full Drop Area -->
             <Grid Visibility="{Binding Service.Playlist.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}">
                 <Rectangle x:Name="DropAreaUI" Stroke="{StaticResource BorderColor}" StrokeThickness="2" 
                            Fill="{StaticResource SidebarBackground}" RadiusX="10" RadiusY="10" 
@@ -39,7 +38,6 @@
                 </Border>
             </Grid>
 
-            <!-- Populated State: Playlist Area -->
             <Grid Visibility="{Binding Service.Playlist.Count, Converter={StaticResource CountToVisibilityConverter}}">
                 <ListBox x:Name="PlaylistListBox" 
                          ItemsSource="{Binding Service.Playlist}"
@@ -53,14 +51,11 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                
                                 <icons:MaterialIcon Kind="MusicNote" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Opacity="0.7" Margin="0,0,10,0"/>
-                                
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Text="{Binding AddedAt, StringFormat='Added: {0:HH:mm}'}" Foreground="{StaticResource TextMuted}" FontSize="10"/>
                                 </StackPanel>
-
                                 <Button Grid.Column="2" Style="{StaticResource TransparentIconButton}" Click="RemoveItem_Click" Tag="{Binding}">
                                     <icons:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14" Foreground="{StaticResource AccentRed}"/>
                                 </Button>
@@ -71,10 +66,9 @@
             </Grid>
         </Grid>
 
-        <!-- 2. Player Controls Area -->
-        <Border Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,20" ClipToBounds="True">
+        <!-- 2. Player Controls Area (Remove manual CornerRadius to avoid mismatch) -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,20">
             <StackPanel>
-                <!-- Row 1: Now Playing Info -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,15">
                     <icons:MaterialIcon Kind="MusicNote" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBlock x:Name="CurrentTrackName" Text="No track selected" 
@@ -82,7 +76,6 @@
                                TextTrimming="CharacterEllipsis" MaxWidth="300" VerticalAlignment="Center"/>
                 </StackPanel>
                 
-                <!-- Row 2: Timeline -->
                 <Grid Margin="0,0,0,20">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="45"/>
@@ -95,41 +88,31 @@
                     <TextBlock x:Name="TotalTimeText" Text="0:00" Grid.Column="2" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
                 </Grid>
 
-                <!-- Row 3: Command Center -->
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/> <!-- Utils Left -->
-                        <ColumnDefinition Width="Auto"/> <!-- Main Buttons -->
-                        <ColumnDefinition Width="*"/> <!-- Utils Right -->
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-
-                    <!-- Secondary: Add URL -->
                     <Button HorizontalAlignment="Left" Style="{StaticResource TransparentIconButton}" Click="AddUrl_Click" ToolTip="Add URL" Width="34" Height="34">
                         <icons:MaterialIcon Kind="Link" Width="20" Height="20" Foreground="{StaticResource AccentBrush}"/>
                     </Button>
-
-                    <!-- Primary: Playback -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button Style="{StaticResource IconButton}" Background="White" Width="38" Height="38" Click="SkipBackward_Click">
                             <icons:MaterialIcon Kind="SkipPrevious" Width="20" Height="20" Foreground="{StaticResource SidebarBackground}"/>
                         </Button>
-                        
                         <Button x:Name="PlayPauseButton" Style="{StaticResource PrimaryButton}" Width="38" Height="38" Margin="15,0" Click="PlayPause_Click">
                             <icons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Pause,Play'}" Width="20" Height="20"/>
                         </Button>
-                        
                         <Button Style="{StaticResource IconButton}" Background="White" Width="38" Height="38" Click="SkipForward_Click">
                             <icons:MaterialIcon Kind="SkipNext" Width="20" Height="20" Foreground="{StaticResource SidebarBackground}"/>
                         </Button>
                     </StackPanel>
-                    
-                    <!-- Secondary: Clear -->
                     <Button Grid.Column="2" HorizontalAlignment="Right" Style="{StaticResource TransparentIconButton}" Click="ClearPlaylist_Click" ToolTip="Clear Playlist" Width="34" Height="34">
                         <icons:MaterialIcon Kind="DeleteSweepOutline" Width="20" Height="20" Foreground="{StaticResource TextMuted}"/>
                     </Button>
                 </Grid>
 
-                <!-- Row 4: Volume -->
                 <Border Background="{StaticResource SidebarBackground}" CornerRadius="15" Padding="12,4" Margin="0,20,0,0" HorizontalAlignment="Center" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal">
                         <icons:MaterialIcon Kind="{Binding IsMuted, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='VolumeMute,VolumeMedium'}" 
