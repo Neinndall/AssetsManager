@@ -64,12 +64,42 @@
                                         <ColumnDefinition Width="Auto"/> <!-- Controls -->
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Title/Icon -->
+                                    <!-- Title/Icon Area -->
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
+                                        <!-- Image Logo (Standard WPF Icon) -->
+                                        <Image Source="{Binding Icon, RelativeSource={RelativeSource TemplatedParent}}"
+                                               Width="18" Height="18" 
+                                               Margin="0,0,10,0"
+                                               RenderOptions.BitmapScalingMode="HighQuality">
+                                            <Image.Style>
+                                                <Style TargetType="Image">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="Source" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Image.Style>
+                                        </Image>
+
+                                        <!-- Material Icon (Fallback if no Icon is set) -->
                                         <icons:MaterialIcon Kind="{Binding HeaderIcon, RelativeSource={RelativeSource TemplatedParent}}" 
                                                            Width="18" Height="18" 
                                                            Foreground="{StaticResource AccentBrush}" 
-                                                           Margin="0,0,10,0"/>
+                                                           Margin="0,0,10,0">
+                                            <icons:MaterialIcon.Style>
+                                                <Style TargetType="icons:MaterialIcon">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Icon, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </icons:MaterialIcon.Style>
+                                        </icons:MaterialIcon>
+
                                         <TextBlock Text="{Binding HeaderTitle, RelativeSource={RelativeSource TemplatedParent}}" 
                                                    FontSize="13" 
                                                    Foreground="{StaticResource TextPrimary}" 
@@ -81,17 +111,17 @@
                                         <!-- Usamos comandos nativos de sistema vinculados a la ventana actual -->
                                         <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" 
                                                 Command="{x:Static SystemCommands.MinimizeWindowCommand}"
-                                                CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
-                                                ToolTip="Minimize">
+                                                CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}">
                                             <icons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14" Foreground="{StaticResource TextPrimary}"/>
                                         </Button>
                                         
-                                        <Button Command="{x:Static SystemCommands.MaximizeWindowCommand}"
-                                                CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
-                                                ToolTip="Maximize/Restore">
+                                        <Button CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource HUDTitleBarMaximizeButtonStyle}">
+                                                    <!-- Comando por defecto: Maximizar -->
+                                                    <Setter Property="Command" Value="{x:Static SystemCommands.MaximizeWindowCommand}"/>
                                                     <Style.Triggers>
+                                                        <!-- Si ya está maximizada, cambiar a Restaurar -->
                                                         <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}}" Value="Maximized">
                                                             <Setter Property="Command" Value="{x:Static SystemCommands.RestoreWindowCommand}"/>
                                                         </DataTrigger>
@@ -103,8 +133,7 @@
                                         <Button x:Name="PART_Close" 
                                                 Style="{StaticResource HUDTitleBarCloseButtonStyle}" 
                                                 Command="{x:Static SystemCommands.CloseWindowCommand}"
-                                                CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
-                                                ToolTip="Close">
+                                                CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}">
                                             <icons:MaterialIcon Kind="WindowClose" Width="14" Height="14" Foreground="{StaticResource TextPrimary}"/>
                                         </Button>
                                     </StackPanel>

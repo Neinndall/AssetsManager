@@ -17,7 +17,6 @@
         Icon="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico"
         Background="{StaticResource SidebarBackground}"
         HeaderTitle="AssetsManager"
-        HeaderIcon="PackageVariant"
         Style="{StaticResource HudWindowStyle}"
         FontFamily="{StaticResource AppFontFamily}">
 
