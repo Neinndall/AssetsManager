@@ -3,12 +3,14 @@ using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls; // Added for ContextMenu/MenuItem if needed, though they are in System.Windows.Controls
 using System.Windows.Input;
+using System.Windows.Interop;
 using Hardcodet.Wpf.TaskbarNotification; // Hardcodet Namespace
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Utils;
@@ -31,6 +33,31 @@ namespace AssetsManager.Views
 {
     public partial class MainWindow : Window
     {
+        // ──────────────────────────────────────────────────────────────────────
+        // Win32 / DWM interop
+        // ──────────────────────────────────────────────────────────────────────
+
+        private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+        private const int DWMWCP_ROUND                   = 2;
+        private const int DWMWCP_DONOTROUND              = 1;
+        private const int WM_ERASEBKGND                  = 0x0014;
+        private const int WM_NCCALCSIZE                  = 0x0083;
+
+        [DllImport("dwmapi.dll", PreserveSig = false)]
+        private static extern void DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        private static void ApplyDwmRoundedCorners(IntPtr hwnd)
+        {
+            try
+            {
+                int preference = DWMWCP_ROUND;
+                DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
+            }
+            catch { /* Not Windows 11 — ignore */ }
+        }
+
+        // ──────────────────────────────────────────────────────────────────────
+
         private readonly IServiceProvider _serviceProvider;
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
@@ -167,20 +194,44 @@ namespace AssetsManager.Views
         {
             base.OnSourceInitialized(e);
 
-            // Register window hook to handle single instance restoration message
-            var source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
-            source?.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
+            var hwnd = new WindowInteropHelper(this).Handle;
+
+            // Hook único que gestiona: SingleInstance, WM_ERASEBKGND y WM_NCCALCSIZE
+            var source = HwndSource.FromHwnd(hwnd);
+            source?.AddHook(WndProc);
+
+            // Rounded corners nativas en Windows 11 (no-op silencioso en Win10)
+            ApplyDwmRoundedCorners(hwnd);
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            // Single instance: restaurar desde tray cuando otra instancia intenta arrancar
+            if (msg == SingleInstance.WM_SHOW_APP)
             {
-                if (msg == SingleInstance.WM_SHOW_APP)
-                {
-                    ShowAppFromTray();
-                    handled = true;
-                }
+                ShowAppFromTray();
+                handled = true;
                 return IntPtr.Zero;
-            });
-            
-            // SingleInstance registration removed as it is no longer needed for basic notifications
-            // If advanced command line handling is needed for the tray icon, it can be re-added here.
+            }
+
+            switch (msg)
+            {
+                case WM_ERASEBKGND:
+                    // Evita el fondo blanco al redimensionar
+                    handled = true;
+                    return new IntPtr(1);
+
+                case WM_NCCALCSIZE:
+                    // Elimina el borde NC oculto que causa el artefacto en los bordes al resize
+                    if (wParam == new IntPtr(1))
+                    {
+                        handled = true;
+                        return IntPtr.Zero;
+                    }
+                    break;
+            }
+
+            return IntPtr.Zero;
         }
 
         // --- Taskbar / NotifyIcon Logic ---

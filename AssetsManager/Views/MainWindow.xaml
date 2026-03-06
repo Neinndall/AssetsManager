@@ -14,19 +14,20 @@
         MinWidth="1100" MinHeight="900"
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico"
-        Background="Transparent"
-        AllowsTransparency="True"
-        WindowStyle="None"
+        Background="{StaticResource SidebarBackground}"
+        WindowStyle="SingleBorderWindow"
         ResizeMode="CanResize"
         FontFamily="{StaticResource AppFontFamily}">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="36" 
-                      ResizeBorderThickness="8" 
-                      GlassFrameThickness="0" 
+        <WindowChrome CaptionHeight="36"
+                      ResizeBorderThickness="8"
+                      GlassFrameThickness="0"
                       CornerRadius="0" />
     </WindowChrome.WindowChrome>
 
+    <!-- Sin AllowsTransparency: las esquinas redondeadas las gestiona DWM via code-behind (Win11).
+         En Win10 la ventana tendrá esquinas rectas, pero sin flicker y con animaciones nativas. -->
     <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
         <Border.Style>
             <Style TargetType="Border">
@@ -64,10 +65,10 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Image Grid.Column="0" Source="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" Width="18" Height="18" Margin="15,0,0,0" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" Text="AssetsManager" FontSize="13" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                    
+
                     <!-- HUD Window Controls -->
                     <StackPanel Grid.Column="3" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="MinimizeButton_Click">
@@ -111,7 +112,7 @@
                         <RowDefinition x:Name="LogRowDefinition" Height="180" MinHeight="38"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    
+
                     <Border Grid.Row="0" Background="Transparent" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
                         <ContentControl x:Name="MainContentArea" Background="Transparent"/>
                     </Border>
@@ -138,7 +139,7 @@
                         </Border.Style>
                         <controls:LogView x:Name="LogView" StatusText="{Binding ViewModel.StatusText, ElementName=StatusBar}"/>
                     </Border>
-                    
+
                     <!-- StatusBar -->
                     <Border Grid.Row="3" Background="{StaticResource SidebarBackground}" ClipToBounds="True">
                         <Border.Style>
