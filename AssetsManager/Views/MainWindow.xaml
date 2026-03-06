@@ -158,7 +158,23 @@
             </Grid>
 
             <!-- Taskbar Icon -->
-            <tb:TaskbarIcon x:Name="TrayIcon" Visibility="Collapsed" ToolTipText="AssetsManager" IconSource="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick"/>
+            <tb:TaskbarIcon x:Name="TrayIcon" Visibility="Collapsed" ToolTipText="AssetsManager" IconSource="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
+                <tb:TaskbarIcon.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Show" Click="MenuItem_Show_Click">
+                            <MenuItem.Icon>
+                                <icons:MaterialIcon Kind="WindowRestore" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <Separator Background="{StaticResource BorderColor}" Margin="0,2"/>
+                        <MenuItem Header="Exit" Click="MenuItem_Exit_Click">
+                            <MenuItem.Icon>
+                                <icons:MaterialIcon Kind="ExitToApp" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </tb:TaskbarIcon.ContextMenu>
+            </tb:TaskbarIcon>
         </Grid>
     </Border>
 </Window>

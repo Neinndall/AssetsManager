@@ -707,7 +707,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         using (var stream = new MemoryStream(data))
                         {
-                            bitmap = Utils.TextureUtils.LoadTexture(stream, node.Extension);
+                            bitmap = TextureUtils.LoadTexture(stream, node.Extension);
                         }
                     }
                     else

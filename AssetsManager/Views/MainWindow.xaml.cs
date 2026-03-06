@@ -29,33 +29,14 @@ using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Viewer;
 
+using AssetsManager.Utils.Win;
+
 namespace AssetsManager.Views
 {
     public partial class MainWindow : Window
     {
         // ──────────────────────────────────────────────────────────────────────
-        // Win32 / DWM interop
-        // ──────────────────────────────────────────────────────────────────────
-
-        private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
-        private const int DWMWCP_ROUND                   = 2;
-        private const int DWMWCP_DONOTROUND              = 1;
-        private const int WM_ERASEBKGND                  = 0x0014;
-        private const int WM_NCCALCSIZE                  = 0x0083;
-
-        [DllImport("dwmapi.dll", PreserveSig = false)]
-        private static extern void DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
-
-        private static void ApplyDwmRoundedCorners(IntPtr hwnd)
-        {
-            try
-            {
-                int preference = DWMWCP_ROUND;
-                DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
-            }
-            catch { /* Not Windows 11 — ignore */ }
-        }
-
+        // Fields
         // ──────────────────────────────────────────────────────────────────────
 
         private readonly IServiceProvider _serviceProvider;
@@ -201,7 +182,7 @@ namespace AssetsManager.Views
             source?.AddHook(WndProc);
 
             // Rounded corners nativas en Windows 11 (no-op silencioso en Win10)
-            ApplyDwmRoundedCorners(hwnd);
+            WindowNativeHelper.ApplyDwmRoundedCorners(hwnd);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -214,25 +195,10 @@ namespace AssetsManager.Views
                 return IntPtr.Zero;
             }
 
-            switch (msg)
-            {
-                case WM_ERASEBKGND:
-                    // Evita el fondo blanco al redimensionar
-                    handled = true;
-                    return new IntPtr(1);
-
-                case WM_NCCALCSIZE:
-                    // Elimina el borde NC oculto que causa el artefacto en los bordes al resize
-                    if (wParam == new IntPtr(1))
-                    {
-                        handled = true;
-                        return IntPtr.Zero;
-                    }
-                    break;
-            }
-
-            return IntPtr.Zero;
+            // Delegar mensajes de redimensionado fluido y anti-flicker a la utilidad
+            return WindowNativeHelper.HandleWindowMessage(msg, wParam, ref handled);
         }
+
 
         // --- Taskbar / NotifyIcon Logic ---
 
