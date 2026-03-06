@@ -46,8 +46,7 @@ namespace AssetsManager.Views.Helpers
 
         public HudWindow()
         {
-            // SingleBorderWindow enables native animations
-            WindowStyle = WindowStyle.SingleBorderWindow;
+            // WindowStyle controlado en el .xaml (HudWindowStyles.xaml)
             AllowsTransparency = false;
 
             // Register SystemCommands handlers for this window
