@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        xmlns:base="clr-namespace:AssetsManager.Views.Base"
+        xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
         mc:Ignorable="d"
         Title="Help" Height="750" Width="950"
         MinHeight="750" MinWidth="950"

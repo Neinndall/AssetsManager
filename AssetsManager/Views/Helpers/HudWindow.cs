@@ -4,11 +4,12 @@ using System.Windows.Interop;
 using AssetsManager.Utils.Win;
 using Material.Icons;
 
-namespace AssetsManager.Views.Base
+namespace AssetsManager.Views.Helpers
 {
     /// <summary>
-    /// Base class for all HUD-styled windows.
-    /// Centralizes native Win32 interop, rounded corners, and title bar logic.
+    /// Helper base class for all HUD-styled windows.
+    /// Centralizes native Win32 interop, rounded corners, and title bar properties.
+    /// Title bar buttons (Min/Max/Close) are handled via SystemCommands in the ControlTemplate.
     /// </summary>
     public class HudWindow : Window
     {
@@ -40,15 +41,20 @@ namespace AssetsManager.Views.Base
 
         static HudWindow()
         {
-            // Tells WPF to look for the style in generic.xaml or a merged dictionary
             DefaultStyleKeyProperty.OverrideMetadata(typeof(HudWindow), new FrameworkPropertyMetadata(typeof(HudWindow)));
         }
 
         public HudWindow()
         {
-            // Standard HUD defaults
+            // SingleBorderWindow enables native animations
             WindowStyle = WindowStyle.SingleBorderWindow;
             AllowsTransparency = false;
+
+            // Register SystemCommands handlers for this window
+            this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.CloseWindowCommand, (s, e) => SystemCommands.CloseWindow(this)));
+            this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.MaximizeWindowCommand, (s, e) => SystemCommands.MaximizeWindow(this)));
+            this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.MinimizeWindowCommand, (s, e) => SystemCommands.MinimizeWindow(this)));
+            this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.RestoreWindowCommand, (s, e) => SystemCommands.RestoreWindow(this)));
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -70,18 +76,6 @@ namespace AssetsManager.Views.Base
         {
             // Handle common HUD window messages (anti-flicker, NC calc, etc.)
             return WindowNativeHelper.HandleWindowMessage(msg, wParam, ref handled);
-        }
-
-        // ──────────────────────────────────────────────────────────────────────
-        // Window Commands (Standardized)
-        // ──────────────────────────────────────────────────────────────────────
-
-        internal void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
-        internal void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-        internal void MaximizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
-            else SystemCommands.MaximizeWindow(this);
         }
     }
 }

@@ -2,7 +2,7 @@ using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views.Help;
-using AssetsManager.Views.Base;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views
 {

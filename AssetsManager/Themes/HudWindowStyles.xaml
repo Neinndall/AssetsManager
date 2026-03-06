@@ -1,7 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    x:Class="AssetsManager.Themes.HudWindowStyles"
-                    xmlns:base="clr-namespace:AssetsManager.Views.Base"
+                    xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
                     xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF">
 
     <ResourceDictionary.MergedDictionaries>
@@ -79,17 +78,32 @@
 
                                     <!-- Controls -->
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <!-- Usamos comandos nativos de sistema vinculados a la ventana actual -->
                                         <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" 
-                                                Click="MinimizeButton_Click"
+                                                Command="{x:Static SystemCommands.MinimizeWindowCommand}"
+                                                CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
                                                 ToolTip="Minimize">
                                             <icons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14" Foreground="{StaticResource TextPrimary}"/>
                                         </Button>
-                                        <Button Style="{StaticResource HUDTitleBarMaximizeButtonStyle}" 
-                                                Click="MaximizeButton_Click"
-                                                ToolTip="Maximize/Restore"/>
+                                        
+                                        <Button Command="{x:Static SystemCommands.MaximizeWindowCommand}"
+                                                CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                                ToolTip="Maximize/Restore">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource HUDTitleBarMaximizeButtonStyle}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}}" Value="Maximized">
+                                                            <Setter Property="Command" Value="{x:Static SystemCommands.RestoreWindowCommand}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+
                                         <Button x:Name="PART_Close" 
                                                 Style="{StaticResource HUDTitleBarCloseButtonStyle}" 
-                                                Click="CloseButton_Click"
+                                                Command="{x:Static SystemCommands.CloseWindowCommand}"
+                                                CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
                                                 ToolTip="Close">
                                             <icons:MaterialIcon Kind="WindowClose" Width="14" Height="14" Foreground="{StaticResource TextPrimary}"/>
                                         </Button>

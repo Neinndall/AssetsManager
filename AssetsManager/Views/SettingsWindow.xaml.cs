@@ -3,7 +3,7 @@ using System.Windows;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Settings;
-using AssetsManager.Views.Base;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Utils;
 using Microsoft.Extensions.DependencyInjection;
 
