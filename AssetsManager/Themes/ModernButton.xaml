@@ -604,10 +604,11 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <!-- Forzamos el redondeado de la esquina superior derecha directamente en el estilo (11px para encajar en marco de 12px) -->
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="0,11,0,0" SnapsToDevicePixels="True">
+                    <!-- Ajustamos a 2px para que el color rojo rellene la esquina y sea el marco de la ventana (12px) el que dicte la curva final -->
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="0,2,0,0" SnapsToDevicePixels="True" UseLayoutRounding="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
+
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bg" Property="Background" Value="#E81123"/>
