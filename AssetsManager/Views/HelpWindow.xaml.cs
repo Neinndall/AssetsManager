@@ -2,10 +2,11 @@ using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views.Help;
+using AssetsManager.Views.Base;
 
 namespace AssetsManager.Views
 {
-    public partial class HelpWindow : Window
+    public partial class HelpWindow : HudWindow
     {
         private readonly IServiceProvider _serviceProvider;
 
@@ -47,15 +48,5 @@ namespace AssetsManager.Views
             NavBugsReport.Checked -= NavBugsReport_Checked;
             NavUpdates.Checked -= NavUpdates_Checked;
         }
-
-        private void Close_Click(object sender, RoutedEventArgs e) => Close();
-
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
-            else SystemCommands.MaximizeWindow(this);
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     }
 }

@@ -1,9 +1,10 @@
 using System;
 using System.Windows;
 using AssetsManager.Services.Core;
-using AssetsManager.Utils;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Settings;
+using AssetsManager.Views.Base;
+using AssetsManager.Utils;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AssetsManager.Views
@@ -13,7 +14,7 @@ namespace AssetsManager.Views
         public bool WasResetToDefaults { get; set; }
     }
 
-    public partial class SettingsWindow : Window
+    public partial class SettingsWindow : HudWindow
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly AppSettings _appSettings;
@@ -94,15 +95,5 @@ namespace AssetsManager.Views
             _customMessageBoxService.ShowSuccess("Success", "Settings have been saved successfully.", this);
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = false });
         }
-
-        private void Close_Click(object sender, RoutedEventArgs e) => Close();
-
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
-            else SystemCommands.MaximizeWindow(this);
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     }
 }
