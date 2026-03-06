@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -145,7 +146,7 @@ namespace AssetsManager.Views.Dialogs
                         {
                             using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
                             {
-                                bitmap = Utils.TextureUtils.LoadTexture(stream, System.IO.Path.GetExtension(filePath));
+                                bitmap = TextureUtils.LoadTexture(stream, System.IO.Path.GetExtension(filePath));
                             }
                         }
                         else
