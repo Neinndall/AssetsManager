@@ -47,7 +47,7 @@ namespace AssetsManager.Views.Helpers
         public HudWindow()
         {
             // WindowStyle controlado en el .xaml (HudWindowStyles.xaml)
-            AllowsTransparency = false;
+            AllowsTransparency = true;
 
             // Register SystemCommands handlers for this window
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.CloseWindowCommand, (s, e) => SystemCommands.CloseWindow(this)));
@@ -65,7 +65,7 @@ namespace AssetsManager.Views.Helpers
             source?.AddHook(WndProc);
 
             // Apply Win11 native rounded corners
-            WindowNativeHelper.ApplyDwmRoundedCorners(hwnd);
+            // WindowNativeHelper.ApplyDwmRoundedCorners(hwnd);
         }
 
         /// <summary>

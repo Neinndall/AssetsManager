@@ -9,7 +9,7 @@
     </ResourceDictionary.MergedDictionaries>
 
     <Style x:Key="HudWindowStyle" TargetType="{x:Type base:HudWindow}">
-        <Setter Property="WindowStyle" Value="SingleBorderWindow"/>
+        <Setter Property="WindowStyle" Value="None"/>
         <Setter Property="WindowChrome.WindowChrome">
             <Setter.Value>
                 <WindowChrome CaptionHeight="36" 
@@ -25,6 +25,7 @@
                             Background="{TemplateBinding Background}" 
                             BorderBrush="{StaticResource BorderColor}" 
                             BorderThickness="1"
+                            Margin="0"
                             SnapsToDevicePixels="True"
                             UseLayoutRounding="True">
                         <Border.Style>
