@@ -12,7 +12,7 @@
         <Setter Property="WindowChrome.WindowChrome">
             <Setter.Value>
                 <WindowChrome CaptionHeight="36" 
-                              ResizeBorderThickness="8" 
+                              ResizeBorderThickness="3" 
                               GlassFrameThickness="0" 
                               CornerRadius="0" />
             </Setter.Value>
@@ -28,7 +28,7 @@
                             UseLayoutRounding="True">
                         <Border.Style>
                             <Style TargetType="Border">
-                                <Setter Property="CornerRadius" Value="12"/>
+                                <Setter Property="CornerRadius" Value="11"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}}" Value="Maximized">
                                         <Setter Property="CornerRadius" Value="0"/>
@@ -143,10 +143,10 @@
                             </Border>
 
                             <!-- 2. Main Content Area -->
-                            <Border Grid.Row="1" ClipToBounds="True" Margin="-0.5,0,-0.5,-0.5">
+                            <Border Grid.Row="1" ClipToBounds="True" Margin="-1,0,-1,-1">
                                 <Border.Style>
                                     <Style TargetType="Border">
-                                        <Setter Property="CornerRadius" Value="0,0,11.5,11.5"/>
+                                        <Setter Property="CornerRadius" Value="0,0,10.5,10.5"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}}" Value="Maximized">
                                                 <Setter Property="CornerRadius" Value="0"/>
