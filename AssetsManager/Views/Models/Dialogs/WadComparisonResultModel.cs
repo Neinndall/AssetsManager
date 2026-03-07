@@ -30,6 +30,8 @@ namespace AssetsManager.Views.Models.Dialogs
         private string _countModified = "0";
         private string _countRemoved = "0";
         private string _countRenamed = "0";
+        private string _filterText = string.Empty;
+        private int _totalDiffsCount = -1;
 
         // Sub-Models (Encapsulated responsibilities)
         public WadResultsTreeModel TreeModel { get; } = new WadResultsTreeModel();
@@ -46,6 +48,12 @@ namespace AssetsManager.Views.Models.Dialogs
         {
             get => _isDashboardVisible;
             set { _isDashboardVisible = value; OnPropertyChanged(); }
+        }
+
+        public string FilterText
+        {
+            get => _filterText;
+            set { if (_filterText != value) { _filterText = value; OnPropertyChanged(); } }
         }
 
         public WadComparisonResultModel()
@@ -123,17 +131,32 @@ namespace AssetsManager.Views.Models.Dialogs
         {
             SetLoadingState(ComparisonLoadingState.Ready);
             
+            // Store total count on the first real results load
+            if (_totalDiffsCount == -1) _totalDiffsCount = diffs.Count;
+
             // 1. Update the Results Model (The Tree)
             TreeModel.WadGroups.ReplaceRange(groups);
             
-            // 2. Update Global Stats
-            SummaryText = $"Found {diffs.Count} differences across {groups.Count} WAD files.";
-            CountNew = diffs.Count(d => d.Type == ChunkDiffType.New).ToString();
-            CountModified = diffs.Count(d => d.Type == ChunkDiffType.Modified).ToString();
-            CountRemoved = diffs.Count(d => d.Type == ChunkDiffType.Removed).ToString();
-            CountRenamed = diffs.Count(d => d.Type == ChunkDiffType.Renamed).ToString();
+            // 2. Update Summary Text (Logic inside Model as it is 'Info')
+            if (diffs.Count == _totalDiffsCount)
+            {
+                SummaryText = $"Found {diffs.Count} differences across {groups.Count} WAD files.";
+            }
+            else
+            {
+                SummaryText = $"Showing {diffs.Count} of {_totalDiffsCount} differences across {groups.Count} WAD files.";
+            }
 
-            // 3. Perform Analysis (Populates Dashboard in TreeModel)
+            // 3. Update Global Stats (only on initial load)
+            if (diffs.Count == _totalDiffsCount)
+            {
+                CountNew = diffs.Count(d => d.Type == ChunkDiffType.New).ToString();
+                CountModified = diffs.Count(d => d.Type == ChunkDiffType.Modified).ToString();
+                CountRemoved = diffs.Count(d => d.Type == ChunkDiffType.Removed).ToString();
+                CountRenamed = diffs.Count(d => d.Type == ChunkDiffType.Renamed).ToString();
+            }
+
+            // 4. Perform Analysis (Populates Dashboard in TreeModel)
             CalculateInsights(diffs);
         }
 

@@ -30,6 +30,39 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             set { _dashboardToggleChecked = value; OnPropertyChanged(); }
         }
 
+        // --- Surgical Filtering States ---
+        private bool _showNew = true;
+        private bool _showModified = true;
+        private bool _showRemoved = true;
+        private bool _showRenamed = true;
+
+        public bool ShowNew
+        {
+            get => _showNew;
+            set { if (_showNew != value) { _showNew = value; OnPropertyChanged(); OnFilterChanged(); } }
+        }
+
+        public bool ShowModified
+        {
+            get => _showModified;
+            set { if (_showModified != value) { _showModified = value; OnPropertyChanged(); OnFilterChanged(); } }
+        }
+
+        public bool ShowRemoved
+        {
+            get => _showRemoved;
+            set { if (_showRemoved != value) { _showRemoved = value; OnPropertyChanged(); OnFilterChanged(); } }
+        }
+
+        public bool ShowRenamed
+        {
+            get => _showRenamed;
+            set { if (_showRenamed != value) { _showRenamed = value; OnPropertyChanged(); OnFilterChanged(); } }
+        }
+
+        public event EventHandler FilterChanged;
+        private void OnFilterChanged() => FilterChanged?.Invoke(this, EventArgs.Empty);
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
