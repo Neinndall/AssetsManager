@@ -5,10 +5,12 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Views.Helpers;
+using Material.Icons;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ImageDiffWindow : Window
+    public partial class ImageDiffWindow : HudWindow
     {
         private bool _isInitialized = false;
         private Point _lastMousePosition;
@@ -46,18 +48,6 @@ namespace AssetsManager.Views.Dialogs
             SideBySideBtn.IsChecked = true;
             UpdateUIMode();
         }
-
-        #region Window Controls
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-
-        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
-            else SystemCommands.MaximizeWindow(this);
-        }
-
-        private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
-        #endregion
 
         #region Difference Map Logic
 
