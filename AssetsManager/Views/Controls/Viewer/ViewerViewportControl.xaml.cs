@@ -12,15 +12,15 @@ using LeagueToolkit.Core.Mesh;
 using System.Collections.Generic;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Models;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Services.Viewer;
+using AssetsManager.Views.Models.Viewer;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
 using System.Windows.Threading;
 
-namespace AssetsManager.Views.Controls.Models
+namespace AssetsManager.Views.Controls.Viewer
 {
-    public partial class ModelViewportControl : UserControl
+    public partial class ViewerViewportControl : UserControl
     {
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
@@ -47,7 +47,7 @@ namespace AssetsManager.Views.Controls.Models
         private ModelVisual3D _skyVisual;
         private ModelVisual3D _groundVisual;
 
-        public ModelViewportControl()
+        public ViewerViewportControl()
         {
             InitializeComponent();
 

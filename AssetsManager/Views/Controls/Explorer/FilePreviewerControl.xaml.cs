@@ -14,6 +14,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Controls.Explorer;
 using AssetsManager.Views.Models.Wad;
@@ -30,6 +31,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public TreeUIManager TreeUIManager { get; set; }
 
         public event EventHandler<NodeClickedEventArgs> BreadcrumbNodeClicked;
+        public event EventHandler<SelectionActionEventArgs> SelectionActionRequested;
 
         public FilePreviewerModel ViewModel { get; set; }
         private bool _isLoaded = false;
@@ -218,6 +220,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 Breadcrumbs.NodeClicked += Breadcrumbs_NodeClicked;
                 FileGridControl.NodeClicked += FileGridControl_NodeClicked;
+                FileGridControl.SelectionActionRequested += FileGridControl_SelectionActionRequested;
                 UpdateScrollButtonsVisibility();
 
                 _isLoaded = true;
@@ -243,6 +246,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 
                 Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
                 FileGridControl.NodeClicked -= FileGridControl_NodeClicked;
+                FileGridControl.SelectionActionRequested -= FileGridControl_SelectionActionRequested;
             }
             catch (Exception ex)
             {
@@ -316,7 +320,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     .Select(n => new FileGridViewModel(n)));
 
                 FileGridControl.ItemsSource = gridItems;
-
+                
                 if (!ViewModel.IsGridMode && !ViewModel.HasEverPreviewedAFile)
                 {
                     _ = ExplorerPreviewService.ResetPreviewAsync();
@@ -364,6 +368,11 @@ namespace AssetsManager.Views.Controls.Explorer
         private void FileGridControl_NodeClicked(object sender, NodeClickedEventArgs e)
         {
             BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(e.Node));
+        }
+
+        private void FileGridControl_SelectionActionRequested(object sender, SelectionActionEventArgs e)
+        {
+            SelectionActionRequested?.Invoke(this, e);
         }
         
         public void SetBreadcrumbToggleState(bool isToggleOn)

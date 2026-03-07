@@ -3,12 +3,14 @@ using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls; // Added for ContextMenu/MenuItem if needed, though they are in System.Windows.Controls
 using System.Windows.Input;
+using System.Windows.Interop;
 using Hardcodet.Wpf.TaskbarNotification; // Hardcodet Namespace
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Utils;
@@ -25,11 +27,18 @@ using AssetsManager.Views.Controls;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
+using AssetsManager.Views.Viewer;
+using AssetsManager.Views.Helpers;
+using AssetsManager.Utils.Win;
 
 namespace AssetsManager.Views
 {
-    public partial class MainWindow
+    public partial class MainWindow : HudWindow
     {
+        // ──────────────────────────────────────────────────────────────────────
+        // Fields
+        // ──────────────────────────────────────────────────────────────────────
+
         private readonly IServiceProvider _serviceProvider;
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
@@ -165,22 +174,21 @@ namespace AssetsManager.Views
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-
-            // Register window hook to handle single instance restoration message
-            var source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
-            source?.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
-            {
-                if (msg == SingleInstance.WM_SHOW_APP)
-                {
-                    ShowAppFromTray();
-                    handled = true;
-                }
-                return IntPtr.Zero;
-            });
-            
-            // SingleInstance registration removed as it is no longer needed for basic notifications
-            // If advanced command line handling is needed for the tray icon, it can be re-added here.
         }
+
+        protected override IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            // Single instance: restaurar desde tray cuando otra instancia intenta arrancar
+            if (msg == SingleInstance.WM_SHOW_APP)
+            {
+                ShowAppFromTray();
+                handled = true;
+                return IntPtr.Zero;
+            }
+
+            return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
+        }
+
 
         // --- Taskbar / NotifyIcon Logic ---
 
@@ -257,10 +265,7 @@ namespace AssetsManager.Views
         
         private async void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
         {
-            if (allDiffs == null)
-            {
-                return;
-            }
+            if (allDiffs == null) return;
 
             var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
             {
@@ -276,10 +281,7 @@ namespace AssetsManager.Views
                 NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
             }).ToList();
 
-            if (!serializableDiffs.Any())
-            {
-                return;
-            }
+            if (!serializableDiffs.Any()) return;
 
             // Identify if this is the same comparison as before to avoid duplicate backups
             string currentIdentity = CalculateComparisonIdentity(serializableDiffs, oldLolPath, newLolPath);
@@ -297,11 +299,7 @@ namespace AssetsManager.Views
                 string displayName = "Unknown";
                 var uniqueWads = serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
 
-                if (uniqueWads.Count == 1)
-                {
-                    string wadFileName = Path.GetFileName(uniqueWads[0]);
-                    displayName = wadFileName.Split('.')[0];
-                }
+                if (uniqueWads.Count == 1) displayName = Path.GetFileName(uniqueWads[0]).Split('.')[0];
                 else
                 {
                     displayName = Path.GetFileName(newLolPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
@@ -399,7 +397,7 @@ namespace AssetsManager.Views
         {
             // If the log is currently showing only the toolbar (effectively hidden by manual resize)
             // or is explicitly minimized, we want to expand it.
-            if (_isLogMinimized || LogRowDefinition.ActualHeight <= 45)
+            if (_isLogMinimized || LogViewRow.ActualHeight <= 45)
             {
                 // Restore / Expand
                 // If the last height was too small (due to manual resize), use a default height
@@ -408,14 +406,14 @@ namespace AssetsManager.Views
                     _lastLogHeight = new GridLength(180);
                 }
 
-                LogRowDefinition.Height = _lastLogHeight;
+                LogViewRow.Height = _lastLogHeight;
                 _isLogMinimized = false;
             }
             else
             {
                 // Minimize
-                _lastLogHeight = LogRowDefinition.Height;
-                LogRowDefinition.Height = GridLength.Auto;
+                _lastLogHeight = LogViewRow.Height;
+                LogViewRow.Height = GridLength.Auto;
                 _isLogMinimized = true;
             }
         }
@@ -447,9 +445,9 @@ namespace AssetsManager.Views
                 {
                     explorerWindow.CleanupResources();
                 }
-                else if (MainContentArea.Content is ModelWindow modelWindow)
+                else if (MainContentArea.Content is ViewerWindow viewerWindow)
                 {
-                    modelWindow.CleanupResources();
+                    viewerWindow.CleanupResources();
                 }
             }
 
@@ -458,7 +456,7 @@ namespace AssetsManager.Views
                 case "Home": LoadHomeWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
                 case "Comparator": LoadComparatorWindow(); break;
-                case "Models": LoadModelWindow(); break;
+                case "Viewer": LoadViewerWindow(); break;
                 case "Monitor": LoadMonitorWindow(); break;
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
@@ -476,26 +474,10 @@ namespace AssetsManager.Views
             MainContentArea.Content = homeWindow;
         }
 
-        private void LoadExplorerWindow()
-        {
-            MainContentArea.Content = _serviceProvider.GetRequiredService<ExplorerWindow>();
-        }
-
-        private void LoadComparatorWindow()
-        {
-            var comparatorWindow = _serviceProvider.GetRequiredService<ComparatorWindow>();
-            MainContentArea.Content = comparatorWindow;
-        }
-
-        private void LoadModelWindow()
-        {
-            MainContentArea.Content = _serviceProvider.GetRequiredService<ModelWindow>();
-        }
-
-        private void LoadMonitorWindow()
-        {
-            MainContentArea.Content = _serviceProvider.GetRequiredService<MonitorWindow>();
-        }
+        private void LoadExplorerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ExplorerWindow>();
+        private void LoadComparatorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ComparatorWindow>();
+        private void LoadViewerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ViewerWindow>();
+        private void LoadMonitorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<MonitorWindow>();
 
         private void btnHelp_Click(object sender, RoutedEventArgs e)
         {
@@ -523,26 +505,14 @@ namespace AssetsManager.Views
             TrayIcon?.Dispose();
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e)
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
         }
 
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized)
-            {
-                this.WindowState = WindowState.Normal;
-            }
-            else
-            {
-                this.WindowState = WindowState.Maximized;
-            }
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
-        }
+        private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
     }
 }

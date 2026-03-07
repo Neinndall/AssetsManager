@@ -16,7 +16,7 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
-using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Services.Audio
 {
@@ -650,7 +650,7 @@ namespace AssetsManager.Services.Audio
                 if (binNode == null)
                 {
                     _logService.LogDebug($"[FindAssociatedBinFileAsync] Node not found with direct path. Trying with status prefixes.");
-                    string[] prefixes = { "[~] Modified/", "[+] New/", "[»] Renamed/", "[=] Dependency/" };
+                    string[] prefixes = { "Modified/", "New/", "Renamed/", "Dependency/" };
                     foreach (var prefix in prefixes)
                     {
                         string prefixedPath = prefix + strategy.BinPath;

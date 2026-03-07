@@ -5,7 +5,7 @@ using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Dialogs;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Services.Explorer
 {

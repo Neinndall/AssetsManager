@@ -8,13 +8,14 @@ using System.Windows.Media;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Utils;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Home;
 using AssetsManager.Views.Models.Settings;
 using Microsoft.Win32;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ConverterWindow : Window
+    public partial class ConverterWindow : HudWindow
     {
         public ConverterModel ViewModel { get; set; }
         private readonly CustomMessageBoxService _customMessageBox;
@@ -30,15 +31,6 @@ namespace AssetsManager.Views.Dialogs
             ViewModel = new ConverterModel();
             this.DataContext = ViewModel;
         }
-
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-                this.DragMove();
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e) => this.WindowState = WindowState.Minimized;
-        private void Close_Click(object sender, RoutedEventArgs e) => this.Close();
 
         private void DropArea_DragEnter(object sender, DragEventArgs e)
         {
@@ -161,7 +153,7 @@ namespace AssetsManager.Views.Dialogs
                                     await ProcessAudioItem(item, destinationPath);
                                 }
                             }
-                            catch
+                            catch (Exception)
                             {
                                 item.Status = "Error";
                             }

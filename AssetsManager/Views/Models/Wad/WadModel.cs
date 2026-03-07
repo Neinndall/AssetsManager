@@ -66,21 +66,19 @@ namespace AssetsManager.Views.Models.Wad
         {
             get
             {
-                if (Type != ChunkDiffType.Modified || OldUncompressedSize == null || NewUncompressedSize == null)
-                    return null;
+                if (Type == ChunkDiffType.Renamed || Type == ChunkDiffType.Dependency) return "N/A";
 
-                long diff = (long)NewUncompressedSize - (long)OldUncompressedSize;
-                if (diff == 0) return "N/A";
-                
-                string sign = diff > 0 ? "+" : "";
-                
-                if (Math.Abs(diff) < 1024)
+                long diff = Type switch
                 {
-                    return $"{sign}{diff} Bytes";
-                }
+                    ChunkDiffType.New => (long)(NewUncompressedSize ?? 0),
+                    ChunkDiffType.Removed => -(long)(OldUncompressedSize ?? 0),
+                    ChunkDiffType.Modified => (long)(NewUncompressedSize ?? 0) - (long)(OldUncompressedSize ?? 0),
+                    _ => 0
+                };
 
-                double diffKB = diff / 1024.0;
-                return $"{sign}{diffKB:F2} KB";
+                if (diff == 0 && Type == ChunkDiffType.Modified) return "N/A";
+                
+                return (diff > 0 ? "+" : "") + FormatSize((ulong)Math.Abs(diff));
             }
         }
 

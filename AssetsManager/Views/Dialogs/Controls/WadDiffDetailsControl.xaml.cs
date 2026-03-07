@@ -12,12 +12,5 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             InitializeComponent();
         }
-
-        private string FormatSize(ulong? sizeInBytes)
-        {
-            if (sizeInBytes == null) return "N/A";
-            double sizeInKB = (double)sizeInBytes / 1024.0;
-            return $"{sizeInKB:F2} KB";
-        }
     }
 }

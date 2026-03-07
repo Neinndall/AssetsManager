@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Shared
 {
@@ -11,7 +12,7 @@ namespace AssetsManager.Views.Models.Shared
     {
         private List<T> _fullList = new List<T>();
 
-        public ObservableCollection<T> PagedItems { get; } = new ObservableCollection<T>();
+        public ObservableRangeCollection<T> PagedItems { get; } = new ObservableRangeCollection<T>();
 
         private int _currentPage = 1;
         public int CurrentPage
@@ -83,11 +84,7 @@ namespace AssetsManager.Views.Models.Shared
                     .Skip((CurrentPage - 1) * PageSize)
                     .Take(PageSize);
 
-                PagedItems.Clear();
-                foreach (var item in pagedItems)
-                {
-                    PagedItems.Add(item);
-                }
+                PagedItems.ReplaceRange(pagedItems);
             }
 
             OnPropertyChanged(nameof(CanGoToNextPage));

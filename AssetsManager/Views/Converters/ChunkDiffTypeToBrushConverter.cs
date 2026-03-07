@@ -18,7 +18,7 @@ namespace AssetsManager.Views.Converters
                     case ChunkDiffType.Removed: return Brushes.Red;
                     case ChunkDiffType.Modified: return Brushes.DodgerBlue;
                     case ChunkDiffType.Renamed: return Brushes.Orange;
-                    case ChunkDiffType.Dependency: return Brushes.Gray;
+                    case ChunkDiffType.Dependency: return Brushes.Teal;
                     default: return Brushes.White;
                 }
             }

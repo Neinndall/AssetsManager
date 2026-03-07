@@ -116,16 +116,13 @@
                                      TextChanged="SearchTextBox_TextChanged"
                                      Margin="4,0,0,0"/>
                             
-                            <TextBlock Text="Search files..."
-                                       Foreground="{StaticResource TextSecondary}"
-                                       VerticalAlignment="Center"
-                                       HorizontalAlignment="Left"
-                                       FontSize="12"
-                                       Opacity="0.5"
-                                       IsHitTestVisible="False"
-                                       Margin="20,0,0,0">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
+                            <StackPanel Orientation="Horizontal"
+                                        IsHitTestVisible="False"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left"
+                                        Margin="20,0,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
                                             <MultiDataTrigger>
@@ -137,8 +134,14 @@
                                             </MultiDataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                                </StackPanel.Style>
+                                <materialIcons:MaterialIcon Kind="Magnify" Width="14" Height="14" Foreground="{StaticResource TextSecondary}" Opacity="0.5" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Search..."
+                                           Foreground="{StaticResource TextSecondary}"
+                                           Opacity="0.5"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 </Grid>

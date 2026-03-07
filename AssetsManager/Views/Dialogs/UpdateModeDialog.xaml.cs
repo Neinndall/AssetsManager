@@ -1,4 +1,5 @@
 using System.Windows;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -9,7 +10,7 @@ namespace AssetsManager.Views.Dialogs
         CleanWithSaving
     }
 
-    public partial class UpdateModeDialog : Window
+    public partial class UpdateModeDialog : HudWindow
     {
         public UpdateMode SelectedMode { get; private set; } = UpdateMode.None;
 
@@ -33,17 +34,6 @@ namespace AssetsManager.Views.Dialogs
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
-        }
-
-        private void TitleBar_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
-                this.DragMove();
-        }
-
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
         }
     }
 }

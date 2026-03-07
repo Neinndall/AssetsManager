@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Collections;
 using System.Windows.Controls.Primitives;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Helpers
 {
@@ -37,18 +38,19 @@ namespace AssetsManager.Views.Helpers
             // 2. Seguridad: Asegurar que el clic es en el encabezado de ESTE ítem y no en uno de sus hijos
             if (FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != item) return;
 
-            bool isControlPressed = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
-
-            // 3. Lógica de Selección Múltiple (Solo para modelos compatibles)
-            if (isControlPressed && item.DataContext is FileSystemNodeModel model)
+            // 3. Lógica de Selección Múltiple (Usa el Helper Centralizado)
+            if (InteractionHelper.IsMultiSelectIntent())
             {
-                model.IsMultiSelected = !model.IsMultiSelected;
-                e.Handled = true; // Bloqueamos la selección nativa para mantener nuestra multi-selección
-                return;
+                if (item.DataContext is FileSystemNodeModel model)
+                {
+                    model.IsMultiSelected = !model.IsMultiSelected;
+                    e.Handled = true; // Bloqueamos la selección nativa para mantener nuestra multi-selección
+                    return;
+                }
             }
 
-            // 4. Lógica de Navegación y Expansión (Clic Normal)
-            if (!isControlPressed)
+            // 4. Lógica de Navegación y Expansión (Clic Normal / Primary Action)
+            if (InteractionHelper.IsPrimaryActionIntent())
             {
                 // Limpiar estados de multi-selección solo si estamos en un árbol compatible
                 var treeView = FindAncestor<TreeView>(item);

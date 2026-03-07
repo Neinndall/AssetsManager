@@ -9,12 +9,12 @@ using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Hashing;
 using LeagueToolkit.Core.Memory;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using Quaternion = System.Numerics.Quaternion;
 
-namespace AssetsManager.Services.Models
+namespace AssetsManager.Services.Viewer
 {
     public class AnimationPlayer
     {

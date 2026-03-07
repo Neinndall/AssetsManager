@@ -116,6 +116,12 @@
 
                             <!-- Actions -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Click="btnEditName_Click" ToolTip="Edit Comparison Name" 
+                                        Style="{StaticResource TransparentIconButton}" 
+                                        Width="28" Height="28" Margin="0,0,4,0">
+                                    <materialIcons:MaterialIcon Kind="PencilOutline" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                                </Button>
+
                                 <Button Click="btnViewDiff_Click" ToolTip="View Historical Differences" 
                                         Style="{StaticResource TransparentIconButton}" 
                                         Width="28" Height="28" Margin="0,0,4,0">

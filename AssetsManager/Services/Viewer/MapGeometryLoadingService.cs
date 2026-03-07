@@ -15,10 +15,11 @@ using LeagueToolkit.Core.Memory;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 
-namespace AssetsManager.Services.Models
+namespace AssetsManager.Services.Viewer
 {
     public class MapGeometryLoadingService
     {
@@ -213,7 +214,8 @@ namespace AssetsManager.Services.Models
 
             var submeshDataList = processingResult.SubmeshDataList;
             var loadedTextures = processingResult.LoadedTextures;
-            var availableTextureNames = new ObservableCollection<string>(loadedTextures.Keys);
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
+            var parts = new List<ModelPart>();
 
             foreach (var data in submeshDataList)
             {
@@ -246,10 +248,11 @@ namespace AssetsManager.Services.Models
                 modelPart.Visual.Content = geometryModel;
                 TextureUtils.UpdateMaterial(modelPart);
 
-                sceneModel.Parts.Add(modelPart);
+                parts.Add(modelPart);
                 sceneModel.RootVisual.Children.Add(modelPart.Visual);
             }
 
+            sceneModel.Parts.AddRange(parts);
             _logService.LogDebug("--- Finished displaying model ---");
             return sceneModel;
         }

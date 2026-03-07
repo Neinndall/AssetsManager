@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Services.Hashes;
@@ -53,7 +54,7 @@ namespace AssetsManager.Views
             FileExplorer.AudioBankService = audioBankService;
             FileExplorer.AudioBankLinkerService = audioBankLinkerService;
             FileExplorer.HashResolverService = hashResolverService;
-            FileExplorer.TaskCancellationManager = taskCancellationManager; // Added this line
+            FileExplorer.TaskCancellationManager = taskCancellationManager;
             FileExplorer.FavoritesManager = favoritesManager;
             FileExplorer.ImageMergerService = imageMergerService;
             FileExplorer.ProgressUIManager = progressUIManager;
@@ -64,12 +65,13 @@ namespace AssetsManager.Views
             FilePreviewer.ExplorerPreviewService = explorerPreviewService;
             FilePreviewer.TreeUIManager = treeUIManager;
 
-            FileExplorer.FilePreviewer = FilePreviewer; // Set the dependency
+            FileExplorer.FilePreviewer = FilePreviewer;
         }
 
         private void ExplorerWindow_Loaded(object sender, RoutedEventArgs e)
         {
             FilePreviewer.BreadcrumbNodeClicked += FilePreviewer_BreadcrumbNodeClicked;
+            FilePreviewer.SelectionActionRequested += FilePreviewer_SelectionActionRequested;
             FileExplorer.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
         }
 
@@ -78,10 +80,25 @@ namespace AssetsManager.Views
             FilePreviewer.SetBreadcrumbToggleState(e.NewValue);
         }
 
-
         private void FilePreviewer_BreadcrumbNodeClicked(object sender, NodeClickedEventArgs e)
         {
             FileExplorer.SelectNode(e.Node);
+        }
+
+        private void FilePreviewer_SelectionActionRequested(object sender, SelectionActionEventArgs e)
+        {
+            switch (e.Action)
+            {
+                case "Extract":
+                    FileExplorer.TriggerExtractNodes(e.Nodes);
+                    break;
+                case "Save":
+                    FileExplorer.TriggerSaveNodes(e.Nodes);
+                    break;
+                case "Merge":
+                    FileExplorer.TriggerAddToMerger(e.Nodes);
+                    break;
+            }
         }
 
         private async void FileExplorer_FileSelected(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -89,15 +106,12 @@ namespace AssetsManager.Views
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
                 FilePreviewer.UpdateSelectedNode(selectedNode, FileExplorer.RootNodes);
-
-                // Always show the preview for the selected node.
                 await FilePreviewer.ShowPreviewAsync(selectedNode);
             }
         }
 
         public void CleanupResources()
         {
-            // Desuscribir evento
             if (FileExplorer != null)
             {
                 FileExplorer.FileSelected -= FileExplorer_FileSelected;
@@ -107,12 +121,11 @@ namespace AssetsManager.Views
             if (FilePreviewer != null)
             {
                 FilePreviewer.BreadcrumbNodeClicked -= FilePreviewer_BreadcrumbNodeClicked;
+                FilePreviewer.SelectionActionRequested -= FilePreviewer_SelectionActionRequested;
             }
 
-            // Limpiar controles hijo
             FileExplorer?.CleanupResources();
 
-            // Romper referencia cruzada
             if (FileExplorer != null)
             {
                 FileExplorer.FilePreviewer = null;

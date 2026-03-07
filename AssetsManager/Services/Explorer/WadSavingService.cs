@@ -8,6 +8,7 @@ using System.Threading;
 using System.Linq;
 using LeagueToolkit.Toolkit;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Services.Parsers;
@@ -130,7 +131,15 @@ namespace AssetsManager.Services.Explorer
             {
                 SourceChunkPathHash = (diff.Type == ChunkDiffType.Removed) ? diff.OldPathHash : diff.NewPathHash,
                 ChunkDiff = diff,
-                Status = (DiffStatus)diff.Type
+                Status = diff.Type switch
+                {
+                    ChunkDiffType.New => DiffStatus.New,
+                    ChunkDiffType.Modified => DiffStatus.Modified,
+                    ChunkDiffType.Renamed => DiffStatus.Renamed,
+                    ChunkDiffType.Removed => DiffStatus.Deleted,
+                    ChunkDiffType.Dependency => DiffStatus.Dependency,
+                    _ => DiffStatus.Unchanged
+                }
             };
 
             await ProcessAndSaveAsync(node, destinationPath, null, basePath, cancellationToken);
@@ -382,6 +391,13 @@ namespace AssetsManager.Services.Explorer
         private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // If user wants the original format, we don't load or convert the texture
+            if (_appSettings.ImageExportFormat == ImageExportFormat.Original)
+            {
+                await HandleRawFileExtractionAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                return;
+            }
 
             var fileBytes = await _wadExtractionService.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null)

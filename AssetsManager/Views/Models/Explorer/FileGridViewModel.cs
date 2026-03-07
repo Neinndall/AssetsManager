@@ -15,13 +15,14 @@ namespace AssetsManager.Views.Models.Explorer
 
         public string DisplayNameShort => PathUtils.TruncateForDisplay(Node.DisplayName, 50);
 
-        public string SubfolderCount => IsUnloadedSoundBank 
-            ? "N/A" 
-            : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
+        private string _subfolderCount;
+        public string SubfolderCount => _subfolderCount ?? (_subfolderCount = IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
 
-        public string AssetCount => IsUnloadedSoundBank 
-            ? "N/A" 
-            : (Node.Children?.Count(c => !IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
+        private string _folderCount;
+        public string FolderCount => _folderCount ?? (_folderCount = IsUnloadedSoundBank ? "0" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
+
+        private string _assetCount;
+        public string AssetCount => _assetCount ?? (_assetCount = IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => !IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
 
         private bool IsUnloadedSoundBank => Node.Type == NodeType.SoundBank && 
                                             Node.Children?.Count == 1 && 
@@ -30,6 +31,13 @@ namespace AssetsManager.Views.Models.Explorer
         private static bool IsNodeFolder(FileSystemNodeModel node)
         {
             return node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent;
+        }
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { if (_isSelected != value) { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); } }
         }
 
         private ImageSource _imagePreview;
@@ -52,7 +60,7 @@ namespace AssetsManager.Views.Models.Explorer
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged(string propertyName)
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

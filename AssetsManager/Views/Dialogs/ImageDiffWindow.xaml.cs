@@ -5,10 +5,11 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ImageDiffWindow : Window
+    public partial class ImageDiffWindow : HudWindow
     {
         private bool _isInitialized = false;
         private Point _lastMousePosition;
@@ -111,6 +112,9 @@ namespace AssetsManager.Views.Dialogs
 
         private void ImageDiffWindow_MouseDown(object sender, MouseButtonEventArgs e)
         {
+            // Abort if the click comes from the title bar area (36px)
+            if (e.GetPosition(this).Y < 36) return;
+
             if (e.ChangedButton == MouseButton.Left || e.ChangedButton == MouseButton.Middle)
             {
                 _isDragging = true;
@@ -148,7 +152,8 @@ namespace AssetsManager.Views.Dialogs
             UpdateTransformGroup(OldOverlayScale, OldOverlayTranslate, scale, deltaX, deltaY);
             UpdateTransformGroup(NewOverlayScale, NewOverlayTranslate, scale, deltaX, deltaY);
             UpdateTransformGroup(DiffOverlayScale, DiffOverlayTranslate, scale, deltaX, deltaY);
-            UpdateTransformGroup(SliderSeparatorScale, SliderSeparatorTranslate, scale, deltaX, deltaY);
+            if (SliderSeparatorScale != null && SliderSeparatorTranslate != null)
+                UpdateTransformGroup(SliderSeparatorScale, SliderSeparatorTranslate, scale, deltaX, deltaY);
             UpdateSliderEffect();
         }
 
@@ -230,28 +235,6 @@ namespace AssetsManager.Views.Dialogs
             NewImageOverlay.Source = null;
             DiffImageOverlay.Source = null;
             _diffMap = null;
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
-
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized)
-            {
-                this.WindowState = WindowState.Normal;
-            }
-            else
-            {
-                this.WindowState = WindowState.Maximized;
-            }
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
         }
     }
 }

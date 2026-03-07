@@ -1,9 +1,8 @@
 using System;
-using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Views.Models.Explorer;
-using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Controls.Explorer
 {

@@ -4,7 +4,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Utils.Framework
 {
     /// <summary> 
     /// Extension of ObservableCollection to support AddRange and suppress multiple notifications.
@@ -40,6 +40,8 @@ namespace AssetsManager.Utils
                 _isSuppressingNotification = false;
             }
 
+            OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
+            OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
@@ -64,6 +66,8 @@ namespace AssetsManager.Utils
                 _isSuppressingNotification = false;
             }
 
+            OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
+            OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 

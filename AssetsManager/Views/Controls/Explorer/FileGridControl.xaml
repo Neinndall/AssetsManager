@@ -6,134 +6,100 @@
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
-    <UserControl.Resources>
-        <DataTemplate x:Key="FileGridItemTemplate">
-            <!-- Main Card Container -->
-            <Border Margin="8" Width="140" Height="170" CornerRadius="12"
-                    MouseLeftButtonUp="FileGridControl_Item_MouseLeftButtonUp" Cursor="Hand"
-                    Background="{StaticResource CardBackground}"
-                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>   <!-- Hero / Thumbnail -->
-                        <RowDefinition Height="Auto"/> <!-- Info -->
-                    </Grid.RowDefinitions>
-
-                    <!-- HERO AREA -->
-                    <Border Grid.Row="0" CornerRadius="11,11,0,0" Background="Transparent" ClipToBounds="True">
-                        <Grid>
-                            <!-- Folder/Generic Background Pattern (Optional subtle tint) -->
-                            <Border Background="{StaticResource SidebarBackground}" Opacity="0.3"/>
-
-                            <!-- Material Icon Fallback -->
-                            <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
-                                                        Width="64" Height="64" 
-                                                        HorizontalAlignment="Center" VerticalAlignment="Center" 
-                                                        Foreground="{StaticResource TextSecondary}"
-                                                        Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
-                            
-                            <!-- Image Preview (using Border+ImageBrush for perfect corner clipping) -->
-                            <Border x:Name="ImageBorder"
-                                    CornerRadius="11,11,0,0"
-                                    Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
-                                <Border.Background>
-                                    <ImageBrush ImageSource="{Binding ImagePreview}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
-                                </Border.Background>
-                            </Border>
-
-                            <!-- Top-Right Badge (Type Indicator) -->
-                            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0" 
-                                    CornerRadius="4" Padding="6,2" Background="#CC000000">
-                                <TextBlock Text="{Binding FileExtensionDisplay}" 
-                                           FontSize="9" 
-                                           FontWeight="Bold" 
-                                           Foreground="White"/>
-                            </Border>
-                        </Grid>
-                    </Border>
-
-                    <!-- INFO AREA -->
-                    <Border Grid.Row="1" Background="Transparent" Padding="10,8,10,12">
-                        <StackPanel>
-                            <!-- File Name -->
-                            <TextBlock Text="{Binding DisplayNameShort}" 
-                                       TextTrimming="CharacterEllipsis"
-                                       TextWrapping="Wrap"
-                                       TextAlignment="Left"
-                                       Foreground="{StaticResource TextPrimary}" 
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Height="34"/> <!-- Fixed height for 2 lines -->
-
-                            <!-- Metadata Line -->
-                            <Grid Margin="0,4,0,0">
-                                <!-- Folder Stats: Subfolders and Assets split -->
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsFolder}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
-                                    
-                                    <!-- Subfolders -->
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
-                                        <materialIcons:MaterialIcon Kind="FolderOutline" Width="10" Height="10" Foreground="{StaticResource AccentOrange}" Margin="0,0,3,0"/>
-                                        <TextBlock Text="{Binding SubfolderCount}" FontSize="10" Foreground="{StaticResource TextSecondary}" FontWeight="Medium"/>
-                                    </StackPanel>
-
-                                    <!-- Assets -->
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="FileOutline" Width="10" Height="10" Foreground="{StaticResource AccentBlue}" Margin="0,0,3,0"/>
-                                        <TextBlock Text="{Binding AssetCount}" FontSize="10" Foreground="{StaticResource TextSecondary}" FontWeight="Medium"/>
-                                    </StackPanel>
-                                </StackPanel>
-                                
-                                <!-- File Hint (if not folder) -->
-                                <TextBlock Text="Asset" FontSize="10" Foreground="{StaticResource TextMuted}" FontStyle="Italic">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsFolder}" Value="False">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </Grid>
-            </Border>
-        </DataTemplate>
-    </UserControl.Resources>
     
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
-        <ItemsControl x:Name="FileGridViewItemsControl"
-                      ItemTemplate="{StaticResource FileGridItemTemplate}">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-        </ItemsControl>
-    </ScrollViewer>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Folder Insights & Filters -->
+            <RowDefinition Height="*"/>    <!-- Main Grid -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. Header -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" Margin="1,0,5,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <TextBlock Text="FILTER BY" Style="{StaticResource ToolSectionLabel}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" IsChecked="True" Tag="All" Click="FilterButton_Click" ToolTip="Show All Assets" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="BorderAll" Width="16" Height="16"/>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Images" Click="FilterButton_Click" ToolTip="Images &amp; Textures" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="TextureBox" Width="16" Height="16"/>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Audio" Click="FilterButton_Click" ToolTip="Audio Banks &amp; Media" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="VolumeHigh" Width="16" Height="16"/>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="3D" Click="FilterButton_Click" ToolTip="3D Models &amp; Animations" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="16" Height="16"/>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Data" Click="FilterButton_Click" ToolTip="Text &amp; Data" Padding="10,4">
+                            <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="16" Height="16"/>
+                        </RadioButton>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- 2. Main Grid: Simplified ListBox -->
+        <ListBox Grid.Row="1" x:Name="FileGridListBox"
+                 Style="{StaticResource ModernFileGridListBox}"
+                 ItemTemplate="{StaticResource FileGridItemTemplate}"
+                 SelectionChanged="FileGridListBox_SelectionChanged">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem" BasedOn="{StaticResource FileGridItemStyle}">
+                    <EventSetter Event="PreviewMouseLeftButtonDown" Handler="FileGridControl_Item_MouseLeftButtonDown"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
+        </ListBox>
+
+        <!-- 3. Floating Action Bar (Visible on Multi-selection) -->
+        <Border x:Name="ActionBarBorder" Grid.Row="1" 
+                VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                Margin="0,0,0,30" Visibility="Collapsed"
+                Background="{StaticResource CardBackground}" 
+                CornerRadius="22" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1.5"
+                Padding="15,8">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="15" ShadowDepth="2" Opacity="0.4"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <materialIcons:MaterialIcon Kind="CheckCircleOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="5,0,12,0"/>
+                <TextBlock x:Name="SelectedCountText" Text="0 items" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                
+                <Border Background="{StaticResource BorderColor}" Width="1" Height="16" Margin="0,0,15,0"/>
+
+                <!-- Extract (Raw) -->
+                <Button Style="{StaticResource TransparentIconButton}" Tag="Extract" Click="ActionBar_Action_Click" ToolTip="Extract Raw Assets" Width="32" Height="32">
+                    <materialIcons:MaterialIcon Kind="FileDownloadOutline" Width="20" Height="20"/>
+                </Button>
+
+                <!-- Save (Smart) -->
+                <Button Style="{StaticResource TransparentIconButton}" Tag="Save" Click="ActionBar_Action_Click" ToolTip="Save (conversion)" Width="32" Height="32">
+                    <materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="20" Height="20"/>
+                </Button>
+
+                <!-- Merger -->
+                <Button Style="{StaticResource TransparentIconButton}" Tag="Merge" Click="ActionBar_Action_Click" ToolTip="Add to Image Merger" Width="32" Height="32">
+                    <materialIcons:MaterialIcon Kind="ViewGridPlusOutline" Width="20" Height="20"/>
+                </Button>
+
+                <Border Background="{StaticResource BorderColor}" Width="1" Height="16" Margin="10,0,10,0"/>
+
+                <!-- Close -->
+                <Button Tag="Close" Click="ActionBar_Action_Click" ToolTip="Clear Selection" Width="32" Height="32">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <materialIcons:MaterialIcon Kind="Close" Width="18" Height="18"/>
+                </Button>
+            </StackPanel>
+        </Border>
+    </Grid>
 </UserControl>

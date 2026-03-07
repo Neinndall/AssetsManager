@@ -17,16 +17,20 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Views.Models.Dialogs;
+using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Wad;
+using TextBox = System.Windows.Controls.TextBox;
+using MenuItem = System.Windows.Controls.MenuItem;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class WadComparisonResultWindow : Window
+    public partial class WadComparisonResultWindow : HudWindow
     {
         private List<SerializableChunkDiff> _serializableDiffs;
         private readonly IServiceProvider _serviceProvider;
@@ -77,8 +81,39 @@ namespace AssetsManager.Views.Dialogs
             _hashResolverService = hashResolverService;
             _appSettings = appSettings;
 
+            _viewModel.TreeModel.FilterChanged += (s, e) => 
+            {
+                Dispatcher.Invoke(() => ApplyFilters());
+            };
+
             Loaded += WadComparisonResultWindow_Loaded;
             Closed += OnWindowClosed;
+        }
+
+        public void ApplyFilters()
+        {
+            if (_serializableDiffs == null) return;
+
+            // 1. Filter the raw list
+            var filtered = _serializableDiffs.Where(d => 
+            {
+                // State Filter
+                bool stateMatch = false;
+                if (d.Type == ChunkDiffType.New && _viewModel.TreeModel.ShowNew) stateMatch = true;
+                else if (d.Type == ChunkDiffType.Modified && _viewModel.TreeModel.ShowModified) stateMatch = true;
+                else if (d.Type == ChunkDiffType.Removed && _viewModel.TreeModel.ShowRemoved) stateMatch = true;
+                else if (d.Type == ChunkDiffType.Renamed && _viewModel.TreeModel.ShowRenamed) stateMatch = true;
+                
+                if (!stateMatch) return false;
+
+                // Text Filter
+                if (string.IsNullOrWhiteSpace(_viewModel.FilterText)) return true;
+                return d.FileName.IndexOf(_viewModel.FilterText, StringComparison.OrdinalIgnoreCase) >= 0;
+            }).ToList();
+
+            // 2. Update Tree Model
+            var wadGroups = PrepareGroupedResults(filtered);
+            _viewModel.SetResults(filtered, wadGroups);
         }
 
         /// <summary>
@@ -145,17 +180,8 @@ namespace AssetsManager.Views.Dialogs
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             var searchTextBox = (TextBox)e.Source;
-            if (string.IsNullOrWhiteSpace(searchTextBox.Text))
-            {
-                PopulateResults(_serializableDiffs);
-            }
-            else
-            {
-                var filteredDiffs = _serializableDiffs
-                    .Where(d => d.FileName.IndexOf(searchTextBox.Text, StringComparison.OrdinalIgnoreCase) >= 0)
-                    .ToList();
-                PopulateResults(filteredDiffs);
-            }
+            _viewModel.FilterText = searchTextBox.Text;
+            ApplyFilters();
         }
 
         private void TryResolveHashes()
@@ -250,22 +276,42 @@ namespace AssetsManager.Views.Dialogs
 
         private List<WadGroupViewModel> PrepareGroupedResults(List<SerializableChunkDiff> diffs)
         {
-            var groupedByWad = diffs.GroupBy(d => d.SourceWadFile)
-                                    .OrderBy(g => g.Key);
+            var groups = new List<WadGroupViewModel>();
+            var groupedByWad = diffs.GroupBy(d => d.SourceWadFile).OrderBy(g => g.Key);
 
-            return groupedByWad.Select(wadGroup => new WadGroupViewModel
+            foreach (var wadGroup in groupedByWad)
             {
-                WadName = wadGroup.Key,
-                DiffCount = wadGroup.Count(),
-                Types = new ObservableRangeCollection<DiffTypeGroupViewModel>(wadGroup.GroupBy(d => d.Type)
-                                  .OrderBy(g => g.Key.ToString())
-                                  .Select(typeGroup => new DiffTypeGroupViewModel
-                                  {
-                                      Type = typeGroup.Key,
-                                      DiffCount = typeGroup.Count(),
-                                      Diffs = new ObservableRangeCollection<SerializableChunkDiff>(typeGroup.OrderBy(d => d.NewPath ?? d.OldPath))
-                                  }))
-            }).ToList();
+                var wadVm = new WadGroupViewModel
+                {
+                    WadName = wadGroup.Key,
+                    DiffCount = wadGroup.Count()
+                };
+
+                var groupedByType = wadGroup.GroupBy(d => d.Type).OrderBy(g => g.Key.ToString());
+                foreach (var typeGroup in groupedByType)
+                {
+                    var typeVm = new DiffTypeGroupViewModel
+                    {
+                        Type = typeGroup.Key,
+                        DiffCount = typeGroup.Count()
+                    };
+                    typeVm.Diffs.ReplaceRange(typeGroup.OrderBy(d => d.NewPath ?? d.OldPath));
+                    
+                    // Only add the type group if it actually contains items after filtering
+                    if (typeVm.Diffs.Count > 0)
+                    {
+                        wadVm.Types.Add(typeVm);
+                    }
+                }
+
+                // Only add the WAD group if it contains at least one type group with items
+                if (wadVm.Types.Count > 0)
+                {
+                    groups.Add(wadVm);
+                }
+            }
+
+            return groups;
         }
 
         private void PopulateResults(List<SerializableChunkDiff> diffs)
@@ -276,7 +322,14 @@ namespace AssetsManager.Views.Dialogs
 
         private void ResultsTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            _viewModel.SelectedDiff = e.NewValue as SerializableChunkDiff;
+            if (e.NewValue is SerializableChunkDiff diff)
+            {
+                _viewModel.DetailsModel = new WadDiffDetailsModel { SelectedDiff = diff };
+            }
+            else
+            {
+                _viewModel.DetailsModel = null;
+            }
         }
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -377,28 +430,6 @@ namespace AssetsManager.Views.Dialogs
                     viewDiffMenuItem.IsEnabled = true;
                 }
             }
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
-
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized)
-            {
-                this.WindowState = WindowState.Normal;
-            }
-            else
-            {
-                this.WindowState = WindowState.Maximized;
-            }
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
         }
     }
 }

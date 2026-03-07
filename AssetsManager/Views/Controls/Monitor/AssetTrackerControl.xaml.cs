@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -14,6 +15,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Views.Controls.Monitor
@@ -28,17 +30,17 @@ namespace AssetsManager.Views.Controls.Monitor
         public AppSettings AppSettings { get; set; }
 
         // Internal state properties
-        public ObservableCollection<AssetCategory> Categories { get; set; }
+        public ObservableRangeCollection<AssetCategory> Categories { get; set; }
         public AssetCategory SelectedCategory { get; set; }
-        public ObservableCollection<TrackedAsset> Assets { get; set; }
+        public ObservableRangeCollection<TrackedAsset> Assets { get; set; }
 
         public AssetTrackerControl()
         {
             InitializeComponent();
             this.Loaded += AssetTrackerControl_Loaded;
             this.Unloaded += AssetTrackerControl_Unloaded;
-            Categories = new ObservableCollection<AssetCategory>();
-            Assets = new ObservableCollection<TrackedAsset>();
+            Categories = new ObservableRangeCollection<AssetCategory>();
+            Assets = new ObservableRangeCollection<TrackedAsset>();
         }
 
         private void AssetTrackerControl_Loaded(object sender, RoutedEventArgs e)
@@ -64,12 +66,7 @@ namespace AssetsManager.Views.Controls.Monitor
         private void LoadTrackerData()
         {
             MonitorService.LoadAssetCategories();
-
-            Categories.Clear();
-            foreach (var category in MonitorService.AssetCategories)
-            {
-                Categories.Add(category);
-            }
+            Categories.ReplaceRange(MonitorService.AssetCategories);
 
             CategoryComboBox.ItemsSource = Categories;
 
@@ -110,16 +107,15 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void RefreshAssetList()
         {
-            Assets.Clear();
-            if (SelectedCategory == null || MonitorService == null) return;
+            if (SelectedCategory == null || MonitorService == null)
+            {
+                Assets.Clear();
+                return;
+            }
 
             // The service now returns the exact list we need to display
             var assetsFromService = MonitorService.GetAssetListForCategory(SelectedCategory);
-
-            foreach (var asset in assetsFromService)
-            {
-                Assets.Add(asset);
-            }
+            Assets.ReplaceRange(assetsFromService);
 
             AssetsItemsControl.ItemsSource = Assets;
         }
@@ -184,10 +180,7 @@ namespace AssetsManager.Views.Controls.Monitor
             try
             {
                 var newAssets = MonitorService.GenerateMoreAssets(Assets, SelectedCategory, 5); // Generate 5 more
-                foreach (var asset in newAssets)
-                {
-                    Assets.Add(asset);
-                }
+                Assets.AddRange(newAssets);
             }
             catch (Exception ex)
             {
@@ -328,7 +321,7 @@ namespace AssetsManager.Views.Controls.Monitor
             var assetToRemove = button?.Tag as TrackedAsset;
             if (assetToRemove == null || SelectedCategory == null) return;
 
-            var result = CustomMessageBoxService.ShowYesNo("Info", $"Are you sure you want to remove '{assetToRemove.DisplayName}'? This action is permanent and the asset will not appear again in this category.", Window.GetWindow(this));
+            var result = CustomMessageBoxService.ShowYesNo("Information", $"Are you sure you want to remove '{assetToRemove.DisplayName}'? This action is permanent and the asset will not appear again in this category.", Window.GetWindow(this));
             if (result == true)
             {
                 MonitorService.RemoveAsset(SelectedCategory, assetToRemove);
@@ -340,7 +333,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (SelectedCategory == null || !Assets.Any(a => a.Status == "OK"))
             {
-                CustomMessageBoxService.ShowInfo("Info", "There are no found assets to remove in this category.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowInfo("Information", "There are no found assets to remove in this category.", Window.GetWindow(this));
                 return;
             }
 

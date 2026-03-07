@@ -12,10 +12,12 @@ using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ImageMergerWindow : Window
+    public partial class ImageMergerWindow : HudWindow
     {
         public ImageMergerModel ViewModel { get; set; }
         private readonly CustomMessageBoxService _customMessageBox;
@@ -34,7 +36,6 @@ namespace AssetsManager.Views.Dialogs
 
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
             
-            // Suscribirse a la colección del servicio directamente para asegurar que los cambios se detecten siempre
             _imageMergerService.Items.CollectionChanged += (s, e) => RequestRender();
             
             RequestRender();
@@ -89,19 +90,14 @@ namespace AssetsManager.Views.Dialogs
 
                 if (items.Count == 0) return null;
 
-                // 1. Calculate dimensions
                 int rows = (int)Math.Ceiling((double)items.Count / columns);
                 
-                // We use the maximum width/height of items to normalize the grid if needed, 
-                // or just follow their natural size. For simplicity and better look, 
-                // we'll find the max dimensions to make a uniform grid.
                 double maxWidth = items.Max(i => i.Image.PixelWidth);
                 double maxHeight = items.Max(i => i.Image.PixelHeight);
 
                 int totalWidth = (int)(columns * maxWidth + (columns - 1) * margin);
                 int totalHeight = (int)(rows * maxHeight + (rows - 1) * margin);
 
-                // Use DrawingVisual for high performance rendering
                 DrawingVisual drawingVisual = new DrawingVisual();
                 using (DrawingContext drawingContext = drawingVisual.RenderOpen())
                 {
@@ -113,7 +109,6 @@ namespace AssetsManager.Views.Dialogs
                         double x = col * (maxWidth + margin);
                         double y = row * (maxHeight + margin);
 
-                        // Draw image centered in its cell if smaller than max
                         double drawX = x + (maxWidth - items[i].Image.PixelWidth) / 2;
                         double drawY = y + (maxHeight - items[i].Image.PixelHeight) / 2;
 
@@ -121,7 +116,6 @@ namespace AssetsManager.Views.Dialogs
                     }
                 }
 
-                // Render to bitmap
                 RenderTargetBitmap rtb = new RenderTargetBitmap(totalWidth, totalHeight, 96, 96, PixelFormats.Pbgra32);
                 rtb.Render(drawingVisual);
                 rtb.Freeze();
@@ -153,7 +147,7 @@ namespace AssetsManager.Views.Dialogs
                         {
                             using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
                             {
-                                bitmap = Utils.TextureUtils.LoadTexture(stream, System.IO.Path.GetExtension(filePath));
+                                bitmap = TextureUtils.LoadTexture(stream, System.IO.Path.GetExtension(filePath));
                             }
                         }
                         else
@@ -198,8 +192,8 @@ namespace AssetsManager.Views.Dialogs
             var item = (sender as Button)?.Tag as ImageMergerItem;
             if (item == null) return;
 
-            int index = ViewModel.Items.IndexOf(item);
-            if (index < ViewModel.Items.Count - 1)
+            int index = ViewModel.Items.Count > 0 ? ViewModel.Items.IndexOf(item) : -1;
+            if (index != -1 && index < ViewModel.Items.Count - 1)
             {
                 _imageMergerService.Items.Move(index, index + 1);
             }
@@ -242,16 +236,6 @@ namespace AssetsManager.Views.Dialogs
                     _customMessageBox.ShowError("Error", $"Failed to export image: {ex.Message}", this);
                 }
             }
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
         }
     }
 }

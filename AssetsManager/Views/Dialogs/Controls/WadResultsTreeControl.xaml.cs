@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -7,7 +9,7 @@ using System.Windows.Media;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
-    public partial class WadResultsTreeControl : UserControl
+    public partial class WadResultsTreeControl : UserControl, INotifyPropertyChanged
     {
         public event RoutedPropertyChangedEventHandler<object> SelectedItemChanged;
         public event TextChangedEventHandler SearchTextChanged;
@@ -34,13 +36,10 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void Cleanup()
         {
-            // Desuscribir eventos
             Loaded -= WadResultsTreeControl_Loaded;
             Unloaded -= WadResultsTreeControl_Unloaded;
             resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
             searchTextBox.TextChanged -= SearchTextBox_TextChanged;
-
-            // Anular referencias
             resultsTreeView.ItemsSource = null;
         }
 
@@ -92,5 +91,8 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             WadContextMenuOpening?.Invoke(this, e);
         }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

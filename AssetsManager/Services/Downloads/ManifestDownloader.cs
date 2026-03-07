@@ -196,7 +196,6 @@ public class ManifestDownloader
                     if ((now - lastProgressTime).TotalMilliseconds >= 100 || completed == totalToVerify)
                     {
                         lastProgressTime = now;
-                        // Use the professional format "File X of Y: filename" to enable dual-progress view
                         ProgressChanged?.Invoke("Verifying", $"{completed} of {totalToVerify} files: {file.Name}", completed, totalToVerify);
                     }
                 }
@@ -216,22 +215,39 @@ public class ManifestDownloader
 
         if (!filesToPatch.Any()) return 0;
 
+        // Sequential UI Reporting: Sort files alphabetically to follow manifest/folder order
+        var filesToPatchList = filesToPatch.OrderBy(f => f.FileInfo.Name).ToList();
+        var initialChunksPerFile = filesToPatchList.ToDictionary(f => f.FullPath, f => f.ChunksByBundle.Values.Sum(l => l.Count));
+        var pathToIndex = filesToPatchList.Select((f, i) => new { f.FullPath, i }).ToDictionary(x => x.FullPath, x => x.i);
+
         // ===========================================================================
         // PHASE 2: GLOBAL UPDATE (STREAMING & DEDUPLICATED)
         // ===========================================================================
-        var allTasks = filesToPatch.SelectMany(f => f.ChunksByBundle.Values.SelectMany(l => l)).ToList();
+        var allTasks = filesToPatchList.SelectMany(f => f.ChunksByBundle.Values.SelectMany(l => l)).ToList();
         var uniqueChunks = allTasks.GroupBy(t => t.Chunk.ChunkId)
                                    .Select(g => new UniqueChunkTask { 
                                        Chunk = g.First().Chunk, 
                                        Targets = g.Select(t => new TargetInfo { FullPath = t.FullPath, FileOffset = t.FileOffset, FileInfo = t.FileInfo }).ToList() 
                                    }).ToList();
 
-        var bundlesToProcess = uniqueChunks.GroupBy(c => c.Chunk.BundleId).ToDictionary(g => g.Key, g => g.ToList());
+        // Priority Download: Order bundles by the first file they complete in our sorted list
+        var bundlesToProcess = uniqueChunks
+            .GroupBy(c => c.Chunk.BundleId)
+            .Select(g => new { 
+                Id = g.Key, 
+                Chunks = g.ToList(), 
+                Priority = g.Min(c => c.Targets.Min(t => pathToIndex[t.FullPath])) 
+            })
+            .OrderBy(x => x.Priority)
+            .ToDictionary(x => x.Id, x => x.Chunks);
         
         int totalChunks = allTasks.Count;
         int completedChunks = 0;
-        int completedFilesCount = 0;
-        int totalFilesToPatch = filesToPatch.Count;
+        int totalFilesToPatch = filesToPatchList.Count;
+        int visualFileIndex = 0;
+        int lastReportedChunks = -1;
+        var uiLock = new object();
+
         long totalDownloaded = 0;
         long wastedBytes = 0;
         int totalRequests = 0;
@@ -240,7 +256,7 @@ public class ManifestDownloader
         
         var updateSw = System.Diagnostics.Stopwatch.StartNew();
         var openHandles = new ConcurrentDictionary<string, SafeFileHandle>();
-        var pendingPerFile = new ConcurrentDictionary<string, int>(filesToPatch.ToDictionary(f => f.FullPath, f => f.ChunksByBundle.Values.Sum(l => l.Count)));
+        var pendingPerFile = new ConcurrentDictionary<string, int>(initialChunksPerFile);
 
         try
         {
@@ -286,7 +302,7 @@ public class ManifestDownloader
 
                         foreach (var t in group)
                         {
-                            long gap = (long)t.Chunk.ChunkId == 0 ? 0 : (long)t.Chunk.BundleOffset - currentStreamPos; // Placeholder fix for gap logic
+                            long gap = (long)t.Chunk.ChunkId == 0 ? 0 : (long)t.Chunk.BundleOffset - currentStreamPos; 
                             if (gap > 0)
                             {
                                 byte[] skipBuf = _skipBufferPool.TryTake(out var b) ? b : new byte[64 * 1024];
@@ -321,24 +337,45 @@ public class ManifestDownloader
 
                                     foreach (var target in t.Targets)
                                     {
-                                        var dir = Path.GetDirectoryName(target.FullPath);
-                                        if (!string.IsNullOrEmpty(dir)) _directoriesCreator.CreateDirectory(dir);
-
                                         var handle = openHandles.GetOrAdd(target.FullPath, (path) => {
+                                            var dir = Path.GetDirectoryName(path);
+                                            if (!string.IsNullOrEmpty(dir)) _directoriesCreator.CreateDirectory(dir);
                                             var h = File.OpenHandle(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);
                                             if ((ulong)RandomAccess.GetLength(h) != target.FileInfo.FileSize) RandomAccess.SetLength(h, (long)target.FileInfo.FileSize);
                                             return h;
                                         });
 
                                         RandomAccess.Write(handle, uncomp, (long)target.FileOffset);
-                                        int doneChunks = Interlocked.Increment(ref completedChunks);
+                                        int currentDoneChunks = Interlocked.Increment(ref completedChunks);
                                         int rem = pendingPerFile.AddOrUpdate(target.FullPath, 0, (k, v) => v - 1);
+                                        
                                         if (rem == 0) {
-                                            Interlocked.Increment(ref completedFilesCount);
                                             if (openHandles.TryRemove(target.FullPath, out var hnd)) hnd.Dispose();
                                         }
-                                        // Use the full relative path (FileInfo.Name) for consistent technical context
-                                        ProgressChanged?.Invoke("Updating", $"{completedFilesCount} of {totalFilesToPatch} files: {target.FileInfo.Name}", doneChunks, totalChunks);
+
+                                        // UI Coordination: Thread-safe sequential focus with detailed progress
+                                        lock (uiLock)
+                                        {
+                                            while (visualFileIndex < filesToPatchList.Count && 
+                                                   pendingPerFile.TryGetValue(filesToPatchList[visualFileIndex].FullPath, out int p) && p == 0)
+                                            {
+                                                visualFileIndex++;
+                                            }
+
+                                            if (currentDoneChunks > lastReportedChunks)
+                                            {
+                                                lastReportedChunks = currentDoneChunks;
+                                                int reportIndex = Math.Min(visualFileIndex, totalFilesToPatch - 1);
+                                                var reportFile = filesToPatchList[reportIndex];
+                                                
+                                                pendingPerFile.TryGetValue(reportFile.FullPath, out int pending);
+                                                int totalForFile = initialChunksPerFile[reportFile.FullPath];
+                                                int doneForFile = totalForFile - pending;
+
+                                                string message = $"{visualFileIndex + 1} of {totalFilesToPatch} files: {reportFile.FileInfo.Name}|{doneForFile}/{totalForFile}";
+                                                ProgressChanged?.Invoke("Updating", message, currentDoneChunks, totalChunks);
+                                            }
+                                        }
                                     }
                                 } finally { _decompressorPool.Push(decompressor); }
                             } finally { cpuSem.Release(); }

@@ -8,6 +8,7 @@ namespace AssetsManager.Views.Models.Settings
 
     public enum ImageExportFormat
     {
+        Original,
         Png,
         Jpeg
     }

@@ -14,4 +14,10 @@
         <Setter Property="Opacity" Value="0.8"/>
     </Style>
 
+    <!-- Unified Section Header for Inspectors and Panels -->
+    <Style x:Key="InspectorSectionHeaderStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Horizontal"/>
+        <Setter Property="Margin" Value="0,0,0,12"/>
+    </Style>
+
 </ResourceDictionary>

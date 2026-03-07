@@ -4,13 +4,13 @@ using System.Linq;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Windows.Media;
-using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Models.Explorer
 {
     public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, WemFile, SoundBank }
-    public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted }
+    public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted, Dependency }
     public enum AudioSourceType { Wpk, Bnk }
 
     public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable
@@ -34,8 +34,22 @@ namespace AssetsManager.Views.Models.Explorer
         public string BackupChunkPath { get; set; } // Only for nodes from a backup
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
-        public string Extension => (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory) ? "" : Path.GetExtension(FullPath).ToLowerInvariant();
-        public bool IsGroupingFolder => Name != null && Name.StartsWith("[");
+        private string _extension;
+        public string Extension
+        {
+            get
+            {
+                if (_extension == null)
+                {
+                    if (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory)
+                        _extension = "";
+                    else
+                        _extension = Path.GetExtension(FullPath ?? "").ToLowerInvariant();
+                }
+                return _extension;
+            }
+        }
+        public bool IsGroupingFolder { get; set; }
 
         public string DisplayName
         {
@@ -62,11 +76,6 @@ namespace AssetsManager.Views.Models.Explorer
             get
             {
                 var name = DisplayName;
-
-                if (name.StartsWith("[") && name.Length > 4 && name[3] == ' ')
-                {
-                    name = name.Substring(4);
-                }
 
                 int parenthesisIndex = name.LastIndexOf(" (");
                 if (parenthesisIndex > 0)
@@ -203,7 +212,7 @@ namespace AssetsManager.Views.Models.Explorer
             if (Directory.Exists(path))
             {
                 Type = NodeType.RealDirectory;
-                Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
             }
             else
             {
@@ -211,12 +220,12 @@ namespace AssetsManager.Views.Models.Explorer
                 if (lowerPath.EndsWith(".wad") || lowerPath.EndsWith(".wad.client"))
                 {
                     Type = NodeType.WadFile;
-                    Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                    Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
                 }
                 else if (lowerPath.EndsWith(".wpk") || lowerPath.EndsWith(".bnk"))
                 {
                     Type = NodeType.SoundBank;
-                    Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                    Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
                 }
                 else
                 {
@@ -243,7 +252,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (lowerName.EndsWith(".wpk") || lowerName.EndsWith(".bnk"))
                 {
                     Type = NodeType.SoundBank;
-                    Children.Add(new FileSystemNodeModel()); // Add dummy child for lazy loading
+                    Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
                 }
                 else
                 {

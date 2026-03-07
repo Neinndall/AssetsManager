@@ -15,16 +15,17 @@ using SixLabors.ImageSharp.PixelFormats;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Models
+namespace AssetsManager.Services.Viewer
 {
-    public class SknModelLoadingService
+    public class SknLoadingService
     {
         private readonly LogService _logService;
 
-        public SknModelLoadingService(LogService logService)
+        public SknLoadingService(LogService logService)
         {
             _logService = logService;
         }
@@ -112,7 +113,7 @@ namespace AssetsManager.Services.Models
             _logService.LogDebug($"Available texture keys: {string.Join(", ", loadedTextures.Keys)}");
 
             var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh };
-            var availableTextureNames = new ObservableCollection<string>(loadedTextures.Keys);
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
 
             string defaultTextureKey = loadedTextures.Keys
                 .Where(k => k.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase))
@@ -120,6 +121,7 @@ namespace AssetsManager.Services.Models
                 .FirstOrDefault();
 
             string skinName = modelName.Split('.')[0];
+            var parts = new List<ModelPart>();
 
             foreach (var rangeObj in skinnedMesh.Ranges)
             {
@@ -169,9 +171,11 @@ namespace AssetsManager.Services.Models
                 modelPart.Visual.Content = geometryModel;
                 TextureUtils.UpdateMaterial(modelPart);
 
-                sceneModel.Parts.Add(modelPart);
+                parts.Add(modelPart);
                 sceneModel.RootVisual.Children.Add(modelPart.Visual);
             }
+
+            sceneModel.Parts.AddRange(parts);
             _logService.LogDebug("--- Finished displaying model ---");
             return sceneModel;
         }

@@ -4,7 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Views.Models.Home
@@ -105,3 +105,4 @@ namespace AssetsManager.Views.Models.Home
         }
     }
 }
+

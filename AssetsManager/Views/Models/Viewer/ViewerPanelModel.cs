@@ -2,9 +2,9 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Material.Icons;
 
-namespace AssetsManager.Views.Models.Models3D
+namespace AssetsManager.Views.Models.Viewer
 {
-    public class ModelPanelModel : INotifyPropertyChanged
+    public class ViewerPanelModel : INotifyPropertyChanged
     {
         private bool _isMapMode;
         private string _loadButtonText = "Model";

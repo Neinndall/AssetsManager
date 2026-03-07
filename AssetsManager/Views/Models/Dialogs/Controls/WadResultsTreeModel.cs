@@ -1,37 +1,130 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+using System.ComponentModel; // Added for INotifyPropertyChanged
+using System.Runtime.CompilerServices; // Added for CallerMemberName
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Dialogs.Controls
 {
+    /// <summary>
+    /// Model for the results data, including the hierarchy and analytical insights.
+    /// </summary>
     public class WadResultsTreeModel : INotifyPropertyChanged
     {
-        private ObservableRangeCollection<WadGroupViewModel> _wadGroups;
-        private bool _isBusy;
-        private string _loadingText = "LOADING DATA";
+        // 1. Data Hierarchy (The Tree)
+        public ObservableRangeCollection<WadGroupViewModel> WadGroups { get; set; } = new ObservableRangeCollection<WadGroupViewModel>();
 
-        public bool IsBusy
+        // 2. Analytical Insights (The Dashboard)
+        public ObservableRangeCollection<AssetCategoryStats> CategoryDistribution { get; } = new ObservableRangeCollection<AssetCategoryStats>();
+        public ObservableRangeCollection<TopImpactFile> TopImpactFiles { get; } = new ObservableRangeCollection<TopImpactFile>();
+        public ObservableRangeCollection<AffectedArea> AffectedAreas { get; } = new ObservableRangeCollection<AffectedArea>();
+        
+        // Dashboard Toggle State
+        private bool _dashboardToggleChecked = false;
+        public bool DashboardToggleChecked
         {
-            get => _isBusy;
-            set { _isBusy = value; OnPropertyChanged(); }
+            get => _dashboardToggleChecked;
+            set { _dashboardToggleChecked = value; OnPropertyChanged(); }
         }
 
-        public string LoadingText
+        // --- Surgical Filtering States ---
+        private bool _showNew = true;
+        private bool _showModified = true;
+        private bool _showRemoved = true;
+        private bool _showRenamed = true;
+
+        public bool ShowNew
         {
-            get => _loadingText;
-            set { _loadingText = value; OnPropertyChanged(); }
+            get => _showNew;
+            set { if (_showNew != value) { _showNew = value; OnPropertyChanged(); OnFilterChanged(); } }
         }
 
-        public ObservableRangeCollection<WadGroupViewModel> WadGroups
+        public bool ShowModified
         {
-            get => _wadGroups;
-            set { _wadGroups = value; OnPropertyChanged(); }
+            get => _showModified;
+            set { if (_showModified != value) { _showModified = value; OnPropertyChanged(); OnFilterChanged(); } }
         }
+
+        public bool ShowRemoved
+        {
+            get => _showRemoved;
+            set { if (_showRemoved != value) { _showRemoved = value; OnPropertyChanged(); OnFilterChanged(); } }
+        }
+
+        public bool ShowRenamed
+        {
+            get => _showRenamed;
+            set { if (_showRenamed != value) { _showRenamed = value; OnPropertyChanged(); OnFilterChanged(); } }
+        }
+
+        public event EventHandler FilterChanged;
+        private void OnFilterChanged() => FilterChanged?.Invoke(this, EventArgs.Empty);
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+    }
+
+    public class WadGroupViewModel
+    {
+        public string WadName { get; set; }
+        public int DiffCount { get; set; }
+        public string WadNameWithCount => $"{WadName} ({DiffCount})";
+        public ObservableRangeCollection<DiffTypeGroupViewModel> Types { get; set; } = new ObservableRangeCollection<DiffTypeGroupViewModel>();
+    }
+
+    public class DiffTypeGroupViewModel
+    {
+        public ChunkDiffType Type { get; set; }
+        public int DiffCount { get; set; }
+        public string TypeNameWithCount => $"{Type} ({DiffCount})";
+        public ObservableRangeCollection<SerializableChunkDiff> Diffs { get; set; } = new ObservableRangeCollection<SerializableChunkDiff>();
+    }
+
+    public class AssetCategoryStats
+    {
+        public string Name { get; set; }
+        public int Count { get; set; }
+        public double Percentage { get; set; }
+        public long TotalSizeChange { get; set; }
+        public string SizeChangeText => (TotalSizeChange >= 0 ? "+" : "") + FormatSize((ulong)Math.Abs(TotalSizeChange));
+
+        private string FormatSize(ulong sizeInBytes)
+        {
+            if (sizeInBytes < 1024) return $"{sizeInBytes} B";
+            double sizeInKB = sizeInBytes / 1024.0;
+            if (sizeInKB < 1024) return $"{sizeInKB:F1} KB";
+            double sizeInMB = sizeInKB / 1024.0;
+            return $"{sizeInMB:F1} MB";
+        }
+    }
+
+    public class TopImpactFile
+    {
+        public string Name { get; set; }
+        public string Path { get; set; }
+        public ChunkDiffType Type { get; set; }
+        public ulong OldSize { get; set; }
+        public ulong NewSize { get; set; }
+        public long SizeDiff { get; set; }
+        public string SizeDiffText => (SizeDiff >= 0 ? "+" : "") + FormatSize((ulong)Math.Abs(SizeDiff));
+
+        private string FormatSize(ulong sizeInBytes)
+        {
+            if (sizeInBytes < 1024) return $"{sizeInBytes} B";
+            double sizeInKB = sizeInBytes / 1024.0;
+            if (sizeInKB < 1024) return $"{sizeInKB:F1} KB";
+            double sizeInMB = sizeInKB / 1024.0;
+            return $"{sizeInMB:F1} MB";
+        }
+    }
+
+    public class AffectedArea
+    {
+        public string Name { get; set; }
+        public int Count { get; set; }
     }
 }

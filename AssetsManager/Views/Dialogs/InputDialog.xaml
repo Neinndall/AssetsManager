@@ -1,98 +1,55 @@
-<Window x:Class="AssetsManager.Views.Dialogs.InputDialog"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:local="clr-namespace:AssetsManager.Views.Dialogs"
-        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Title="Input" Height="Auto" Width="480"
-        SizeToContent="Height" WindowStyle="None" AllowsTransparency="True" 
-        WindowStartupLocation="CenterOwner" Background="Transparent"
-        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
-        
-    <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="12">
-        <Border.Effect>
-             <DropShadowEffect BlurRadius="25" ShadowDepth="10" Direction="270" Opacity="0.25" Color="Black"/>
-        </Border.Effect>
-        
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> <!-- Header -->
-                <RowDefinition Height="*"/>    <!-- Body -->
-            </Grid.RowDefinitions>
+<base:HudWindow x:Class="AssetsManager.Views.Dialogs.InputDialog"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                xmlns:local="clr-namespace:AssetsManager.Views.Dialogs"
+                xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+                xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+                mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+                Width="480"
+                SizeToContent="Height"
+                WindowStartupLocation="CenterOwner" 
+                Background="{StaticResource SidebarBackground}"
+                Style="{StaticResource HudWindowStyle}"
+                ShowMinimizeButton="False"
+                ShowMaximizeButton="False"
+                ResizeMode="NoResize">
 
-            <!-- Header -->
-            <Grid Grid.Row="0" Height="40" Margin="16,0,10,0" MouseDown="TitleBar_MouseDown" Background="Transparent">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="TextBoxEdit" 
-                                                Foreground="{StaticResource AccentBrush}" 
-                                                Width="18" Height="18" Margin="0,0,10,0"
-                                                VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" 
-                               FontWeight="Normal" FontSize="13" 
-                               Foreground="{StaticResource TextPrimary}" 
-                               VerticalAlignment="Center"/>
-                </StackPanel>
+        <!-- 1. Content Area (Input Section) -->
+        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" Padding="24,24">
+            <StackPanel>
+                <TextBlock Name="textBlockQuestion" 
+                           TextWrapping="Wrap" 
+                           Margin="0,0,0,16" 
+                           Foreground="{StaticResource TextSecondary}" 
+                           FontSize="12"/>
+                               
+                <TextBox Name="textBoxInput" 
+                         Style="{StaticResource ModernTextBoxEditable}" 
+                         AcceptsReturn="True" 
+                         TextWrapping="Wrap" 
+                         VerticalScrollBarVisibility="Auto" 
+                         MinHeight="44" MaxHeight="250"
+                         FontSize="12"
+                         Padding="12"/>
+            </StackPanel>
+        </Border>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click" Width="34" Height="40">
-                        <materialIcons:MaterialIcon Kind="WindowMinimize" Width="15" Height="15"/>
-                    </Button>
-                    <Button Style="{StaticResource TitleBarButtonStyle}" Click="btnCancel_Click" Width="34" Height="40">
-                        <materialIcons:MaterialIcon Kind="WindowClose" Width="15" Height="15"/>
-                    </Button>
-                </StackPanel>
-            </Grid>
-
-            <!-- Separator -->
-            <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Opacity="0.1"/>
-
-            <!-- Dark Body Area -->
-            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,12,12" Padding="0">
-                <Grid>
-                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Input Content -->
-                    <Grid Grid.Row="0" Margin="24">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        
-                        <TextBlock Name="textBlockQuestion" Grid.Row="0"
-                                   TextWrapping="Wrap" 
-                                   Margin="0,0,0,16" 
-                                   Foreground="{StaticResource TextSecondary}" 
-                                   FontSize="12"/>
-                                   
-                        <TextBox Name="textBoxInput" Grid.Row="1"
-                                 Style="{StaticResource ModernTextBoxEditable}" 
-                                 AcceptsReturn="True" 
-                                 TextWrapping="Wrap" 
-                                 VerticalScrollBarVisibility="Auto" 
-                                 MinHeight="44" MaxHeight="250"
-                                 FontSize="12"
-                                 Padding="12"/>
-                    </Grid>
-
-                    <!-- Footer -->
-                    <Grid Grid.Row="1" Margin="24,0,24,24">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Name="btnCancel" Content="Cancel" Click="btnCancel_Click" Style="{StaticResource SecondaryButton}"/>
-                            <Button Name="btnOk" Content="OK" Margin="12,0,0,0" Click="btnOk_Click" Style="{StaticResource PrimaryButton}"/>
-                        </StackPanel>
-                    </Grid>
-                </Grid>
-            </Border>
-        </Grid>
-    </Border>
-</Window>
+        <!-- 2. Footer Area -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" 
+                BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" 
+                Padding="20,14">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Name="btnCancelBottom" Content="Cancel" Click="btnCancel_Click" Style="{StaticResource SecondaryButton}" Width="90" Height="32"/>
+                <Button Name="btnOk" Content="OK" Margin="12,0,0,0" Click="btnOk_Click" Style="{StaticResource SecondaryButton}" Width="90" Height="32"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</base:HudWindow>

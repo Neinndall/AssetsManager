@@ -23,9 +23,6 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             InitializeComponent();
             this.Loaded += ManageVersionsControl_Loaded;
-            this.Unloaded += ManageVersionsControl_Unloaded;
-            LeagueClientVersionsListView.SelectionChanged += ListView_SelectionChanged;
-            LoLGameClientVersionsListView.SelectionChanged += ListView_SelectionChanged;
         }
 
         private async void ManageVersionsControl_Loaded(object sender, RoutedEventArgs e)
@@ -125,12 +122,6 @@ namespace AssetsManager.Views.Controls.Monitor
             await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
         }
 
-        private void ListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            // Empty event handler to allow multiple selections through CheckBoxes
-            // The selection is bound to the IsSelected property of the VersionFileInfo model
-        }
-
         private void ListViewItem_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (!(sender is ListViewItem item) || !(item.DataContext is VersionFileInfo clickedVersion)) return;
@@ -228,12 +219,6 @@ namespace AssetsManager.Views.Controls.Monitor
         private void NextLoLGameClientPage_Click(object sender, RoutedEventArgs e)
         {
             _viewModel.LoLGameClientPaginator.NextPage();
-        }
-
-        private void ManageVersionsControl_Unloaded(object sender, RoutedEventArgs e)
-        {
-            LeagueClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
-            LoLGameClientVersionsListView.SelectionChanged -= ListView_SelectionChanged;
         }
     }
 }

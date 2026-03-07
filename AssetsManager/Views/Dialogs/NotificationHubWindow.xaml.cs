@@ -1,12 +1,13 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class NotificationHubWindow : Window
+    public partial class NotificationHubWindow : HudWindow
     {
         public NotificationHubModel ViewModel => DataContext as NotificationHubModel;
 
@@ -20,9 +21,16 @@ namespace AssetsManager.Views.Dialogs
         {
             if (this.IsVisible)
             {
-                // Return focus to the owner window when toggling off BEFORE hiding to prevent flicker
-                if (owner != null) owner.Activate();
+                // If minimized, restore and focus
+                if (this.WindowState == WindowState.Minimized)
+                {
+                    this.WindowState = WindowState.Normal;
+                    this.Activate();
+                    return;
+                }
 
+                // If visible but NOT minimized, toggle (Hide)
+                if (owner != null) owner.Activate();
                 this.Hide();
                 if (ViewModel != null) ViewModel.IsOpen = false;
                 return;
@@ -32,31 +40,6 @@ namespace AssetsManager.Views.Dialogs
             this.Show();
             this.Activate();
             if (ViewModel != null) ViewModel.IsOpen = true;
-        }
-
-        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-            {
-                this.DragMove();
-            }
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            // Return focus to the owner window BEFORE hiding to prevent background apps from jumping/flickering
-            if (this.Owner != null)
-            {
-                this.Owner.Activate();
-            }
-
-            this.Hide(); 
-            if (ViewModel != null) ViewModel.IsOpen = false;
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            this.WindowState = WindowState.Minimized;
         }
 
         private void MarkAllRead_Click(object sender, RoutedEventArgs e)
@@ -75,6 +58,18 @@ namespace AssetsManager.Views.Dialogs
             {
                 ViewModel?.RemoveNotification(note);
             }
+        }
+
+        // Override the close behavior to Hide instead of Close
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            e.Cancel = true;
+            if (this.Owner != null)
+            {
+                this.Owner.Activate();
+            }
+            this.Hide();
+            if (ViewModel != null) ViewModel.IsOpen = false;
         }
     }
 }

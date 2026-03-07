@@ -8,6 +8,7 @@ using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Controls;
 using AssetsManager.Utils;
+using Material.Icons;
 
 namespace AssetsManager.Services.Core
 {
@@ -70,13 +71,24 @@ namespace AssetsManager.Services.Core
                 _totalFiles = totalItems;
                 UpdateStatusBar(initialStatusMsg, 0, totalItems);
 
+                // Convert string iconKind to MaterialIconKind enum
+                MaterialIconKind icon = MaterialIconKind.ProgressClock; // Default
+                if (!string.IsNullOrEmpty(iconKind))
+                {
+                    if (Enum.TryParse(iconKind, out MaterialIconKind parsedIcon))
+                    {
+                        icon = parsedIcon;
+                    }
+                }
+
                 _progressDetailsWindow = new ProgressDetailsWindow(_logService, headerText, _taskCancellationManager)
                 {
                     Owner = _owner,
-                    OperationVerb = verb,
-                    HeaderIconKind = iconKind,
-                    HeaderText = headerText
+                    HeaderIcon = icon,
+                    HeaderTitle = headerText
                 };
+                
+                _progressDetailsWindow.ViewModel.OperationVerb = verb;
                 
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
@@ -88,7 +100,14 @@ namespace AssetsManager.Services.Core
         /// </summary>
         private void UpdateOperation(string statusMessage, int current, int total, string currentFileDetail, bool success = true, string errorMessage = null)
         {
-            UpdateStatusBar(statusMessage, current, total);
+            // Clean statusMessage for StatusBar (remove anything after '|')
+            string cleanStatus = statusMessage;
+            if (cleanStatus != null && cleanStatus.Contains("|"))
+            {
+                cleanStatus = cleanStatus.Split('|')[0].Trim();
+            }
+
+            UpdateStatusBar(cleanStatus, current, total);
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(current, total, currentFileDetail, success, errorMessage);
@@ -110,8 +129,12 @@ namespace AssetsManager.Services.Core
 
         private void CloseProgressWindow()
         {
-            _progressDetailsWindow?.Close();
-            _progressDetailsWindow = null;
+            if (_progressDetailsWindow != null)
+            {
+                _progressDetailsWindow.ViewModel.IsFinished = true;
+                _progressDetailsWindow.Close();
+                _progressDetailsWindow = null;
+            }
         }
 
         private void UpdateStatusBar(string message, int completed = -1, int total = -1)
@@ -275,7 +298,7 @@ namespace AssetsManager.Services.Core
             {
                 if (_progressDetailsWindow != null)
                 {
-                    _progressDetailsWindow.OperationVerb = data.TaskName; // Cambia dinámicamente entre Verifying y Updating
+                    _progressDetailsWindow.ViewModel.OperationVerb = data.TaskName; // Cambia dinámicamente entre Verifying y Updating
                 }
             });
             // data.CurrentFile already contains "X of Y files: name", so we just prepend the TaskName

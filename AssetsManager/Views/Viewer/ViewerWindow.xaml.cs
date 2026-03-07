@@ -5,20 +5,20 @@ using System.Windows.Controls;
 using System.Windows.Media.Media3D;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Models;
+using AssetsManager.Services.Viewer;
 using AssetsManager.Views.Helpers;
 using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Animation;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Views
+namespace AssetsManager.Views.Viewer
 {
-    public partial class ModelWindow : UserControl
+    public partial class ViewerWindow : UserControl
     {
-        private readonly SknModelLoadingService _sknModelLoadingService;
-        private readonly ScoModelLoadingService _scoModelLoadingService;
+        private readonly SknLoadingService _sknLoadingService;
+        private readonly ScoLoadingService _scoLoadingService;
         private readonly MapGeometryLoadingService _mapGeometryLoadingService;
         private readonly LogService _logService;
         private readonly CustomMessageBoxService _customMessageBoxService;
@@ -29,11 +29,11 @@ namespace AssetsManager.Views
 
         private readonly AppSettings _appSettings;
 
-        public ModelWindow(SknModelLoadingService sknModelLoadingService, ScoModelLoadingService scoModelLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService, AppSettings appSettings)
+        public ViewerWindow(SknLoadingService sknLoadingService, ScoLoadingService scoLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService, AppSettings appSettings)
         {
             InitializeComponent();
-            _sknModelLoadingService = sknModelLoadingService;
-            _scoModelLoadingService = scoModelLoadingService;
+            _sknLoadingService = sknLoadingService;
+            _scoLoadingService = scoLoadingService;
             _mapGeometryLoadingService = mapGeometryLoadingService;
             _logService = logService;
             _customMessageBoxService = customMessageBoxService;
@@ -42,8 +42,8 @@ namespace AssetsManager.Views
 
             // Inject services into controls
             ViewportControl.LogService = _logService;
-            PanelControl.SknModelLoadingService = _sknModelLoadingService;
-            PanelControl.ScoModelLoadingService = _scoModelLoadingService;
+            PanelControl.SknLoadingService = _sknLoadingService;
+            PanelControl.ScoLoadingService = _scoLoadingService;
             PanelControl.MapGeometryLoadingService = _mapGeometryLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = _customMessageBoxService;

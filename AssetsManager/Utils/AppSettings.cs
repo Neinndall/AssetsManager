@@ -36,7 +36,7 @@ namespace AssetsManager.Utils
         public string CustomFloorTexturePath { get; set; } = string.Empty;
         public Dictionary<string, long> HashesSizes { get; set; }
         public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
-        public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Png;
+        public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Original;
 
         // Dictionary for File Watcher
         public Dictionary<string, DateTime> JsonDataModificationDates { get; set; }
@@ -179,7 +179,7 @@ namespace AssetsManager.Utils
                 DefaultExtractedSelectDirectory = null,
                 CustomFloorTexturePath = null,
                 AudioExportFormat = AudioExportFormat.Ogg,
-                ImageExportFormat = ImageExportFormat.Png,
+                ImageExportFormat = ImageExportFormat.Original,
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
                 HashesSizes = new Dictionary<string, long>(),
@@ -241,7 +241,8 @@ namespace AssetsManager.Utils
             AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
             FavoritePaths = defaultSettings.FavoritePaths;
             ApiSettings = defaultSettings.ApiSettings;
-            // SyncHashesWithCDTB and HashesSizes are intentionally not reset.
+            SyncHashesWithCDTB = defaultSettings.SyncHashesWithCDTB;
+            // HashesSizes is intentionally not reset to preserve local cache state.
         }
     }
 }

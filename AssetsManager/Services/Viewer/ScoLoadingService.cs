@@ -8,16 +8,17 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models.Models3D;
+using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Mesh;
 
-namespace AssetsManager.Services.Models
+namespace AssetsManager.Services.Viewer
 {
-    public class ScoModelLoadingService
+    public class ScoLoadingService
     {
         private readonly LogService _logService;
 
-        public ScoModelLoadingService(LogService logService)
+        public ScoLoadingService(LogService logService)
         {
             _logService = logService;
         }
@@ -122,7 +123,7 @@ namespace AssetsManager.Services.Models
         private SceneModel CreateSceneModel(StaticMesh staticMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)
         {
             var sceneModel = new SceneModel { Name = modelName };
-            var availableTextureNames = new ObservableCollection<string>(loadedTextures.Keys);
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
             
             // Group faces by material to create submeshes
             var facesByMaterial = staticMesh.Faces.GroupBy(f => f.Material.TrimEnd('\0'));

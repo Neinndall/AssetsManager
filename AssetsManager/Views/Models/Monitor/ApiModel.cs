@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows;
 using System.Collections.Generic;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework; // Added for ObservableRangeCollection
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Monitor;
 
@@ -44,9 +45,9 @@ namespace AssetsManager.Views.Models.Monitor
 
         public PaginationModel<CatalogItem> Paginator { get; }
 
-        public ObservableCollection<CatalogItem> SalesCatalog => Paginator.PagedItems;
+        public ObservableRangeCollection<CatalogItem> SalesCatalog => Paginator.PagedItems;
 
-        public ObservableCollection<MythicShopCategory> MythicShopCategories { get; }
+        public ObservableRangeCollection<MythicShopCategory> MythicShopCategories { get; }
 
         // Computed properties for display
         public string RegionText => $"Region: {_apiSettings?.Token?.Region ?? "N/A"}";
@@ -72,7 +73,7 @@ namespace AssetsManager.Views.Models.Monitor
             AuthButtonContent = "Authenticate";
 
             Paginator = new PaginationModel<CatalogItem> { PageSize = 12 };
-            MythicShopCategories = new ObservableCollection<MythicShopCategory>();
+            MythicShopCategories = new ObservableRangeCollection<MythicShopCategory>();
         }
 
         public void SetFullSalesCatalog(IEnumerable<CatalogItem> items)
