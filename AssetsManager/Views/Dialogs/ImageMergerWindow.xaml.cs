@@ -13,10 +13,11 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ImageMergerWindow : Window
+    public partial class ImageMergerWindow : HudWindow
     {
         public ImageMergerModel ViewModel { get; set; }
         private readonly CustomMessageBoxService _customMessageBox;
@@ -236,15 +237,5 @@ namespace AssetsManager.Views.Dialogs
                 }
             }
         }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
-            else SystemCommands.MaximizeWindow(this);
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e) => Close();
     }
 }
