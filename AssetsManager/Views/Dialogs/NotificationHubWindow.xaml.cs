@@ -1,11 +1,13 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class NotificationHubWindow : Window
+    public partial class NotificationHubWindow : HudWindow
     {
         public NotificationHubModel ViewModel => DataContext as NotificationHubModel;
 
@@ -19,6 +21,15 @@ namespace AssetsManager.Views.Dialogs
         {
             if (this.IsVisible)
             {
+                // If minimized, restore and focus
+                if (this.WindowState == WindowState.Minimized)
+                {
+                    this.WindowState = WindowState.Normal;
+                    this.Activate();
+                    return;
+                }
+
+                // If visible but NOT minimized, toggle (Hide)
                 if (owner != null) owner.Activate();
                 this.Hide();
                 if (ViewModel != null) ViewModel.IsOpen = false;
@@ -29,22 +40,6 @@ namespace AssetsManager.Views.Dialogs
             this.Show();
             this.Activate();
             if (ViewModel != null) ViewModel.IsOpen = true;
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.Owner != null)
-            {
-                this.Owner.Activate();
-            }
-
-            this.Hide(); 
-            if (ViewModel != null) ViewModel.IsOpen = false;
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            SystemCommands.MinimizeWindow(this);
         }
 
         private void MarkAllRead_Click(object sender, RoutedEventArgs e)
@@ -63,6 +58,18 @@ namespace AssetsManager.Views.Dialogs
             {
                 ViewModel?.RemoveNotification(note);
             }
+        }
+
+        // Override the close behavior to Hide instead of Close
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            e.Cancel = true;
+            if (this.Owner != null)
+            {
+                this.Owner.Activate();
+            }
+            this.Hide();
+            if (ViewModel != null) ViewModel.IsOpen = false;
         }
     }
 }
