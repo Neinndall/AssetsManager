@@ -604,8 +604,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <!-- Ajustamos a 8px para que el color rojo rellene la esquina y encaje perfectamente con el marco de la ventana -->
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="0,8,0,0" SnapsToDevicePixels="True" UseLayoutRounding="True">
+                    <!-- Ajustamos a 9px para que el color rojo rellene la esquina y encaje perfectamente con el marco de la ventana, con margen negativo para evitar el gap de 1px -->
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="0,9,0,0" Margin="0,-1,-1,0" SnapsToDevicePixels="True" UseLayoutRounding="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
