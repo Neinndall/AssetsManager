@@ -7,7 +7,7 @@
                 xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
                 xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
                 mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-                HeaderTitle="Input" Width="480"
+                Width="480"
                 SizeToContent="Height"
                 WindowStartupLocation="CenterOwner" 
                 Background="{StaticResource SidebarBackground}"
