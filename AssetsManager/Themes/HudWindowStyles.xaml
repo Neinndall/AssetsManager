@@ -9,7 +9,6 @@
     </ResourceDictionary.MergedDictionaries>
 
     <Style x:Key="HudWindowStyle" TargetType="{x:Type base:HudWindow}">
-        <Setter Property="WindowStyle" Value="SingleBorderWindow"/>
         <Setter Property="WindowChrome.WindowChrome">
             <Setter.Value>
                 <WindowChrome CaptionHeight="36" 
