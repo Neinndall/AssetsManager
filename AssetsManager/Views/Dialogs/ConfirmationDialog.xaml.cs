@@ -1,4 +1,5 @@
 using System.Windows;
+using AssetsManager.Views.Helpers;
 using Material.Icons;
 
 namespace AssetsManager.Views.Dialogs
@@ -19,7 +20,7 @@ namespace AssetsManager.Views.Dialogs
         OK
     }
 
-    public partial class ConfirmationDialog : Window
+    public partial class ConfirmationDialog : HudWindow
     {
         public ConfirmationDialog()
         {
@@ -28,7 +29,7 @@ namespace AssetsManager.Views.Dialogs
 
         public void Initialize(string title, string message, CustomMessageBoxButtons buttons = CustomMessageBoxButtons.YesNo, CustomMessageBoxIcon icon = CustomMessageBoxIcon.None)
         {
-            Title = title;
+            HeaderTitle = title;
             textBlockMessage.Text = message;
 
             if (buttons == CustomMessageBoxButtons.OK)
@@ -45,27 +46,25 @@ namespace AssetsManager.Views.Dialogs
             switch (icon)
             {
                 case CustomMessageBoxIcon.Info:
-                    iconType.Kind = MaterialIconKind.Information;
+                    HeaderIcon = MaterialIconKind.Information;
                     break;
                 case CustomMessageBoxIcon.Question:
-                    iconType.Kind = MaterialIconKind.QuestionMarkCircle;
+                    HeaderIcon = MaterialIconKind.QuestionMarkCircle;
                     break;
                 case CustomMessageBoxIcon.Warning:
-                    iconType.Kind = MaterialIconKind.Warning;
+                    HeaderIcon = MaterialIconKind.Warning;
                     break;
                 case CustomMessageBoxIcon.Error:
-                    iconType.Kind = MaterialIconKind.Error;
+                    HeaderIcon = MaterialIconKind.Error;
                     break;
                 case CustomMessageBoxIcon.Success:
-                    iconType.Kind = MaterialIconKind.CheckCircle;
+                    HeaderIcon = MaterialIconKind.CheckCircle;
                     break;
                 default:
-                    iconType.Visibility = Visibility.Collapsed;
+                    HeaderIcon = MaterialIconKind.Information; // Default icon
                     break;
             }
         }
-
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
 
         private void btnYes_Click(object sender, RoutedEventArgs e) => DialogResult = true;
 

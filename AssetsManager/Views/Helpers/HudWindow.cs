@@ -15,6 +15,12 @@ namespace AssetsManager.Views.Helpers
         public static readonly DependencyProperty HeaderIconProperty =
             DependencyProperty.Register("HeaderIcon", typeof(MaterialIconKind), typeof(HudWindow), new PropertyMetadata(MaterialIconKind.WindowMaximize));
 
+        public static readonly DependencyProperty ShowMinimizeButtonProperty =
+            DependencyProperty.Register("ShowMinimizeButton", typeof(bool), typeof(HudWindow), new PropertyMetadata(true));
+
+        public static readonly DependencyProperty ShowMaximizeButtonProperty =
+            DependencyProperty.Register("ShowMaximizeButton", typeof(bool), typeof(HudWindow), new PropertyMetadata(true));
+
         public string HeaderTitle
         {
             get => (string)GetValue(HeaderTitleProperty);
@@ -25,6 +31,18 @@ namespace AssetsManager.Views.Helpers
         {
             get => (MaterialIconKind)GetValue(HeaderIconProperty);
             set => SetValue(HeaderIconProperty, value);
+        }
+
+        public bool ShowMinimizeButton
+        {
+            get => (bool)GetValue(ShowMinimizeButtonProperty);
+            set => SetValue(ShowMinimizeButtonProperty, value);
+        }
+
+        public bool ShowMaximizeButton
+        {
+            get => (bool)GetValue(ShowMaximizeButtonProperty);
+            set => SetValue(ShowMaximizeButtonProperty, value);
         }
 
         static HudWindow()

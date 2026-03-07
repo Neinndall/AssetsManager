@@ -111,12 +111,14 @@
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
                                         <!-- Usamos comandos nativos de sistema vinculados a la ventana actual -->
                                         <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" 
+                                                Visibility="{Binding ShowMinimizeButton, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BooleanToVisibilityConverter}}"
                                                 Command="{x:Static SystemCommands.MinimizeWindowCommand}"
                                                 CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}">
                                             <icons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14" Foreground="{StaticResource TextPrimary}"/>
                                         </Button>
                                         
-                                        <Button CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}">
+                                        <Button CommandParameter="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                                Visibility="{Binding ShowMaximizeButton, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BooleanToVisibilityConverter}}">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource HUDTitleBarMaximizeButtonStyle}">
                                                     <!-- Comando por defecto: Maximizar -->
