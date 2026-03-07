@@ -818,6 +818,13 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (TreeUIManager.SafeVisualUpwardSearch(e.OriginalSource as DependencyObject) is TreeViewItem treeViewItem)
             {
+                // Si el nodo ya está seleccionado (por selección normal o múltiple), 
+                // no hacemos nada para evitar que el TreeView nativo limpie la selección múltiple.
+                if (treeViewItem.DataContext is FileSystemNodeModel node && (node.IsMultiSelected || treeViewItem.IsSelected))
+                {
+                    return;
+                }
+
                 treeViewItem.IsSelected = true;
                 e.Handled = true;
             }
