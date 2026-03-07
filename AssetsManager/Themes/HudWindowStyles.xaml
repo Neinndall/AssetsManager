@@ -107,7 +107,7 @@
                                     </StackPanel>
 
                                     <!-- Controls -->
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True" Margin="0,0.5,0,0">
                                         <!-- Usamos comandos nativos de sistema vinculados a la ventana actual -->
                                         <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" 
                                                 Visibility="{Binding ShowMinimizeButton, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BooleanToVisibilityConverter}}"
