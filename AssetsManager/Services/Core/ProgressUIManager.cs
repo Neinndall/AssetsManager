@@ -84,10 +84,11 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow = new ProgressDetailsWindow(_logService, headerText, _taskCancellationManager)
                 {
                     Owner = _owner,
-                    OperationVerb = verb,
                     HeaderIcon = icon,
                     HeaderTitle = headerText
                 };
+                
+                _progressDetailsWindow.ViewModel.OperationVerb = verb;
                 
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
@@ -130,7 +131,7 @@ namespace AssetsManager.Services.Core
         {
             if (_progressDetailsWindow != null)
             {
-                _progressDetailsWindow.IsFinished = true;
+                _progressDetailsWindow.ViewModel.IsFinished = true;
                 _progressDetailsWindow.Close();
                 _progressDetailsWindow = null;
             }
@@ -297,7 +298,7 @@ namespace AssetsManager.Services.Core
             {
                 if (_progressDetailsWindow != null)
                 {
-                    _progressDetailsWindow.OperationVerb = data.TaskName; // Cambia dinámicamente entre Verifying y Updating
+                    _progressDetailsWindow.ViewModel.OperationVerb = data.TaskName; // Cambia dinámicamente entre Verifying y Updating
                 }
             });
             // data.CurrentFile already contains "X of Y files: name", so we just prepend the TaskName

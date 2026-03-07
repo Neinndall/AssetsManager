@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Dialogs;
 using Material.Icons;
 
 namespace AssetsManager.Views.Dialogs
@@ -17,7 +18,7 @@ namespace AssetsManager.Views.Dialogs
         private int _totalFiles;
         private readonly DispatcherTimer _timer;
 
-        public string OperationVerb { get; set; }
+        public ProgressDetailsModel ViewModel { get; }
 
         private readonly TaskCancellationManager _taskCancellationManager;
 
@@ -28,9 +29,11 @@ namespace AssetsManager.Views.Dialogs
             _taskCancellationManager = taskCancellationManager;
             _startTime = DateTime.Now;
 
+            ViewModel = new ProgressDetailsModel();
+            this.DataContext = ViewModel;
+
             this.HeaderTitle = windowTitle;
             this.HeaderIcon = MaterialIconKind.ProgressClock;
-            this.DataContext = this;
 
             _timer = new DispatcherTimer
             {
@@ -50,7 +53,7 @@ namespace AssetsManager.Views.Dialogs
             _completedFiles = completedFiles;
             _totalFiles = totalFiles;
 
-            if (!string.IsNullOrEmpty(OperationVerb)) VerbTextBlock.Text = OperationVerb;
+            string verb = ViewModel.OperationVerb;
 
             if (!string.IsNullOrEmpty(currentFileName) && currentFileName.Contains(" of ") && currentFileName.Contains(": "))
             {
@@ -62,68 +65,64 @@ namespace AssetsManager.Views.Dialogs
                     if (countParts.Length > 0 && !char.IsDigit(countParts[0][0])) 
                     {
                         startIdx = 1;
-                        VerbTextBlock.Text = countParts[0];
-                        OperationVerb = countParts[0];
+                        verb = countParts[0];
+                        ViewModel.OperationVerb = verb;
                     }
 
                     if (countParts.Length >= startIdx + 3)
                     {
-                        ItemProgressTextBlock.Text = $"{countParts[startIdx]} of {countParts[startIdx + 2]}";
+                        ViewModel.ItemProgressText = $"{countParts[startIdx]} of {countParts[startIdx + 2]}";
                     }
                     else
                     {
-                        ItemProgressTextBlock.Text = mainParts[0];
+                        ViewModel.ItemProgressText = mainParts[0];
                     }
                     
-                    CurrentFileTextBlock.Text = mainParts[1];
+                    ViewModel.CurrentFileName = mainParts[1];
                 }
                 else
                 {
-                    ItemProgressTextBlock.Text = "0 / 0";
-                    CurrentFileTextBlock.Text = currentFileName;
+                    ViewModel.ItemProgressText = "0 / 0";
+                    ViewModel.CurrentFileName = currentFileName;
                 }
             }
             else
             {
-                ItemProgressTextBlock.Text = $"{completedFiles} of {totalFiles}";
-                CurrentFileTextBlock.Text = currentFileName ?? "...";
+                ViewModel.ItemProgressText = $"{completedFiles} of {totalFiles}";
+                ViewModel.CurrentFileName = currentFileName ?? "...";
             }
 
             string fileSpecificProgress = null;
-            if (CurrentFileTextBlock.Text.Contains("|"))
+            string cleanFileName = ViewModel.CurrentFileName;
+            if (cleanFileName != null && cleanFileName.Contains("|"))
             {
-                var pipeParts = CurrentFileTextBlock.Text.Split('|');
-                CurrentFileTextBlock.Text = pipeParts[0].Trim();
+                var pipeParts = cleanFileName.Split('|');
+                ViewModel.CurrentFileName = pipeParts[0].Trim();
                 if (pipeParts.Length > 1) fileSpecificProgress = pipeParts[1].Trim();
             }
 
-            bool showChunks = OperationVerb == "Comparing" || OperationVerb == "Updating";
+            ViewModel.ShowChunks = verb == "Comparing" || verb == "Updating";
             
-            if (showChunks)
+            if (ViewModel.ShowChunks)
             {
-                SubProgressRow.Visibility = Visibility.Visible;
                 if (!string.IsNullOrEmpty(fileSpecificProgress))
                 {
                     string formattedFileProgress = fileSpecificProgress.Replace("/", " of ");
-                    SubProgressTextBlock.Text = $"Chunks: {formattedFileProgress} ({completedFiles}/{totalFiles})";
+                    ViewModel.SubProgressText = $"Chunks: {formattedFileProgress} ({completedFiles}/{totalFiles})";
                 }
                 else
                 {
-                    SubProgressTextBlock.Text = $"Chunks: {completedFiles} of {totalFiles}";
+                    ViewModel.SubProgressText = $"Chunks: {completedFiles} of {totalFiles}";
                 }
-            }
-            else
-            {
-                SubProgressRow.Visibility = Visibility.Collapsed;
             }
 
             if (totalFiles > 0)
             {
-                MainProgressBar.Value = (double)completedFiles / totalFiles * 100;
+                ViewModel.ProgressValue = (double)completedFiles / totalFiles * 100;
             }
             else
             {
-                MainProgressBar.Value = 0;
+                ViewModel.ProgressValue = 0;
             }
 
             UpdateEstimatedTime(completedFiles, totalFiles);
@@ -131,8 +130,8 @@ namespace AssetsManager.Views.Dialogs
             if (completedFiles >= totalFiles && totalFiles > 0)
             {
                 _timer.Stop();
-                EstimatedTimeTextBlock.Text = "Estimated time remaining: 00:00:00";
-                MainProgressBar.Value = 100;
+                ViewModel.EstimatedTimeText = "Estimated time remaining: 00:00:00";
+                ViewModel.ProgressValue = 100;
             }
         }
 
@@ -140,7 +139,7 @@ namespace AssetsManager.Views.Dialogs
         {
             if (completedFiles == 0 || totalFiles == 0)
             {
-                EstimatedTimeTextBlock.Text = "Estimated time: Calculating...";
+                ViewModel.EstimatedTimeText = "Estimated time: Calculating...";
                 return;
             }
 
@@ -154,25 +153,23 @@ namespace AssetsManager.Views.Dialogs
 
                 if (estimatedRemainingTime.TotalSeconds < 0)
                 {
-                    EstimatedTimeTextBlock.Text = "Estimated time remaining: 00:00:00";
+                    ViewModel.EstimatedTimeText = "Estimated time remaining: 00:00:00";
                 }
                 else
                 {
-                    EstimatedTimeTextBlock.Text = $"Estimated time remaining: {estimatedRemainingTime.ToString(@"hh\:mm\:ss")}";
+                    ViewModel.EstimatedTimeText = $"Estimated time remaining: {estimatedRemainingTime.ToString(@"hh\:mm\:ss")}";
                 }
             }
             else
             {
-                EstimatedTimeTextBlock.Text = "Estimated time: Calculating...";
+                ViewModel.EstimatedTimeText = "Estimated time: Calculating...";
             }
         }
-
-        public bool IsFinished { get; set; } = false;
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             // If the process is not finished, just hide the window to keep background progress
-            if (!IsFinished && Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted)
+            if (!ViewModel.IsFinished && Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted)
             {
                 e.Cancel = true;
                 this.Hide();

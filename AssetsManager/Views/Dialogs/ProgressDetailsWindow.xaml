@@ -37,7 +37,7 @@
                                            Foreground="{StaticResource TextPrimary}"
                                            Margin="0,0,10,0"/>
                                 <TextBlock x:Name="ItemProgressTextBlock" 
-                                           Text="0 of 0" 
+                                           Text="{Binding ItemProgressText}" 
                                            FontSize="15" 
                                            Foreground="{StaticResource TextPrimary}" 
                                            FontWeight="SemiBold"
@@ -47,7 +47,7 @@
                             <!-- 2. Current File Name -->
                             <Grid Margin="0,0,0,12">
                                 <TextBlock x:Name="CurrentFileTextBlock" 
-                                           Text="..." 
+                                           Text="{Binding CurrentFileName}" 
                                            FontSize="12" 
                                            Foreground="{StaticResource TextSecondary}" 
                                            TextTrimming="CharacterEllipsis"
@@ -59,17 +59,17 @@
                                 <ProgressBar x:Name="MainProgressBar" 
                                              Height="8" 
                                              Minimum="0" Maximum="100" 
-                                             Value="0"
+                                             Value="{Binding ProgressValue}"
                                              Style="{StaticResource ModernProgressBar}"/>
                             </Grid>
                             
                             <!-- 4. Technical Data Area -->
                             <StackPanel>
                                 <!-- Sub-progress Row -->
-                                <StackPanel x:Name="SubProgressRow" Orientation="Horizontal" Margin="0,0,0,10">
+                                <StackPanel x:Name="SubProgressRow" Orientation="Horizontal" Margin="0,0,0,10" Visibility="{Binding SubProgressVisibility}">
                                     <materialIcons:MaterialIcon Kind="ChartBubble" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                     <TextBlock x:Name="SubProgressTextBlock" 
-                                               Text="0 of 0" 
+                                               Text="{Binding SubProgressText}" 
                                                FontSize="12" 
                                                Foreground="{StaticResource TextSecondary}" 
                                                VerticalAlignment="Center"
@@ -80,7 +80,7 @@
                                 <StackPanel Orientation="Horizontal">
                                     <materialIcons:MaterialIcon Kind="ClockTimeFourOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                     <TextBlock x:Name="EstimatedTimeTextBlock" 
-                                               Text="Calculating..." 
+                                               Text="{Binding EstimatedTimeText}" 
                                                FontSize="12" 
                                                Foreground="{StaticResource TextSecondary}" 
                                                VerticalAlignment="Center"
