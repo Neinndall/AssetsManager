@@ -4,10 +4,12 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
+using AssetsManager.Views.Helpers;
+using Material.Icons;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class ProgressDetailsWindow : Window
+    public partial class ProgressDetailsWindow : HudWindow
     {
         private readonly LogService _logService;
         private DateTime _startTime;
@@ -16,9 +18,6 @@ namespace AssetsManager.Views.Dialogs
         private readonly DispatcherTimer _timer;
 
         public string OperationVerb { get; set; }
-        public string WindowTitle { get; set; }
-        public string HeaderIconKind { get; set; }
-        public string HeaderText { get; set; }
 
         private readonly TaskCancellationManager _taskCancellationManager;
 
@@ -29,8 +28,8 @@ namespace AssetsManager.Views.Dialogs
             _taskCancellationManager = taskCancellationManager;
             _startTime = DateTime.Now;
 
-            this.Title = windowTitle;
-            this.WindowTitle = windowTitle;
+            this.HeaderTitle = windowTitle;
+            this.HeaderIcon = MaterialIconKind.ProgressClock;
             this.DataContext = this;
 
             _timer = new DispatcherTimer
@@ -168,15 +167,21 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void CloseButton_Click(object sender, RoutedEventArgs e) => this.Hide();
-
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            _timer?.Stop();
-            _timer.Tick -= Timer_Tick;
-            base.OnClosing(e);
+            // Instead of closing, we hide it to preserve state if needed,
+            // but we must check if we are actually shutting down the app.
+            if (Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted)
+            {
+                e.Cancel = true;
+                this.Hide();
+            }
+            
+            if (_timer != null)
+            {
+                _timer.Stop();
+                _timer.Tick -= Timer_Tick;
+            }
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)

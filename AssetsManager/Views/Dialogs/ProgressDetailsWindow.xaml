@@ -1,161 +1,105 @@
-<Window x:Class="AssetsManager.Views.Dialogs.ProgressDetailsWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Title="Progress Details" Height="Auto" Width="600" 
-        SizeToContent="Height"
-        WindowStartupLocation="CenterOwner"
-        Background="Transparent"
-        AllowsTransparency="True"
-        WindowStyle="None"
-        ResizeMode="CanResize"
-        UseLayoutRounding="True"
-        SnapsToDevicePixels="True">
+<base:HudWindow x:Class="AssetsManager.Views.Dialogs.ProgressDetailsWindow"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+                xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+                mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+                Height="Auto" Width="600" 
+                SizeToContent="Height"
+                WindowStartupLocation="CenterOwner"
+                Style="{StaticResource HudWindowStyle}"
+                ShowMaximizeButton="False"
+                ResizeMode="NoResize">
 
-    <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="36" 
-                      ResizeBorderThickness="8" 
-                      GlassFrameThickness="0" 
-                      CornerRadius="0" />
-    </WindowChrome.WindowChrome>
-        
-    <Border Margin="10" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Background="{StaticResource SidebarBackground}">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="15" ShadowDepth="2" Color="Black" Opacity="0.4"/>
-        </Border.Effect>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> <!-- 0: Custom Title Bar -->
-                <RowDefinition Height="*"/>    <!-- 1: Content -->
-            </Grid.RowDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-            <!-- 1. Custom Title Bar (HUD Style: 36px) -->
-            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" CornerRadius="11,11,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="10" ClipToBounds="True">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/> <!-- Icon/Title -->
-                        <ColumnDefinition Width="*"/>    <!-- Spacer -->
-                        <ColumnDefinition Width="Auto"/> <!-- Window Controls -->
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
-                        <materialIcons:MaterialIcon Kind="{Binding HeaderIconKind}" 
-                                                    Width="18" Height="18" 
-                                                    Foreground="{StaticResource AccentBrush}" 
-                                                    VerticalAlignment="Center" 
-                                                    Margin="0,0,10,0"/>
-                        <TextBlock Text="{Binding HeaderText}" 
-                                   FontWeight="Normal" FontSize="13" 
-                                   Foreground="{StaticResource TextPrimary}" 
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-
-                    <!-- Drag Area -->
-                    <Rectangle Grid.Column="1" Fill="Transparent" IsHitTestVisible="True"/>
-
-                    <!-- HUD Window Controls -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button Style="{StaticResource HUDTitleBarMinimizeButtonStyle}" Click="MinimizeButton_Click">
-                            <materialIcons:MaterialIcon Kind="WindowMinimize" Width="14" Height="14"/>
-                        </Button>
-                        <Button Style="{StaticResource HUDTitleBarCloseButtonStyle}" Click="CloseButton_Click">
-                            <materialIcons:MaterialIcon Kind="WindowClose" Width="14" Height="14"/>
-                        </Button>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- 2. Dark Body Area (With bottom rounding) -->
-            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,11" ClipToBounds="True">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Content -->
-                    <Grid Grid.Row="0" Margin="24">
+        <!-- 1. Dark Body Area -->
+        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}">
+            <Grid Margin="24">
+                <StackPanel>
+                    <!-- Technical Status Card -->
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <StackPanel>
-                            <!-- Technical Status Card -->
-                            <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                <StackPanel>
-                                    <!-- 1. Operation and Progress -->
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                        <TextBlock x:Name="VerbTextBlock" 
-                                                   Text="{Binding OperationVerb}" 
-                                                   FontWeight="SemiBold" FontSize="15" 
-                                                   Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text=":" 
-                                                   FontWeight="SemiBold" FontSize="15" 
-                                                   Foreground="{StaticResource TextPrimary}"
-                                                   Margin="0,0,10,0"/>
-                                        <TextBlock x:Name="ItemProgressTextBlock" 
-                                                   Text="0 of 0" 
-                                                   FontSize="15" 
-                                                   Foreground="{StaticResource TextPrimary}" 
-                                                   FontWeight="SemiBold"
-                                                   FontFamily="Consolas"/>
-                                    </StackPanel>
+                            <!-- 1. Operation and Progress -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock x:Name="VerbTextBlock" 
+                                           Text="{Binding OperationVerb}" 
+                                           FontWeight="SemiBold" FontSize="15" 
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text=":" 
+                                           FontWeight="SemiBold" FontSize="15" 
+                                           Foreground="{StaticResource TextPrimary}"
+                                           Margin="0,0,10,0"/>
+                                <TextBlock x:Name="ItemProgressTextBlock" 
+                                           Text="0 of 0" 
+                                           FontSize="15" 
+                                           Foreground="{StaticResource TextPrimary}" 
+                                           FontWeight="SemiBold"
+                                           FontFamily="Consolas"/>
+                            </StackPanel>
 
-                                    <!-- 2. Current File Name -->
-                                    <Grid Margin="0,0,0,12">
-                                        <TextBlock x:Name="CurrentFileTextBlock" 
-                                                   Text="..." 
-                                                   FontSize="12" 
-                                                   Foreground="{StaticResource TextSecondary}" 
-                                                   TextTrimming="CharacterEllipsis"
-                                                   FontWeight="Medium"/>
-                                    </Grid>
+                            <!-- 2. Current File Name -->
+                            <Grid Margin="0,0,0,12">
+                                <TextBlock x:Name="CurrentFileTextBlock" 
+                                           Text="..." 
+                                           FontSize="12" 
+                                           Foreground="{StaticResource TextSecondary}" 
+                                           TextTrimming="CharacterEllipsis"
+                                           FontWeight="Medium"/>
+                            </Grid>
 
-                                    <!-- 3. Visual Progress Bar -->
-                                    <Grid Margin="0,0,0,12">
-                                        <ProgressBar x:Name="MainProgressBar" 
-                                                     Height="8" 
-                                                     Minimum="0" Maximum="100" 
-                                                     Value="0"
-                                                     Style="{StaticResource ModernProgressBar}"/>
-                                    </Grid>
-                                    
-                                    <!-- 4. technical Data Area -->
-                                    <StackPanel>
-                                        <!-- Sub-progress Row -->
-                                        <StackPanel x:Name="SubProgressRow" Orientation="Horizontal" Margin="0,0,0,10">
-                                            <materialIcons:MaterialIcon Kind="ChartBubble" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <TextBlock x:Name="SubProgressTextBlock" 
-                                                       Text="0 of 0" 
-                                                       FontSize="12" 
-                                                       Foreground="{StaticResource TextSecondary}" 
-                                                       VerticalAlignment="Center"
-                                                       FontFamily="Consolas"/>
-                                        </StackPanel>
-
-                                        <!-- Estimated Time Row -->
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialIcons:MaterialIcon Kind="ClockTimeFourOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <TextBlock x:Name="EstimatedTimeTextBlock" 
-                                                       Text="Calculating..." 
-                                                       FontSize="12" 
-                                                       Foreground="{StaticResource TextSecondary}" 
-                                                       VerticalAlignment="Center"
-                                                       FontFamily="Consolas"/>
-                                        </StackPanel>
-                                    </StackPanel>
+                            <!-- 3. Visual Progress Bar -->
+                            <Grid Margin="0,0,0,12">
+                                <ProgressBar x:Name="MainProgressBar" 
+                                             Height="8" 
+                                             Minimum="0" Maximum="100" 
+                                             Value="0"
+                                             Style="{StaticResource ModernProgressBar}"/>
+                            </Grid>
+                            
+                            <!-- 4. Technical Data Area -->
+                            <StackPanel>
+                                <!-- Sub-progress Row -->
+                                <StackPanel x:Name="SubProgressRow" Orientation="Horizontal" Margin="0,0,0,10">
+                                    <materialIcons:MaterialIcon Kind="ChartBubble" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="SubProgressTextBlock" 
+                                               Text="0 of 0" 
+                                               FontSize="12" 
+                                               Foreground="{StaticResource TextSecondary}" 
+                                               VerticalAlignment="Center"
+                                               FontFamily="Consolas"/>
                                 </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </Grid>
 
-                    <!-- Footer -->
-                    <Grid Grid.Row="1" Margin="24,0,24,24">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource PrimaryButton}" Click="CancelButton_Click"/>
+                                <!-- Estimated Time Row -->
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="ClockTimeFourOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="EstimatedTimeTextBlock" 
+                                               Text="Calculating..." 
+                                               FontSize="12" 
+                                               Foreground="{StaticResource TextSecondary}" 
+                                               VerticalAlignment="Center"
+                                               FontFamily="Consolas"/>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
-                    </Grid>
-                </Grid>
-            </Border>
-        </Grid>
-    </Border>
-</Window>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 2. Footer Area (Actions) -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" 
+                BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" 
+                Padding="20,14" CornerRadius="0,0,11,11">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource SecondaryButton}" Click="CancelButton_Click" Height="32" Width="90"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</base:HudWindow>

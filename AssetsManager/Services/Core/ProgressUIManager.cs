@@ -8,6 +8,7 @@ using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Controls;
 using AssetsManager.Utils;
+using Material.Icons;
 
 namespace AssetsManager.Services.Core
 {
@@ -70,12 +71,22 @@ namespace AssetsManager.Services.Core
                 _totalFiles = totalItems;
                 UpdateStatusBar(initialStatusMsg, 0, totalItems);
 
+                // Convert string iconKind to MaterialIconKind enum
+                MaterialIconKind icon = MaterialIconKind.ProgressClock; // Default
+                if (!string.IsNullOrEmpty(iconKind))
+                {
+                    if (Enum.TryParse(iconKind, out MaterialIconKind parsedIcon))
+                    {
+                        icon = parsedIcon;
+                    }
+                }
+
                 _progressDetailsWindow = new ProgressDetailsWindow(_logService, headerText, _taskCancellationManager)
                 {
                     Owner = _owner,
                     OperationVerb = verb,
-                    HeaderIconKind = iconKind,
-                    HeaderText = headerText
+                    HeaderIcon = icon,
+                    HeaderTitle = headerText
                 };
                 
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
