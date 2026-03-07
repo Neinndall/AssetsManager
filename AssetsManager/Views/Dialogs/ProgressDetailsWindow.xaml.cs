@@ -167,16 +167,19 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
+        public bool IsFinished { get; set; } = false;
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            // Instead of closing, we hide it to preserve state if needed,
-            // but we must check if we are actually shutting down the app.
-            if (Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted)
+            // If the process is not finished, just hide the window to keep background progress
+            if (!IsFinished && Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted)
             {
                 e.Cancel = true;
                 this.Hide();
+                return;
             }
-            
+
+            // If finished or app shutdown, clean up resources and allow closure
             if (_timer != null)
             {
                 _timer.Stop();

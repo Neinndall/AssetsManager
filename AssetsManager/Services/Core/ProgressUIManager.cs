@@ -128,8 +128,12 @@ namespace AssetsManager.Services.Core
 
         private void CloseProgressWindow()
         {
-            _progressDetailsWindow?.Close();
-            _progressDetailsWindow = null;
+            if (_progressDetailsWindow != null)
+            {
+                _progressDetailsWindow.IsFinished = true;
+                _progressDetailsWindow.Close();
+                _progressDetailsWindow = null;
+            }
         }
 
         private void UpdateStatusBar(string message, int completed = -1, int total = -1)
