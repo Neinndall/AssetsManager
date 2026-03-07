@@ -66,6 +66,7 @@
         <!-- Thinner selection box -->
         <Setter Property="Padding" Value="4,1"/> 
         <Setter Property="helpers:TreeViewItemBehavior.SingleClickExpand" Value="True"/>
+        <Setter Property="helpers:TreeViewItemBehavior.PreserveSelectionOnRightClick" Value="True"/>
         <Setter Property="ContextMenu" Value="{x:Null}"/>
         <Setter Property="Template">
             <Setter.Value>

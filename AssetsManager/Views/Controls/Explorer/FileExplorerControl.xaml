@@ -220,7 +220,6 @@
                         <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="VerticalContentAlignment" Value="Center" />
                         <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <EventSetter Event="PreviewMouseRightButtonDown" Handler="TreeViewItem_PreviewMouseRightButtonDown"/>
                     </Style>
                 </TreeView.ItemContainerStyle>
             </TreeView>
