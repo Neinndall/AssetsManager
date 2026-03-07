@@ -4,10 +4,11 @@ using System.Windows;
 using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class JsonDiffWindow : Window
+    public partial class JsonDiffWindow : HudWindow
     {
         public JsonDiffWindow(CustomMessageBoxService customMessageBoxService, JsonFormatterService jsonFormatterService)
         {
@@ -60,15 +61,5 @@ namespace AssetsManager.Views.Dialogs
             JsonDiffControl.Visibility = Visibility.Visible;
             await JsonDiffControl.LoadAndDisplayDiffAsync(oldText, newText, oldFileName, newFileName);
         }
-
-        private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
-
-        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
-            else SystemCommands.MaximizeWindow(this);
-        }
-
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     }
 }
