@@ -1,10 +1,11 @@
 using System;
 using System.Windows;
 using Serilog;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class UpdateProgressWindow : Window
+    public partial class UpdateProgressWindow : HudWindow
     {
         public UpdateProgressWindow()
         {
@@ -23,9 +24,5 @@ namespace AssetsManager.Views.Dialogs
             DownloadProgressBar.Value = percentage;
             MessageTextBlock.Text = message;
         }
-
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
-
-        private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
     }
 }

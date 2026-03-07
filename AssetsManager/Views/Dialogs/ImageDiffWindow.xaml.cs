@@ -6,7 +6,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Views.Helpers;
-using Material.Icons;
 
 namespace AssetsManager.Views.Dialogs
 {

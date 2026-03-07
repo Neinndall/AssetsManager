@@ -1,4 +1,5 @@
 using System.Windows;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -9,7 +10,7 @@ namespace AssetsManager.Views.Dialogs
         CleanWithSaving
     }
 
-    public partial class UpdateModeDialog : Window
+    public partial class UpdateModeDialog : HudWindow
     {
         public UpdateMode SelectedMode { get; private set; } = UpdateMode.None;
 
@@ -34,7 +35,5 @@ namespace AssetsManager.Views.Dialogs
         {
             DialogResult = false;
         }
-
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     }
 }
