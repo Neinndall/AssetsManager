@@ -1,11 +1,13 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using AssetsManager.Views.Controls.Explorer;
 
 namespace AssetsManager.Views.Models.Explorer
 {
     public class ExplorerToolbarModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
+        public FileExplorerControl ParentExplorer { get; set; } // Reference back for direct actions
 
         private bool _isWadMode = true;
         private bool _isGridMode = false;
