@@ -15,7 +15,7 @@ namespace AssetsManager.Views.Dialogs
             InitializeComponent();
             JsonDiffControl.CustomMessageBoxService = customMessageBoxService;
             JsonDiffControl.JsonFormatterService = jsonFormatterService;
-            JsonDiffControl.ComparisonFinished += JsonDiffControl_ComparisonFinished;
+            JsonDiffControl.ParentWindow = this;
 
             // Start invisible to prevent visual jump
             Visibility = Visibility.Hidden;
@@ -23,17 +23,8 @@ namespace AssetsManager.Views.Dialogs
             Closed += OnWindowClosed;
         }
 
-        private void JsonDiffControl_ComparisonFinished(object sender, bool success)
-        {
-            if (success)
-            {
-                Close();
-            }
-        }
-
         private void OnWindowClosed(object sender, EventArgs e)
         {
-            JsonDiffControl.ComparisonFinished -= JsonDiffControl_ComparisonFinished;
             JsonDiffControl.Dispose();
         }
 

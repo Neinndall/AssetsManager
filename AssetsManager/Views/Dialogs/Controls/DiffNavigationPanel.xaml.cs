@@ -13,21 +13,19 @@ namespace AssetsManager.Views.Dialogs.Controls
 {
     public partial class DiffNavigationPanel : UserControl
     {
+        public JsonDiffControl ParentControl { get; set; }
+
         private TextEditor _oldEditor;
         private TextEditor _newEditor;
         private SideBySideDiffModel _diffModel;
         private SideBySideDiffModel _originalDiffModel;
         private IList<DiffPiece> _unifiedLines;
         private bool _isDragging;
-        private Point _dragStartPoint;
-        private bool _wasActuallyDragged;
         private readonly List<int> _diffLines;
         public int CurrentLine { get; set; }
 
         private readonly SolidColorBrush _backgroundPanelBrush, _addedBrush, _removedBrush, _modifiedBrush, _imaginaryBrush, _viewportBrush;
         private DrawingVisual _oldViewportGuide, _newViewportGuide;
-
-        public event Action<int> ScrollRequested;
 
         public DiffNavigationPanel()
         {
@@ -58,22 +56,19 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void Cleanup()
         {
-            // Unsubscribe events
             OldDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
             OldDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
             OldDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
-            OldDiffMapHost.SizeChanged -= OldDiffMapHost_SizeChanged;
+            OldDiffMapHost.SizeChanged -= MapHost_SizeChanged;
 
             NewDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
             NewDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
             NewDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
-            NewDiffMapHost.SizeChanged -= NewDiffMapHost_SizeChanged;
+            NewDiffMapHost.SizeChanged -= MapHost_SizeChanged;
 
-            // Clear visuals
             OldDiffMapHost.ClearVisuals();
             NewDiffMapHost.ClearVisuals();
 
-            // Clear references
             _oldEditor = null;
             _newEditor = null;
             _diffModel = null;
@@ -82,6 +77,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             _diffLines.Clear();
             _oldViewportGuide = null;
             _newViewportGuide = null;
+            ParentControl = null;
         }
 
         public void Initialize(TextEditor oldEditor, TextEditor newEditor, SideBySideDiffModel diffModel, SideBySideDiffModel originalDiffModel = null)
@@ -106,42 +102,33 @@ namespace AssetsManager.Views.Dialogs.Controls
             _diffModel = null;
             _originalDiffModel = null;
 
-            // En modo unificado NO necesitamos el mapa visual ni sus eventos.
-            // Solo calculamos las líneas para que funcionen los botones de navegación.
             FindDiffLines();
         }
 
         private void SetupEvents()
         {
-            // Limpiar eventos previos antes de re-suscribir para evitar duplicados
             OldDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
             OldDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
             OldDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
-            OldDiffMapHost.SizeChanged -= OldDiffMapHost_SizeChanged;
+            OldDiffMapHost.SizeChanged -= MapHost_SizeChanged;
 
             NewDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
             NewDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
             NewDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
-            NewDiffMapHost.SizeChanged -= NewDiffMapHost_SizeChanged;
+            NewDiffMapHost.SizeChanged -= MapHost_SizeChanged;
 
             OldDiffMapHost.MouseLeftButtonDown += NavigationPanel_MouseLeftButtonDown;
             OldDiffMapHost.MouseMove += NavigationPanel_MouseMove;
             OldDiffMapHost.MouseLeftButtonUp += NavigationPanel_MouseLeftButtonUp;
-            OldDiffMapHost.SizeChanged += OldDiffMapHost_SizeChanged;
+            OldDiffMapHost.SizeChanged += MapHost_SizeChanged;
 
             NewDiffMapHost.MouseLeftButtonDown += NavigationPanel_MouseLeftButtonDown;
             NewDiffMapHost.MouseMove += NavigationPanel_MouseMove;
             NewDiffMapHost.MouseLeftButtonUp += NavigationPanel_MouseLeftButtonUp;
-            NewDiffMapHost.SizeChanged += NewDiffMapHost_SizeChanged;
+            NewDiffMapHost.SizeChanged += MapHost_SizeChanged;
         }
 
-        private void OldDiffMapHost_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            InitializeDiffMarkers();
-            UpdateViewportGuide();
-        }
-
-        private void NewDiffMapHost_SizeChanged(object sender, SizeChangedEventArgs e)
+        private void MapHost_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             InitializeDiffMarkers();
             UpdateViewportGuide();
@@ -149,274 +136,152 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void InitializeDiffMarkers()
         {
-            OldDiffMapHost.ClearVisuals();
-            NewDiffMapHost.ClearVisuals();
+            if (_originalDiffModel == null) return;
 
-            if (_unifiedLines != null) return; // Unified mode doesn't show map for now
-            if (_diffModel?.OldText?.Lines == null) return;
+            DrawMapMarkers(OldDiffMapHost, _originalDiffModel.OldText);
+            DrawMapMarkers(NewDiffMapHost, _originalDiffModel.NewText);
+            
+            // CRÍTICO: Resetear guías para que se vuelvan a añadir al host tras el ClearVisuals de DrawMapMarkers
+            _oldViewportGuide = null;
+            _newViewportGuide = null;
+        }
 
-            var panelHeight = OldDiffMapHost.ActualHeight > 0 ? OldDiffMapHost.ActualHeight : 600;
-            var totalLines = Math.Max(_diffModel.OldText.Lines.Count, _diffModel.NewText.Lines.Count);
-            if (totalLines == 0) return;
-            var lineHeight = panelHeight / totalLines;
+        private void DrawMapMarkers(VisualHost host, DiffPaneModel pane)
+        {
+            host.ClearVisuals();
+            var backgroundVisual = new DrawingVisual();
+            using (var dc = backgroundVisual.RenderOpen())
+            {
+                dc.DrawRectangle(_backgroundPanelBrush, null, new Rect(0, 0, host.ActualWidth, host.ActualHeight));
 
-            DrawPanelContent(OldDiffMapHost, _diffModel.OldText.Lines, lineHeight);
-            DrawPanelContent(NewDiffMapHost, _diffModel.NewText.Lines, lineHeight);
+                if (pane.Lines.Count > 0 && host.ActualHeight > 0)
+                {
+                    double ratio = host.ActualHeight / pane.Lines.Count;
+                    for (int i = 0; i < pane.Lines.Count; i++)
+                    {
+                        var line = pane.Lines[i];
+                        if (line.Type == ChangeType.Unchanged) continue;
+
+                        Brush brush = line.Type switch
+                        {
+                            ChangeType.Inserted => _addedBrush,
+                            ChangeType.Deleted => _removedBrush,
+                            ChangeType.Modified => _modifiedBrush,
+                            ChangeType.Imaginary => _imaginaryBrush,
+                            _ => null
+                        };
+
+                        if (brush != null)
+                        {
+                            dc.DrawRectangle(brush, null, new Rect(0, i * ratio, host.ActualWidth, Math.Max(1, ratio)));
+                        }
+                    }
+                }
+            }
+            host.AddVisual(backgroundVisual);
         }
 
         public void UpdateViewportGuide()
         {
-            // Remove the old viewport visual from the host
-            if (_oldViewportGuide != null) OldDiffMapHost.RemoveVisual(_oldViewportGuide);
-            if (_newViewportGuide != null) NewDiffMapHost.RemoveVisual(_newViewportGuide);
-
-            if (_unifiedLines != null) return; // Unified mode doesn't show map for now
-            if (_diffModel == null) return;
-
-            var panelHeight = OldDiffMapHost.ActualHeight;
-            if (panelHeight <= 0) return;
-
-            Rect oldRect, newRect;
-
-            if (_originalDiffModel != _diffModel)
-            {
-                var totalLines = Math.Max(_diffModel.OldText.Lines.Count, _diffModel.NewText.Lines.Count);
-                if (totalLines == 0 || CurrentLine <= 0) return;
-                var lineHeight = panelHeight / totalLines;
-                var lineIndex = CurrentLine - 1;
-                if (lineIndex < 0 || lineIndex >= totalLines) return;
-
-                var highlighterTop = lineIndex * lineHeight;
-                oldRect = new Rect(0, highlighterTop, OldDiffMapHost.ActualWidth, Math.Max(2.0, lineHeight));
-                newRect = new Rect(0, highlighterTop, NewDiffMapHost.ActualWidth, Math.Max(2.0, lineHeight));
-            }
-            else
-            {
-                if (_newEditor.ExtentHeight <= 0) return;
-
-                var viewportRatio = _newEditor.ViewportHeight / _newEditor.ExtentHeight;
-                var offsetRatio = _newEditor.VerticalOffset / _newEditor.ExtentHeight;
-                var viewportHeight = panelHeight * viewportRatio;
-                viewportHeight = Math.Min(viewportHeight, panelHeight); // Cap the height at the panel's height
-                var viewportTop = panelHeight * offsetRatio;
-
-                oldRect = new Rect(0, viewportTop, OldDiffMapHost.ActualWidth, Math.Max(2.0, viewportHeight));
-                newRect = new Rect(0, viewportTop, NewDiffMapHost.ActualWidth, Math.Max(2.0, viewportHeight));
-            }
-
-            _oldViewportGuide = CreateRectangleVisual(oldRect, _viewportBrush);
-            _newViewportGuide = CreateRectangleVisual(newRect, _viewportBrush);
-
-            OldDiffMapHost.AddVisual(_oldViewportGuide);
-            NewDiffMapHost.AddVisual(_newViewportGuide);
+            if (_oldEditor != null) UpdateViewport(OldDiffMapHost, _oldEditor, ref _oldViewportGuide);
+            if (_newEditor != null) UpdateViewport(NewDiffMapHost, _newEditor, ref _newViewportGuide);
         }
 
-        private void DrawPanelContent(VisualHost host, IReadOnlyList<DiffPiece> lines, double lineHeight)
+        private void UpdateViewport(VisualHost host, TextEditor editor, ref DrawingVisual guide)
         {
-            for (int i = 0; i < lines.Count; i++)
-            {
-                var brush = GetBrushForChangeType(lines[i].Type);
-                if (brush == null) continue;
+            // Seguridad: Validar nulos y estado del editor para evitar crash en Disposal
+            if (host == null || editor == null || editor.Document == null || editor.TextArea?.TextView == null || host.ActualHeight <= 0 || editor.Document.LineCount <= 0) return;
 
-                var rect = new Rect(0, i * lineHeight, host.ActualWidth, Math.Max(1.0, lineHeight));
-                var visual = CreateRectangleVisual(rect, brush);
-                host.AddVisual(visual);
-            }
-        }
-
-        private DrawingVisual CreateRectangleVisual(Rect rect, Brush brush)
-        {
-            var visual = new DrawingVisual();
-            using (var dc = visual.RenderOpen())
+            if (guide == null)
             {
-                dc.DrawRectangle(brush, null, rect);
+                guide = new DrawingVisual();
+                host.AddVisual(guide);
             }
-            return visual;
+
+            double visibleLines = editor.TextArea.TextView.ActualHeight / editor.TextArea.TextView.DefaultLineHeight;
+            double topLines = editor.TextArea.TextView.VerticalOffset / editor.TextArea.TextView.DefaultLineHeight;
+            double ratio = host.ActualHeight / editor.Document.LineCount;
+
+            using (var dc = guide.RenderOpen())
+            {
+                dc.DrawRectangle(null, new Pen(_viewportBrush, 1), new Rect(0, topLines * ratio, host.ActualWidth, Math.Max(visibleLines * ratio, 2)));
+                dc.DrawRectangle(_viewportBrush, null, new Rect(0, topLines * ratio, host.ActualWidth, Math.Max(visibleLines * ratio, 2)));
+            }
         }
 
         private void FindDiffLines()
         {
             _diffLines.Clear();
-            var diffLineSet = new HashSet<int>();
+            var lines = _diffModel?.NewText.Lines ?? _unifiedLines;
+            if (lines == null) return;
 
-            if (_unifiedLines != null)
+            for (int i = 0; i < lines.Count; i++)
             {
-                if (_unifiedLines.Count > 0 && _unifiedLines[0].Type != ChangeType.Unchanged)
-                    diffLineSet.Add(1);
-
-                for (int i = 1; i < _unifiedLines.Count; i++)
+                if (lines[i].Type != ChangeType.Unchanged && lines[i].Type != ChangeType.Imaginary)
                 {
-                    if (_unifiedLines[i].Type != ChangeType.Unchanged && _unifiedLines[i].Type != _unifiedLines[i - 1].Type)
-                    {
-                        diffLineSet.Add(i + 1);
-                    }
+                    _diffLines.Add(i + 1);
                 }
             }
-            else if (_diffModel != null)
-            {
-                var newLines = _diffModel.NewText.Lines;
-                var oldLines = _diffModel.OldText.Lines;
-                int count = Math.Min(newLines.Count, oldLines.Count);
-
-                if (count > 0)
-                {
-                    // Check first line
-                    if (newLines[0].Type != ChangeType.Unchanged || oldLines[0].Type != ChangeType.Unchanged)
-                        diffLineSet.Add(1);
-
-                    // Check subsequent lines
-                    for (int i = 1; i < count; i++)
-                    {
-                        var currNew = newLines[i];
-                        var prevNew = newLines[i - 1];
-                        var currOld = oldLines[i];
-                        var prevOld = oldLines[i - 1];
-
-                        bool typeChanged = currNew.Type != prevNew.Type || currOld.Type != prevOld.Type;
-                        
-                        // Gap detection logic for filtered views
-                        bool gapDetected = (currNew.Position.HasValue && prevNew.Position.HasValue && currNew.Position.Value != prevNew.Position.Value + 1) ||
-                                           (currOld.Position.HasValue && prevOld.Position.HasValue && currOld.Position.Value != prevOld.Position.Value + 1);
-
-                        if (typeChanged || gapDetected)
-                        {
-                            bool isCurrentLineDiff = currNew.Type != ChangeType.Unchanged || currOld.Type != ChangeType.Unchanged;
-                            if (isCurrentLineDiff)
-                            {
-                                diffLineSet.Add(i + 1);
-                            }
-                        }
-                    }
-                }
-            }
-
-            _diffLines.AddRange(diffLineSet);
-            _diffLines.Sort();
         }
 
         public void NavigateToNextDifference(int currentLine)
         {
-            if (_diffLines.Count == 0) return;
-            var nextDiffLine = _diffLines.FirstOrDefault(line => line > currentLine);
-            if (nextDiffLine == 0) nextDiffLine = _diffLines[0];
-            ScrollToLine(nextDiffLine);
+            if (!_diffLines.Any()) return;
+            int next = _diffLines.FirstOrDefault(l => l > currentLine);
+            if (next == 0) next = _diffLines.First();
+            ParentControl?.ScrollToLine(next);
         }
 
         public void NavigateToPreviousDifference(int currentLine)
         {
-            if (_diffLines.Count == 0) return;
-            var previousDiffLine = _diffLines.LastOrDefault(line => line < currentLine);
-            if (previousDiffLine == 0) previousDiffLine = _diffLines.Last();
-            ScrollToLine(previousDiffLine);
+            if (!_diffLines.Any()) return;
+            int prev = _diffLines.LastOrDefault(l => l < currentLine);
+            if (prev == 0) prev = _diffLines.Last();
+            ParentControl?.ScrollToLine(prev);
         }
 
         public void NavigateToDifferenceByIndex(int index)
         {
             if (index >= 0 && index < _diffLines.Count)
             {
-                var lineToScrollTo = _diffLines[index];
-                ScrollToLine(lineToScrollTo);
-            }
-            else if (_diffLines.Count > 0)
-            {
-                ScrollToLine(_diffLines[0]);
+                ParentControl?.ScrollToLine(_diffLines[index]);
             }
         }
 
-        public int FindClosestDifferenceIndex(int currentLine)
+        public int FindClosestDifferenceIndex(int line)
         {
-            if (_diffLines.Count == 0) return -1;
-
-            var closestLine = _diffLines.OrderBy(line => Math.Abs(line - currentLine)).First();
-            return _diffLines.IndexOf(closestLine);
-        }
-
-        private void ScrollToLine(int lineNumber)
-        {
-            ScrollRequested?.Invoke(lineNumber);
-        }
-
-        private SolidColorBrush GetBrushForChangeType(ChangeType changeType)
-        {
-            return changeType switch
-            {
-                ChangeType.Inserted => _addedBrush,
-                ChangeType.Deleted => _removedBrush,
-                ChangeType.Modified => _modifiedBrush,
-                ChangeType.Imaginary => _imaginaryBrush,
-                _ => null
-            };
+            if (!_diffLines.Any()) return -1;
+            int index = _diffLines.FindIndex(l => l >= line);
+            return index != -1 ? index : _diffLines.Count - 1;
         }
 
         private void NavigationPanel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender is UIElement panel)
-            {
-                _isDragging = true;
-                _wasActuallyDragged = false;
-                _dragStartPoint = e.GetPosition(panel);
-                panel.CaptureMouse();
-            }
+            _isDragging = true;
+            var host = sender as VisualHost;
+            host.CaptureMouse();
+            ProcessMousePosition(host, e.GetPosition(host).Y);
         }
 
         private void NavigationPanel_MouseMove(object sender, MouseEventArgs e)
         {
-            if (_isDragging && sender is UIElement panel)
-            {
-                var currentPosition = e.GetPosition(panel);
-                var dragVector = _dragStartPoint - currentPosition;
-
-                if (!_wasActuallyDragged &&
-                    (Math.Abs(dragVector.X) > SystemParameters.MinimumHorizontalDragDistance ||
-                     Math.Abs(dragVector.Y) > SystemParameters.MinimumVerticalDragDistance))
-                {
-                    _wasActuallyDragged = true;
-                }
-
-                if (_wasActuallyDragged)
-                {
-                    HandleNavigation(panel, currentPosition.Y);
-                }
-            }
+            if (_isDragging) ProcessMousePosition(sender as VisualHost, e.GetPosition(sender as VisualHost).Y);
         }
 
         private void NavigationPanel_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (_isDragging && sender is UIElement panel)
-            {
-                if (!_wasActuallyDragged)
-                {
-                    NavigateToClosestDifference(panel, e.GetPosition(panel).Y);
-                }
-                _isDragging = false;
-                panel.ReleaseMouseCapture();
-            }
+            _isDragging = false;
+            (sender as VisualHost).ReleaseMouseCapture();
         }
 
-        private void NavigateToClosestDifference(IInputElement panel, double y)
+        private void ProcessMousePosition(VisualHost host, double y)
         {
-            if (!_diffLines.Any()) return;
+            if (host == null || host.ActualHeight <= 0) return;
+            int lineCount = _diffModel?.NewText.Lines.Count ?? _unifiedLines?.Count ?? 0;
+            if (lineCount <= 0) return;
 
-            var totalLines = _unifiedLines?.Count ?? Math.Max(_diffModel?.OldText.Lines.Count ?? 0, _diffModel?.NewText.Lines.Count ?? 0);
-            if (totalLines == 0) return;
-
-            var panelHeight = (panel as FrameworkElement).ActualHeight;
-            if (panelHeight <= 0) return;
-
-            var clickedLine = (int)((y / panelHeight) * totalLines) + 1;
-            var closestDiffLine = _diffLines.OrderBy(diffLine => Math.Abs(diffLine - clickedLine)).First();
-            ScrollToLine(closestDiffLine);
-        }
-
-        private void HandleNavigation(IInputElement panel, double y)
-        {
-            var totalLines = _unifiedLines?.Count ?? Math.Max(_diffModel?.OldText.Lines.Count ?? 0, _diffModel?.NewText.Lines.Count ?? 0);
-            if (totalLines == 0) return;
-
-            var panelHeight = (panel as FrameworkElement).ActualHeight;
-            if (panelHeight <= 0) return;
-            var lineNumber = (int)((y / panelHeight) * totalLines) + 1;
-            ScrollRequested?.Invoke(lineNumber);
+            int lineNumber = (int)(lineCount * (y / host.ActualHeight)) + 1;
+            ParentControl?.ScrollToLine(Math.Max(1, Math.Min(lineCount, lineNumber)));
         }
     }
 }

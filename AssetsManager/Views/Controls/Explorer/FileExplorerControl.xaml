@@ -53,7 +53,7 @@
                                       Grid.Row="0" 
                                       Margin="10,10,10,5" 
                                       DataContext="{Binding Toolbar}"
-                                      Visibility="{Binding DataContext.IsToolbarVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                      Visibility="{Binding DataContext.IsToolbarVisible, RelativeSource={RelativeSource AncestorType={x:Type local:FileExplorerControl}}, Converter={StaticResource BoolToVisibilityConverter}}"/>
         
         <!-- Content Area -->
         <Grid Grid.Row="1">

@@ -75,13 +75,15 @@ namespace AssetsManager.Views.Dialogs
             // Peer Injection
             ResultsTree.ParentWindow = this;
 
-            _viewModel.TreeModel.FilterChanged += (s, e) => 
-            {
-                Dispatcher.Invoke(() => ApplyFilters());
-            };
+            _viewModel.TreeModel.FilterChanged += OnTreeFilterChanged;
 
             Loaded += WadComparisonResultWindow_Loaded;
             Closed += OnWindowClosed;
+        }
+
+        private void OnTreeFilterChanged(object sender, EventArgs e)
+        {
+            Dispatcher.Invoke(() => ApplyFilters());
         }
 
         public void ApplyFilters()
@@ -137,6 +139,10 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnWindowClosed(object sender, System.EventArgs e)
         {
+            if (_viewModel?.TreeModel != null)
+            {
+                _viewModel.TreeModel.FilterChanged -= OnTreeFilterChanged;
+            }
             _serializableDiffs?.Clear();
             _viewModel.TreeModel.WadGroups?.Clear();
             ResultsTree.Cleanup();

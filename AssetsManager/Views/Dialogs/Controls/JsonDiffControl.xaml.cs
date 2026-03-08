@@ -41,10 +41,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         public JsonDiffModel State { get; } = new JsonDiffModel();
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public JsonFormatterService JsonFormatterService { get; set; }
-        #endregion
-
-        #region Events
-        public event EventHandler<bool> ComparisonFinished;
+        public JsonDiffWindow ParentWindow { get; set; }
         #endregion
 
         #region Constructor & Setup
@@ -52,6 +49,10 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             InitializeComponent();
             this.DataContext = State;
+            
+            // Peer injection
+            DiffNavigationPanel.ParentControl = this;
+
             LoadJsonSyntaxHighlighting();
             SetupScrollSync();
         }
@@ -88,25 +89,37 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
                 NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
-                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += (sender, args) => RefreshGuidePosition();
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += (sender, args) => RefreshGuidePosition();
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
             };
+        }
+
+        private void Editor_GuideScrollChanged(object sender, EventArgs e)
+        {
+            RefreshGuidePosition();
         }
         #endregion
 
         #region Public Methods
         public void Dispose()
         {
-            if (DiffNavigationPanel != null) DiffNavigationPanel.ScrollRequested -= ScrollToLine;
+            ParentWindow = null;
+            if (DiffNavigationPanel != null)
+            {
+                DiffNavigationPanel.ParentControl = null;
+                DiffNavigationPanel.Cleanup();
+            }
             
-            // Unsubscribe events
+            // Unsubscribe events safely
             if (OldJsonContent?.TextArea?.TextView != null)
             {
                 OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= Editor_GuideScrollChanged;
             }
             if (NewJsonContent?.TextArea?.TextView != null)
             {
                 NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= Editor_GuideScrollChanged;
             }
 
             // Clear heavy resources
@@ -114,9 +127,10 @@ namespace AssetsManager.Views.Dialogs.Controls
             NewJsonContent?.TextArea?.TextView?.BackgroundRenderers.Clear();
             UnifiedDiffEditor?.TextArea?.TextView?.BackgroundRenderers.Clear();
 
-            OldJsonContent.Document = null;
-            NewJsonContent.Document = null;
-            UnifiedDiffEditor.Document = null;
+            // Set documents to null at the very end to avoid event triggers during cleanup
+            if (OldJsonContent != null) OldJsonContent.Document = null;
+            if (NewJsonContent != null) NewJsonContent.Document = null;
+            if (UnifiedDiffEditor != null) UnifiedDiffEditor.Document = null;
 
             _cachedOldDoc = null;
             _cachedNewDoc = null;
@@ -155,7 +169,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             catch (Exception ex)
             {
                 CustomMessageBoxService?.ShowError("Error", $"Failed to load comparison: {ex.Message}", Window.GetWindow(this));
-                ComparisonFinished?.Invoke(this, false);
+                ParentWindow?.Close();
             }
         }
         #endregion
@@ -205,7 +219,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
 
             DiffNavigationPanel.Initialize(UnifiedDiffEditor, linesToShow);
-            SetupNavigationEvents();
 
             RestoreViewPosition(UnifiedDiffEditor, diffIndexToRestore, explicitLine);
         }
@@ -247,15 +260,8 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
 
             DiffNavigationPanel.Initialize(OldJsonContent, NewJsonContent, modelToShow, originalModelForNav);
-            SetupNavigationEvents();
 
             RestoreViewPosition(NewJsonContent, diffIndexToRestore, explicitLine);
-        }
-
-        private void SetupNavigationEvents()
-        {
-            DiffNavigationPanel.ScrollRequested -= ScrollToLine;
-            DiffNavigationPanel.ScrollRequested += ScrollToLine;
         }
 
         private void RestoreViewPosition(ICSharpCode.AvalonEdit.TextEditor editor, int? diffIndex, int? explicitLine)
@@ -336,13 +342,13 @@ namespace AssetsManager.Views.Dialogs.Controls
         private void NextDiffButton_Click(object sender, RoutedEventArgs e)
         {
             var editor = State.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
-            DiffNavigationPanel?.NavigateToNextDifference(editor.TextArea.Caret.Line);
+            DiffNavigationPanel?.NavigateToNextDifference(GetCurrentLineRobust(editor));
         }
 
         private void PreviousDiffButton_Click(object sender, RoutedEventArgs e)
         {
             var editor = State.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
-            DiffNavigationPanel?.NavigateToPreviousDifference(editor.TextArea.Caret.Line);
+            DiffNavigationPanel?.NavigateToPreviousDifference(GetCurrentLineRobust(editor));
         }
 
         private void WordLevelDiffButton_Click(object sender, RoutedEventArgs e)
@@ -385,10 +391,9 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void SyncScroll(object sender, ICSharpCode.AvalonEdit.TextEditor target)
         {
-            target.TextArea.TextView.ScrollOffsetChanged -= (State.IsInlineMode ? (EventHandler)null : (target == OldJsonContent ? OldEditor_ScrollChanged : NewEditor_ScrollChanged));
-            // Note: Simplification above is tricky due to event signature matching, keeping explicit unsubscription is safer in SyncScroll
-            
-            // Re-implementing with explicit safety
+            if (target == null || target.TextArea?.TextView == null) return;
+
+            // Bloquear eventos de scroll en el destino mientras sincronizamos
             if (target == OldJsonContent) target.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
             else target.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
 
@@ -407,7 +412,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
-        private void ScrollToLine(int lineNumber)
+        public void ScrollToLine(int lineNumber)
         {
             if (State.IsInlineMode)
             {
@@ -416,6 +421,8 @@ namespace AssetsManager.Views.Dialogs.Controls
                 UnifiedDiffEditor.Focus();
                 return;
             }
+
+            if (OldJsonContent?.TextArea?.TextView == null || NewJsonContent?.TextArea?.TextView == null) return;
 
             OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
             NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
