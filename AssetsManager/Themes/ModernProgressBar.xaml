@@ -4,32 +4,35 @@
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
-    <!-- Modern Rounded ProgressBar Style -->
+    <!-- Modern Rounded ProgressBar Style (Adaptive & Solid) -->
     <Style x:Key="ModernProgressBar" TargetType="ProgressBar">
         <Setter Property="Background" Value="{StaticResource DarkBackground}"/>
         <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Height" Value="10"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Height" Value="8"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ProgressBar">
                     <Grid x:Name="TemplateRoot" SnapsToDevicePixels="true">
-                        <!-- Fondo de la barra (El carril) -->
+                        <!-- 1. El carril de fondo (Track) -->
                         <Border x:Name="Track" 
-                                CornerRadius="5" 
-                                Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}" 
-                                BorderThickness="{TemplateBinding BorderThickness}"/>
+                                CornerRadius="4" 
+                                Background="{TemplateBinding Background}"/>
 
-                        <!-- El indicador de progreso (Lo que se llena) -->
-                        <!-- Usamos un Decorator para que WPF gestione el tamaño de PART_Indicator -->
-                        <Grid x:Name="PART_Track" Margin="1">
-                            <Border x:Name="PART_Indicator" 
-                                    CornerRadius="4" 
-                                    Background="{TemplateBinding Foreground}" 
-                                    HorizontalAlignment="Left"/>
-                        </Grid>
+                        <!-- 2. Contenedor del indicador -->
+                        <!-- Usamos ClipToBounds para asegurar que el inicio no se salga de la curva del carril -->
+                        <Border CornerRadius="4" ClipToBounds="True">
+                            <Grid x:Name="PART_Track" Background="Transparent">
+                                <!-- El indicador ahora es un Border con CornerRadius -->
+                                <!-- Esto hace que la "punta" que avanza sea redonda -->
+                                <Border x:Name="PART_Indicator" 
+                                        Background="{TemplateBinding Foreground}"
+                                        CornerRadius="4"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Stretch"/>
+                            </Grid>
+                        </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsIndeterminate" Value="true">
