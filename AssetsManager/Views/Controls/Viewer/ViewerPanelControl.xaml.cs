@@ -42,19 +42,8 @@ namespace AssetsManager.Views.Controls.Viewer
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
 
-        public event EventHandler<AnimationModel> AnimationReadyForDisplay;
-        public event EventHandler<(AnimationModel, TimeSpan)> AnimationSeekRequested;
-        public event Action<SceneModel> ModelRemovedFromViewport;
-        public event EventHandler<AnimationModel> AnimationStopRequested;
-        public event EventHandler SceneClearRequested;
-        public event EventHandler MapGeometryLoadRequested;
-
         public ViewerViewportControl Viewport { get; set; }
 
-        public event Action<SceneModel> ModelReadyForViewport;
-        public event Action<SceneModel> ActiveModelChanged;
-        public event Action SceneSetupRequested;
-        public event Action CameraResetRequested;
         public event Action<Visibility> EmptyStateVisibilityChanged;
         public event Action<Visibility> MainContentVisibilityChanged;
 
@@ -120,12 +109,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 _loadedModels.Remove(modelToDelete);
                 _transformData.Remove(modelToDelete);
-                ModelRemovedFromViewport?.Invoke(modelToDelete);
+                Viewport?.RemoveModel(modelToDelete);
 
                 if (_loadedModels.Count == 0)
                 {
                     ResetScene();
-                    SceneClearRequested?.Invoke(this, EventArgs.Empty);
+                    Viewport?.ResetScene();
+                    Viewport?.ResetCamera();
                 }
                 else
                 {
@@ -155,7 +145,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             else
             {
-                MapGeometryLoadRequested?.Invoke(this, EventArgs.Empty);
+                Viewport?.HandleMapGeometryLoadRequest();
             }
         }
 
@@ -242,7 +232,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (isInitialLoad)
                 {
-                    SceneSetupRequested?.Invoke();
+                    Viewport?.HandleSceneSetupRequest();
                     EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
                     MainContentVisibilityChanged?.Invoke(Visibility.Visible);
                 }
@@ -251,13 +241,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 _transformData.Add(newModel, transformData);
                 UpdateTransform(newModel, transformData);
 
-                ModelReadyForViewport?.Invoke(newModel);
+                Viewport?.AddModel(newModel);
                 MeshesListBox.ItemsSource = newModel.Parts;
 
                 _loadedModels.Add(newModel);
                 ModelsListBox.SelectedItem = newModel;
 
-                CameraResetRequested?.Invoke();
+                Viewport?.ResetCamera();
 
                 LoadAnimationButton.IsEnabled = true;
             }
@@ -339,7 +329,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _currentlyPlayingAnimation = animationModel;
                 _currentlyPlayingAnimation.IsPlaying = true;
 
-                AnimationReadyForDisplay?.Invoke(this, animationModel);
+                Viewport?.SetAnimation(animationModel);
             }
         }
 
@@ -360,11 +350,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
-                SceneSetupRequested?.Invoke();
+                Viewport?.HandleSceneSetupRequest();
                 EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
                 MainContentVisibilityChanged?.Invoke(Visibility.Visible);
 
-                ModelReadyForViewport?.Invoke(newModel);
+                Viewport?.AddModel(newModel);
                 MeshesListBox.ItemsSource = newModel.Parts;
 
                 foreach (var model in _loadedModels)
@@ -374,7 +364,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _loadedModels.Clear();
                 _loadedModels.Add(newModel);
 
-                CameraResetRequested?.Invoke();
+                Viewport?.ResetCamera();
 
                 LoadModelButton.IsEnabled = false;
             }
@@ -384,7 +374,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (AnimationsListBox.SelectedItem is AnimationModel animationModel)
             {
-                AnimationStopRequested?.Invoke(this, animationModel);
+                Viewport?.TogglePauseResume(animationModel);
             }
         }
 
@@ -393,7 +383,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (e.AddedItems.Count > 0 && e.AddedItems[0] is SceneModel selectedModel)
             {
                 _selectedModel = selectedModel;
-                ActiveModelChanged?.Invoke(selectedModel);
+                Viewport?.SetActiveModel(selectedModel);
                 MeshesListBox.ItemsSource = selectedModel.Parts;
 
                 if (selectedModel.Animations != null)
@@ -496,7 +486,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (AnimationsListBox.SelectedItem is AnimationModel animationModel && _isSliderDragging)
             {
-                AnimationSeekRequested?.Invoke(this, (animationModel, TimeSpan.FromSeconds(e.NewValue)));
+                Viewport?.SeekAnimation(TimeSpan.FromSeconds(e.NewValue));
             }
         }
 

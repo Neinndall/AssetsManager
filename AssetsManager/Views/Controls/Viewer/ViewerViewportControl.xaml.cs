@@ -24,12 +24,12 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
+        public ViewerPanelControl Panel { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
-        public event Action<AnimationModel, bool> PlaybackStateChanged;
-        public event EventHandler<double> AnimationProgressChanged;
         public event EventHandler<bool> MaximizeClicked;
-        public event EventHandler<double> AutoRotationStopped;
+        public event Action SceneSetupRequested;
+        public event Action MapGeometryLoadRequested;
 
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
         private readonly PointsVisual3D _jointsVisual = new PointsVisual3D { Color = Colors.Blue, Size = 5 };
@@ -109,7 +109,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _activeSceneModel.IsAnimationPaused = false;
             _lastFrameTime = DateTime.Now;
 
-            PlaybackStateChanged?.Invoke(animationModel, true);
+            Panel?.SetAnimationPlayingState(animationModel, true);
         }
 
         public void TogglePauseResume(AnimationModel animationToToggle)
@@ -118,7 +118,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _activeSceneModel.IsAnimationPaused = !_activeSceneModel.IsAnimationPaused;
 
-            PlaybackStateChanged?.Invoke(_activeAnimationModel, !_activeSceneModel.IsAnimationPaused);
+            Panel?.SetAnimationPlayingState(_activeAnimationModel, !_activeSceneModel.IsAnimationPaused);
         }
 
         public void SeekAnimation(TimeSpan time)
@@ -135,7 +135,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_activeSceneModel.CurrentAnimation != null)
             {
-                PlaybackStateChanged?.Invoke(_activeAnimationModel, false);
+                Panel?.SetAnimationPlayingState(_activeAnimationModel, false);
             }
 
             _activeSceneModel.CurrentAnimation = null;
@@ -260,7 +260,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         _activeSceneModel.AnimationTime = 0;
                     }
 
-                    AnimationProgressChanged?.Invoke(this, _activeSceneModel.AnimationTime);
+                    Panel?.UpdateAnimationProgress(_activeSceneModel.AnimationTime);
                 }
 
                 _animationPlayer.Update(
@@ -476,6 +476,9 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        public void HandleSceneSetupRequest() => SceneSetupRequested?.Invoke();
+        public void HandleMapGeometryLoadRequest() => MapGeometryLoadRequested?.Invoke();
+
         private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             ResetCamera();
@@ -512,7 +515,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
                     if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
                     {
-                        AutoRotationStopped?.Invoke(this, ((AxisAngleRotation3D)_autoRotation.Rotation).Angle);
+                        Panel?.ApplyAutoRotation(((AxisAngleRotation3D)_autoRotation.Rotation).Angle);
                         transformGroup.Children.Remove(_autoRotation);
                         ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                     }
