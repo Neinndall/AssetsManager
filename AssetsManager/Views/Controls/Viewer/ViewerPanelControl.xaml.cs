@@ -31,7 +31,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
     public partial class ViewerPanelControl : UserControl
     {
-        public ViewerPanelModel ViewModel { get; } = new();
+        private readonly ViewerPanelModel _viewModel;
+        public ViewerPanelModel ViewModel => _viewModel;
 
         private enum ViewerType { Skn, MapGeometry }
         private ViewerType _currentMode;
@@ -58,6 +59,10 @@ namespace AssetsManager.Views.Controls.Viewer
         public ViewerPanelControl()
         {
             InitializeComponent();
+            
+            _viewModel = new ViewerPanelModel();
+            DataContext = _viewModel;
+
             ModelsListBox.ItemsSource = _loadedModels;
             AnimationsListBox.ItemsSource = _animationModels;
 

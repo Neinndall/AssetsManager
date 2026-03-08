@@ -57,11 +57,6 @@ namespace AssetsManager.Views
             ViewportControl.MapGeometryLoadRequested += OnMapGeometryLoadRequested;
             PanelControl.EmptyStateVisibilityChanged += OnEmptyStateVisibilityChanged;
             PanelControl.MainContentVisibilityChanged += OnMainContentVisibilityChanged;
-
-            Unloaded += (s, e) =>
-            {
-                CleanupResources();
-            };
         }
 
         // Event handlers extraídos de lambdas

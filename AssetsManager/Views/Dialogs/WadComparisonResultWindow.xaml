@@ -149,11 +149,7 @@
             </Grid.ColumnDefinitions>
             
             <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0"
-                                            DataContext="{Binding TreeModel}"
-                                            SelectedItemChanged="ResultsTree_SelectedItemChanged"
-                                            SearchTextChanged="SearchTextBox_TextChanged"
-                                            WadContextMenuOpening="ResultsTree_ContextMenuOpening"
-                                            ViewDifferencesClick="ViewDifferences_Click"/>
+                                            DataContext="{Binding TreeModel}"/>
             
             <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ShowsPreview="False"/>
 
