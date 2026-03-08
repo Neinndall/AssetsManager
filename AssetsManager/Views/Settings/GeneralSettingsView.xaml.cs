@@ -5,14 +5,11 @@ namespace AssetsManager.Views.Settings
 {
     public partial class GeneralSettingsView : UserControl
     {
+        public SettingsModel ViewModel => DataContext as SettingsModel;
+
         public GeneralSettingsView()
         {
             InitializeComponent();
-        }
-
-        public void ApplySettingsToUI(SettingsModel model)
-        {
-            this.DataContext = model;
         }
     }
 }

@@ -43,9 +43,10 @@ namespace AssetsManager.Views
             _defaultPathsSettingsView = _serviceProvider.GetRequiredService<DefaultPathsSettingsView>();
             _advancedSettingsView = _serviceProvider.GetRequiredService<AdvancedSettingsView>();
 
-            _generalSettingsView.ApplySettingsToUI(_settingsModel);
-            _defaultPathsSettingsView.ApplySettingsToUI(_settingsModel);
-            _advancedSettingsView.ApplySettingsToUI(_settingsModel);
+            // Inject DataContext (Consumidores de datos)
+            _generalSettingsView.DataContext = _settingsModel;
+            _defaultPathsSettingsView.DataContext = _settingsModel;
+            _advancedSettingsView.DataContext = _settingsModel;
 
             SetupNavigation();
             NavigateToView(_generalSettingsView);
@@ -90,7 +91,6 @@ namespace AssetsManager.Views
 
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
-            _advancedSettingsView.SaveSettings();
             _appSettings.Save();
             _customMessageBoxService.ShowSuccess("Success", "Settings have been saved successfully.", this);
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { WasResetToDefaults = false });
