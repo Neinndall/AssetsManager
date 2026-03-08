@@ -13,6 +13,7 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isGridMode;
         private bool _isBreadcrumbToggleOn = true;
         private PinnedFilesManager _pinnedFilesManager;
+        private FileGridModel _gridModel;
 
         private bool _hasSelectedNode;
         private bool _isSelectedNodeContainer;
@@ -36,7 +37,14 @@ namespace AssetsManager.Views.Models.Explorer
         public FilePreviewerModel()
         {
             PinnedFilesManager = new PinnedFilesManager();
+            _gridModel = new FileGridModel();
             PinnedFilesManager.PinnedFiles.CollectionChanged += (s, e) => OnPropertyChanged(nameof(AreTabsVisible));
+        }
+
+        public FileGridModel GridModel
+        {
+            get => _gridModel;
+            set { _gridModel = value; OnPropertyChanged(); }
         }
 
         public PinnedFilesManager PinnedFilesManager

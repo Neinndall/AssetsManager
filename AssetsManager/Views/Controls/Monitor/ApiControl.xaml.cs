@@ -30,19 +30,23 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private DispatcherTimer _lcuConnectionTimer;
 
-        // The state model for this view
-        public ApiModel Status { get; } = new ApiModel();
+        // The state model for this view (Container Pattern: Owner)
+        private readonly ApiModel _viewModel;
+        public ApiModel ViewModel => _viewModel;
 
         public ApiControl()
         {
             InitializeComponent();
-            this.DataContext = this;
+            
+            _viewModel = new ApiModel();
+            DataContext = _viewModel;
+
             this.Loaded += ApiControl_Loaded;
-            this.Unloaded += ApiControl_Unloaded; // Added
+            this.Unloaded += ApiControl_Unloaded;
 
             // Initialize the timer
             _lcuConnectionTimer = new DispatcherTimer();
-            _lcuConnectionTimer.Interval = TimeSpan.FromSeconds(2); // Check every 2 seconds
+            _lcuConnectionTimer.Interval = TimeSpan.FromSeconds(2);
             _lcuConnectionTimer.Tick += LcuConnectionTimer_Tick;
         }
 
@@ -108,7 +112,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     if (salesCatalog != null)
                     {
                         var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR");
-                        Status.SetFullSalesCatalog(salesItems);
+                        ViewModel?.SetFullSalesCatalog(salesItems);
                     }
                 }
             }
@@ -126,8 +130,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            Status.IsBusy = true;
-            Status.StatusText = "Status: Connecting to LCU...";
+            ViewModel?.IsBusy = true;
+            ViewModel?.StatusText = "Status: Connecting to LCU...";
 
             if (AppSettings != null)
             {
@@ -137,7 +141,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             bool lockfileRead = await RiotApiService.ReadLockfileAsync(true); // Con log de error
             
-            UpdateConnectionStatus(lockfileRead); // This will set Status.IsConnected
+            UpdateConnectionStatus(lockfileRead); // This will set ViewModel?.IsConnected
 
             if (lockfileRead)
             {
@@ -149,24 +153,24 @@ namespace AssetsManager.Views.Controls.Monitor
                 _lcuConnectionTimer.Stop(); // Stop if connection failed
             }
 
-            Status.IsBusy = false;
+            ViewModel?.IsBusy = false;
         }
 
         private void UpdateConnectionStatus(bool isConnected)
         {
             if (isConnected)
             {
-                Status.StatusText = "Status: LCU Connected";
-                Status.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
-                Status.ButtonContent = "Reconnect";
-                Status.IsConnected = true;
+                ViewModel?.StatusText = "Status: LCU Connected";
+                ViewModel?.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                ViewModel?.ButtonContent = "Reconnect";
+                ViewModel?.IsConnected = true;
             }
             else
             {
-                Status.StatusText = "Status: Disconnected";
-                Status.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
-                Status.ButtonContent = "Connect";
-                Status.IsConnected = false;
+                ViewModel?.StatusText = "Status: Disconnected";
+                ViewModel?.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                ViewModel?.ButtonContent = "Connect";
+                ViewModel?.IsConnected = false;
                 _lcuConnectionTimer.Stop(); // Stop the timer if disconnected
 
                 if (AppSettings != null)
@@ -181,17 +185,17 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (AppSettings != null && !string.IsNullOrEmpty(AppSettings.ApiSettings.Token.Jwt) && AppSettings.ApiSettings.Token.Expiration > DateTime.UtcNow)
             {
-                Status.AuthenticationStatusText = "Status: Authenticated";
-                Status.AuthenticationStatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
-                Status.IsAuthenticated = true;
+                ViewModel?.AuthenticationStatusText = "Status: Authenticated";
+                ViewModel?.AuthenticationStatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                ViewModel?.IsAuthenticated = true;
             }
             else
             {
-                Status.AuthenticationStatusText = "Status: Not Authenticated";
-                Status.AuthenticationStatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
-                Status.IsAuthenticated = false;
+                ViewModel?.AuthenticationStatusText = "Status: Not Authenticated";
+                ViewModel?.AuthenticationStatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                ViewModel?.IsAuthenticated = false;
             }
-            Status.Update(this.AppSettings); // Ensure computed properties (RegionText, etc.) are refreshed
+            ViewModel?.Update(this.AppSettings); // Ensure computed properties (RegionText, etc.) are refreshed
         }
 
         private async void RequestsSales_Click(object sender, RoutedEventArgs e)
@@ -202,9 +206,9 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            Status.IsBusy = true;
+            ViewModel?.IsBusy = true;
             var salesCatalog = await RiotApiService.GetSalesCatalogAsync();
-            Status.IsBusy = false;
+            ViewModel?.IsBusy = false;
 
             if (salesCatalog != null)
             {
@@ -213,12 +217,12 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 if (salesItems.Any())
                 {
-                    Status.SetFullSalesCatalog(salesItems);
+                    ViewModel?.SetFullSalesCatalog(salesItems);
                     LogService.LogSuccess("Sales data retrieved and displayed successfully!");
                 }
                 else
                 {
-                    Status.SetFullSalesCatalog(Enumerable.Empty<CatalogItem>()); // Clear the view
+                    ViewModel?.SetFullSalesCatalog(Enumerable.Empty<CatalogItem>()); // Clear the view
                     LogService.LogWarning("Sales data was retrieved, but it contains no valid skin sales information (this is common for PBE).");
                 }
             }
@@ -230,7 +234,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Status.SalesCatalog.Count == 0)
+            if (ViewModel?.SalesCatalog.Count == 0)
             {
                 CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
                 return;
@@ -271,7 +275,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async Task SaveSalesAsPngAsync(string filePath)
         {
-            var items = Status.SalesCatalog; // Use the currently displayed page
+            var items = ViewModel?.SalesCatalog; // Use the currently displayed page
             if (items == null || !items.Any())
             {
                 CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
@@ -311,12 +315,12 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void PreviousPage_Click(object sender, RoutedEventArgs e)
         {
-            Status.Paginator.PreviousPage();
+            ViewModel?.Paginator.PreviousPage();
         }
 
         private void NextPage_Click(object sender, RoutedEventArgs e)
         {
-            Status.Paginator.NextPage();
+            ViewModel?.Paginator.NextPage();
         }
 
         private async void RequestsMythicShop_Click(object sender, RoutedEventArgs e)
@@ -327,9 +331,9 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            Status.IsBusy = true;
+            ViewModel?.IsBusy = true;
             var mythicShopResponse = await RiotApiService.GetMythicShopResponseAsync();
-            Status.IsBusy = false;
+            ViewModel?.IsBusy = false;
 
             if (mythicShopResponse == null)
             {
@@ -352,7 +356,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             try
             {
-                Status.MythicShopCategories.Clear();
+                ViewModel?.MythicShopCategories.Clear();
                 var categories = new Dictionary<string, MythicShopCategory>();
                 var categoryOrder = new[] { "FEATURED", "BIWEEKLY", "WEEKLY", "DAILY" };
 
@@ -397,7 +401,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     .Select(catName => categories[catName])
                     .ToList();
 
-                Status.MythicShopCategories.ReplaceRange(finalCategories);
+                ViewModel?.MythicShopCategories.ReplaceRange(finalCategories);
             }
             catch (Exception ex)
             {
@@ -408,7 +412,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Status.MythicShopCategories.Count == 0)
+            if (ViewModel?.MythicShopCategories.Count == 0)
             {
                 CustomMessageBoxService.ShowInfo("Info", "No Mythic Shop data to save.", Window.GetWindow(this));
                 return;
@@ -440,7 +444,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async Task SaveMythicShopAsPngAsync(string filePath)
         {
-            var categories = Status.MythicShopCategories;
+            var categories = ViewModel?.MythicShopCategories;
             if (categories == null || !categories.Any())
             {
                 CustomMessageBoxService.ShowInfo("Info", "No Mythic Shop data to save.", Window.GetWindow(this));
@@ -497,7 +501,7 @@ namespace AssetsManager.Views.Controls.Monitor
             // Only update the status if there's a change, to avoid constant UI refreshes
             // and potential race conditions if the user clicks "Connect" at the same time.
             bool isStillConnected = await RiotApiService.ReadLockfileAsync(false); // Silenciosa
-            if (isStillConnected != Status.IsConnected)
+            if (isStillConnected != ViewModel?.IsConnected)
             {
                 UpdateConnectionStatus(isStillConnected);
             }        

@@ -8,11 +8,14 @@ using AssetsManager.Views.Controls.Comparator;
 using System;
 using System.Windows.Controls;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Views.Models.Comparator;
 
 namespace AssetsManager.Views
 {
     public partial class ComparatorWindow : UserControl
     {
+        private readonly WadComparisonModel _viewModel;
+
         public ComparatorWindow(
             CustomMessageBoxService customMessageBoxService,
             WadComparatorService wadComparatorService,
@@ -26,10 +29,13 @@ namespace AssetsManager.Views
             DiffViewService diffViewService,
             IServiceProvider serviceProvider,
             HashResolverService hashResolverService,
-            TaskCancellationManager taskCancellationManager // Added this line
+            TaskCancellationManager taskCancellationManager
             )
         {
             InitializeComponent();
+
+            _viewModel = new WadComparisonModel();
+            WadComparisonControl.DataContext = _viewModel;
 
             // Set services for WadComparisonControl
             WadComparisonControl.CustomMessageBoxService = customMessageBoxService;
@@ -44,7 +50,7 @@ namespace AssetsManager.Views
             WadComparisonControl.ServiceProvider = serviceProvider;
             WadComparisonControl.DiffViewService = diffViewService;
             WadComparisonControl.HashResolverService = hashResolverService;
-            WadComparisonControl.TaskCancellationManager = taskCancellationManager; // Added this line
+            WadComparisonControl.TaskCancellationManager = taskCancellationManager;
         }
     }
 }

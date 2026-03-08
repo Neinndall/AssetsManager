@@ -17,7 +17,6 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (SearchToggleButton.IsChecked == true)
             {
-                // Delay focus slightly to allow the animation to start and the control to become visible
                 Dispatcher.BeginInvoke(new System.Action(() =>
                 {
                     SearchTextBox.Focus();

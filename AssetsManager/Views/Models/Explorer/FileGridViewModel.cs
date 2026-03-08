@@ -1,10 +1,55 @@
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Explorer
 {
+    /// <summary>
+    /// Model for the Grid Control State (Data/Info)
+    /// </summary>
+    public class FileGridModel : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private int _selectedCount;
+        public int SelectedCount
+        {
+            get => _selectedCount;
+            set
+            {
+                if (_selectedCount != value)
+                {
+                    _selectedCount = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsActionBarVisible));
+                    OnPropertyChanged(nameof(SelectedCountDisplay));
+                }
+            }
+        }
+
+        public bool IsActionBarVisible => SelectedCount > 1;
+        public string SelectedCountDisplay => $"{SelectedCount} items selected";
+
+        private string _currentFilter = "All";
+        public string CurrentFilter
+        {
+            get => _currentFilter;
+            set { if (_currentFilter != value) { _currentFilter = value; OnPropertyChanged(); } }
+        }
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    /// <summary>
+    /// Model for each individual item in the Grid
+    /// </summary>
     public class FileGridViewModel : INotifyPropertyChanged
     {
         public FileSystemNodeModel Node { get; private set; }
@@ -60,7 +105,7 @@ namespace AssetsManager.Views.Models.Explorer
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

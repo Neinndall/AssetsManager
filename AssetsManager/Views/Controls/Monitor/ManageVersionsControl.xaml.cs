@@ -17,7 +17,9 @@ namespace AssetsManager.Views.Controls.Monitor
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
+        
         private ManageVersions _viewModel;
+        public ManageVersions ViewModel => _viewModel;
 
         public ManageVersionsControl()
         {

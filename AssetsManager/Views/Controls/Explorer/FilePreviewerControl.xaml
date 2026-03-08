@@ -152,7 +152,8 @@
         <Grid Margin="0">
             <!-- 1. GRID VIEW (Folders) -->
             <local:FileGridControl x:Name="FileGridControl" 
-                                Visibility="{Binding IsGridVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                   DataContext="{Binding GridModel}"
+                                   Visibility="{Binding IsGridVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
             <!-- 2. CONTENT PREVIEWS (Files) -->
             <Grid x:Name="PreviewArea">

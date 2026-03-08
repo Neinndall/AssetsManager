@@ -164,13 +164,15 @@ namespace AssetsManager.Services.Monitor
                 return;
 
             var directoryInfo = new DirectoryInfo(path);
+            long totalBytes = GetDirectorySize(directoryInfo.FullName);
             backups.Add(new BackupModel
             {
                 Name = directoryInfo.Name,
                 DisplayName = GetBackupDisplayName(directoryInfo.Name),
                 Path = directoryInfo.FullName,
                 CreationDate = directoryInfo.CreationTime,
-                Size = FormatBytes(GetDirectorySize(directoryInfo.FullName)),
+                Size = totalBytes,
+                SizeDisplay = FormatBytes(totalBytes),
                 IsSelected = false,
                 IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
             });

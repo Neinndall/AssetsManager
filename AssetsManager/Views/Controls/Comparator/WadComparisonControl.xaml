@@ -50,11 +50,12 @@
                         <RadioButton x:Name="ModeDirectory" 
                                      Content="Directory" 
                                      GroupName="ComparisonMode"
-                                     IsChecked="True" 
+                                     IsChecked="{Binding IsDirectoryMode}" 
                                      Style="{StaticResource SegmentedRadioButtonStyle}"/>
                         <RadioButton x:Name="ModeFile" 
                                      Content="Wad File" 
                                      GroupName="ComparisonMode"
+                                     IsChecked="{Binding IsFileMode, Mode=OneWay}"
                                      Style="{StaticResource SegmentedRadioButtonStyle}"/>
                     </StackPanel>
                 </Border>
@@ -85,7 +86,7 @@
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value="New Directory"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=ModeFile}" Value="True">
+                                            <DataTrigger Binding="{Binding IsFileMode}" Value="True">
                                                 <Setter Property="Text" Value="New Wad File"/>
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -96,7 +97,7 @@
                     </StackPanel>
 
                     <!-- Inputs: Directory Mode -->
-                    <StackPanel Visibility="{Binding IsChecked, ElementName=ModeDirectory, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -106,6 +107,7 @@
                                      Style="{StaticResource ModernTextBox}" 
                                      Height="38"
                                      IsReadOnly="True" 
+                                     Text="{Binding NewDirectoryPath}"
                                      Padding="10,0" 
                                      VerticalContentAlignment="Center"
                                      Grid.Column="0"
@@ -123,7 +125,7 @@
                     </StackPanel>
 
                     <!-- Inputs: File Mode -->
-                    <StackPanel Visibility="{Binding IsChecked, ElementName=ModeFile, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -133,6 +135,7 @@
                                      Style="{StaticResource ModernTextBox}" 
                                      Height="38"
                                      IsReadOnly="True" 
+                                     Text="{Binding NewWadFilePath}"
                                      Padding="10,0" 
                                      VerticalContentAlignment="Center"
                                      Grid.Column="0"
@@ -164,7 +167,7 @@
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value="Old Directory"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=ModeFile}" Value="True">
+                                            <DataTrigger Binding="{Binding IsFileMode}" Value="True">
                                                 <Setter Property="Text" Value="Old Wad File"/>
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -175,7 +178,7 @@
                     </StackPanel>
 
                     <!-- Inputs: Directory Mode -->
-                    <StackPanel Visibility="{Binding IsChecked, ElementName=ModeDirectory, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -185,6 +188,7 @@
                                      Style="{StaticResource ModernTextBox}" 
                                      Height="38"
                                      IsReadOnly="True" 
+                                     Text="{Binding OldDirectoryPath}"
                                      Padding="10,0" 
                                      VerticalContentAlignment="Center"
                                      Grid.Column="0"
@@ -202,7 +206,7 @@
                     </StackPanel>
 
                     <!-- Inputs: File Mode -->
-                    <StackPanel Visibility="{Binding IsChecked, ElementName=ModeFile, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -212,6 +216,7 @@
                                      Style="{StaticResource ModernTextBox}" 
                                      Height="38"
                                      IsReadOnly="True" 
+                                     Text="{Binding OldWadFilePath}"
                                      Padding="10,0" 
                                      VerticalContentAlignment="Center"
                                      Grid.Column="0"
@@ -262,6 +267,7 @@
                 <Button Grid.Column="2" 
                         x:Name="compareWadButton" 
                         Click="compareWadButton_Click"
+                        IsEnabled="{Binding IsComparing, Converter={StaticResource InverseBooleanConverter}}"
                         Style="{StaticResource PrimaryButton}"
                         HorizontalContentAlignment="Left"
                         Padding="10,0,14,0"

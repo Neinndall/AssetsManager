@@ -10,27 +10,29 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
-using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
-    public partial class BackupsControl : UserControl, INotifyPropertyChanged
+    public partial class BackupsControl : UserControl
     {
+        // Public properties for dependency injection from the container
         public BackupManager BackupManager { get; set; }
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        public ObservableCollection<BackupModel> AllBackups { get; private set; }
+        // The state model for this view (Container Pattern: Owner)
+        private readonly BackupsControlModel _viewModel;
+        public BackupsControlModel ViewModel => _viewModel;
 
         public BackupsControl()
         {
             InitializeComponent();
-            AllBackups = new ObservableCollection<BackupModel>();
-            this.DataContext = this;
+            
+            _viewModel = new BackupsControlModel();
+            DataContext = _viewModel;
+
             this.Loaded += BackupsControl_Loaded;
             this.Unloaded += BackupsControl_Unloaded;
         }
@@ -66,42 +68,26 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async Task LoadBackupsAsync()
         {
+            if (BackupManager == null) return;
+
             try
             {
                 var backups = await BackupManager.GetBackupsAsync();
-                AllBackups.Clear();
+                ViewModel.AllBackups.Clear();
                 foreach (var backup in backups)
                 {
-                    AllBackups.Add(backup);
+                    ViewModel.AllBackups.Add(backup);
                 }
             }
             catch (Exception ex)
             {
                 LogService.LogError(ex, "Error loading backups.");
-                throw;
             }
-        }
-
-        private int DeleteBackups(IEnumerable<BackupModel> backupsToDelete)
-        {
-            if (backupsToDelete == null || !backupsToDelete.Any()) return 0;
-
-            var deletedCount = 0;
-            foreach (var backup in backupsToDelete.ToList())
-            {
-                if (BackupManager.DeleteBackup(backup.Path))
-                {
-                    AllBackups.Remove(backup);
-                    deletedCount++;
-                }
-            }
-            
-            return deletedCount;
         }
 
         private void DeleteSelectedBackups_Click(object sender, RoutedEventArgs e)
         {
-            var selectedBackups = AllBackups.Where(b => b.IsSelected).ToList();
+            var selectedBackups = ViewModel.AllBackups.Where(b => b.IsSelected).ToList();
 
             if (selectedBackups == null || !selectedBackups.Any())
             {
@@ -112,14 +98,23 @@ namespace AssetsManager.Views.Controls.Monitor
             var result = CustomMessageBoxService.ShowYesNo("Delete Backup", $"Are you sure you want to delete the selected backup? This action is irreversible.", Window.GetWindow(this));
             if (result == true)
             {
-                var deletedCount = DeleteBackups(selectedBackups);
+                int deletedCount = 0;
+                foreach (var backup in selectedBackups)
+                {
+                    if (BackupManager.DeleteBackup(backup.Path))
+                    {
+                        ViewModel.AllBackups.Remove(backup);
+                        deletedCount++;
+                    }
+                }
+
                 if(deletedCount > 0)
                 {
-                    CustomMessageBoxService.ShowInfo("Success", $"Successfully deleted {deletedCount} backup.", Window.GetWindow(this));
+                    CustomMessageBoxService.ShowInfo("Success", $"Successfully deleted {deletedCount} backup(s).", Window.GetWindow(this));
                 }
                 else
                 {
-                    CustomMessageBoxService.ShowError("Error", "Could not delete the selected backups. Please check the logs for more information.", Window.GetWindow(this));
+                    CustomMessageBoxService.ShowError("Error", "Could not delete the selected backups.", Window.GetWindow(this));
                 }
             }
         }
@@ -142,8 +137,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             string destinationBackupPath = sourceLolPath + "_old";
 
-            var createBackupButton = (Button)sender;
-            createBackupButton.IsEnabled = false;
+            ViewModel.IsBusy = true;
             try
             {
                 var cancellationToken = TaskCancellationManager.PrepareNewOperation();
@@ -160,25 +154,15 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 LogService.LogWarning("LoL backup was cancelled.");
             }
-            catch (System.IO.DirectoryNotFoundException ex)
-            {
-                LogService.LogError(ex, "Error creating LoL backup");
-                CustomMessageBoxService.ShowError("Error", ex.Message, Window.GetWindow(this));
-            }
             catch (Exception ex)
             {
                 LogService.LogError(ex, "Error creating LoL backup");
-                CustomMessageBoxService.ShowError("Error", $"An unexpected error occurred while creating the backup: {ex.Message}", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", $"An unexpected error occurred: {ex.Message}", Window.GetWindow(this));
             }
             finally
             {
-                createBackupButton.IsEnabled = true;
+                ViewModel.IsBusy = false;
             }
-        }
-        
-        protected virtual void OnPropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         private void ListViewItem_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
