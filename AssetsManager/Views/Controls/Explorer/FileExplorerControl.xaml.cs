@@ -30,7 +30,6 @@ namespace AssetsManager.Views.Controls.Explorer
     public partial class FileExplorerControl : UserControl
     {
         public event RoutedPropertyChangedEventHandler<object> FileSelected;
-        public event RoutedPropertyChangedEventHandler<bool> BreadcrumbVisibilityChanged;
         
         public FilePreviewerControl FilePreviewer { get; set; }
 
@@ -227,7 +226,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
         {
-            BreadcrumbVisibilityChanged?.Invoke(this, e);
+            FilePreviewer?.SetBreadcrumbToggleState(e.NewValue);
         }
 
         private void Toolbar_FavoritesVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
@@ -842,6 +841,12 @@ namespace AssetsManager.Views.Controls.Explorer
                     await TreeBuilderService.ExpandAudioBankAsync(selectedNode, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
                 }
                 
+                if (FilePreviewer != null)
+                {
+                    FilePreviewer.UpdateSelectedNode(selectedNode, RootNodes);
+                    await FilePreviewer.ShowPreviewAsync(selectedNode);
+                }
+
                 FileSelected?.Invoke(this, e);
             }
         }

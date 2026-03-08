@@ -30,7 +30,7 @@
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <explorer:FileExplorerControl x:Name="FileExplorer" FileSelected="FileExplorer_FileSelected"/>
+                <explorer:FileExplorerControl x:Name="FileExplorer"/>
             </Border>
 
             <!-- Splitter -->
