@@ -97,9 +97,10 @@
         <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.4" Duration="0:0:1.5" AutoReverse="True"/>
     </Storyboard>
 
-    <!-- Technical Glow Animation for Backgrounds (Softer, static position) -->
+    <!-- Technical Glow Animation for Backgrounds -->
     <Storyboard x:Key="GlowPulseAnimation" RepeatBehavior="Forever">
-        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.04" To="0.08" Duration="0:0:2.5" AutoReverse="True"/>
+        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.04" To="0.14" Duration="0:0:1.5" AutoReverse="True"/>
+        <ThicknessAnimation Storyboard.TargetProperty="Margin" From="4" To="-4" Duration="0:0:1.5" AutoReverse="True"/>
     </Storyboard>
 
     <!-- Global style for technical pulsing glow -->
