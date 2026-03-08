@@ -4,39 +4,59 @@
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
-    <!-- Modern CheckBox Style -->
+    <!-- Professional Studio CheckBox Style -->
     <Style x:Key="ModernCheckBox" TargetType="CheckBox">
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="FontSize" Value="13"/>
-        <Setter Property="FontWeight" Value="Medium"/>
-        <Setter Property="Margin" Value="0,10,0,8"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Margin" Value="0,8,0,8"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
-                    <StackPanel Orientation="Horizontal">
-                        <Border x:Name="CheckBorder"
-                                Width="15" Height="15"
-                                Background="Transparent"
-                                BorderBrush="{StaticResource TextSecondary}"
-                                BorderThickness="2"
-                                CornerRadius="3"
-                                Margin="0,0,12,0">
-                            <Path x:Name="CheckMark"
-                                  Data="M0,4 L4,9 L13,0"
-                                  Stroke="{StaticResource AccentBrush}"
-                                  StrokeThickness="2"
-                                  Visibility="Collapsed"/>
-                        </Border>
-                        <ContentPresenter VerticalAlignment="Center"/>
-                    </StackPanel>
+                    <Grid x:Name="RootGrid">
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="18" Height="18" Margin="0,0,12,0">
+                                <!-- Background Layer -->
+                                <Border x:Name="CheckBorder"
+                                        Background="{StaticResource DarkBackground}"
+                                        BorderBrush="{StaticResource BorderColor}"
+                                        BorderThickness="1.5"
+                                        CornerRadius="5"/>
+                                
+                                <!-- Check Icon (Path) -->
+                                <Path x:Name="CheckMark"
+                                      Data="M4,9 L8,13 L14,5"
+                                      Stroke="White"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Opacity="0"
+                                      RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <ScaleTransform ScaleX="0.5" ScaleY="0.5"/>
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Grid>
+                            <ContentPresenter VerticalAlignment="Center" x:Name="Content"/>
+                        </StackPanel>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="CheckBorder" Property="Background" Value="{StaticResource AccentBrush}"/>
                             <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="CheckMark" Property="Opacity" Value="1"/>
+                            <Setter TargetName="CheckMark" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource TextSecondary}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
