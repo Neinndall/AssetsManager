@@ -29,9 +29,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public DirectoriesCreator DirectoriesCreator { get; set; }
         public ExplorerPreviewService ExplorerPreviewService { get; set; }
         public TreeUIManager TreeUIManager { get; set; }
-
-        public event EventHandler<NodeClickedEventArgs> BreadcrumbNodeClicked;
-        public event EventHandler<SelectionActionEventArgs> SelectionActionRequested;
+        public FileExplorerControl FileExplorer { get; set; }
 
         public FilePreviewerModel ViewModel { get; set; }
         private bool _isLoaded = false;
@@ -367,12 +365,25 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void FileGridControl_NodeClicked(object sender, NodeClickedEventArgs e)
         {
-            BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(e.Node));
+            FileExplorer?.SelectNode(e.Node);
         }
 
         private void FileGridControl_SelectionActionRequested(object sender, SelectionActionEventArgs e)
         {
-            SelectionActionRequested?.Invoke(this, e);
+            if (FileExplorer == null) return;
+
+            switch (e.Action)
+            {
+                case "Extract":
+                    FileExplorer.TriggerExtractNodes(e.Nodes);
+                    break;
+                case "Save":
+                    FileExplorer.TriggerSaveNodes(e.Nodes);
+                    break;
+                case "Merge":
+                    FileExplorer.TriggerAddToMerger(e.Nodes);
+                    break;
+            }
         }
         
         public void SetBreadcrumbToggleState(bool isToggleOn)
@@ -413,7 +424,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void Breadcrumbs_NodeClicked(object sender, NodeClickedEventArgs e)
         {
-            BreadcrumbNodeClicked?.Invoke(this, e);
+            FileExplorer?.SelectNode(e.Node);
         }
     }
 }
