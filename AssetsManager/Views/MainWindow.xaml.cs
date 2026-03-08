@@ -27,7 +27,6 @@ using AssetsManager.Views.Controls;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Viewer;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Utils.Win;
 

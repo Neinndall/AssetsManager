@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Views.Viewer
+namespace AssetsManager.Views
 {
     public partial class ViewerWindow : UserControl
     {
