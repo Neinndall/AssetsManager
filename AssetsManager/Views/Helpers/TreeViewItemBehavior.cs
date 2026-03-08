@@ -49,6 +49,9 @@ namespace AssetsManager.Views.Helpers
         {
             if (sender is TreeViewItem treeViewItem)
             {
+                // Seguridad: Asegurar que el clic es en el encabezado de ESTE ítem y no en uno de sus hijos
+                if (FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != treeViewItem) return;
+
                 // Si el nodo ya está seleccionado (por selección normal o múltiple), 
                 // no hacemos nada para evitar que el TreeView nativo limpie la selección múltiple.
                 if (treeViewItem.DataContext is FileSystemNodeModel node && (node.IsMultiSelected || treeViewItem.IsSelected))
