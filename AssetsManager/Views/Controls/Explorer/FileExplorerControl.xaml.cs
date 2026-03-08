@@ -22,6 +22,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Controls.Explorer

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Windows;
-using AssetsManager.Views.Models.Shared;
+using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Dialogs;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;

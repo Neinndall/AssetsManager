@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Explorer;
-using AssetsManager.Views.Models.Shared;
+using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
