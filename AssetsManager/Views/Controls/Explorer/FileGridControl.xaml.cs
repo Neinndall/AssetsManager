@@ -14,6 +14,8 @@ namespace AssetsManager.Views.Controls.Explorer
 {
     public partial class FileGridControl : UserControl
     {
+        public FilePreviewerControl ParentPreviewer { get; set; }
+
         private ObservableRangeCollection<FileGridViewModel> _allItems = new ObservableRangeCollection<FileGridViewModel>();
         public ObservableRangeCollection<FileGridViewModel> DisplayItems { get; } = new ObservableRangeCollection<FileGridViewModel>();
 
@@ -25,9 +27,6 @@ namespace AssetsManager.Views.Controls.Explorer
             get { return (ObservableRangeCollection<FileGridViewModel>)GetValue(ItemsSourceProperty); }
             set { SetValue(ItemsSourceProperty, value); }
         }
-
-        public event EventHandler<NodeClickedEventArgs> NodeClicked;
-        public event EventHandler<SelectionActionEventArgs> SelectionActionRequested;
 
         private string _currentFilter = "All";
 
@@ -73,7 +72,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 if (InteractionHelper.IsPrimaryActionIntent())
                 {
                     // Primary action = Navigation
-                    NodeClicked?.Invoke(this, new NodeClickedEventArgs(item.Node));
+                    ParentPreviewer?.HandleNodeClicked(item.Node);
                     
                     // Mark as handled to prevent ListBox from selecting/focusing
                     e.Handled = true;
@@ -128,7 +127,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
 
                 var selectedNodes = FileGridListBox.SelectedItems.Cast<FileGridViewModel>().Select(i => i.Node).ToList();
-                SelectionActionRequested?.Invoke(this, new SelectionActionEventArgs(action, selectedNodes));
+                ParentPreviewer?.HandleSelectionActionRequested(action, selectedNodes);
             }
         }
     }

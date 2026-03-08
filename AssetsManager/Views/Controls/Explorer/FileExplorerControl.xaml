@@ -52,7 +52,8 @@
         <local:ExplorerToolbarControl x:Name="Toolbar" 
                                       Grid.Row="0" 
                                       Margin="10,10,10,5" 
-                                      Visibility="{Binding IsToolbarVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                      DataContext="{Binding Toolbar}"
+                                      Visibility="{Binding DataContext.IsToolbarVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
         
         <!-- Content Area -->
         <Grid Grid.Row="1">

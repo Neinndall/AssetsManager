@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
-    <Grid DataContext="{Binding Toolbar}">
+    <Grid>
         <Border Background="{StaticResource CardBackground}" 
                 CornerRadius="6" 
                 Padding="4" 
@@ -41,10 +41,9 @@
                     </Button>
                     <ToggleButton x:Name="SortToggleButton"
                                   Style="{StaticResource TransparentIconToggleButton}"
-                                  Click="SortToggleButton_Click"
                                   ToolTip="Group by paths/categories"
                                   Margin="0,0,2,0"
-                                  IsChecked="True"
+                                  IsChecked="{Binding IsSortButtonVisible}"
                                   Visibility="{Binding IsSortButtonVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                         <materialIcons:MaterialIcon Kind="SortAlphabeticalAscending" Width="18" Height="18"/>
                     </ToggleButton>
@@ -63,8 +62,7 @@
                                   Style="{StaticResource TransparentIconToggleButton}"
                                   ToolTip="Toggle Grid View"
                                   Margin="0,0,2,0" 
-                                  IsChecked="{Binding IsGridMode}"
-                                  Click="GridViewToggle_Click">
+                                  IsChecked="{Binding IsGridMode}">
                         <materialIcons:MaterialIcon Kind="ViewGridOutline" Width="18" Height="18"/>
                     </ToggleButton>
 
@@ -72,14 +70,12 @@
                                   Style="{StaticResource TransparentIconToggleButton}"
                                   ToolTip="Show Breadcrumb"
                                   Margin="0,0,2,0"
-                                  IsChecked="{Binding IsBreadcrumbVisible}"
-                                  Click="BreadcrumbToggleButton_Click">
+                                  IsChecked="{Binding IsBreadcrumbVisible}">
                         <materialIcons:MaterialIcon Kind="CodeTags" Width="18" Height="18"/>
                     </ToggleButton>
 
                     <ToggleButton x:Name="FavoritesToggleButton"
                                   Style="{StaticResource TransparentIconToggleButton}"
-                                  Click="FavoritesToggleButton_Click"
                                   ToolTip="Toggle Favorites"
                                   Margin="0,0,2,0"
                                   IsChecked="{Binding IsFavoritesEnabled}"
@@ -113,7 +109,6 @@
                                      Style="{StaticResource AnimatedSearchBoxStyle}" 
                                      Tag="{Binding IsChecked, ElementName=SearchToggleButton}"
                                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                     TextChanged="SearchTextBox_TextChanged"
                                      Margin="4,0,0,0"/>
                             
                             <StackPanel Orientation="Horizontal"

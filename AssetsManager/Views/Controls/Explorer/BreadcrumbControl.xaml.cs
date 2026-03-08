@@ -18,7 +18,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
     public partial class BreadcrumbControl : UserControl
     {
-        public event EventHandler<NodeClickedEventArgs> NodeClicked;
+        public FilePreviewerControl ParentPreviewer { get; set; }
 
         public BreadcrumbControl()
         {
@@ -40,7 +40,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (sender is Button button && button.DataContext is FileSystemNodeModel node)
             {
-                NodeClicked?.Invoke(this, new NodeClickedEventArgs(node));
+                ParentPreviewer?.HandleNodeClicked(node);
             }
         }
     }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -29,8 +30,6 @@ namespace AssetsManager.Views.Controls.Explorer
 {
     public partial class FileExplorerControl : UserControl
     {
-        public event RoutedPropertyChangedEventHandler<object> FileSelected;
-        
         public FilePreviewerControl FilePreviewer { get; set; }
 
         public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "PinMenuItem");
@@ -95,18 +94,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 _searchTimer.Tick -= SearchTimer_Tick;
             }
 
-            // 2. Desuscribir eventos del Toolbar
-            if (Toolbar != null)
+            // 2. Limpiar referencia en Toolbar
+            if (_viewModel.Toolbar != null)
             {
-                Toolbar.SearchTextChanged -= Toolbar_SearchTextChanged;
-                Toolbar.CollapseToContainerClicked -= Toolbar_CollapseToContainerClicked;
-                Toolbar.LoadComparisonClicked -= Toolbar_LoadComparisonClicked;
-                Toolbar.SwitchModeClicked -= Toolbar_SwitchModeClicked;
-                Toolbar.BreadcrumbVisibilityChanged -= Toolbar_BreadcrumbVisibilityChanged;
-                Toolbar.FavoritesVisibilityChanged -= Toolbar_FavoritesVisibilityChanged;
-                Toolbar.SortStateChanged -= Toolbar_SortStateChanged;
-                Toolbar.ViewModeChanged -= Toolbar_ViewModeChanged;
-                Toolbar.ImageMergerClicked -= Toolbar_ImageMergerClicked;
+                _viewModel.Toolbar.PropertyChanged -= Toolbar_PropertyChanged;
+                _viewModel.Toolbar.ParentExplorer = null;
             }
 
             // 3. Desuscribir eventos propios
@@ -172,16 +164,9 @@ namespace AssetsManager.Views.Controls.Explorer
                 _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
             }
 
-            // Setup toolbar events (can be done regardless of loading)
-            Toolbar.SearchTextChanged += Toolbar_SearchTextChanged;
-            Toolbar.CollapseToContainerClicked += Toolbar_CollapseToContainerClicked;
-            Toolbar.LoadComparisonClicked += Toolbar_LoadComparisonClicked;
-            Toolbar.SwitchModeClicked += Toolbar_SwitchModeClicked;
-            Toolbar.BreadcrumbVisibilityChanged += Toolbar_BreadcrumbVisibilityChanged;
-            Toolbar.FavoritesVisibilityChanged += Toolbar_FavoritesVisibilityChanged;
-            Toolbar.SortStateChanged += Toolbar_SortStateChanged;
-            Toolbar.ViewModeChanged += Toolbar_ViewModeChanged;
-            Toolbar.ImageMergerClicked += Toolbar_ImageMergerClicked;
+            // Setup toolbar peer connection
+            _viewModel.Toolbar.ParentExplorer = this;
+            _viewModel.Toolbar.PropertyChanged += Toolbar_PropertyChanged;
 
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
@@ -199,11 +184,33 @@ namespace AssetsManager.Views.Controls.Explorer
             _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
         }
 
-        private void Toolbar_ViewModeChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        private void Toolbar_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(ExplorerToolbarModel.IsGridMode):
+                    HandleViewModeChanged(_viewModel.Toolbar.IsGridMode);
+                    break;
+                case nameof(ExplorerToolbarModel.IsBreadcrumbVisible):
+                    HandleBreadcrumbVisibilityChanged(_viewModel.Toolbar.IsBreadcrumbVisible);
+                    break;
+                case nameof(ExplorerToolbarModel.IsFavoritesEnabled):
+                    HandleFavoritesVisibilityChanged(_viewModel.Toolbar.IsFavoritesEnabled);
+                    break;
+                case nameof(ExplorerToolbarModel.IsSortButtonVisible):
+                    HandleSortStateChanged(_viewModel.Toolbar.IsSortButtonVisible);
+                    break;
+                case nameof(ExplorerToolbarModel.SearchText):
+                    HandleSearchTextChanged();
+                    break;
+            }
+        }
+
+        public void HandleViewModeChanged(bool isGridMode)
         {
             if (FilePreviewer != null)
             {
-                FilePreviewer.SetViewMode(e.NewValue);
+                FilePreviewer.SetViewMode(isGridMode);
             }
         }
 
@@ -212,7 +219,7 @@ namespace AssetsManager.Views.Controls.Explorer
             _viewModel.Toolbar.IsGridMode = isGridMode;
         }
 
-        private async void Toolbar_SwitchModeClicked(object sender, RoutedEventArgs e)
+        public async void HandleSwitchMode()
         {
             _viewModel.IsWadMode = !_viewModel.IsWadMode;
             // Mode switched, we keep the current view mode (Grid/Preview) preference.
@@ -224,26 +231,26 @@ namespace AssetsManager.Views.Controls.Explorer
             await ReloadTreeAsync();
         }
 
-        private void Toolbar_BreadcrumbVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        public void HandleBreadcrumbVisibilityChanged(bool isVisible)
         {
-            FilePreviewer?.SetBreadcrumbToggleState(e.NewValue);
+            FilePreviewer?.SetBreadcrumbToggleState(isVisible);
         }
 
-        private void Toolbar_FavoritesVisibilityChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        public void HandleFavoritesVisibilityChanged(bool isVisible)
         {
-            _viewModel.IsFavoritesEnabled = e.NewValue;
+            _viewModel.IsFavoritesEnabled = isVisible;
         }
 
-        private async void Toolbar_SortStateChanged(object sender, RoutedPropertyChangedEventArgs<bool> e)
+        public async void HandleSortStateChanged(bool isEnabled)
         {
-            _viewModel.IsSortingEnabled = e.NewValue;
+            _viewModel.IsSortingEnabled = isEnabled;
             if (_viewModel.IsBackupMode)
             {
                 await BuildTreeFromBackupAsync(_backupJsonPath);
             }
         }
 
-        private void Toolbar_ImageMergerClicked(object sender, RoutedEventArgs e)
+        public void HandleImageMergerClicked()
         {
             ImageMergerService.ShowWindow();
         }
@@ -274,7 +281,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async void Toolbar_LoadComparisonClicked(object sender, RoutedEventArgs e)
+        public async void HandleLoadComparison()
         {
             var openFileDialog = new CommonOpenFileDialog
             {
@@ -846,18 +853,16 @@ namespace AssetsManager.Views.Controls.Explorer
                     FilePreviewer.UpdateSelectedNode(selectedNode, RootNodes);
                     await FilePreviewer.ShowPreviewAsync(selectedNode);
                 }
-
-                FileSelected?.Invoke(this, e);
             }
         }
 
-        private void Toolbar_SearchTextChanged(object sender, RoutedEventArgs e)
+        public void HandleSearchTextChanged()
         {
             _searchTimer.Stop();
             _searchTimer.Start();
         }
 
-        private void Toolbar_CollapseToContainerClicked(object sender, RoutedEventArgs e)
+        public void HandleCollapseToContainer()
         {
             if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode) return;
 
