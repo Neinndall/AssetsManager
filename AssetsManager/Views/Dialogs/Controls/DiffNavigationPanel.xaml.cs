@@ -259,59 +259,31 @@ namespace AssetsManager.Views.Dialogs.Controls
             ParentControl?.ScrollToLine(prev);
         }
 
-        private Point _dragStartPoint;
-        private bool _wasActuallyDragged;
-
         private void NavigationPanel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender is UIElement panel)
+            if (sender is VisualHost host)
             {
                 _isDragging = true;
-                _wasActuallyDragged = false;
-                _dragStartPoint = e.GetPosition(panel);
-                panel.CaptureMouse();
-                
-                // Procesar posición inicial para respuesta inmediata
-                ProcessMousePosition(sender as VisualHost, _dragStartPoint.Y);
+                host.CaptureMouse();
+                ProcessMousePosition(host, e.GetPosition(host).Y);
             }
         }
 
         private void NavigationPanel_MouseMove(object sender, MouseEventArgs e)
         {
-            if (_isDragging && sender is UIElement panel)
+            if (_isDragging && sender is VisualHost host)
             {
-                var currentPosition = e.GetPosition(panel);
-                var dragVector = _dragStartPoint - currentPosition;
-
-                // Umbral de movimiento para confirmar el arrastre (estándar del sistema)
-                if (!_wasActuallyDragged &&
-                    (Math.Abs(dragVector.X) > SystemParameters.MinimumHorizontalDragDistance ||
-                     Math.Abs(dragVector.Y) > SystemParameters.MinimumVerticalDragDistance))
-                {
-                    _wasActuallyDragged = true;
-                }
-
-                if (_wasActuallyDragged)
-                {
-                    ProcessMousePosition(sender as VisualHost, currentPosition.Y);
-                }
+                ProcessMousePosition(host, e.GetPosition(host).Y);
             }
         }
 
         private void NavigationPanel_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (_isDragging && sender is UIElement panel)
+            if (_isDragging)
             {
                 _isDragging = false;
-                if (panel.IsMouseCaptured) panel.ReleaseMouseCapture();
-
-                // Si fue solo un clic (sin arrastre), navegamos a la posición final
-                if (!_wasActuallyDragged)
-                {
-                    ProcessMousePosition(sender as VisualHost, e.GetPosition(panel).Y);
-                }
-
-                // Sincronización final tras soltar
+                var host = sender as VisualHost;
+                if (host.IsMouseCaptured) host.ReleaseMouseCapture();
                 UpdateViewportGuide();
             }
         }
