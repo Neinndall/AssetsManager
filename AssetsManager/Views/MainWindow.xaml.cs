@@ -470,11 +470,7 @@ namespace AssetsManager.Views
         private void LoadHomeWindow()
         {
             var homeWindow = _serviceProvider.GetRequiredService<HomeWindow>();
-            homeWindow.NavigationRequested += (tag) =>
-            {
-                Sidebar.SelectNavigationItem(tag);
-                OnSidebarNavigationRequested(tag);
-            };
+            homeWindow.ParentWindow = this;
             MainContentArea.Content = homeWindow;
         }
 

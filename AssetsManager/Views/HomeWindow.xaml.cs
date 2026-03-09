@@ -10,8 +10,8 @@ namespace AssetsManager.Views
 {
     public partial class HomeWindow : UserControl
     {
+        public MainWindow ParentWindow { get; set; }
         private readonly HomeModel _model;
-        public event Action<string> NavigationRequested;
 
         public HomeWindow(AppSettings appSettings)
         {
@@ -32,7 +32,11 @@ namespace AssetsManager.Views
         {
             if (sender is Button button && button.CommandParameter is string destination)
             {
-                NavigationRequested?.Invoke(destination);
+                if (ParentWindow != null)
+                {
+                    ParentWindow.Sidebar.SelectNavigationItem(destination);
+                    ParentWindow.OnSidebarNavigationRequested(destination);
+                }
             }
         }
 
