@@ -154,7 +154,8 @@ namespace AssetsManager.Views.Dialogs.Controls
             var backgroundVisual = new DrawingVisual();
             using (var dc = backgroundVisual.RenderOpen())
             {
-                dc.DrawRectangle(_backgroundPanelBrush, null, new Rect(0, 0, host.ActualWidth, host.ActualHeight));
+                // ELIMINADO: dc.DrawRectangle(_backgroundPanelBrush, ...) 
+                // Dejamos que el fondo del Border en XAML haga el trabajo con sus esquinas redondeadas.
 
                 if (pane.Lines.Count > 0)
                 {
