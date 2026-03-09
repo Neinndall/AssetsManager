@@ -211,8 +211,8 @@
                             </Border>
                         </Border>
                         
-                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
-                            <jsonDiff:DiffNavigationPanel x:Name="DiffNavigationPanel" Margin="0,4"/>
+                        <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12" ClipToBounds="True">
+                            <jsonDiff:DiffNavigationPanel x:Name="DiffNavigationPanel"/>
                         </Border>
                     </Grid>
                 </Border>

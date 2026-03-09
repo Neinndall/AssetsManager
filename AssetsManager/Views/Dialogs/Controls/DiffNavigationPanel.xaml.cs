@@ -148,13 +148,15 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void DrawMapMarkers(VisualHost host, DiffPaneModel pane)
         {
+            if (host == null || host.ActualWidth <= 0 || host.ActualHeight <= 0) return;
             host.ClearVisuals();
+            
             var backgroundVisual = new DrawingVisual();
             using (var dc = backgroundVisual.RenderOpen())
             {
                 dc.DrawRectangle(_backgroundPanelBrush, null, new Rect(0, 0, host.ActualWidth, host.ActualHeight));
 
-                if (pane.Lines.Count > 0 && host.ActualHeight > 0)
+                if (pane.Lines.Count > 0)
                 {
                     double ratio = host.ActualHeight / pane.Lines.Count;
                     for (int i = 0; i < pane.Lines.Count; i++)
@@ -183,6 +185,10 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void UpdateViewportGuide()
         {
+            // BLOQUEO CRÍTICO: Si el usuario está arrastrando la guía, ignoramos las actualizaciones
+            // que vienen del scroll del editor para evitar el efecto de "baile" o jitter.
+            if (_isDragging) return;
+
             if (_oldEditor != null) UpdateViewport(OldDiffMapHost, _oldEditor, ref _oldViewportGuide);
             if (_newEditor != null) UpdateViewport(NewDiffMapHost, _newEditor, ref _newViewportGuide);
         }
@@ -217,9 +223,21 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             for (int i = 0; i < lines.Count; i++)
             {
-                if (lines[i].Type != ChangeType.Unchanged && lines[i].Type != ChangeType.Imaginary)
+                // Una línea es un cambio si no es Unchanged ni Imaginary
+                // En SideBySide, comparamos ambos lados para no saltarnos los borrados (OLD)
+                bool isChange = _diffModel != null 
+                    ? (_diffModel.OldText.Lines[i].Type != ChangeType.Unchanged && _diffModel.OldText.Lines[i].Type != ChangeType.Imaginary) ||
+                      (_diffModel.NewText.Lines[i].Type != ChangeType.Unchanged && _diffModel.NewText.Lines[i].Type != ChangeType.Imaginary)
+                    : (lines[i].Type != ChangeType.Unchanged && lines[i].Type != ChangeType.Imaginary);
+
+                if (isChange)
                 {
-                    _diffLines.Add(i + 1);
+                    // Es inicio de bloque si es la primera línea o si el tipo de alguna de las dos ha cambiado
+                    bool isStart = i == 0 || (_diffModel != null 
+                        ? _diffModel.OldText.Lines[i].Type != _diffModel.OldText.Lines[i - 1].Type || _diffModel.NewText.Lines[i].Type != _diffModel.NewText.Lines[i - 1].Type
+                        : lines[i].Type != lines[i - 1].Type);
+
+                    if (isStart) _diffLines.Add(i + 1);
                 }
             }
         }
@@ -240,48 +258,107 @@ namespace AssetsManager.Views.Dialogs.Controls
             ParentControl?.ScrollToLine(prev);
         }
 
-        public void NavigateToDifferenceByIndex(int index)
-        {
-            if (index >= 0 && index < _diffLines.Count)
-            {
-                ParentControl?.ScrollToLine(_diffLines[index]);
-            }
-        }
-
-        public int FindClosestDifferenceIndex(int line)
-        {
-            if (!_diffLines.Any()) return -1;
-            int index = _diffLines.FindIndex(l => l >= line);
-            return index != -1 ? index : _diffLines.Count - 1;
-        }
+        private Point _dragStartPoint;
+        private bool _wasActuallyDragged;
 
         private void NavigationPanel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            _isDragging = true;
-            var host = sender as VisualHost;
-            host.CaptureMouse();
-            ProcessMousePosition(host, e.GetPosition(host).Y);
+            if (sender is UIElement panel)
+            {
+                _isDragging = true;
+                _wasActuallyDragged = false;
+                _dragStartPoint = e.GetPosition(panel);
+                panel.CaptureMouse();
+                
+                // Procesar posición inicial para respuesta inmediata
+                ProcessMousePosition(sender as VisualHost, _dragStartPoint.Y);
+            }
         }
 
         private void NavigationPanel_MouseMove(object sender, MouseEventArgs e)
         {
-            if (_isDragging) ProcessMousePosition(sender as VisualHost, e.GetPosition(sender as VisualHost).Y);
+            if (_isDragging && sender is UIElement panel)
+            {
+                var currentPosition = e.GetPosition(panel);
+                var dragVector = _dragStartPoint - currentPosition;
+
+                // Umbral de movimiento para confirmar el arrastre (estándar del sistema)
+                if (!_wasActuallyDragged &&
+                    (Math.Abs(dragVector.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                     Math.Abs(dragVector.Y) > SystemParameters.MinimumVerticalDragDistance))
+                {
+                    _wasActuallyDragged = true;
+                }
+
+                if (_wasActuallyDragged)
+                {
+                    ProcessMousePosition(sender as VisualHost, currentPosition.Y);
+                }
+            }
         }
 
         private void NavigationPanel_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            _isDragging = false;
-            (sender as VisualHost).ReleaseMouseCapture();
+            if (_isDragging && sender is UIElement panel)
+            {
+                _isDragging = false;
+                if (panel.IsMouseCaptured) panel.ReleaseMouseCapture();
+
+                // Si fue solo un clic (sin arrastre), navegamos a la posición final
+                if (!_wasActuallyDragged)
+                {
+                    ProcessMousePosition(sender as VisualHost, e.GetPosition(panel).Y);
+                }
+
+                // Sincronización final tras soltar
+                UpdateViewportGuide();
+            }
         }
 
         private void ProcessMousePosition(VisualHost host, double y)
         {
             if (host == null || host.ActualHeight <= 0) return;
-            int lineCount = _diffModel?.NewText.Lines.Count ?? _unifiedLines?.Count ?? 0;
-            if (lineCount <= 0) return;
+            
+            // Calculamos el porcentaje basado en la posición del ratón
+            double percentage = Math.Max(0, Math.Min(y / host.ActualHeight, 1.0));
+            
+            // Mandamos la orden de scroll al editor (unidireccional durante el drag)
+            ParentControl?.ScrollToPercentage(percentage);
+            
+            // Movemos la guía visualmente de forma inmediata para control total del usuario
+            UpdateViewportGuideManually(percentage);
+        }
 
-            int lineNumber = (int)(lineCount * (y / host.ActualHeight)) + 1;
-            ParentControl?.ScrollToLine(Math.Max(1, Math.Min(lineCount, lineNumber)));
+        private void UpdateViewportGuideManually(double percentage)
+        {
+            if (_oldEditor != null) UpdateViewportWithPercentage(OldDiffMapHost, _oldEditor, ref _oldViewportGuide, percentage);
+            if (_newEditor != null) UpdateViewportWithPercentage(NewDiffMapHost, _newEditor, ref _newViewportGuide, percentage);
+        }
+
+        private void UpdateViewportWithPercentage(VisualHost host, TextEditor editor, ref DrawingVisual guide, double percentage)
+        {
+            if (host == null || editor == null || host.ActualHeight <= 0) return;
+
+            if (guide == null)
+            {
+                guide = new DrawingVisual();
+                host.AddVisual(guide);
+            }
+
+            double viewportHeight = editor.ViewportHeight;
+            double extentHeight = editor.ExtentHeight;
+            if (extentHeight <= 0) return;
+
+            double ratio = host.ActualHeight / extentHeight;
+            // El porcentaje define el inicio del área visible
+            double top = (extentHeight - viewportHeight) * percentage * ratio;
+            double height = viewportHeight * ratio;
+
+            using (var dc = guide.RenderOpen())
+            {
+                dc.DrawRectangle(null, new Pen(_viewportBrush, 1), new Rect(0, top, host.ActualWidth, Math.Max(height, 2)));
+                dc.DrawRectangle(_viewportBrush, null, new Rect(0, top, host.ActualWidth, Math.Max(height, 2)));
+            }
         }
     }
 }
