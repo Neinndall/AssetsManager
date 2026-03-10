@@ -43,7 +43,7 @@
                                   Style="{StaticResource TransparentIconToggleButton}"
                                   ToolTip="Group by paths/categories"
                                   Margin="0,0,2,0"
-                                  IsChecked="{Binding IsSortButtonVisible}"
+                                  IsChecked="{Binding IsGroupingEnabled}"
                                   Visibility="{Binding IsSortButtonVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                         <materialIcons:MaterialIcon Kind="SortAlphabeticalAscending" Width="18" Height="18"/>
                     </ToggleButton>

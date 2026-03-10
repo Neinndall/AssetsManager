@@ -15,8 +15,15 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isFavoritesEnabled = false;
         private string _searchText = string.Empty;
         private bool _isSortButtonVisible = false;
+        private bool _isGroupingEnabled = true;
         private bool _isSearchVisible = false;
         private bool _isToolsExpanded = false;
+
+        public bool IsGroupingEnabled
+        {
+            get => _isGroupingEnabled;
+            set { if (_isGroupingEnabled != value) { _isGroupingEnabled = value; OnPropertyChanged(); } }
+        }
 
         public bool IsSearchVisible
         {

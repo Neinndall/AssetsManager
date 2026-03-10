@@ -197,8 +197,8 @@ namespace AssetsManager.Views.Controls.Explorer
                 case nameof(ExplorerToolbarModel.IsFavoritesEnabled):
                     HandleFavoritesVisibilityChanged(_viewModel.Toolbar.IsFavoritesEnabled);
                     break;
-                case nameof(ExplorerToolbarModel.IsSortButtonVisible):
-                    HandleSortStateChanged(_viewModel.Toolbar.IsSortButtonVisible);
+                case nameof(ExplorerToolbarModel.IsGroupingEnabled):
+                    HandleSortStateChanged(_viewModel.Toolbar.IsGroupingEnabled);
                     break;
                 case nameof(ExplorerToolbarModel.SearchText):
                     HandleSearchTextChanged();
