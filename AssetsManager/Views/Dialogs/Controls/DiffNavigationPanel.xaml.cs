@@ -56,14 +56,15 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void Cleanup()
         {
-            OldDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
-            OldDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
-            OldDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
+            // Desuscribir de los contenedores para permitir navegación en toda la superficie
+            OldDiffMapContainer.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
+            OldDiffMapContainer.MouseMove -= NavigationPanel_MouseMove;
+            OldDiffMapContainer.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
             OldDiffMapHost.SizeChanged -= MapHost_SizeChanged;
 
-            NewDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
-            NewDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
-            NewDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
+            NewDiffMapContainer.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
+            NewDiffMapContainer.MouseMove -= NavigationPanel_MouseMove;
+            NewDiffMapContainer.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
             NewDiffMapHost.SizeChanged -= MapHost_SizeChanged;
 
             OldDiffMapHost.ClearVisuals();
@@ -107,24 +108,26 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void SetupEvents()
         {
-            OldDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
-            OldDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
-            OldDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
+            // Limpieza previa
+            OldDiffMapContainer.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
+            OldDiffMapContainer.MouseMove -= NavigationPanel_MouseMove;
+            OldDiffMapContainer.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
             OldDiffMapHost.SizeChanged -= MapHost_SizeChanged;
 
-            NewDiffMapHost.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
-            NewDiffMapHost.MouseMove -= NavigationPanel_MouseMove;
-            NewDiffMapHost.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
+            NewDiffMapContainer.MouseLeftButtonDown -= NavigationPanel_MouseLeftButtonDown;
+            NewDiffMapContainer.MouseMove -= NavigationPanel_MouseMove;
+            NewDiffMapContainer.MouseLeftButtonUp -= NavigationPanel_MouseLeftButtonUp;
             NewDiffMapHost.SizeChanged -= MapHost_SizeChanged;
 
-            OldDiffMapHost.MouseLeftButtonDown += NavigationPanel_MouseLeftButtonDown;
-            OldDiffMapHost.MouseMove += NavigationPanel_MouseMove;
-            OldDiffMapHost.MouseLeftButtonUp += NavigationPanel_MouseLeftButtonUp;
+            // Suscribir a los contenedores
+            OldDiffMapContainer.MouseLeftButtonDown += NavigationPanel_MouseLeftButtonDown;
+            OldDiffMapContainer.MouseMove += NavigationPanel_MouseMove;
+            OldDiffMapContainer.MouseLeftButtonUp += NavigationPanel_MouseLeftButtonUp;
             OldDiffMapHost.SizeChanged += MapHost_SizeChanged;
 
-            NewDiffMapHost.MouseLeftButtonDown += NavigationPanel_MouseLeftButtonDown;
-            NewDiffMapHost.MouseMove += NavigationPanel_MouseMove;
-            NewDiffMapHost.MouseLeftButtonUp += NavigationPanel_MouseLeftButtonUp;
+            NewDiffMapContainer.MouseLeftButtonDown += NavigationPanel_MouseLeftButtonDown;
+            NewDiffMapContainer.MouseMove += NavigationPanel_MouseMove;
+            NewDiffMapContainer.MouseLeftButtonUp += NavigationPanel_MouseLeftButtonUp;
             NewDiffMapHost.SizeChanged += MapHost_SizeChanged;
         }
 
@@ -141,7 +144,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             DrawMapMarkers(OldDiffMapHost, _originalDiffModel.OldText);
             DrawMapMarkers(NewDiffMapHost, _originalDiffModel.NewText);
             
-            // CRÍTICO: Resetear guías para que se vuelvan a añadir al host tras el ClearVisuals de DrawMapMarkers
             _oldViewportGuide = null;
             _newViewportGuide = null;
         }
@@ -154,9 +156,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             var backgroundVisual = new DrawingVisual();
             using (var dc = backgroundVisual.RenderOpen())
             {
-                // ELIMINADO: dc.DrawRectangle(_backgroundPanelBrush, ...) 
-                // Dejamos que el fondo del Border en XAML haga el trabajo con sus esquinas redondeadas.
-
                 if (pane.Lines.Count > 0)
                 {
                     double ratio = host.ActualHeight / pane.Lines.Count;
@@ -195,7 +194,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void UpdateViewport(VisualHost host, TextEditor editor, ref DrawingVisual guide)
         {
-            // Seguridad: Validar nulos y estado del editor para evitar crash en Disposal
             if (host == null || editor == null || editor.Document == null || editor.TextArea?.TextView == null || host.ActualHeight <= 0 || editor.Document.LineCount <= 0) return;
 
             if (guide == null)
@@ -223,8 +221,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             for (int i = 0; i < lines.Count; i++)
             {
-                // Una línea es un cambio si no es Unchanged ni Imaginary
-                // En SideBySide, comparamos ambos lados para no saltarnos los borrados (OLD)
                 bool isChange = _diffModel != null 
                     ? (_diffModel.OldText.Lines[i].Type != ChangeType.Unchanged && _diffModel.OldText.Lines[i].Type != ChangeType.Imaginary) ||
                       (_diffModel.NewText.Lines[i].Type != ChangeType.Unchanged && _diffModel.NewText.Lines[i].Type != ChangeType.Imaginary)
@@ -232,7 +228,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                 if (isChange)
                 {
-                    // Es inicio de bloque si es la primera línea o si el tipo de alguna de las dos ha cambiado
                     bool isStart = i == 0 || (_diffModel != null 
                         ? _diffModel.OldText.Lines[i].Type != _diffModel.OldText.Lines[i - 1].Type || _diffModel.NewText.Lines[i].Type != _diffModel.NewText.Lines[i - 1].Type
                         : lines[i].Type != lines[i - 1].Type);
@@ -260,19 +255,21 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void NavigationPanel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender is VisualHost host)
+            if (sender is Grid container)
             {
                 _isDragging = true;
-                host.CaptureMouse();
-                ProcessMousePosition(host, e.GetPosition(host).Y);
+                container.CaptureMouse();
+                var host = container.Children.OfType<VisualHost>().FirstOrDefault();
+                if (host != null) ProcessMousePosition(host, e.GetPosition(container).Y);
             }
         }
 
         private void NavigationPanel_MouseMove(object sender, MouseEventArgs e)
         {
-            if (_isDragging && sender is VisualHost host)
+            if (_isDragging && sender is Grid container)
             {
-                ProcessMousePosition(host, e.GetPosition(host).Y);
+                var host = container.Children.OfType<VisualHost>().FirstOrDefault();
+                if (host != null) ProcessMousePosition(host, e.GetPosition(container).Y);
             }
         }
 
@@ -281,8 +278,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             if (_isDragging)
             {
                 _isDragging = false;
-                var host = sender as VisualHost;
-                if (host.IsMouseCaptured) host.ReleaseMouseCapture();
+                if (sender is Grid container && container.IsMouseCaptured) container.ReleaseMouseCapture();
                 UpdateViewportGuide();
             }
         }
@@ -290,14 +286,8 @@ namespace AssetsManager.Views.Dialogs.Controls
         private void ProcessMousePosition(VisualHost host, double y)
         {
             if (host == null || host.ActualHeight <= 0) return;
-            
-            // Calculamos el porcentaje basado en la posición del ratón
             double percentage = Math.Max(0, Math.Min(y / host.ActualHeight, 1.0));
-            
-            // Mandamos la orden de scroll al editor (unidireccional durante el drag)
             ParentControl?.ScrollToPercentage(percentage);
-            
-            // Movemos la guía visualmente de forma inmediata para control total del usuario
             UpdateViewportGuideManually(percentage);
         }
 
@@ -322,7 +312,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             if (extentHeight <= 0) return;
 
             double ratio = host.ActualHeight / extentHeight;
-            // El porcentaje define el inicio del área visible
             double top = (extentHeight - viewportHeight) * percentage * ratio;
             double height = viewportHeight * ratio;
 
