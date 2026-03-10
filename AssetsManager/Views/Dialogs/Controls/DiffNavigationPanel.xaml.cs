@@ -186,8 +186,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void UpdateViewportGuide()
         {
-            // BLOQUEO CRÍTICO: Si el usuario está arrastrando la guía, ignoramos las actualizaciones
-            // que vienen del scroll del editor para evitar el efecto de "baile" o jitter.
+            // Esto arregla el scroll arrastrando la guia (evita que el editor luche contra el ratón)
             if (_isDragging) return;
 
             if (_oldEditor != null) UpdateViewport(OldDiffMapHost, _oldEditor, ref _oldViewportGuide);

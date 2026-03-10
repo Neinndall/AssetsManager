@@ -30,7 +30,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         private DiffPaneModel _unifiedModel;
         private string _oldText;
         private string _newText;
-        private bool _isUpdatingView;
 
         // Cache to prevent flickering
         private TextDocument _cachedOldDoc;
@@ -97,7 +96,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void Editor_GuideScrollChanged(object sender, EventArgs e)
         {
-            if (_isUpdatingView) return;
+            // Esto arregla el scroll arrastrando la guia (evita rebotes visuales)
             RefreshGuidePosition();
         }
         #endregion
@@ -181,7 +180,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_originalDiffModel == null) return;
 
-            _isUpdatingView = true;
             try
             {
                 if (State.IsInlineMode)
@@ -195,7 +193,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
             catch
             {
-                _isUpdatingView = false;
                 throw;
             }
         }
@@ -268,30 +265,23 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void RestoreViewPosition(ICSharpCode.AvalonEdit.TextEditor editor, double? percentage, int? explicitLine)
         {
-            try
-            {
-                // Force immediate layout update to allow synchronous scrolling
-                editor.UpdateLayout();
+            // Force immediate layout update to allow synchronous scrolling
+            editor.UpdateLayout();
 
-                if (explicitLine.HasValue && explicitLine.Value > 0)
-                {
-                    ScrollToLine(explicitLine.Value);
-                }
-                else if (percentage.HasValue)
-                {
-                    ScrollToPercentage(percentage.Value);
-                }
-                else
-                {
-                    FocusFirstDifference();
-                }
-
-                RefreshGuidePosition();
-            }
-            finally
+            if (explicitLine.HasValue && explicitLine.Value > 0)
             {
-                _isUpdatingView = false;
+                ScrollToLine(explicitLine.Value);
             }
+            else if (percentage.HasValue)
+            {
+                ScrollToPercentage(percentage.Value);
+            }
+            else
+            {
+                FocusFirstDifference();
+            }
+
+            RefreshGuidePosition();
         }
         #endregion
 
@@ -323,13 +313,11 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void OldEditor_ScrollChanged(object sender, EventArgs e)
         {
-            if (_isUpdatingView) return;
             SyncScroll(sender, NewJsonContent);
         }
 
         private void NewEditor_ScrollChanged(object sender, EventArgs e)
         {
-            if (_isUpdatingView) return;
             SyncScroll(sender, OldJsonContent);
         }
 
@@ -431,7 +419,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
             NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= Editor_GuideScrollChanged;
 
-            _isUpdatingView = true;
             try
             {
                 var oldTargetY = (OldJsonContent.ExtentHeight - OldJsonContent.ViewportHeight) * percentage;
@@ -442,8 +429,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
             finally
             {
-                _isUpdatingView = false;
-                
                 // RECONEXIÓN
                 OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
                 NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
