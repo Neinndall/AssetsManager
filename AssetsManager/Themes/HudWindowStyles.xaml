@@ -32,13 +32,12 @@
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource TemplatedParent}}" Value="Maximized">
                                         <Setter Property="CornerRadius" Value="0"/>
-                                        <Setter Property="BorderThickness" Value="0"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
                         
-                        <Grid>
+                        <Grid Margin="{Binding MaximizedMargin, RelativeSource={RelativeSource TemplatedParent}}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/> <!-- 0: Title Bar -->
                                 <RowDefinition Height="*"/>    <!-- 1: Client Area -->
