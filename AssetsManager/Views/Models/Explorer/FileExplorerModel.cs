@@ -1,6 +1,8 @@
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Utils.Framework;
 
@@ -71,6 +73,7 @@ namespace AssetsManager.Views.Models.Explorer
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true;
+            OnPropertyChanged(nameof(IsToolbarVisible));
         }
 
         public string StatusTitle
@@ -207,7 +210,6 @@ namespace AssetsManager.Views.Models.Explorer
                 { 
                     _isEmptyState = value; 
                     OnPropertyChanged(); 
-                    OnPropertyChanged(nameof(IsToolbarVisible));
                 } 
             }
         }
@@ -270,8 +272,9 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool IsFavoritesToggleVisible => IsWadMode && !IsBackupMode;
         
-        // Toolbar is visible if Tree is ready OR if we are in Directory Mode (even if empty, to allow switching back)
-        public bool IsToolbarVisible => IsTreeReady || (IsEmptyState && !IsWadMode);
+        // Toolbar is visible if Tree is ready OR if we are NOT in WAD mode 
+        // (to allow switching back to WAD mode even if the directory is empty)
+        public bool IsToolbarVisible => IsTreeReady || !IsWadMode;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
@@ -279,4 +282,3 @@ namespace AssetsManager.Views.Models.Explorer
         }
     }
 }
-

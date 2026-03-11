@@ -1,11 +1,13 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using AssetsManager.Views.Controls.Explorer;
 
 namespace AssetsManager.Views.Models.Explorer
 {
     public class ExplorerToolbarModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
+        public FileExplorerControl ParentExplorer { get; set; } // Reference back for direct actions
 
         private bool _isWadMode = true;
         private bool _isGridMode = false;
@@ -13,8 +15,15 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isFavoritesEnabled = false;
         private string _searchText = string.Empty;
         private bool _isSortButtonVisible = false;
+        private bool _isGroupingEnabled = true;
         private bool _isSearchVisible = false;
         private bool _isToolsExpanded = false;
+
+        public bool IsGroupingEnabled
+        {
+            get => _isGroupingEnabled;
+            set { if (_isGroupingEnabled != value) { _isGroupingEnabled = value; OnPropertyChanged(); } }
+        }
 
         public bool IsSearchVisible
         {

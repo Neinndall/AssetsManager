@@ -14,6 +14,9 @@ namespace AssetsManager.Views.Controls.Explorer
 {
     public partial class FileGridControl : UserControl
     {
+        public FilePreviewerControl ParentPreviewer { get; set; }
+        public FileGridModel ViewModel => DataContext as FileGridModel;
+
         private ObservableRangeCollection<FileGridViewModel> _allItems = new ObservableRangeCollection<FileGridViewModel>();
         public ObservableRangeCollection<FileGridViewModel> DisplayItems { get; } = new ObservableRangeCollection<FileGridViewModel>();
 
@@ -25,11 +28,6 @@ namespace AssetsManager.Views.Controls.Explorer
             get { return (ObservableRangeCollection<FileGridViewModel>)GetValue(ItemsSourceProperty); }
             set { SetValue(ItemsSourceProperty, value); }
         }
-
-        public event EventHandler<NodeClickedEventArgs> NodeClicked;
-        public event EventHandler<SelectionActionEventArgs> SelectionActionRequested;
-
-        private string _currentFilter = "All";
 
         public FileGridControl()
         {
@@ -45,7 +43,14 @@ namespace AssetsManager.Views.Controls.Explorer
                 control._allItems = newItems ?? new ObservableRangeCollection<FileGridViewModel>();
                 
                 // Re-apply current filter when folder or search changes
-                control.ApplyFilter(control._currentFilter);
+                if (control.ViewModel != null)
+                {
+                    control.ApplyFilter(control.ViewModel.CurrentFilter);
+                }
+                else
+                {
+                    control.DisplayItems.ReplaceRange(control._allItems);
+                }
             }
         }
 
@@ -55,39 +60,29 @@ namespace AssetsManager.Views.Controls.Explorer
             foreach (FileGridViewModel item in e.RemovedItems) item.IsSelected = false;
             foreach (FileGridViewModel item in e.AddedItems) item.IsSelected = true;
 
-            UpdateActionBarVisibility();
-        }
-
-        private void UpdateActionBarVisibility()
-        {
-            int selectedCount = FileGridListBox.SelectedItems.Count;
-            ActionBarBorder.Visibility = selectedCount > 1 ? Visibility.Visible : Visibility.Collapsed;
-            SelectedCountText.Text = $"{selectedCount} items selected";
+            if (ViewModel != null)
+            {
+                ViewModel.SelectedCount = FileGridListBox.SelectedItems.Count;
+            }
         }
 
         private void FileGridControl_Item_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (sender is ListBoxItem itemContainer && itemContainer.DataContext is FileGridViewModel item)
             {
-                // We use Preview event to intercept the click before ListBox selection logic
                 if (InteractionHelper.IsPrimaryActionIntent())
                 {
-                    // Primary action = Navigation
-                    NodeClicked?.Invoke(this, new NodeClickedEventArgs(item.Node));
-                    
-                    // Mark as handled to prevent ListBox from selecting/focusing
+                    ParentPreviewer?.HandleNodeClicked(item.Node);
                     e.Handled = true;
                 }
-                // If it's NOT primary (Ctrl/Shift), we DON'T set Handled=true 
-                // so the ListBox can perform its normal multi-selection logic.
             }
         }
 
         private void FilterButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is RadioButton rb && rb.Tag is string filterType)
+            if (sender is RadioButton rb && rb.Tag is string filterType && ViewModel != null)
             {
-                _currentFilter = filterType;
+                ViewModel.CurrentFilter = filterType;
                 ApplyFilter(filterType);
             }
         }
@@ -128,20 +123,8 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
 
                 var selectedNodes = FileGridListBox.SelectedItems.Cast<FileGridViewModel>().Select(i => i.Node).ToList();
-                SelectionActionRequested?.Invoke(this, new SelectionActionEventArgs(action, selectedNodes));
+                ParentPreviewer?.HandleSelectionActionRequested(action, selectedNodes);
             }
         }
     }
-
-    public class SelectionActionEventArgs : EventArgs
-    {
-        public string Action { get; }
-        public List<FileSystemNodeModel> Nodes { get; }
-        public SelectionActionEventArgs(string action, List<FileSystemNodeModel> nodes)
-        {
-            Action = action;
-            Nodes = nodes;
-        }
-    }
 }
-

@@ -4,19 +4,22 @@ using AssetsManager.Services;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using AssetsManager.Services.Downloads; // Agregado: para el tipo Status
+using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
     public partial class MonitorDashboardControl : UserControl
     {
+        // Public properties for Service Injection from Parent Window
         public MonitorService MonitorService { get; set; }
         public PbeStatusService PbeStatusService { get; set; }
         public AppSettings AppSettings { get; set; }
         public VersionService VersionService { get; set; }
         public Status StatusService { get; set; }
         public UpdateCheckService UpdateCheckService { get; set; }
+
+        public MonitorDashboardModel ViewModel => DataContext as MonitorDashboardModel;
 
         public MonitorDashboardControl()
         {
@@ -26,10 +29,10 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
+            // Solo creamos el modelo si no existe ya y si tenemos todos los servicios inyectados
             if (DataContext == null && MonitorService != null && PbeStatusService != null && AppSettings != null && VersionService != null && StatusService != null && UpdateCheckService != null)
             {
-                var model = new MonitorDashboardModel(MonitorService, PbeStatusService, AppSettings, VersionService, StatusService, UpdateCheckService);
-                DataContext = model;
+                DataContext = new MonitorDashboardModel(MonitorService, PbeStatusService, AppSettings, VersionService, StatusService, UpdateCheckService);
             }
         }
     }

@@ -1,21 +1,17 @@
 using System.Windows.Controls;
 using System.Windows;
-using Material.Icons;
 using System;
+using System.Linq;
 using AssetsManager.Views.Models.Controls;
 
 namespace AssetsManager.Views.Controls
 {
     public partial class LogView : UserControl
     {
+        public MainWindow ParentWindow { get; set; }
         public LogViewModel ViewModel { get; } = new LogViewModel();
 
         public RichTextBox LogRichTextBox => richTextBoxLogs;
-
-        public event EventHandler ToggleLogSizeRequested;
-        public event EventHandler LogExpandedManually;
-        public event EventHandler ClearStatusBarRequested;
-        public event EventHandler NotificationClicked;
 
         // Dependency Property for StatusText (to sync Clear Button state)
         public static readonly DependencyProperty StatusTextProperty =
@@ -31,7 +27,6 @@ namespace AssetsManager.Views.Controls
         {
             if (d is LogView logView)
             {
-                // Logic: If there is text, status is active.
                 logView.ViewModel.HasActiveStatus = !string.IsNullOrEmpty((string)e.NewValue);
             }
         }
@@ -45,7 +40,6 @@ namespace AssetsManager.Views.Controls
 
         private void LogView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            // Update icon and visibility based on manual resize (GridSplitter)
             if (e.NewSize.Height <= 45)
             {
                 ViewModel.SetLogVisibility(false);
@@ -55,7 +49,10 @@ namespace AssetsManager.Views.Controls
                 if (!ViewModel.IsLogVisible)
                 {
                     ViewModel.SetLogVisibility(true);
-                    LogExpandedManually?.Invoke(this, EventArgs.Empty);
+                    if (ParentWindow != null)
+                    {
+                        ParentWindow.HandleLogExpandedManually();
+                    }
                 }
             }
         }
@@ -67,18 +64,17 @@ namespace AssetsManager.Views.Controls
 
         private void ClearStatusBar_Click(object sender, RoutedEventArgs e)
         {
-            ClearStatusBarRequested?.Invoke(this, EventArgs.Empty);
+            ParentWindow?.ClearStatusBar();
         }
 
         private void ToggleLogSize_Click(object sender, RoutedEventArgs e)
         {
-            ViewModel.ToggleLog();
-            ToggleLogSizeRequested?.Invoke(this, EventArgs.Empty);
+            ParentWindow?.OnToggleLogSizeRequested(this, EventArgs.Empty);
         }
         
         private void NotificationButton_Click(object sender, RoutedEventArgs e)
         {
-            NotificationClicked?.Invoke(this, EventArgs.Empty);
+            ParentWindow?.OnNotificationHubRequested(this, EventArgs.Empty);
         }
     }
 }

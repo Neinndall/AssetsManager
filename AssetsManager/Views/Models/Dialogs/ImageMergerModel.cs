@@ -5,7 +5,7 @@ using System.Windows.Media.Imaging;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Utils.Framework;
 
-namespace AssetsManager.Views.Models.Shared
+namespace AssetsManager.Views.Models.Dialogs
 {
     /// <summary>
     /// Representa una imagen individual dentro de la lista del mezclador.

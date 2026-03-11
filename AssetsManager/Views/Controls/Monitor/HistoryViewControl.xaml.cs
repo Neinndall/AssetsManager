@@ -22,11 +22,16 @@ namespace AssetsManager.Views.Controls.Monitor
         public ComparisonHistoryService ComparisonHistoryService { get; set; }
         public IServiceProvider ServiceProvider { get; set; }
 
-        private HistoryModel _viewModel;
+        private readonly HistoryModel _viewModel;
+        public HistoryModel ViewModel => _viewModel;
 
         public HistoryViewControl()
         {
             InitializeComponent();
+            
+            _viewModel = new HistoryModel();
+            DataContext = _viewModel;
+
             this.Loaded += HistoryViewControl_Loaded;
             this.Unloaded += HistoryViewControl_Unloaded;
         }
@@ -36,9 +41,6 @@ namespace AssetsManager.Views.Controls.Monitor
             if (AppSettings != null)
             {
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
-                
-                _viewModel = new HistoryModel();
-                this.DataContext = _viewModel;
                 _viewModel.LoadHistory(AppSettings.DiffHistory);
             }
         }
@@ -55,7 +57,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             Dispatcher.Invoke(() =>
             {
-                if (_viewModel != null && AppSettings != null)
+                if (AppSettings != null)
                 {
                     _viewModel.LoadHistory(AppSettings.DiffHistory);
                 }
@@ -152,13 +154,11 @@ namespace AssetsManager.Views.Controls.Monitor
                                 AppSettings.Save();
                             }
                         }
-                        
-                        // UI will refresh automatically via ConfigurationSaved event
                     }
                     catch (Exception ex)
                     {
                         LogService.LogError(ex, "Error deleting history entries.");
-                        CustomMessageBoxService.ShowError("Error", "Could not delete one or more history entries. Please check the logs for details.", Window.GetWindow(this));
+                        CustomMessageBoxService.ShowError("Error", "Could not delete one or more history entries.", Window.GetWindow(this));
                     }
                 }
             }

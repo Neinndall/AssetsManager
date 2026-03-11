@@ -29,9 +29,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public DirectoriesCreator DirectoriesCreator { get; set; }
         public ExplorerPreviewService ExplorerPreviewService { get; set; }
         public TreeUIManager TreeUIManager { get; set; }
-
-        public event EventHandler<NodeClickedEventArgs> BreadcrumbNodeClicked;
-        public event EventHandler<SelectionActionEventArgs> SelectionActionRequested;
+        public FileExplorerControl FileExplorer { get; set; } // Peer Injection
 
         public FilePreviewerModel ViewModel { get; set; }
         private bool _isLoaded = false;
@@ -218,9 +216,10 @@ namespace AssetsManager.Views.Controls.Explorer
                     ViewModel
                 );
 
-                Breadcrumbs.NodeClicked += Breadcrumbs_NodeClicked;
-                FileGridControl.NodeClicked += FileGridControl_NodeClicked;
-                FileGridControl.SelectionActionRequested += FileGridControl_SelectionActionRequested;
+                // Setup sub-controls peer connection
+                Breadcrumbs.ParentPreviewer = this;
+                FileGridControl.ParentPreviewer = this;
+                
                 UpdateScrollButtonsVisibility();
 
                 _isLoaded = true;
@@ -243,10 +242,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 
                 ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
                 ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
-                
-                Breadcrumbs.NodeClicked -= Breadcrumbs_NodeClicked;
-                FileGridControl.NodeClicked -= FileGridControl_NodeClicked;
-                FileGridControl.SelectionActionRequested -= FileGridControl_SelectionActionRequested;
+
+                // Clear sub-controls peer connection
+                if (Breadcrumbs != null) Breadcrumbs.ParentPreviewer = null;
+                if (FileGridControl != null) FileGridControl.ParentPreviewer = null;
             }
             catch (Exception ex)
             {
@@ -365,14 +364,27 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private void FileGridControl_NodeClicked(object sender, NodeClickedEventArgs e)
+        public void HandleNodeClicked(FileSystemNodeModel node)
         {
-            BreadcrumbNodeClicked?.Invoke(this, new NodeClickedEventArgs(e.Node));
+            FileExplorer?.SelectNode(node);
         }
 
-        private void FileGridControl_SelectionActionRequested(object sender, SelectionActionEventArgs e)
+        public void HandleSelectionActionRequested(string action, List<FileSystemNodeModel> nodes)
         {
-            SelectionActionRequested?.Invoke(this, e);
+            if (FileExplorer == null) return;
+
+            switch (action)
+            {
+                case "Extract":
+                    FileExplorer.TriggerExtractNodes(nodes);
+                    break;
+                case "Save":
+                    FileExplorer.TriggerSaveNodes(nodes);
+                    break;
+                case "Merge":
+                    FileExplorer.TriggerAddToMerger(nodes);
+                    break;
+            }
         }
         
         public void SetBreadcrumbToggleState(bool isToggleOn)
@@ -409,11 +421,6 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 Breadcrumbs.Nodes.Add(node);
             }
-        }
-
-        private void Breadcrumbs_NodeClicked(object sender, NodeClickedEventArgs e)
-        {
-            BreadcrumbNodeClicked?.Invoke(this, e);
         }
     }
 }

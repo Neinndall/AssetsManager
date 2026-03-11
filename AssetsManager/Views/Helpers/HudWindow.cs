@@ -21,6 +21,9 @@ namespace AssetsManager.Views.Helpers
         public static readonly DependencyProperty ShowMaximizeButtonProperty =
             DependencyProperty.Register("ShowMaximizeButton", typeof(bool), typeof(HudWindow), new PropertyMetadata(true));
 
+        public static readonly DependencyProperty MaximizedMarginProperty =
+            DependencyProperty.Register("MaximizedMargin", typeof(Thickness), typeof(HudWindow), new PropertyMetadata(new Thickness(0)));
+
         public string HeaderTitle
         {
             get => (string)GetValue(HeaderTitleProperty);
@@ -45,6 +48,12 @@ namespace AssetsManager.Views.Helpers
             set => SetValue(ShowMaximizeButtonProperty, value);
         }
 
+        public Thickness MaximizedMargin
+        {
+            get => (Thickness)GetValue(MaximizedMarginProperty);
+            set => SetValue(MaximizedMarginProperty, value);
+        }
+
         static HudWindow()
         {
             DefaultStyleKeyProperty.OverrideMetadata(typeof(HudWindow), new FrameworkPropertyMetadata(typeof(HudWindow)));
@@ -55,10 +64,26 @@ namespace AssetsManager.Views.Helpers
             this.WindowStyle = WindowStyle.SingleBorderWindow;
             this.AllowsTransparency = false;
 
+            this.StateChanged += HudWindow_StateChanged;
+
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.CloseWindowCommand, (s, e) => SystemCommands.CloseWindow(this)));
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.MaximizeWindowCommand, (s, e) => SystemCommands.MaximizeWindow(this)));
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.MinimizeWindowCommand, (s, e) => SystemCommands.MinimizeWindow(this)));
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.RestoreWindowCommand, (s, e) => SystemCommands.RestoreWindow(this)));
+        }
+
+        private void HudWindow_StateChanged(object sender, EventArgs e)
+        {
+            if (this.WindowState == WindowState.Maximized)
+            {
+                // Ajuste de precisión: 7px compensan el desbordamiento de WindowChrome
+                // sin que la ventana parezca encogida hacia adentro.
+                this.MaximizedMargin = new Thickness(7);
+            }
+            else
+            {
+                this.MaximizedMargin = new Thickness(0);
+            }
         }
 
         protected override void OnSourceInitialized(EventArgs e)

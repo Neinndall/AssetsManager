@@ -7,67 +7,76 @@ namespace AssetsManager.Views.Settings
 {
     public partial class DefaultPathsSettingsView : UserControl
     {
+        public SettingsModel ViewModel => DataContext as SettingsModel;
+
         public DefaultPathsSettingsView()
         {
             InitializeComponent();
         }
 
-        public void ApplySettingsToUI(SettingsModel model)
-        {
-            this.DataContext = model;
-        }
-
         private void btnBrowseLol_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel == null) return;
+
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select lol PBE directory"
+                Title = "Select lol PBE directory",
+                InitialDirectory = ViewModel.Settings.LolPbeDirectory
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    textBoxLolPath.Text = folderBrowserDialog.FileName;
+                    ViewModel.Settings.LolPbeDirectory = folderBrowserDialog.FileName;
                 }
             }
         }
 
         private void btnBrowseLolLive_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel == null) return;
+
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select lol Live directory"
+                Title = "Select lol Live directory",
+                InitialDirectory = ViewModel.Settings.LolLiveDirectory
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    textBoxLolLivePath.Text = folderBrowserDialog.FileName;
+                    ViewModel.Settings.LolLiveDirectory = folderBrowserDialog.FileName;
                 }
             }
         }
 
         private void btnBrowseDefaultExtracted_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel == null) return;
+
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select default extraction directory"
+                Title = "Select default extraction directory",
+                InitialDirectory = ViewModel.Settings.DefaultExtractedSelectDirectory
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    textBoxDefaultExtractedPath.Text = folderBrowserDialog.FileName;
+                    ViewModel.Settings.DefaultExtractedSelectDirectory = folderBrowserDialog.FileName;
                 }
             }
         }
 
         private void btnBrowseCustomFloorTexture_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel == null) return;
+
             using (var openFileDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = false,
                 Title = "Select custom floor texture file",
+                InitialDirectory = System.IO.Path.GetDirectoryName(ViewModel.Settings.CustomFloorTexturePath),
                 Filters = {
                     new CommonFileDialogFilter("Image Files", "*.png;*.jpg;*.jpeg;*.dds;*.tga"),
                     new CommonFileDialogFilter("All Files", "*.*")
@@ -76,7 +85,7 @@ namespace AssetsManager.Views.Settings
             {
                 if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    textBoxCustomFloorTexturePath.Text = openFileDialog.FileName;
+                    ViewModel.Settings.CustomFloorTexturePath = openFileDialog.FileName;
                 }
             }
         }

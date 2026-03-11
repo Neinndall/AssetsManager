@@ -1,21 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Windows.Controls;
 using System.Windows;
 using System.Threading;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
-using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Views.Controls.Monitor
@@ -29,18 +25,19 @@ namespace AssetsManager.Views.Controls.Monitor
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public AppSettings AppSettings { get; set; }
 
-        // Internal state properties
-        public ObservableRangeCollection<AssetCategory> Categories { get; set; }
-        public AssetCategory SelectedCategory { get; set; }
-        public ObservableRangeCollection<TrackedAsset> Assets { get; set; }
+        // The state model for this view (Container Pattern: Owner)
+        private readonly AssetTrackerModel _viewModel;
+        public AssetTrackerModel ViewModel => _viewModel;
 
         public AssetTrackerControl()
         {
             InitializeComponent();
+            
+            _viewModel = new AssetTrackerModel();
+            DataContext = _viewModel;
+
             this.Loaded += AssetTrackerControl_Loaded;
             this.Unloaded += AssetTrackerControl_Unloaded;
-            Categories = new ObservableRangeCollection<AssetCategory>();
-            Assets = new ObservableRangeCollection<TrackedAsset>();
         }
 
         private void AssetTrackerControl_Loaded(object sender, RoutedEventArgs e)
@@ -66,31 +63,31 @@ namespace AssetsManager.Views.Controls.Monitor
         private void LoadTrackerData()
         {
             MonitorService.LoadAssetCategories();
-            Categories.ReplaceRange(MonitorService.AssetCategories);
+            ViewModel.Categories.ReplaceRange(MonitorService.AssetCategories);
 
-            CategoryComboBox.ItemsSource = Categories;
+            CategoryComboBox.ItemsSource = ViewModel.Categories;
 
-            if (Categories.Any())
+            if (ViewModel.Categories.Any())
             {
-                CategoryComboBox.SelectedItem = Categories.First();
+                CategoryComboBox.SelectedItem = ViewModel.Categories.First();
             }
         }
 
         private void CategoryComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Unsubscribe from previous category to avoid memory leaks and multiple refreshes
+            // Unsubscribe from previous category to avoid memory leaks
             if (e.RemovedItems.Count > 0 && e.RemovedItems[0] is AssetCategory oldCategory)
             {
                 oldCategory.PropertyChanged -= OnCategoryPropertyChanged;
             }
 
-            // Update the internal SelectedCategory property from the ComboBox's selection
-            SelectedCategory = CategoryComboBox.SelectedItem as AssetCategory;
+            // Update the model state from the ComboBox's selection
+            ViewModel.SelectedCategory = CategoryComboBox.SelectedItem as AssetCategory;
 
             // Subscribe to new category property changes
-            if (SelectedCategory != null)
+            if (ViewModel.SelectedCategory != null)
             {
-                SelectedCategory.PropertyChanged += OnCategoryPropertyChanged;
+                ViewModel.SelectedCategory.PropertyChanged += OnCategoryPropertyChanged;
             }
 
             RefreshAssetList();
@@ -98,7 +95,6 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void OnCategoryPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            // If the Start ID changes, we refresh the list immediately
             if (e.PropertyName == nameof(AssetCategory.Start))
             {
                 RefreshAssetList();
@@ -107,17 +103,16 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void RefreshAssetList()
         {
-            if (SelectedCategory == null || MonitorService == null)
+            if (ViewModel.SelectedCategory == null || MonitorService == null)
             {
-                Assets.Clear();
+                ViewModel.Assets.Clear();
                 return;
             }
 
-            // The service now returns the exact list we need to display
-            var assetsFromService = MonitorService.GetAssetListForCategory(SelectedCategory);
-            Assets.ReplaceRange(assetsFromService);
+            var assetsFromService = MonitorService.GetAssetListForCategory(ViewModel.SelectedCategory);
+            ViewModel.Assets.ReplaceRange(assetsFromService);
 
-            AssetsItemsControl.ItemsSource = Assets;
+            AssetsItemsControl.ItemsSource = ViewModel.Assets;
         }
 
         private async void DownloadButton_Click(object sender, System.Windows.RoutedEventArgs e)
@@ -128,7 +123,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            var assetsToDownload = Assets.Where(a => a.Status == "OK").ToList();
+            var assetsToDownload = ViewModel.Assets.Where(a => a.Status == "OK").ToList();
 
             if (!assetsToDownload.Any())
             {
@@ -148,7 +143,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     int downloadedCount = 0;
                     try
                     {
-                        DownloadButton.IsEnabled = false;
+                        ViewModel.IsBusy = true;
                         foreach (var asset in assetsToDownload)
                         {
                             string fileName = Path.GetFileName(new Uri(asset.Url).AbsolutePath);
@@ -161,12 +156,12 @@ namespace AssetsManager.Views.Controls.Monitor
                     }
                     catch (Exception ex)
                     {
-                        CustomMessageBoxService.ShowError("Error", "An error occurred during download. Please check the logs for details.", Window.GetWindow(this));
+                        CustomMessageBoxService.ShowError("Error", "An error occurred during download.", Window.GetWindow(this));
                         LogService.LogError(ex, "An error occurred during bulk asset download.");
                     }
                     finally
                     {
-                        DownloadButton.IsEnabled = true;
+                        ViewModel.IsBusy = false;
                     }
                 }
             }
@@ -174,43 +169,40 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void LoadMoreButton_Click(object sender, RoutedEventArgs e)
         {
-            if (MonitorService == null || SelectedCategory == null) return;
+            if (MonitorService == null || ViewModel.SelectedCategory == null) return;
 
-            LoadMoreButton.IsEnabled = false;
+            ViewModel.IsBusy = true;
             try
             {
-                var newAssets = MonitorService.GenerateMoreAssets(Assets, SelectedCategory, 5); // Generate 5 more
-                Assets.AddRange(newAssets);
+                var newAssets = MonitorService.GenerateMoreAssets(ViewModel.Assets, ViewModel.SelectedCategory, 5);
+                ViewModel.Assets.AddRange(newAssets);
             }
             catch (Exception ex)
             {
                 LogService.LogError(ex, "An error occurred while loading more assets.");
-                CustomMessageBoxService.ShowError("Error", "An error occurred while loading more assets. Please check the logs.", Window.GetWindow(this));
             }
             finally
             {
-                LoadMoreButton.IsEnabled = true;
+                ViewModel.IsBusy = false;
             }
         }
 
         private async void CheckButton_Click(object sender, RoutedEventArgs e)
         {
-            if (MonitorService == null || SelectedCategory == null) return;
+            if (MonitorService == null || ViewModel.SelectedCategory == null) return;
 
-            var assetsToCheck = Assets.Where(a => a.Status == "Pending" || a.Status == "Not Found").ToList();
+            var assetsToCheck = ViewModel.Assets.Where(a => a.Status == "Pending" || a.Status == "Not Found").ToList();
             if (!assetsToCheck.Any())
             {
                 var result = CustomMessageBoxService.ShowYesNo("Info", "There are no pending or failed assets to check. Do you want to load more?", Window.GetWindow(this));
                 if (result != true) return;
 
                 LoadMoreButton_Click(this, new RoutedEventArgs());
-                // After loading more, we re-evaluate what to check from the updated Assets collection
-                assetsToCheck = Assets.Where(a => a.Status == "Pending" || a.Status == "Not Found").ToList();
-                if (!assetsToCheck.Any()) return; // Nothing more was loaded or found
+                assetsToCheck = ViewModel.Assets.Where(a => a.Status == "Pending" || a.Status == "Not Found").ToList();
+                if (!assetsToCheck.Any()) return;
             }
 
-            CheckButton.IsEnabled = false;
-            LoadMoreButton.IsEnabled = false;
+            ViewModel.IsBusy = true;
 
             foreach (var asset in assetsToCheck)
             {
@@ -219,20 +211,17 @@ namespace AssetsManager.Views.Controls.Monitor
 
             try
             {
-                await MonitorService.CheckAssetsAsync(assetsToCheck, SelectedCategory, CancellationToken.None);
-
+                await MonitorService.CheckAssetsAsync(assetsToCheck, ViewModel.SelectedCategory, CancellationToken.None);
                 var foundCount = assetsToCheck.Count(a => a.Status == "OK");
-                CustomMessageBoxService.ShowInfo("Info", $"Check finished. Found {foundCount} new assets out of {assetsToCheck.Count} checked.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowInfo("Info", $"Check finished. Found {foundCount} new assets.", Window.GetWindow(this));
             }
             catch (Exception ex)
             {
                 LogService.LogError(ex, "An error occurred during asset check.");
-                CustomMessageBoxService.ShowError("Error", "An error occurred during asset check. Please check the logs.", Window.GetWindow(this));
             }
             finally
             {
-                CheckButton.IsEnabled = true;
-                LoadMoreButton.IsEnabled = true;
+                ViewModel.IsBusy = false;
             }
         }
 
@@ -252,11 +241,11 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void OnCategoryCheckStarted(AssetCategory category)
         {
-            if (category == SelectedCategory)
+            if (category == ViewModel.SelectedCategory)
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    foreach (var asset in Assets.Where(a => a.Status == "Pending"))
+                    foreach (var asset in ViewModel.Assets.Where(a => a.Status == "Pending"))
                     {
                         asset.Status = "Checking";
                     }
@@ -266,7 +255,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void OnCategoryCheckCompleted(AssetCategory category)
         {
-            if (category == SelectedCategory)
+            if (category == ViewModel.SelectedCategory)
             {
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -283,22 +272,9 @@ namespace AssetsManager.Views.Controls.Monitor
             var asset = button?.Tag as TrackedAsset;
             if (asset == null) return;
 
+            var saveFileDialog = new SaveFileDialog { FileName = asset.DisplayName };
             string extension = Path.GetExtension(asset.Url);
-
-            var saveFileDialog = new SaveFileDialog
-            {
-                FileName = asset.DisplayName
-            };
-
-            if (!string.IsNullOrEmpty(extension))
-            {
-                saveFileDialog.Filter = $"Asset File (*{extension})|*{extension}|All files (*.*)|*.*";
-                saveFileDialog.DefaultExt = extension;
-            }
-            else
-            {
-                saveFileDialog.Filter = "All files (*.*)|*.*";
-            }
+            if (!string.IsNullOrEmpty(extension)) saveFileDialog.Filter = $"Asset File (*{extension})|*{extension}|All files (*.*)|*.*";
 
             if (saveFileDialog.ShowDialog() == true)
             {
@@ -310,7 +286,6 @@ namespace AssetsManager.Views.Controls.Monitor
                 catch (Exception ex)
                 {
                     LogService.LogError(ex, $"Failed to save asset '{asset.DisplayName}'.");
-                    CustomMessageBoxService.ShowError("Error", $"Failed to save asset. Check logs for details.", Window.GetWindow(this));
                 }
             }
         }
@@ -319,30 +294,25 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             var button = sender as Button;
             var assetToRemove = button?.Tag as TrackedAsset;
-            if (assetToRemove == null || SelectedCategory == null) return;
+            if (assetToRemove == null || ViewModel.SelectedCategory == null) return;
 
-            var result = CustomMessageBoxService.ShowYesNo("Information", $"Are you sure you want to remove '{assetToRemove.DisplayName}'? This action is permanent and the asset will not appear again in this category.", Window.GetWindow(this));
+            var result = CustomMessageBoxService.ShowYesNo("Information", $"Are you sure you want to remove '{assetToRemove.DisplayName}'?", Window.GetWindow(this));
             if (result == true)
             {
-                MonitorService.RemoveAsset(SelectedCategory, assetToRemove);
+                MonitorService.RemoveAsset(ViewModel.SelectedCategory, assetToRemove);
                 RefreshAssetList();
             }
         }
 
         private void RemoveFoundButton_Click(object sender, RoutedEventArgs e)
         {
-            if (SelectedCategory == null || !Assets.Any(a => a.Status == "OK"))
-            {
-                CustomMessageBoxService.ShowInfo("Information", "There are no found assets to remove in this category.", Window.GetWindow(this));
-                return;
-            }
+            if (ViewModel.SelectedCategory == null || !ViewModel.Assets.Any(a => a.Status == "OK")) return;
 
-            var result = CustomMessageBoxService.ShowYesNo("Warning", $"Are you sure you want to remove ALL found assets ({Assets.Count(a => a.Status == "OK")}) from this category? This action is permanent and they will be marked as ignored.", Window.GetWindow(this));
+            var result = CustomMessageBoxService.ShowYesNo("Warning", $"Are you sure you want to remove ALL found assets?", Window.GetWindow(this));
             if (result == true)
             {
-                MonitorService.RemoveAllFoundAssets(SelectedCategory);
+                MonitorService.RemoveAllFoundAssets(ViewModel.SelectedCategory);
                 RefreshAssetList();
-                CustomMessageBoxService.ShowInfo("Success", "All found assets have been removed and marked as ignored.", Window.GetWindow(this));
             }
         }
     }

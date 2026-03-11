@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Views.Viewer
+namespace AssetsManager.Views
 {
     public partial class ViewerWindow : UserControl
     {
@@ -50,81 +50,33 @@ namespace AssetsManager.Views.Viewer
             
             // Link Panel to Viewport directly for Studio controls
             PanelControl.Viewport = ViewportControl;
+            ViewportControl.Panel = PanelControl;
 
             // Scene events
-            PanelControl.SceneClearRequested += OnSceneClearRequested;
-            PanelControl.SceneSetupRequested += SetupScene;
-            PanelControl.CameraResetRequested += OnCameraResetRequested;
+            ViewportControl.SceneSetupRequested += SetupScene;
+            ViewportControl.MapGeometryLoadRequested += OnMapGeometryLoadRequested;
             PanelControl.EmptyStateVisibilityChanged += OnEmptyStateVisibilityChanged;
             PanelControl.MainContentVisibilityChanged += OnMainContentVisibilityChanged;
-
-            // Model events
-            PanelControl.ModelReadyForViewport += OnModelReadyForViewport;
-            PanelControl.ModelRemovedFromViewport += OnModelRemovedFromViewport;
-            PanelControl.ActiveModelChanged += OnActiveModelChanged;
-            PanelControl.MapGeometryLoadRequested += OnMapGeometryLoadRequested;
-
-            // Animation events
-            PanelControl.AnimationReadyForDisplay += OnAnimationReadyForDisplay;
-            PanelControl.AnimationStopRequested += OnAnimationStopRequested;
-            PanelControl.AnimationSeekRequested += OnAnimationSeekRequested;
-            ViewportControl.AnimationProgressChanged += OnAnimationProgressChanged;
-            ViewportControl.PlaybackStateChanged += OnPlaybackStateChanged;
-
-            // Auto-rotation from Viewport to Panel
-            ViewportControl.AutoRotationStopped += OnAutoRotationStopped;
-
-            Unloaded += (s, e) =>
-            {
-                CleanupResources();
-            };
         }
 
         // Event handlers extraídos de lambdas
-        private void OnCameraResetRequested() => ViewportControl.ResetCamera();
         private void OnEmptyStateVisibilityChanged(Visibility visibility) => EmptyStatePanel.Visibility = visibility;
         private void OnMainContentVisibilityChanged(Visibility visibility) => MainContentGrid.Visibility = visibility;
-        private void OnModelReadyForViewport(SceneModel model) => ViewportControl.AddModel(model);
-        private void OnModelRemovedFromViewport(SceneModel model) => ViewportControl.RemoveModel(model);
-        private void OnActiveModelChanged(SceneModel model) => ViewportControl.SetActiveModel(model);
-        private void OnMapGeometryLoadRequested(object s, EventArgs e) => OpenGeometryFile_Click(s, null);
-        private void OnAnimationReadyForDisplay(object s, AnimationModel anim) => ViewportControl.SetAnimation(anim);
-        private void OnAnimationStopRequested(object s, AnimationModel anim) => ViewportControl.TogglePauseResume(anim);
-        private void OnAnimationSeekRequested(object s, (AnimationModel, TimeSpan) args) => ViewportControl.SeekAnimation(args.Item2);
-        private void OnAnimationProgressChanged(object s, double time) => PanelControl.UpdateAnimationProgress(time);
-        private void OnPlaybackStateChanged(AnimationModel model, bool isPlaying) => PanelControl.SetAnimationPlayingState(model, isPlaying);
-        private void OnAutoRotationStopped(object sender, double angle) => PanelControl.ApplyAutoRotation(angle);
-
-        private void OnSceneClearRequested(object sender, EventArgs e)
-        {
-            ViewportControl.ResetScene();
-            ViewportControl.ResetCamera();
-        }
+        private void OnMapGeometryLoadRequested() => OpenGeometryFile_Click(null, null);
 
         public void CleanupResources()
         {
             // 1. CRÍTICO: Desuscribirse de TODOS los eventos para evitar memory leaks
             if (PanelControl != null)
             {
-                PanelControl.SceneClearRequested -= OnSceneClearRequested;
-                PanelControl.SceneSetupRequested -= SetupScene;
-                PanelControl.CameraResetRequested -= OnCameraResetRequested;
                 PanelControl.EmptyStateVisibilityChanged -= OnEmptyStateVisibilityChanged;
                 PanelControl.MainContentVisibilityChanged -= OnMainContentVisibilityChanged;
-                PanelControl.ModelReadyForViewport -= OnModelReadyForViewport;
-                PanelControl.ModelRemovedFromViewport -= OnModelRemovedFromViewport;
-                PanelControl.ActiveModelChanged -= OnActiveModelChanged;
-                PanelControl.MapGeometryLoadRequested -= OnMapGeometryLoadRequested;
-                PanelControl.AnimationReadyForDisplay -= OnAnimationReadyForDisplay;
-                PanelControl.AnimationStopRequested -= OnAnimationStopRequested;
-                PanelControl.AnimationSeekRequested -= OnAnimationSeekRequested;
             }
 
             if (ViewportControl != null)
             {
-                ViewportControl.AnimationProgressChanged -= OnAnimationProgressChanged;
-                ViewportControl.PlaybackStateChanged -= OnPlaybackStateChanged;
-                ViewportControl.AutoRotationStopped -= OnAutoRotationStopped;
+                ViewportControl.SceneSetupRequested -= SetupScene;
+                ViewportControl.MapGeometryLoadRequested -= OnMapGeometryLoadRequested;
             }
 
             // 2. Limpiar el controlador de la cámara

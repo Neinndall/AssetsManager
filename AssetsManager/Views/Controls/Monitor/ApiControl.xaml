@@ -39,11 +39,11 @@
                                     <Setter Property="Kind" Value="LinkVariantOff" />
                                     <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Status.IsConnected}" Value="True">
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
                                             <Setter Property="Kind" Value="LinkVariant" />
                                             <Setter Property="Foreground" Value="{StaticResource AccentGreen}" />
                                         </DataTrigger>
-                                        <DataTrigger Binding="{Binding Status.StatusText}" Value="Status: Connecting...">
+                                        <DataTrigger Binding="{Binding StatusText}" Value="Status: Connecting...">
                                             <Setter Property="Kind" Value="Sync" />
                                             <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                                         </DataTrigger>
@@ -57,7 +57,7 @@
                         <TextBlock Text="LCU SERVICE" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
                         
                         <!-- Status text ALWAYS visible - Fixed optical alignment with -2 margin -->
-                        <TextBlock Text="{Binding Status.StatusText}" FontSize="11" Foreground="{Binding Status.StatusColor}" Margin="-2,1,0,0"/>
+                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{Binding StatusColor}" Margin="-2,1,0,0"/>
 
                         <!-- Connected Info (Summoner + Region) - Visible ONLY when Authenticated (after a fetch) -->
                         <StackPanel Orientation="Horizontal" Margin="-2,1,0,0">
@@ -65,16 +65,16 @@
                                 <Style TargetType="StackPanel">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Status.IsAuthenticated}" Value="True">
+                                        <DataTrigger Binding="{Binding IsAuthenticated}" Value="True">
                                             <Setter Property="Visibility" Value="Visible"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </StackPanel.Style>
                             
-                            <TextBlock Text="{Binding Status.SummonerIdText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text="{Binding SummonerIdText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
                             <TextBlock Text=" • " FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="4,0"/>
-                            <TextBlock Text="{Binding Status.RegionText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text="{Binding RegionText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
@@ -84,7 +84,7 @@
             <Button Grid.Column="1" Click="ConnectButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="Link" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="{Binding Status.ButtonContent}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="{Binding ButtonContent}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Connect client" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -93,7 +93,7 @@
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                 <!-- Sales -->
                 <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabSales, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Button Click="RequestsSales_Click" IsEnabled="{Binding Status.IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                    <Button Click="RequestsSales_Click" IsEnabled="{Binding IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
                         <StackPanel VerticalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="Refresh" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                             <TextBlock Text="Fetch Sales" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
@@ -111,7 +111,7 @@
 
                 <!-- Mythic -->
                 <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabMythic, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Button Click="RequestsMythicShop_Click" IsEnabled="{Binding Status.IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                    <Button Click="RequestsMythicShop_Click" IsEnabled="{Binding IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
                         <StackPanel VerticalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="AutoFix" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                             <TextBlock Text="Fetch Mythic" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
@@ -149,23 +149,23 @@
                             <MultiDataTrigger>
                                 <MultiDataTrigger.Conditions>
                                     <Condition Binding="{Binding IsChecked, ElementName=TabSales}" Value="True"/>
-                                    <Condition Binding="{Binding Status.Paginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}" Value="Visible"/>
+                                    <Condition Binding="{Binding Paginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}" Value="Visible"/>
                                 </MultiDataTrigger.Conditions>
                                 <Setter Property="Visibility" Value="Visible"/>
                             </MultiDataTrigger>
-                            <DataTrigger Binding="{Binding Status.Paginator.TotalPages}" Value="1">
+                            <DataTrigger Binding="{Binding Paginator.TotalPages}" Value="1">
                                 <Setter Property="Visibility" Value="Collapsed"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </StackPanel.Style>
-                <Button Style="{StaticResource TransparentIconButton}" Click="PreviousPage_Click" IsEnabled="{Binding Status.Paginator.CanGoToPreviousPage}">
+                <Button Style="{StaticResource TransparentIconButton}" Click="PreviousPage_Click" IsEnabled="{Binding Paginator.CanGoToPreviousPage}">
                     <materialIcons:MaterialIcon Kind="ChevronLeft"/>
                 </Button>
                 <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="12,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                    <TextBlock Text="{Binding Status.Paginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Paginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 </Border>
-                <Button Style="{StaticResource TransparentIconButton}" Click="NextPage_Click" IsEnabled="{Binding Status.Paginator.CanGoToNextPage}">
+                <Button Style="{StaticResource TransparentIconButton}" Click="NextPage_Click" IsEnabled="{Binding Paginator.CanGoToNextPage}">
                     <materialIcons:MaterialIcon Kind="ChevronRight"/>
                 </Button>
             </StackPanel>
@@ -179,7 +179,7 @@
                 </Style>
             </TabControl.ItemContainerStyle>
             <TabItem>
-                <ItemsControl x:Name="SalesItemsControl" ItemsSource="{Binding Status.SalesCatalog}" ItemTemplate="{StaticResource StoreItemTemplate}">
+                <ItemsControl x:Name="SalesItemsControl" ItemsSource="{Binding SalesCatalog}" ItemTemplate="{StaticResource StoreItemTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Columns="4"/>
@@ -188,7 +188,7 @@
                 </ItemsControl>
             </TabItem>
             <TabItem>
-                <ItemsControl x:Name="MythicShopCategoriesItemsControl" ItemsSource="{Binding Status.MythicShopCategories}">
+                <ItemsControl x:Name="MythicShopCategoriesItemsControl" ItemsSource="{Binding MythicShopCategories}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,0,0,24">

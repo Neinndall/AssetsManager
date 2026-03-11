@@ -105,23 +105,40 @@ namespace AssetsManager.Services.Monitor
 
                         if (string.IsNullOrEmpty(content)) continue;
 
-                        // Check for the specific pattern
-                        var m = Regex.Match(content, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                        // Only consider it a "real" maintenance if it contains specific keywords
+                        bool isRealMaintenance = content.Contains("maintenance", StringComparison.OrdinalIgnoreCase) || 
+                                               content.Contains("unavailable", StringComparison.OrdinalIgnoreCase);
+
+                        if (!isRealMaintenance) continue;
+
+                        // Check for the specific pattern with more flexibility (single digits)
+                        var m = Regex.Match(content, @"(\d{1,2}/\d{1,2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
                         if (m.Success)
                         {
                             originalContent = content;
                             match = m;
                             break;
                         }
+                        else if (string.IsNullOrEmpty(originalContent))
+                        {
+                            // Capture the first content available as a fallback
+                            originalContent = content;
+                        }
                     }
 
-                    if (string.IsNullOrEmpty(originalContent) || match == null) continue;
+                    if (string.IsNullOrEmpty(originalContent)) continue;
+
+                    if (match == null) return originalContent; // If no regex match, return the raw message
 
                     string dateStr = match.Groups[1].Value;
                     string timeStr = match.Groups[2].Value;
                     string tzAbbr = match.Groups[3].Value;
 
-                    if (!DateTime.TryParseExact($"{dateStr} {timeStr}", "MM/dd/yyyy HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime))
+                    // Support both MM/dd/yyyy and M/d/yyyy
+                    string dateFormat = dateStr.Contains("/") && dateStr.Split('/')[0].Length == 1 ? "M/d/yyyy" : "MM/dd/yyyy";
+                    if (dateStr.Split('/')[1].Length == 1) dateFormat = dateFormat.Replace("dd", "d");
+
+                    if (!DateTime.TryParse(dateStr + " " + timeStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime))
                     {
                         return originalContent; // Return original if parsing fails
                     }
@@ -153,15 +170,7 @@ namespace AssetsManager.Services.Monitor
                         }
                     }
 
-                    // 3. Calculate End Time and Check if Expired
-                    var maintenanceEndTime = maintenanceStartTime.Add(duration);
-
-                    if (maintenanceEndTime.ToUniversalTime() < DateTime.UtcNow)
-                    {
-                        continue; // This specific maintenance window has passed, look for others
-                    }
-
-                    // 4. Format the final message by injecting the user's local time.
+                    // 3. Format the final message by injecting the user's local time.
                     var localMaintenanceTime = maintenanceStartTime.ToLocalTime();
                     string newDateTimeString = $"{match.Value} ({localMaintenanceTime:HH:mm} your timezone)";
 
@@ -206,22 +215,33 @@ namespace AssetsManager.Services.Monitor
 
                         if (string.IsNullOrEmpty(content)) continue;
 
-                        var m = Regex.Match(content, @"(\d{2}/\d{2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                        bool isRealMaintenance = content.Contains("maintenance", StringComparison.OrdinalIgnoreCase) || 
+                                               content.Contains("unavailable", StringComparison.OrdinalIgnoreCase);
+
+                        if (!isRealMaintenance) continue;
+
+                        var m = Regex.Match(content, @"(\d{1,2}/\d{1,2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
                         if (m.Success)
                         {
                             originalContent = content;
                             match = m;
                             break;
                         }
+                        else if (string.IsNullOrEmpty(originalContent))
+                        {
+                            originalContent = content;
+                        }
                     }
 
-                    if (string.IsNullOrEmpty(originalContent) || match == null) continue;
+                    if (string.IsNullOrEmpty(originalContent)) continue;
+
+                    if (match == null) return "Maintenance detected";
 
                     string dateStr = match.Groups[1].Value;
                     string timeStr = match.Groups[2].Value;
                     string tzAbbr = match.Groups[3].Value;
 
-                    if (!DateTime.TryParseExact($"{dateStr} {timeStr}", "MM/dd/yyyy HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime) || !TimeZoneAbbreviations.TryGetValue(tzAbbr, out var offset))
+                    if (!DateTime.TryParse(dateStr + " " + timeStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime) || !TimeZoneAbbreviations.TryGetValue(tzAbbr, out var offset))
                     {
                         return "Maintenance detected";
                     }
@@ -236,13 +256,6 @@ namespace AssetsManager.Services.Monitor
                         string unit = durationMatch.Groups[2].Value.ToLower();
                         if (unit.StartsWith("hour")) duration = TimeSpan.FromHours(durationValue);
                         else if (unit.StartsWith("minute")) duration = TimeSpan.FromMinutes(durationValue);
-                    }
-
-                    var maintenanceEndTime = maintenanceStartTime.Add(duration);
-
-                    if (maintenanceEndTime.ToUniversalTime() < DateTime.UtcNow)
-                    {
-                        continue; // This maintenance passed, check others
                     }
 
                     var localMaintenanceStartTime = maintenanceStartTime.ToLocalTime();

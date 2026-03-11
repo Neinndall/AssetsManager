@@ -97,7 +97,7 @@
                                                 <!-- Size -->
                                                 <StackPanel Orientation="Horizontal">
                                                     <materialIcons:MaterialIcon Kind="DatabaseOutline" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding Size}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding SizeDisplay}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </StackPanel>

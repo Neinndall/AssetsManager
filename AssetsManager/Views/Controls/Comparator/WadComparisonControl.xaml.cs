@@ -1,18 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
-using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.WindowsAPICodePack.Dialogs;
-using AssetsManager.Views.Models.Wad;
-using AssetsManager.Views.Dialogs;
+using AssetsManager.Views.Models.Comparator;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
@@ -20,22 +15,6 @@ using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Views.Controls.Comparator
 {
-    public class LoadWadComparisonEventArgs : EventArgs
-    {
-        public List<SerializableChunkDiff> Diffs { get; }
-        public string OldPath { get; }
-        public string NewPath { get; }
-        public string JsonPath { get; }
-
-        public LoadWadComparisonEventArgs(List<SerializableChunkDiff> diffs, string oldPath, string newPath, string jsonPath)
-        {
-            Diffs = diffs;
-            OldPath = oldPath;
-            NewPath = newPath;
-            JsonPath = jsonPath;
-        }
-    }
-
     public partial class WadComparisonControl : UserControl
     {
         public WadComparatorService WadComparatorService { get; set; }
@@ -52,8 +31,7 @@ namespace AssetsManager.Views.Controls.Comparator
         public HashResolverService HashResolverService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
 
-        private string _oldLolPath;
-        private string _newLolPath;
+        public WadComparisonModel ViewModel => DataContext as WadComparisonModel;
 
         public WadComparisonControl()
         {
@@ -62,6 +40,8 @@ namespace AssetsManager.Views.Controls.Comparator
 
         private void btnSelectOldLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel == null) return;
+
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
@@ -72,8 +52,8 @@ namespace AssetsManager.Views.Controls.Comparator
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     var oldPath = folderBrowserDialog.FileName;
-                    oldLolPbeDirectoryTextBox.Text = oldPath;
-                    newLolPbeDirectoryTextBox.Text = oldPath.Replace("(PBE)_old", "(PBE)");
+                    ViewModel.OldDirectoryPath = oldPath;
+                    ViewModel.NewDirectoryPath = oldPath.Replace("(PBE)_old", "(PBE)");
                     LogService.LogDebug($"Old Directory selected: {oldPath}");
                 }
             }
@@ -81,6 +61,8 @@ namespace AssetsManager.Views.Controls.Comparator
 
         private void btnSelectNewLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel == null) return;
+
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
@@ -91,8 +73,8 @@ namespace AssetsManager.Views.Controls.Comparator
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     var newPath = folderBrowserDialog.FileName;
-                    newLolPbeDirectoryTextBox.Text = newPath;
-                    oldLolPbeDirectoryTextBox.Text = newPath.Replace("(PBE)", "(PBE)_old");
+                    ViewModel.NewDirectoryPath = newPath;
+                    ViewModel.OldDirectoryPath = newPath.Replace("(PBE)", "(PBE)_old");
                     LogService.LogDebug($"New Directory selected: {newPath}");
                 }
             }
@@ -100,6 +82,8 @@ namespace AssetsManager.Views.Controls.Comparator
 
         private void btnSelectOldWadFile_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel == null) return;
+
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
@@ -110,13 +94,15 @@ namespace AssetsManager.Views.Controls.Comparator
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 var oldPath = openFileDialog.FileName;
-                oldWadFileTextBox.Text = oldPath;
-                newWadFileTextBox.Text = oldPath.Replace("(PBE)_old", "(PBE)");
+                ViewModel.OldWadFilePath = oldPath;
+                ViewModel.NewWadFilePath = oldPath.Replace("(PBE)_old", "(PBE)");
             }
         }
 
         private void btnSelectNewWadFile_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel == null) return;
+
             var openFileDialog = new CommonOpenFileDialog
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
@@ -127,37 +113,37 @@ namespace AssetsManager.Views.Controls.Comparator
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 var newPath = openFileDialog.FileName;
-                newWadFileTextBox.Text = newPath;
-                oldWadFileTextBox.Text = newPath.Replace("(PBE)", "(PBE)_old");
+                ViewModel.NewWadFilePath = newPath;
+                ViewModel.OldWadFilePath = newPath.Replace("(PBE)", "(PBE)_old");
             }
         }
 
         private async void compareWadButton_Click(object sender, RoutedEventArgs e)
         {
-            compareWadButton.IsEnabled = false;
+            if (ViewModel == null) return;
+
+            ViewModel.IsComparing = true;
 
             try
             {
                 var cancellationToken = TaskCancellationManager.PrepareNewOperation();
-                if (ModeDirectory.IsChecked == true) // By Directory
+                if (ViewModel.IsDirectoryMode) // By Directory
                 {
-                    if (string.IsNullOrEmpty(oldLolPbeDirectoryTextBox.Text) || string.IsNullOrEmpty(newLolPbeDirectoryTextBox.Text))
+                    if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath) || string.IsNullOrEmpty(ViewModel.NewDirectoryPath))
                     {
                         CustomMessageBoxService.ShowWarning("Warning", "Please select both directories.", Window.GetWindow(this));
-                        return; // Return directly as button.IsEnabled will be set in finally
+                        return;
                     }
-                    _oldLolPath = oldLolPbeDirectoryTextBox.Text;
-                    _newLolPath = newLolPbeDirectoryTextBox.Text;
-                    await WadComparatorService.CompareWadsAsync(_oldLolPath, _newLolPath, cancellationToken);
+                    await WadComparatorService.CompareWadsAsync(ViewModel.OldDirectoryPath, ViewModel.NewDirectoryPath, cancellationToken);
                 }
                 else // By File
                 {
-                    if (string.IsNullOrEmpty(oldWadFileTextBox.Text) || string.IsNullOrEmpty(newWadFileTextBox.Text))
+                    if (string.IsNullOrEmpty(ViewModel.OldWadFilePath) || string.IsNullOrEmpty(ViewModel.NewWadFilePath))
                     {
                         CustomMessageBoxService.ShowWarning("Warning", "Please select both WAD files.", Window.GetWindow(this));
-                        return; // Return directly as button.IsEnabled will be set in finally
+                        return;
                     }
-                    await WadComparatorService.CompareSingleWadAsync(oldWadFileTextBox.Text, newWadFileTextBox.Text, cancellationToken);
+                    await WadComparatorService.CompareSingleWadAsync(ViewModel.OldWadFilePath, ViewModel.NewWadFilePath, cancellationToken);
                 }
             }
             catch (OperationCanceledException)
@@ -171,7 +157,7 @@ namespace AssetsManager.Views.Controls.Comparator
             }
             finally
             {
-                compareWadButton.IsEnabled = true;
+                ViewModel.IsComparing = false;
             }
         }
     }

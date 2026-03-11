@@ -12,14 +12,12 @@
         </Grid.ColumnDefinitions>
 
         <!-- Old Version Panel -->
-        <Grid Grid.Column="0">
-            <Rectangle Fill="Transparent"/>
+        <Grid x:Name="OldDiffMapContainer" Grid.Column="0" Background="Transparent">
             <helpers:VisualHost x:Name="OldDiffMapHost"/>
         </Grid>
 
         <!-- New Version Panel -->
-        <Grid Grid.Column="1">
-            <Rectangle Fill="Transparent"/>
+        <Grid x:Name="NewDiffMapContainer" Grid.Column="1" Background="Transparent">
             <helpers:VisualHost x:Name="NewDiffMapHost"/>
         </Grid>
     </Grid>

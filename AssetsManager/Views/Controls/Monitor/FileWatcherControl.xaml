@@ -166,10 +166,14 @@
 
                             <!-- Contextual Actions -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Click="ViewChanges_Click" ToolTip="Show Differences" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" Margin="0,0,8,0" Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Button Click="ViewChanges_Click" 
+                                        Tag="{Binding}"
+                                        ToolTip="Show Differences" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" Margin="0,0,8,0" Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Foreground="{StaticResource AccentBlue}"/>
                                 </Button>                                    
-                                <Button Click="Remove_Click" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Remove Monitor">
+                                <Button Click="Remove_Click" 
+                                        Tag="{Binding}"
+                                        Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Remove Monitor">
                                     <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
                                 </Button>
                             </StackPanel>

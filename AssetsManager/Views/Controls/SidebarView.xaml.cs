@@ -7,6 +7,8 @@ namespace AssetsManager.Views.Controls
 {
     public partial class SidebarView : UserControl
     {
+        public MainWindow ParentWindow { get; set; }
+
         public static readonly DependencyProperty IsExpandedProperty =
             DependencyProperty.Register("IsExpanded", typeof(bool), typeof(SidebarView),
                 new PropertyMetadata(false));
@@ -16,8 +18,6 @@ namespace AssetsManager.Views.Controls
             get { return (bool)GetValue(IsExpandedProperty); }
             set { SetValue(IsExpandedProperty, value); }
         }
-
-        public event Action<string> NavigationRequested;
 
         public SidebarView()
         {
@@ -29,7 +29,7 @@ namespace AssetsManager.Views.Controls
             var button = sender as RadioButton;
             if (button?.Tag is string viewTag)
             {
-                NavigationRequested?.Invoke(viewTag);
+                ParentWindow?.OnSidebarNavigationRequested(viewTag);
             }
         }
 

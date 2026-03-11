@@ -8,10 +8,10 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls; // Added for ContextMenu/MenuItem if needed, though they are in System.Windows.Controls
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using Hardcodet.Wpf.TaskbarNotification; // Hardcodet Namespace
+using Hardcodet.Wpf.TaskbarNotification;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
@@ -27,7 +27,6 @@ using AssetsManager.Views.Controls;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Views.Viewer;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Utils.Win;
 
@@ -50,8 +49,8 @@ namespace AssetsManager.Views
         private readonly HashResolverService _hashResolverService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
         private readonly ExplorerPreviewService _explorerPreviewService;
-        private readonly ProgressUIManager _progressUIManager;
         private readonly UpdateCheckService _updateCheckService;
+        private readonly ProgressUIManager _progressUIManager;
         private readonly DiffViewService _diffViewService;
         private readonly MonitorService _monitorService;
         private readonly VersionService _versionService;
@@ -73,7 +72,7 @@ namespace AssetsManager.Views
         private string _lastAssignedFolder; // Persists the folder name during the extraction process
         private string _lastComparisonIdentity; // Identity fingerprint of the last comparison
 
-        private GridLength _lastLogHeight;
+        private GridLength _lastLogHeight = new GridLength(180);
         private bool _isLogMinimized = false;
 
         public MainWindow(
@@ -125,16 +124,13 @@ namespace AssetsManager.Views
             _comparisonHistoryService = comparisonHistoryService;
             _wadPackagingService = wadPackagingService;
 
+            // Peer-to-Peer Injection
+            Sidebar.ParentWindow = this;
+            StatusBar.ParentWindow = this;
+            LogView.ParentWindow = this;
+
             _progressUIManager.Initialize(StatusBar.ViewModel, this);
-            
-            // Subscribe to Status Bar events
-            StatusBar.ProgressSummaryClicked += (s, e) => _progressUIManager.ShowDetails();
-            
             _logService.SetLogOutput(LogView.LogRichTextBox);
-            LogView.ToggleLogSizeRequested += OnToggleLogSizeRequested;
-            LogView.ClearStatusBarRequested += (s, e) => ClearStatusBar();
-            LogView.LogExpandedManually += (s, e) => _isLogMinimized = false;
-            LogView.NotificationClicked += OnNotificationHubRequested;
 
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
@@ -155,7 +151,6 @@ namespace AssetsManager.Views
 
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
-            Sidebar.NavigationRequested += OnSidebarNavigationRequested;
             LoadHomeWindow();
 
             _updateCheckService.Start();
@@ -393,14 +388,21 @@ namespace AssetsManager.Views
             StatusBar.ClearStatusBar();
         }
 
-        private void OnToggleLogSizeRequested(object sender, EventArgs e)
+        public void HandleProgressSummaryClicked()
         {
-            // If the log is currently showing only the toolbar (effectively hidden by manual resize)
-            // or is explicitly minimized, we want to expand it.
+            _progressUIManager.ShowDetails();
+        }
+
+        public void HandleLogExpandedManually()
+        {
+            _isLogMinimized = false;
+        }
+
+        public void OnToggleLogSizeRequested(object sender, EventArgs e)
+        {
             if (_isLogMinimized || LogViewRow.ActualHeight <= 45)
             {
                 // Restore / Expand
-                // If the last height was too small (due to manual resize), use a default height
                 if (!_lastLogHeight.IsAbsolute || _lastLogHeight.Value <= 45)
                 {
                     _lastLogHeight = new GridLength(180);
@@ -408,6 +410,7 @@ namespace AssetsManager.Views
 
                 LogViewRow.Height = _lastLogHeight;
                 _isLogMinimized = false;
+                LogView.ViewModel.SetLogVisibility(true); // <--- Restaurar flecha
             }
             else
             {
@@ -415,10 +418,11 @@ namespace AssetsManager.Views
                 _lastLogHeight = LogViewRow.Height;
                 LogViewRow.Height = GridLength.Auto;
                 _isLogMinimized = true;
+                LogView.ViewModel.SetLogVisibility(false); // <--- Restaurar flecha
             }
         }
 
-        private async void OnNotificationHubRequested(object sender, EventArgs e)
+        public async void OnNotificationHubRequested(object sender, EventArgs e)
         {
             if (_notificationHubWindow == null)
             {
@@ -435,7 +439,7 @@ namespace AssetsManager.Views
             }
         }
 
-        private void OnSidebarNavigationRequested(string viewTag)
+        public void OnSidebarNavigationRequested(string viewTag)
         {
             // Only clean up the current view if we are navigating to a *main content view*
             // Dialogs (Settings, Help) do not replace the main content, so no cleanup is needed.
@@ -466,11 +470,7 @@ namespace AssetsManager.Views
         private void LoadHomeWindow()
         {
             var homeWindow = _serviceProvider.GetRequiredService<HomeWindow>();
-            homeWindow.NavigationRequested += (tag) =>
-            {
-                Sidebar.SelectNavigationItem(tag);
-                OnSidebarNavigationRequested(tag);
-            };
+            homeWindow.ParentWindow = this;
             MainContentArea.Content = homeWindow;
         }
 

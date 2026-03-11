@@ -528,13 +528,13 @@
             <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="16">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button x:Name="LoadModelButton" Click="LoadModelButton_Click" Style="{StaticResource SecondaryButton}" Height="56" Width="80" Margin="0,0,6,0" Padding="0"
-                            ToolTip="{Binding ViewModel.LoadButtonTooltip, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                            ToolTip="{Binding LoadButtonTooltip}">
                         <StackPanel VerticalAlignment="Center">
                             <materialIcons:MaterialIcon x:Name="LoadModelIcon" 
-                                                        Kind="{Binding ViewModel.LoadButtonIcon, RelativeSource={RelativeSource AncestorType=UserControl}}" 
+                                                        Kind="{Binding LoadButtonIcon}" 
                                                         Width="20" Height="20" Foreground="{StaticResource AccentBrush}"/>
                             <TextBlock x:Name="LoadModelText" 
-                                       Text="{Binding ViewModel.LoadButtonText, RelativeSource={RelativeSource AncestorType=UserControl}}" 
+                                       Text="{Binding LoadButtonText}" 
                                        FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Button>

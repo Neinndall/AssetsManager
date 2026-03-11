@@ -18,8 +18,14 @@ namespace AssetsManager.Views.Helpers
         public static readonly DependencyProperty SingleClickExpandProperty =
             DependencyProperty.RegisterAttached("SingleClickExpand", typeof(bool), typeof(TreeViewItemBehavior), new UIPropertyMetadata(false, OnSingleClickExpandChanged));
 
+        public static readonly DependencyProperty PreserveSelectionOnRightClickProperty =
+            DependencyProperty.RegisterAttached("PreserveSelectionOnRightClick", typeof(bool), typeof(TreeViewItemBehavior), new UIPropertyMetadata(false, OnPreserveSelectionOnRightClickChanged));
+
         public static bool GetSingleClickExpand(DependencyObject obj) => (bool)obj.GetValue(SingleClickExpandProperty);
         public static void SetSingleClickExpand(DependencyObject obj, bool value) => obj.SetValue(SingleClickExpandProperty, value);
+
+        public static bool GetPreserveSelectionOnRightClick(DependencyObject obj) => (bool)obj.GetValue(PreserveSelectionOnRightClickProperty);
+        public static void SetPreserveSelectionOnRightClick(DependencyObject obj, bool value) => obj.SetValue(PreserveSelectionOnRightClickProperty, value);
 
         private static void OnSingleClickExpandChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
@@ -27,6 +33,34 @@ namespace AssetsManager.Views.Helpers
             {
                 if ((bool)e.NewValue) item.PreviewMouseLeftButtonDown += OnPreviewMouseLeftButtonDown;
                 else item.PreviewMouseLeftButtonDown -= OnPreviewMouseLeftButtonDown;
+            }
+        }
+
+        private static void OnPreserveSelectionOnRightClickChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is TreeViewItem item)
+            {
+                if ((bool)e.NewValue) item.PreviewMouseRightButtonDown += OnPreviewMouseRightButtonDown;
+                else item.PreviewMouseRightButtonDown -= OnPreviewMouseRightButtonDown;
+            }
+        }
+
+        private static void OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is TreeViewItem treeViewItem)
+            {
+                // Seguridad: Asegurar que el clic es en el encabezado de ESTE ítem y no en uno de sus hijos
+                if (FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != treeViewItem) return;
+
+                // Si el nodo ya está seleccionado (por selección normal o múltiple), 
+                // no hacemos nada para evitar que el TreeView nativo limpie la selección múltiple.
+                if (treeViewItem.DataContext is FileSystemNodeModel node && (node.IsMultiSelected || treeViewItem.IsSelected))
+                {
+                    return;
+                }
+
+                treeViewItem.IsSelected = true;
+                e.Handled = true;
             }
         }
 

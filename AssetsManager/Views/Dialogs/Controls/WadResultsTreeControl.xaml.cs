@@ -6,67 +6,45 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
     public partial class WadResultsTreeControl : UserControl, INotifyPropertyChanged
     {
-        public event RoutedPropertyChangedEventHandler<object> SelectedItemChanged;
-        public event TextChangedEventHandler SearchTextChanged;
-        public event RoutedEventHandler WadContextMenuOpening;
+        public WadComparisonResultWindow ParentWindow { get; set; }
+        public WadResultsTreeModel ViewModel => DataContext as WadResultsTreeModel;
         public object SelectedItem => resultsTreeView.SelectedItem;
 
         public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
 
-        public static readonly RoutedEvent ViewDifferencesClickEvent = EventManager.RegisterRoutedEvent(
-            nameof(ViewDifferencesClick), RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(WadResultsTreeControl));
-
-        public event RoutedEventHandler ViewDifferencesClick
-        {
-            add { AddHandler(ViewDifferencesClickEvent, value); }
-            remove { RemoveHandler(ViewDifferencesClickEvent, value); }
-        }
-
         public WadResultsTreeControl()
         {
             InitializeComponent();
-            Loaded += WadResultsTreeControl_Loaded;
-            Unloaded += WadResultsTreeControl_Unloaded;
         }
 
         public void Cleanup()
         {
-            Loaded -= WadResultsTreeControl_Loaded;
-            Unloaded -= WadResultsTreeControl_Unloaded;
             resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
             searchTextBox.TextChanged -= SearchTextBox_TextChanged;
             resultsTreeView.ItemsSource = null;
-        }
-
-        private void WadResultsTreeControl_Loaded(object sender, RoutedEventArgs e)
-        {
-            resultsTreeView.SelectedItemChanged += ResultsTreeView_SelectedItemChanged;
-            searchTextBox.TextChanged += SearchTextBox_TextChanged;
-        }
-
-        private void WadResultsTreeControl_Unloaded(object sender, RoutedEventArgs e)
-        {
-            Cleanup();
+            ParentWindow = null;
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            SearchTextChanged?.Invoke(this, e);
+            ParentWindow?.HandleSearchTextChanged(searchTextBox.Text);
         }
 
         private void ResultsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            SelectedItemChanged?.Invoke(this, e);
+            ParentWindow?.HandleTreeSelectionChanged(e.NewValue);
         }
 
         private void ViewDifferences_Click(object sender, RoutedEventArgs e)
         {
-            RaiseEvent(new RoutedEventArgs(ViewDifferencesClickEvent, SelectedItem));
+            ParentWindow?.HandleViewDifferencesRequest();
         }
 
         public void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -89,7 +67,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void ContextMenu_Opened(object sender, RoutedEventArgs e)
         {
-            WadContextMenuOpening?.Invoke(this, e);
+            ParentWindow?.HandleTreeContextMenuOpening();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
