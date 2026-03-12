@@ -97,7 +97,21 @@ namespace AssetsManager.Services.Explorer.Tree
         {
             var selected = new List<FileSystemNodeModel>();
             FindMultiSelectedNodes(rootNodes, selected);
-            return selected.Count > 0 ? selected : (currentSelectedItem != null ? new List<FileSystemNodeModel> { currentSelectedItem } : selected);
+
+            if (selected.Count > 0)
+            {
+                // Si hay multi-selección, aseguramos que el ítem principal (SelectedItem) 
+                // también esté en la lista si no lo estaba ya.
+                if (currentSelectedItem != null && !selected.Contains(currentSelectedItem))
+                {
+                    // Lo insertamos al principio para que sea el "líder" de la selección
+                    selected.Insert(0, currentSelectedItem);
+                }
+                return selected;
+            }
+
+            // Si no hay multi-selección, devolvemos solo el seleccionado actual
+            return currentSelectedItem != null ? new List<FileSystemNodeModel> { currentSelectedItem } : new List<FileSystemNodeModel>();
         }
 
         private void FindMultiSelectedNodes(IEnumerable<FileSystemNodeModel> nodes, List<FileSystemNodeModel> result)
