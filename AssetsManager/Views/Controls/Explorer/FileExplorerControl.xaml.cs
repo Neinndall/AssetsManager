@@ -61,6 +61,9 @@ namespace AssetsManager.Views.Controls.Explorer
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
 
+        public string NewPbePath => NewLolPath ?? AppSettings.LolPbeDirectory;
+        public string OldPbePath => OldLolPath;
+
         public ObservableRangeCollection<FileSystemNodeModel> RootNodes => _viewModel.RootNodes;
 
         private readonly FileExplorerModel _viewModel;
@@ -639,18 +642,39 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void ViewChanges_Click(object sender, RoutedEventArgs e)
         {
-            if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null } selectedNode) return;
+            // Use the TreeUIManager to get ALL multi-selected nodes, or the current one if none
+            var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
+            
+            // Filter only those that actually HAVE a difference to show
+            var nodesWithDiff = selectedNodes.Where(n => n.ChunkDiff != null).ToList();
 
-            string oldPbePath = this.OldLolPath;
-            string newPbePath = this.NewLolPath;
-
-            if (_viewModel.IsBackupMode)
+            if (nodesWithDiff.Count > 1 && FilePreviewer != null)
             {
-                oldPbePath = null;
-                newPbePath = null;
+                await FilePreviewer.HandleBatchDiffRequestAsync(nodesWithDiff);
+                return;
             }
 
-            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _viewModel.IsBackupMode ? _backupJsonPath : null);
+            if (nodesWithDiff.Count == 1)
+            {
+                string oldPbePath = this.OldLolPath;
+                string newPbePath = this.NewLolPath;
+
+                if (_viewModel.IsBackupMode)
+                {
+                    oldPbePath = null;
+                    newPbePath = null;
+                }
+
+                await DiffViewService.ShowWadDiffAsync(nodesWithDiff[0].ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _viewModel.IsBackupMode ? _backupJsonPath : null);
+            }
+        }
+
+        public async void TriggerBatchDiff(List<FileSystemNodeModel> nodes)
+        {
+            if (FilePreviewer != null)
+            {
+                await FilePreviewer.HandleBatchDiffRequestAsync(nodes);
+            }
         }
 
         private void PinSelected_Click(object sender, RoutedEventArgs e)
@@ -811,7 +835,17 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (ViewChangesMenuItem is not null)
             {
-                ViewChangesMenuItem.IsEnabled = selectedNode.Status == DiffStatus.Modified;
+                var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
+                if (selectedNodes.Count > 1)
+                {
+                    ViewChangesMenuItem.Header = "View Selected Differences";
+                    ViewChangesMenuItem.IsEnabled = selectedNodes.Any(n => n.ChunkDiff != null);
+                }
+                else
+                {
+                    ViewChangesMenuItem.Header = "View Differences";
+                    ViewChangesMenuItem.IsEnabled = selectedNode.Status == DiffStatus.Modified || selectedNode.ChunkDiff != null;
+                }
             }
 
             if (AddToImageMergerMenuItem is not null)
