@@ -6,6 +6,7 @@
                 xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
                 xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
                 xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+                xmlns:local="clr-namespace:AssetsManager.Views.Dialogs"
                 xmlns:localUtils="clr-namespace:AssetsManager.Utils"
                 mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
                 HeaderTitle="Text Comparison" 
@@ -17,7 +18,14 @@
     <Window.InputBindings>
         <KeyBinding Command="{x:Static localUtils:ShortKeys.NextDifference}" Key="Down" Modifiers="Alt" />
         <KeyBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Key="Up" Modifiers="Alt" />
+        <KeyBinding Command="{x:Static localUtils:ShortKeys.NextFile}" Key="Right" Modifiers="Alt" />
+        <KeyBinding Command="{x:Static localUtils:ShortKeys.PreviousFile}" Key="Left" Modifiers="Alt" />
     </Window.InputBindings>
+
+    <Window.CommandBindings>
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.NextFile}" Executed="BtnNextFile_Click" />
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.PreviousFile}" Executed="BtnPrevFile_Click" />
+    </Window.CommandBindings>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -35,8 +43,11 @@
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <icons:MaterialIcon Kind="KeyboardOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
-                    <TextBlock Text="Alt + Up/Down: Prev/Next Difference" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                    <TextBlock Text="Alt + Up/Down: Prev/Next Diff" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
                     
+                    <icons:MaterialIcon Kind="KeyboardOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
+                    <TextBlock Text="Alt + Left/Right: Prev/Next File" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+
                     <icons:MaterialIcon Kind="MouseOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
                     <TextBlock Text="Sync Scroll: Locked" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                 </StackPanel>

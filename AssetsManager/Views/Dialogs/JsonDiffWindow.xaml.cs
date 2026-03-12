@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -49,8 +51,63 @@ namespace AssetsManager.Views.Dialogs
         // Used by DiffViewService when the file content is already processed and available in memory.
         public async Task LoadAndDisplayDiffAsync(string oldText, string newText, string oldFileName, string newFileName)
         {
+            JsonDiffControl.ViewModel.IsBatchMode = false;
             JsonDiffControl.Visibility = Visibility.Visible;
             await JsonDiffControl.LoadAndDisplayDiffAsync(oldText, newText, oldFileName, newFileName);
+        }
+
+        public async Task LoadAndDisplayBatchDiffAsync(
+            List<SerializableChunkDiff> items, 
+            int startIndex, 
+            string oldPbePath, 
+            string newPbePath,
+            Func<SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> loadDataFunc)
+        {
+            var vm = JsonDiffControl.ViewModel;
+            vm.BatchItems = items;
+            vm.OldPbePath = oldPbePath;
+            vm.NewPbePath = newPbePath;
+            vm.LoadDataFunc = loadDataFunc;
+            
+            vm.IsBatchMode = true;
+            vm.TotalFilesCount = items.Count;
+            vm.CurrentFileIndex = startIndex + 1;
+
+            await LoadCurrentBatchItemAsync();
+        }
+
+        private async Task LoadCurrentBatchItemAsync()
+        {
+            var vm = JsonDiffControl.ViewModel;
+            if (vm.BatchItems == null || vm.BatchItems.Count == 0 || vm.LoadDataFunc == null) return;
+
+            var currentItem = vm.BatchItems[vm.CurrentFileIndex - 1];
+            
+            var (oldText, newText) = await vm.LoadDataFunc(currentItem, vm.OldPbePath, vm.NewPbePath);
+            
+            await JsonDiffControl.LoadAndDisplayDiffAsync(oldText, newText, currentItem.OldPath, currentItem.NewPath);
+            JsonDiffControl.FocusFirstDifference();
+            JsonDiffControl.RefreshGuidePosition();
+        }
+
+        public async void BtnPrevFile_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = JsonDiffControl.ViewModel;
+            if (vm.CurrentFileIndex > 1)
+            {
+                vm.CurrentFileIndex--;
+                await LoadCurrentBatchItemAsync();
+            }
+        }
+
+        public async void BtnNextFile_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = JsonDiffControl.ViewModel;
+            if (vm.CurrentFileIndex < vm.TotalFilesCount)
+            {
+                vm.CurrentFileIndex++;
+                await LoadCurrentBatchItemAsync();
+            }
         }
     }
 }

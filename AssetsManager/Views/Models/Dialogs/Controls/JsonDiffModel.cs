@@ -1,5 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Models.Dialogs.Controls
 {
@@ -9,6 +13,11 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         private bool _isWordLevelDiff;
         private bool _hideUnchangedLines;
         private bool _isWordWrapEnabled;
+
+        // Batch Mode Properties
+        private bool _isBatchMode;
+        private int _currentFileIndex = 1;
+        private int _totalFilesCount = 1;
 
         public bool IsInlineMode
         {
@@ -33,6 +42,30 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             get => _isWordWrapEnabled;
             set { _isWordWrapEnabled = value; OnPropertyChanged(); }
         }
+
+        public bool IsBatchMode
+        {
+            get => _isBatchMode;
+            set { _isBatchMode = value; OnPropertyChanged(); }
+        }
+
+        public int CurrentFileIndex
+        {
+            get => _currentFileIndex;
+            set { _currentFileIndex = value; OnPropertyChanged(); }
+        }
+
+        public int TotalFilesCount
+        {
+            get => _totalFilesCount;
+            set { _totalFilesCount = value; OnPropertyChanged(); }
+        }
+
+        // Playlist data
+        public List<SerializableChunkDiff> BatchItems { get; set; }
+        public string OldPbePath { get; set; }
+        public string NewPbePath { get; set; }
+        public Func<SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> LoadDataFunc { get; set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
