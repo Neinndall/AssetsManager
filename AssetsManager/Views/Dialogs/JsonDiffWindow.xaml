@@ -22,11 +22,6 @@
         <KeyBinding Command="{x:Static localUtils:ShortKeys.PreviousFile}" Key="Left" Modifiers="Alt" />
     </Window.InputBindings>
 
-    <Window.CommandBindings>
-        <CommandBinding Command="{x:Static localUtils:ShortKeys.NextFile}" Executed="BtnNextFile_Click" />
-        <CommandBinding Command="{x:Static localUtils:ShortKeys.PreviousFile}" Executed="BtnPrevFile_Click" />
-    </Window.CommandBindings>
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>    <!-- 0: Main Content -->

@@ -173,6 +173,38 @@ namespace AssetsManager.Views.Dialogs.Controls
                 ParentWindow?.Close();
             }
         }
+
+        public async Task LoadAndDisplayBatchDiffAsync(
+            List<AssetsManager.Views.Models.Wad.SerializableChunkDiff> items,
+            int startIndex,
+            string oldPbePath,
+            string newPbePath,
+            Func<AssetsManager.Views.Models.Wad.SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> loadDataFunc)
+        {
+            ViewModel.BatchItems = items;
+            ViewModel.OldPbePath = oldPbePath;
+            ViewModel.NewPbePath = newPbePath;
+            ViewModel.LoadDataFunc = loadDataFunc;
+
+            ViewModel.IsBatchMode = true;
+            ViewModel.TotalFilesCount = items.Count;
+            ViewModel.CurrentFileIndex = startIndex + 1;
+
+            await LoadCurrentBatchItemAsync();
+        }
+
+        private async Task LoadCurrentBatchItemAsync()
+        {
+            if (ViewModel.BatchItems == null || ViewModel.BatchItems.Count == 0 || ViewModel.LoadDataFunc == null) return;
+
+            var currentItem = ViewModel.BatchItems[ViewModel.CurrentFileIndex - 1];
+
+            var (oldText, newText) = await ViewModel.LoadDataFunc(currentItem, ViewModel.OldPbePath, ViewModel.NewPbePath);
+
+            await LoadAndDisplayDiffAsync(oldText, newText, currentItem.OldPath, currentItem.NewPath);
+            FocusFirstDifference();
+            RefreshGuidePosition();
+        }
         #endregion
 
         #region View Logic
@@ -295,6 +327,16 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             PreviousDiffButton_Click(null, null);
         }
+
+        private void NextFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+        {
+            BtnNextFile_Click(null, null);
+        }
+
+        private void PreviousFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+        {
+            BtnPrevFile_Click(null, null);
+        }
         #endregion
 
         #region Event Handlers
@@ -340,14 +382,22 @@ namespace AssetsManager.Views.Dialogs.Controls
             DiffNavigationPanel?.NavigateToPreviousDifference(GetCurrentLineRobust(editor));
         }
 
-        private void BtnPrevFile_Click(object sender, RoutedEventArgs e)
+        public async void BtnPrevFile_Click(object sender, RoutedEventArgs e)
         {
-            ParentWindow?.BtnPrevFile_Click(sender, e);
+            if (ViewModel.CurrentFileIndex > 1)
+            {
+                ViewModel.CurrentFileIndex--;
+                await LoadCurrentBatchItemAsync();
+            }
         }
 
-        private void BtnNextFile_Click(object sender, RoutedEventArgs e)
+        public async void BtnNextFile_Click(object sender, RoutedEventArgs e)
         {
-            ParentWindow?.BtnNextFile_Click(sender, e);
+            if (ViewModel.CurrentFileIndex < ViewModel.TotalFilesCount)
+            {
+                ViewModel.CurrentFileIndex++;
+                await LoadCurrentBatchItemAsync();
+            }
         }
 
         private void WordLevelDiffButton_Click(object sender, RoutedEventArgs e)

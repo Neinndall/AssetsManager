@@ -13,6 +13,8 @@
     <UserControl.CommandBindings>
         <CommandBinding Command="{x:Static localUtils:ShortKeys.NextDifference}" Executed="NextDifference_Executed" />
         <CommandBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Executed="PreviousDifference_Executed" />
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.NextFile}" Executed="NextFile_Executed" />
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.PreviousFile}" Executed="PreviousFile_Executed" />
     </UserControl.CommandBindings>
 
     <Grid>

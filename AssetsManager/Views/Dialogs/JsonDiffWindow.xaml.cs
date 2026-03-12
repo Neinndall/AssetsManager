@@ -63,51 +63,7 @@ namespace AssetsManager.Views.Dialogs
             string newPbePath,
             Func<SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> loadDataFunc)
         {
-            var vm = JsonDiffControl.ViewModel;
-            vm.BatchItems = items;
-            vm.OldPbePath = oldPbePath;
-            vm.NewPbePath = newPbePath;
-            vm.LoadDataFunc = loadDataFunc;
-            
-            vm.IsBatchMode = true;
-            vm.TotalFilesCount = items.Count;
-            vm.CurrentFileIndex = startIndex + 1;
-
-            await LoadCurrentBatchItemAsync();
-        }
-
-        private async Task LoadCurrentBatchItemAsync()
-        {
-            var vm = JsonDiffControl.ViewModel;
-            if (vm.BatchItems == null || vm.BatchItems.Count == 0 || vm.LoadDataFunc == null) return;
-
-            var currentItem = vm.BatchItems[vm.CurrentFileIndex - 1];
-            
-            var (oldText, newText) = await vm.LoadDataFunc(currentItem, vm.OldPbePath, vm.NewPbePath);
-            
-            await JsonDiffControl.LoadAndDisplayDiffAsync(oldText, newText, currentItem.OldPath, currentItem.NewPath);
-            JsonDiffControl.FocusFirstDifference();
-            JsonDiffControl.RefreshGuidePosition();
-        }
-
-        public async void BtnPrevFile_Click(object sender, RoutedEventArgs e)
-        {
-            var vm = JsonDiffControl.ViewModel;
-            if (vm.CurrentFileIndex > 1)
-            {
-                vm.CurrentFileIndex--;
-                await LoadCurrentBatchItemAsync();
-            }
-        }
-
-        public async void BtnNextFile_Click(object sender, RoutedEventArgs e)
-        {
-            var vm = JsonDiffControl.ViewModel;
-            if (vm.CurrentFileIndex < vm.TotalFilesCount)
-            {
-                vm.CurrentFileIndex++;
-                await LoadCurrentBatchItemAsync();
-            }
+            await JsonDiffControl.LoadAndDisplayBatchDiffAsync(items, startIndex, oldPbePath, newPbePath, loadDataFunc);
         }
     }
 }
