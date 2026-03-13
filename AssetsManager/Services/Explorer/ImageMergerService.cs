@@ -29,10 +29,13 @@ namespace AssetsManager.Services.Explorer
 
         public void AddItem(ImageMergerItem item)
         {
-            if (Items.Any(i => i.Path == item.Path)) return;
-            
             Application.Current.Dispatcher.Invoke(() => {
-                Items.Add(item);
+                if (!Items.Any(i => i.Path == item.Path))
+                {
+                    Items.Add(item);
+                }
+                
+                // Always show the window even if the item was already present
                 ShowWindow();
             });
         }
@@ -66,12 +69,15 @@ namespace AssetsManager.Services.Explorer
 
                         if (bitmap != null)
                         {
-                            Items.Add(new ImageMergerItem
+                            if (!Items.Any(i => i.Path == filePath))
                             {
-                                Name = Path.GetFileName(filePath),
-                                Path = filePath,
-                                Image = bitmap
-                            });
+                                Items.Add(new ImageMergerItem
+                                {
+                                    Name = Path.GetFileName(filePath),
+                                    Path = filePath,
+                                    Image = bitmap
+                                });
+                            }
                         }
                     }
                     catch { }
@@ -174,17 +180,26 @@ namespace AssetsManager.Services.Explorer
 
         public void ShowWindow()
         {
-            if (_activeWindow != null && _activeWindow.IsLoaded)
-            {
-                _activeWindow.Activate();
-                if (_activeWindow.WindowState == WindowState.Minimized)
-                    _activeWindow.WindowState = WindowState.Normal;
-                return;
-            }
+            Application.Current.Dispatcher.Invoke(() => {
+                if (_activeWindow != null && _activeWindow.IsLoaded)
+                {
+                    // Ensure the window is visible and focused
+                    _activeWindow.Show();
+                    
+                    if (_activeWindow.WindowState == WindowState.Minimized)
+                        _activeWindow.WindowState = WindowState.Normal;
 
-            _activeWindow = _serviceProvider.GetRequiredService<ImageMergerWindow>();
-            _activeWindow.Owner = Application.Current.MainWindow;
-            _activeWindow.Show();
+                    _activeWindow.Activate();
+                    _activeWindow.Focus();
+                    return;
+                }
+
+                // If window doesn't exist or was destroyed, create a fresh one
+                _activeWindow = _serviceProvider.GetRequiredService<ImageMergerWindow>();
+                _activeWindow.Owner = Application.Current.MainWindow;
+                _activeWindow.Show();
+                _activeWindow.Activate();
+            });
         }
 
         public void Clear()

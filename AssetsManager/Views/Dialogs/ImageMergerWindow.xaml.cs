@@ -24,16 +24,16 @@ namespace AssetsManager.Views.Dialogs
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
             _imageMergerService.Items.CollectionChanged += OnItemsCollectionChanged;
             
-            this.Closed += OnWindowClosed;
+            this.Closing += OnWindowClosing;
             RequestRender();
         }
 
         private void OnItemsCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => RequestRender();
 
-        private void OnWindowClosed(object sender, EventArgs e)
+        private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
-            _imageMergerService.Items.CollectionChanged -= OnItemsCollectionChanged;
+            e.Cancel = true;
+            this.Hide();
         }
 
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
