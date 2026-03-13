@@ -812,6 +812,11 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode) return;
 
+            // Update ViewModel selection so it can calculate values
+            _viewModel.SelectedItem = selectedNode;
+            _viewModel.SelectedNodes = new ObservableCollection<FileSystemNodeModel>(
+                TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, selectedNode));
+
             if (ExtractMenuItem is not null)
             {
                 ExtractMenuItem.IsEnabled = _viewModel.IsWadMode;
@@ -835,17 +840,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (ViewChangesMenuItem is not null)
             {
-                var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
-                if (selectedNodes.Count > 1)
-                {
-                    ViewChangesMenuItem.Header = "View Selected Differences";
-                    ViewChangesMenuItem.IsEnabled = selectedNodes.Any(n => n.ChunkDiff != null);
-                }
-                else
-                {
-                    ViewChangesMenuItem.Header = "View Differences";
-                    ViewChangesMenuItem.IsEnabled = selectedNode.Status == DiffStatus.Modified || selectedNode.ChunkDiff != null;
-                }
+                // Leverage ViewModel logic but assign manually to the Header/IsEnabled
+                ViewChangesMenuItem.Header = _viewModel.ViewChangesHeader;
+                ViewChangesMenuItem.IsEnabled = _viewModel.CanViewChanges;
             }
 
             if (AddToImageMergerMenuItem is not null)
