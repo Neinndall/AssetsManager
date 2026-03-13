@@ -87,10 +87,17 @@ namespace AssetsManager.Views.Models.Explorer
             get
             {
                 if (SelectedNodes.Count > 1)
-                    return SelectedNodes.Any(n => n.ChunkDiff != null);
+                    return SelectedNodes.Any(n => n.ChunkDiff != null && !IsAudioDataBank(n.Name));
 
-                return SelectedItem?.Status == DiffStatus.Modified || SelectedItem?.ChunkDiff != null;
+                return (SelectedItem?.Status == DiffStatus.Modified || SelectedItem?.ChunkDiff != null) && !IsAudioDataBank(SelectedItem?.Name);
             }
+        }
+
+        private bool IsAudioDataBank(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            string lower = name.ToLowerInvariant();
+            return lower.EndsWith(".wpk") || (lower.EndsWith(".bnk") && lower.Contains("_audio"));
         }
 
         public ExplorerToolbarModel Toolbar
