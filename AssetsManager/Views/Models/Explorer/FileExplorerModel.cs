@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Explorer
@@ -87,17 +88,10 @@ namespace AssetsManager.Views.Models.Explorer
             get
             {
                 if (SelectedNodes.Count > 1)
-                    return SelectedNodes.Any(n => n.ChunkDiff != null && !IsAudioDataBank(n.Name));
+                    return SelectedNodes.Any(n => n.ChunkDiff != null && !SupportedFileTypes.IsAudioDataContainer(n.Name));
 
-                return (SelectedItem?.Status == DiffStatus.Modified || SelectedItem?.ChunkDiff != null) && !IsAudioDataBank(SelectedItem?.Name);
+                return (SelectedItem?.Status == DiffStatus.Modified || SelectedItem?.ChunkDiff != null) && !SupportedFileTypes.IsAudioDataContainer(SelectedItem?.Name);
             }
-        }
-
-        private bool IsAudioDataBank(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return false;
-            string lower = name.ToLowerInvariant();
-            return lower.EndsWith(".wpk") || (lower.EndsWith(".bnk") && lower.Contains("_audio"));
         }
 
         public ExplorerToolbarModel Toolbar

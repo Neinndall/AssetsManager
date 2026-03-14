@@ -194,7 +194,11 @@ namespace AssetsManager.Views.Dialogs
                 viewDiffMenuItem.IsEnabled = false;
                 if (ResultsTree.SelectedItem is SerializableChunkDiff diff && diff.Type == ChunkDiffType.Modified)
                 {
-                    viewDiffMenuItem.IsEnabled = true;
+                    // Filter out audio data containers that don't have diffable logical data
+                    if (!SupportedFileTypes.IsAudioDataContainer(diff.Path))
+                    {
+                        viewDiffMenuItem.IsEnabled = true;
+                    }
                 }
             }
         }
