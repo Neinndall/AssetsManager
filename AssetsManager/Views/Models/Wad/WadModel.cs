@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.IO;
 using System.Text.Json.Serialization;
 using LeagueToolkit.Core.Wad;
+using static System.IO.Path;
 
 namespace AssetsManager.Views.Models.Wad
 {
@@ -75,14 +75,14 @@ namespace AssetsManager.Views.Models.Wad
         public string Path => NewPath ?? OldPath;
 
         [JsonIgnore]
-        public string FileName => Path.GetFileName(Path);
+        public string FileName => GetFileName(Path);
 
         [JsonIgnore]
         public string DisplayPath
         {
             get
             {
-                string dir = Path.GetDirectoryName(Path);
+                string dir = GetDirectoryName(Path);
                 return string.IsNullOrEmpty(dir) ? "N/A" : dir;
             }
         }
