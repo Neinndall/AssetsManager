@@ -9,12 +9,11 @@ namespace AssetsManager.Views.Helpers
     public static class InteractionHelper
     {
         /// <summary>
-        /// Determines if the current key modifiers indicate a multi-selection intent.
+        /// Determines if the current key modifiers indicate a multi-selection intent (Control key).
         /// </summary>
         public static bool IsMultiSelectIntent()
         {
-            return Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || 
-                   Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+            return Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         }
 
         /// <summary>

@@ -68,16 +68,52 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
     }
 
-    public class WadGroupViewModel
+    public class WadGroupViewModel : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+        private bool _isSelected;
+        private bool _isMultiSelected;
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { if (_isSelected != value) { _isSelected = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsMultiSelected
+        {
+            get => _isMultiSelected;
+            set { if (_isMultiSelected != value) { _isMultiSelected = value; OnPropertyChanged(); } }
+        }
+
+        protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
         public string WadName { get; set; }
         public int DiffCount { get; set; }
         public string WadNameWithCount => $"{WadName} ({DiffCount})";
         public ObservableRangeCollection<DiffTypeGroupViewModel> Types { get; set; } = new ObservableRangeCollection<DiffTypeGroupViewModel>();
     }
 
-    public class DiffTypeGroupViewModel
+    public class DiffTypeGroupViewModel : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+        private bool _isSelected;
+        private bool _isMultiSelected;
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { if (_isSelected != value) { _isSelected = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsMultiSelected
+        {
+            get => _isMultiSelected;
+            set { if (_isMultiSelected != value) { _isMultiSelected = value; OnPropertyChanged(); } }
+        }
+
+        protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
         public ChunkDiffType Type { get; set; }
         public int DiffCount { get; set; }
         public string TypeNameWithCount => $"{Type} ({DiffCount})";

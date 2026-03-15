@@ -33,8 +33,53 @@ namespace AssetsManager.Views.Models.Dialogs
         private string _filterText = string.Empty;
         private int _totalDiffsCount = -1;
 
+        private SerializableChunkDiff _selectedItem;
+        private List<SerializableChunkDiff> _selectedNodes = new();
+
         // Sub-Models (Encapsulated responsibilities)
         public WadResultsTreeModel TreeModel { get; } = new WadResultsTreeModel();
+
+        public SerializableChunkDiff SelectedItem
+        {
+            get => _selectedItem;
+            set
+            {
+                if (_selectedItem != value)
+                {
+                    _selectedItem = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(ViewChangesHeader));
+                    OnPropertyChanged(nameof(CanViewChanges));
+                }
+            }
+        }
+
+        public List<SerializableChunkDiff> SelectedNodes
+        {
+            get => _selectedNodes;
+            set
+            {
+                _selectedNodes = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewChangesHeader));
+                OnPropertyChanged(nameof(CanViewChanges));
+            }
+        }
+
+        public string ViewChangesHeader => SelectedNodes.Count > 1 
+            ? "View Selected Differences" 
+            : "View Differences";
+
+        public bool CanViewChanges
+        {
+            get
+            {
+                if (SelectedNodes.Count > 1)
+                    return SelectedNodes.Any(d => d.Type == ChunkDiffType.Modified && !SupportedFileTypes.IsAudioDataContainer(d.Path));
+
+                return (SelectedItem?.Type == ChunkDiffType.Modified) && !SupportedFileTypes.IsAudioDataContainer(SelectedItem?.Path);
+            }
+        }
 
         private WadDiffDetailsModel _detailsModel;
         public WadDiffDetailsModel DetailsModel

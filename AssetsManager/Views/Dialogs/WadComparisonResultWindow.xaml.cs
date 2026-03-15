@@ -187,19 +187,34 @@ namespace AssetsManager.Views.Dialogs
             await _diffViewService.ShowWadDiffAsync(diff, _oldPbePath, _newPbePath, this, _sourceJsonPath);
         }
 
+        public async void HandleBatchViewDifferencesRequest(List<SerializableChunkDiff> diffs)
+        {
+            if (diffs == null || diffs.Count == 0) return;
+            
+            // Filter only modified items that are NOT audio data containers
+            var validDiffs = diffs.Where(d => d.Type == ChunkDiffType.Modified && !SupportedFileTypes.IsAudioDataContainer(d.Path)).ToList();
+            
+            if (validDiffs.Count > 1)
+            {
+                await _diffViewService.ShowBatchWadDiffAsync(validDiffs, 0, _oldPbePath, _newPbePath, this);
+            }
+            else if (validDiffs.Count == 1)
+            {
+                await _diffViewService.ShowWadDiffAsync(validDiffs[0], _oldPbePath, _newPbePath, this, _sourceJsonPath);
+            }
+        }
+
         public void HandleTreeContextMenuOpening()
         {
+            // Sync selection to ViewModel to trigger dynamic Header/IsEnabled updates
+            _viewModel.SelectedItem = ResultsTree.SelectedItem as SerializableChunkDiff;
+            _viewModel.SelectedNodes = ResultsTree.SelectedDiffs;
+
+            // Manually sync properties to the MenuItem (FileExplorer standard)
             if (ResultsTree.ViewDifferencesMenuItem is MenuItem viewDiffMenuItem)
             {
-                viewDiffMenuItem.IsEnabled = false;
-                if (ResultsTree.SelectedItem is SerializableChunkDiff diff && diff.Type == ChunkDiffType.Modified)
-                {
-                    // Filter out audio data containers that don't have diffable logical data
-                    if (!SupportedFileTypes.IsAudioDataContainer(diff.Path))
-                    {
-                        viewDiffMenuItem.IsEnabled = true;
-                    }
-                }
+                viewDiffMenuItem.Header = _viewModel.ViewChangesHeader;
+                viewDiffMenuItem.IsEnabled = _viewModel.CanViewChanges;
             }
         }
 
