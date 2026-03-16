@@ -25,11 +25,11 @@ namespace AssetsManager.Views
         private readonly CustomCameraController _cameraController;
         private bool _isMapGeometry = false;
         private ModelVisual3D _groundVisual;
-        private ModelVisual3D _skyVisual;
-
+        private readonly ModelVisual3D _skyVisual;
+        private readonly ChromaScannerService _chromaScannerService;
         private readonly AppSettings _appSettings;
 
-        public ViewerWindow(SknLoadingService sknLoadingService, ScoLoadingService scoLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService, AppSettings appSettings)
+        public ViewerWindow(SknLoadingService sknLoadingService, ScoLoadingService scoLoadingService, MapGeometryLoadingService mapGeometryLoadingService, LogService logService, CustomMessageBoxService customMessageBoxService, AppSettings appSettings, ChromaScannerService chromaScannerService)
         {
             InitializeComponent();
             _sknLoadingService = sknLoadingService;
@@ -38,6 +38,7 @@ namespace AssetsManager.Views
             _logService = logService;
             _customMessageBoxService = customMessageBoxService;
             _appSettings = appSettings;
+            _chromaScannerService = chromaScannerService;
             _cameraController = new CustomCameraController(ViewportControl.Viewport);
 
             // Inject services into controls
@@ -52,11 +53,40 @@ namespace AssetsManager.Views
             PanelControl.Viewport = ViewportControl;
             ViewportControl.Panel = PanelControl;
 
+            // Chroma Overlay Setup (v3.2.2.0)
+            ChromaSelectionOverlay.DataContext = new ChromaSelectionModel();
+            ChromaSelectionOverlay.ChromaSelected += OnChromaSelected;
+            ChromaSelectionOverlay.Cancelled += (s, e) => ChromaSelectionOverlay.Visibility = Visibility.Collapsed;
+
             // Scene events
             ViewportControl.SceneSetupRequested += SetupScene;
             ViewportControl.MapGeometryLoadRequested += OnMapGeometryLoadRequested;
             PanelControl.EmptyStateVisibilityChanged += OnEmptyStateVisibilityChanged;
             PanelControl.MainContentVisibilityChanged += OnMainContentVisibilityChanged;
+
+            // Special: Link Panel's Chroma Request to this Window
+            PanelControl.ChromaGalleryRequested += ShowChromaGallery;
+        }
+
+        private async void ShowChromaGallery(string skinsPath)
+        {
+            ChromaSelectionOverlay.Visibility = Visibility.Visible;
+            await ChromaSelectionOverlay.InitializeAsync(skinsPath);
+        }
+
+        private void OnChromaSelected(object sender, ChromaSkinModel skin)
+        {
+            ChromaSelectionOverlay.Visibility = Visibility.Collapsed;
+            var viewModel = ChromaSelectionOverlay.ViewModel;
+
+            if (!string.IsNullOrEmpty(viewModel.ModelPath))
+            {
+                PanelControl.ProcessModelLoading(viewModel.ModelPath, skin.TexturePath, true);
+            }
+            else
+            {
+                _customMessageBoxService.ShowWarning("Model Not Found", "Could not automatically find the .skn model for this skin folder. Please load it manually.", Window.GetWindow(this));
+            }
         }
 
         // Event handlers extraídos de lambdas
@@ -71,12 +101,18 @@ namespace AssetsManager.Views
             {
                 PanelControl.EmptyStateVisibilityChanged -= OnEmptyStateVisibilityChanged;
                 PanelControl.MainContentVisibilityChanged -= OnMainContentVisibilityChanged;
+                PanelControl.ChromaGalleryRequested -= ShowChromaGallery;
             }
 
             if (ViewportControl != null)
             {
                 ViewportControl.SceneSetupRequested -= SetupScene;
                 ViewportControl.MapGeometryLoadRequested -= OnMapGeometryLoadRequested;
+            }
+
+            if (ChromaSelectionOverlay != null)
+            {
+                ChromaSelectionOverlay.ChromaSelected -= OnChromaSelected;
             }
 
             // 2. Limpiar el controlador de la cámara
@@ -207,28 +243,15 @@ namespace AssetsManager.Views
 
         private void OpenChromaFile_Click(object sender, RoutedEventArgs e)
         {
-            _isMapGeometry = false;
-            DefaultEmptyStateContent.Visibility = Visibility.Visible;
-            LoadingStateContent.Visibility = Visibility.Collapsed;
-
-            var openFileDialog = new CommonOpenFileDialog
+            var folderBrowserDialog = new CommonOpenFileDialog
             {
-                Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
-                Title = "Select a skn file for the chroma"
+                IsFolderPicker = true,
+                Title = "Select the 'skins' folder of the character"
             };
 
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                var folderBrowserDialog = new CommonOpenFileDialog
-                {
-                    IsFolderPicker = true,
-                    Title = "Select the texture folder for the chroma"
-                };
-
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    PanelControl.ProcessModelLoading(openFileDialog.FileName, folderBrowserDialog.FileName, true);
-                }
+                ShowChromaGallery(folderBrowserDialog.FileName);
             }
         }
 

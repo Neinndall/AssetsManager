@@ -1,0 +1,132 @@
+<UserControl x:Class="AssetsManager.Views.Controls.Viewer.ChromaSelectionControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800">
+
+    <UserControl.Resources>
+        <!-- Chroma Card Template -->
+        <DataTemplate x:Key="ChromaCardTemplate">
+            <Border Margin="8" Width="140" Height="180" CornerRadius="12"
+                    Background="{StaticResource CardBackground}"
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                    Cursor="Hand" MouseLeftButtonDown="ChromaCard_MouseLeftButtonDown">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="BorderThickness" Value="2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>   <!-- Thumbnail -->
+                        <RowDefinition Height="Auto"/> <!-- Info -->
+                    </Grid.RowDefinitions>
+
+                    <!-- Preview Area -->
+                    <Border Grid.Row="0" Margin="10,10,10,5" CornerRadius="10" Background="{StaticResource SidebarBackground}">
+                        <Grid>
+                            <!-- Texture Preview -->
+                            <Border CornerRadius="10">
+                                <Border.Background>
+                                    <ImageBrush ImageSource="{Binding PreviewImage}" Stretch="UniformToFill"/>
+                                </Border.Background>
+                            </Border>
+
+                            <!-- Color Swatch Overlay (Bottom Right) -->
+                            <Border Width="24" Height="24" CornerRadius="12" 
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom" 
+                                    Margin="0,0,-5,-5" BorderBrush="{StaticResource BorderColor}" BorderThickness="2">
+                                <Border.Background>
+                                    <SolidColorBrush Color="{Binding SwatchColor}"/>
+                                </Border.Background>
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Opacity="0.5"/>
+                                </Border.Effect>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- Info Area -->
+                    <StackPanel Grid.Row="1" Margin="10,5,10,12" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" 
+                                   Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="CHROMA" FontSize="9" FontWeight="Black" 
+                                   Foreground="{StaticResource TextMuted}" Opacity="0.5" 
+                                   HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- Selected Indicator -->
+                    <materialIcons:MaterialIcon Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" 
+                                                Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Top" 
+                                                Margin="0,6,6,0" Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <materialIcons:MaterialIcon.Effect>
+                            <DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="Black" Opacity="0.5"/>
+                        </materialIcons:MaterialIcon.Effect>
+                    </materialIcons:MaterialIcon>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid Background="{StaticResource SidebarBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="*"/>    <!-- Gallery -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. Technical Header -->
+        <Border Grid.Row="0" Padding="24,20" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="4" Height="24" Background="{StaticResource AccentBrush}" CornerRadius="2" Margin="0,0,15,0"/>
+                    <StackPanel>
+                        <TextBlock Text="CHROMA SELECTION GALLERY" FontSize="16" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.7" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <Button HorizontalAlignment="Right" Style="{StaticResource SecondaryButton}" 
+                        Padding="15,0" Height="32" Click="CloseButton_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" Margin="0,0,8,0"/>
+                        <TextBlock Text="CANCEL SELECTION" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- 2. Chroma Grid -->
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding AvailableSkins}" ItemTemplate="{StaticResource ChromaCardTemplate}" Padding="16">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="Uniform" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- 3. Loading Overlay -->
+        <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" Opacity="0.9"
+                Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <materialIcons:MaterialIcon Kind="Sync" Width="48" Height="48" Foreground="{StaticResource AccentBrush}" Style="{StaticResource SpinningIconStyle}"/>
+                <TextBlock Text="ANALYZING CHARACTER SKINS..." FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,15,0,0" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

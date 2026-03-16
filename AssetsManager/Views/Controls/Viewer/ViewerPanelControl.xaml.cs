@@ -47,6 +47,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public event Action<Visibility> EmptyStateVisibilityChanged;
         public event Action<Visibility> MainContentVisibilityChanged;
+        public event Action<string> ChromaGalleryRequested;
 
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
 
@@ -156,24 +157,15 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void LoadChromaModelButton_Click(object sender, RoutedEventArgs e)
         {
-            var openFileDialog = new CommonOpenFileDialog
+            var folderBrowserDialog = new CommonOpenFileDialog
             {
-                Filters = { new CommonFileDialogFilter("SKN files", "*.skn"), new CommonFileDialogFilter("All files", "*.*") },
-                Title = "Select a skn file for the chroma"
+                IsFolderPicker = true,
+                Title = "Select the 'skins' folder of the character"
             };
 
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                var folderBrowserDialog = new CommonOpenFileDialog
-                {
-                    IsFolderPicker = true,
-                    Title = "Select the texture folder for the chroma"
-                };
-
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    ProcessModelLoading(openFileDialog.FileName, folderBrowserDialog.FileName, false);
-                }
+                ChromaGalleryRequested?.Invoke(folderBrowserDialog.FileName);
             }
         }
 
