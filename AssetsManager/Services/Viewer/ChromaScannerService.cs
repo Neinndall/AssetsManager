@@ -54,7 +54,9 @@ namespace AssetsManager.Services.Viewer
 
                         // Check if THIS specific directory has a .skn model
                         string localSkn = Directory.GetFiles(dir, "*.skn").FirstOrDefault();
-                        if (localSkn != null)
+                        bool hasOwnModel = localSkn != null;
+                        
+                        if (hasOwnModel)
                         {
                             lastFoundModelPath = localSkn;
                         }
@@ -64,6 +66,7 @@ namespace AssetsManager.Services.Viewer
                             Name = dirName.ToUpper(),
                             TexturePath = dir,
                             ModelPath = lastFoundModelPath, // Use the last found model (handles chromas)
+                            TypeText = hasOwnModel ? "SKIN" : "CHROMA",
                             IsSelected = false
                         };
 
@@ -96,17 +99,8 @@ namespace AssetsManager.Services.Viewer
                     _logService.LogError(ex, "Error scanning for chromas");
                 }
 
-                return skins; // Already ordered by NaturalStringComparer
+                return skins;
             });
-        }
-
-        // Helper for natural sorting (skin1, skin2, skin10 instead of skin1, skin10, skin2)
-        private class NaturalStringComparer : IComparer<string>
-        {
-            [System.Runtime.InteropServices.DllImport("shlwapi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
-            private static extern int StrCmpLogicalW(string x, string y);
-
-            public int Compare(string x, string y) => StrCmpLogicalW(x, y);
         }
 
         /// <summary>

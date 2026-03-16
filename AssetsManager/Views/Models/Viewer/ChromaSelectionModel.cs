@@ -15,6 +15,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isSelected;
         private string _name;
         private string _texturePath;
+        private string _modelPath;
         private Color _swatchColor = Colors.Transparent;
         private ImageSource _previewImage;
 
@@ -35,6 +36,8 @@ namespace AssetsManager.Views.Models.Viewer
             get => _modelPath;
             set { _modelPath = value; OnPropertyChanged(); }
         }
+
+        public string TypeText { get; set; } = "SKIN";
 
         public Color SwatchColor
         {
