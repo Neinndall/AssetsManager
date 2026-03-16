@@ -30,6 +30,12 @@ namespace AssetsManager.Views.Models.Viewer
             set { _texturePath = value; OnPropertyChanged(); }
         }
 
+        public string ModelPath
+        {
+            get => _modelPath;
+            set { _modelPath = value; OnPropertyChanged(); }
+        }
+
         public Color SwatchColor
         {
             get => _swatchColor;
@@ -61,7 +67,7 @@ namespace AssetsManager.Views.Models.Viewer
     public class ChromaSelectionModel : INotifyPropertyChanged
     {
         private bool _isLoading;
-        private string _statusText = "Scanning for available chromas...";
+        private string _statusText = "Ready to scan.";
         private ChromaSkinModel _selectedSkin;
         private string _modelPath;
 
@@ -70,13 +76,13 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsLoading
         {
             get => _isLoading;
-            set { _isLoading = value; OnPropertyChanged(); }
+            set { if (_isLoading != value) { _isLoading = value; OnPropertyChanged(); } }
         }
 
         public string StatusText
         {
             get => _statusText;
-            set { _statusText = value; OnPropertyChanged(); }
+            private set { if (_statusText != value) { _statusText = value; OnPropertyChanged(); } }
         }
 
         public ChromaSkinModel SelectedSkin
@@ -97,7 +103,34 @@ namespace AssetsManager.Views.Models.Viewer
         public string ModelPath
         {
             get => _modelPath;
-            set { _modelPath = value; OnPropertyChanged(); }
+            set { if (_modelPath != value) { _modelPath = value; OnPropertyChanged(); } }
+        }
+
+        // --- State Management Methods (v3.2.2.0) ---
+
+        public void SetScanningState(string folderName)
+        {
+            IsLoading = true;
+            AvailableSkins.Clear();
+            StatusText = $"Scanning character skins in: {folderName.ToUpper()}";
+        }
+
+        public void SetEmptyState()
+        {
+            IsLoading = false;
+            StatusText = "No skins or textures found in this directory.";
+        }
+
+        public void SetSuccessState(int count)
+        {
+            IsLoading = false;
+            StatusText = $"Found {count} available skins/chromas.";
+        }
+
+        public void SetErrorState(string message)
+        {
+            IsLoading = false;
+            StatusText = $"Error: {message}";
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

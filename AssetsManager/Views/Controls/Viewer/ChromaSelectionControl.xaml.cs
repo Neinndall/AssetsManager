@@ -10,17 +10,24 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class ChromaSelectionControl : UserControl
     {
-        public ChromaSelectionModel ViewModel => DataContext as ChromaSelectionModel;
+        // Now using the shared ViewerPanelModel from the module
+        public ViewerPanelModel ViewModel => DataContext as ViewerPanelModel;
 
-        public event EventHandler<ChromaSkinModel> ChromaSelected;
-        public event EventHandler Cancelled;
+        // Internal list model for the gallery items (could be moved to ViewerPanelModel if needed)
+        // For now, we'll keep a dedicated model for the gallery logic to avoid bloating the panel model
+        private readonly ChromaSelectionModel _galleryData = new ChromaSelectionModel();
+        public ChromaSelectionModel GalleryData => _galleryData;
 
-        private readonly ChromaScannerService _scannerService;
+        // Dependency Injection via Property
+        public ChromaScannerService ScannerService { get; set; }
 
-        public ChromaSelectionControl(ChromaScannerService scannerService)
+        // Peer Reference
+        public ViewerPanelControl ParentPanel { get; set; }
+
+        public ChromaSelectionControl()
         {
             InitializeComponent();
-            _scannerService = scannerService;
+            // We don't set DataContext here anymore, it's injected from ViewerWindow.xaml
         }
 
         /// <summary>
@@ -28,37 +35,28 @@ namespace AssetsManager.Views.Controls.Viewer
         /// </summary>
         public async Task InitializeAsync(string skinsPath)
         {
-            if (ViewModel == null) return;
+            if (ScannerService == null) return;
 
-            ViewModel.IsLoading = true;
-            ViewModel.AvailableSkins.Clear();
-            ViewModel.StatusText = $"Scanning character skins in: {System.IO.Path.GetFileName(skinsPath)}";
+            _galleryData.SetScanningState(System.IO.Path.GetFileName(skinsPath));
 
             try
             {
-                // 1. Scan for skin directories
-                var skins = await _scannerService.ScanSkinsAsync(skinsPath);
-                ViewModel.AvailableSkins.ReplaceRange(skins);
-
-                // 2. Try to find the associated .skn model
-                ViewModel.ModelPath = _scannerService.FindAssociatedModel(skinsPath);
+                var skins = await ScannerService.ScanSkinsAsync(skinsPath);
+                _galleryData.AvailableSkins.ReplaceRange(skins);
+                _galleryData.ModelPath = ScannerService.FindAssociatedModel(skinsPath);
 
                 if (skins.Count == 0)
                 {
-                    ViewModel.StatusText = "No skins or textures found in this directory.";
+                    _galleryData.SetEmptyState();
                 }
                 else
                 {
-                    ViewModel.StatusText = $"Found {skins.Count} available skins/chromas.";
+                    _galleryData.SetSuccessState(skins.Count);
                 }
             }
             catch (Exception ex)
             {
-                ViewModel.StatusText = $"Error: {ex.Message}";
-            }
-            finally
-            {
-                ViewModel.IsLoading = false;
+                _galleryData.SetErrorState(ex.Message);
             }
         }
 
@@ -66,16 +64,19 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (sender is FrameworkElement element && element.DataContext is ChromaSkinModel skin)
             {
-                ViewModel.SelectedSkin = skin;
+                _galleryData.SelectedSkin = skin;
                 
-                // Fire selection event
-                ChromaSelected?.Invoke(this, skin);
+                // Direct Peer Call
+                ParentPanel?.HandleChromaSelected(skin);
             }
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            Cancelled?.Invoke(this, EventArgs.Empty);
+            if (ViewModel != null)
+            {
+                ViewModel.IsChromaGalleryVisible = false;
+            }
         }
     }
 }

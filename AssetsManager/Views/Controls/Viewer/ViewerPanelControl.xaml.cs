@@ -40,14 +40,16 @@ namespace AssetsManager.Views.Controls.Viewer
         public SknLoadingService SknLoadingService { get; set; }
         public ScoLoadingService ScoLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
+        public ChromaScannerService ChromaScannerService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
 
+        // Peer Controls (Direct communication v3.2.2.0)
         public ViewerViewportControl Viewport { get; set; }
+        public ChromaSelectionControl ChromaGallery { get; set; }
 
         public event Action<Visibility> EmptyStateVisibilityChanged;
         public event Action<Visibility> MainContentVisibilityChanged;
-        public event Action<string> ChromaGalleryRequested;
 
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
 
@@ -64,6 +66,19 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel = new ViewerPanelModel();
             DataContext = _viewModel;
 
+            // Link Model requests to UI events (v3.2.2.0)
+            _viewModel.MainContentRequested += () => 
+            {
+                EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
+                MainContentVisibilityChanged?.Invoke(Visibility.Visible);
+            };
+            
+            _viewModel.EmptyStateRequested += () => 
+            {
+                MainContentVisibilityChanged?.Invoke(Visibility.Collapsed);
+                EmptyStateVisibilityChanged?.Invoke(Visibility.Visible);
+            };
+
             ModelsListBox.ItemsSource = _loadedModels;
             AnimationsListBox.ItemsSource = _animationModels;
 
@@ -74,24 +89,21 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             ResetScene();
             Viewport = null;
+            ChromaGallery = null;
         }
 
         public void ResetScene()
         {
-            // 1. Limpiar animaciones (ahora se limpian con el Dispose de SceneModel)
-
-            // 2. CRÍTICO: Liberar recursos de TODOS los modelos
+            // 1. CRÍTICO: Liberar recursos de TODOS los modelos
             foreach (var model in _loadedModels)
             {
-                model?.Dispose();  // Libera texturas, geometrías y materiales
+                model?.Dispose();
             }
             _loadedModels.Clear();
             _transformData.Clear();
 
-            // 3. Limpiar referencias
             _currentlyPlayingAnimation = null;
 
-            // 4. Limpiar UI
             MeshesListBox.ItemsSource = null;
             _animationModels.Clear();
             ModelsListBox.SelectedItem = null;
@@ -110,9 +122,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (sender is Button button && button.Tag is SceneModel modelToDelete)
             {
-                // Liberar recursos del modelo antes de eliminarlo
                 modelToDelete?.Dispose();
-
                 _loadedModels.Remove(modelToDelete);
                 _transformData.Remove(modelToDelete);
                 Viewport?.RemoveModel(modelToDelete);
@@ -137,7 +147,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 var openFileDialog = new CommonOpenFileDialog
                 {
                     Filters = { 
-                        new CommonFileDialogFilter("SKN files", "*.skn"), 
+                        new CommonFileDialogFilter("3D Model Files", "*.skn"), 
                         new CommonFileDialogFilter("SCO/SCB files", "*.sco;*.scb"),
                         new CommonFileDialogFilter("All files", "*.*") 
                     },
@@ -165,7 +175,35 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                ChromaGalleryRequested?.Invoke(folderBrowserDialog.FileName);
+                HandleChromaGalleryRequest(folderBrowserDialog.FileName);
+            }
+        }
+
+        /// <summary>
+        /// Orchestrates the opening of the Chroma Gallery (v3.2.2.0).
+        /// </summary>
+        public async void HandleChromaGalleryRequest(string skinsPath)
+        {
+            if (ChromaGallery == null) return;
+            
+            ViewModel.IsChromaGalleryVisible = true;
+            await ChromaGallery.InitializeAsync(skinsPath);
+        }
+
+        /// <summary>
+        /// Handles the selection of a chroma from the gallery (v3.2.2.0).
+        /// </summary>
+        public void HandleChromaSelected(ChromaSkinModel skin)
+        {
+            ViewModel.IsChromaGalleryVisible = false;
+            
+            if (!string.IsNullOrEmpty(skin.ModelPath))
+            {
+                ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
+            }
+            else
+            {
+                CustomMessageBoxService.ShowWarning("Model Not Found", "Could not automatically find the .skn model for this skin folder.", Window.GetWindow(this));
             }
         }
 
@@ -214,7 +252,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
-                // Only try to load .skl for .skn files
                 if (extension == ".skn")
                 {
                     string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
@@ -230,8 +267,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (isInitialLoad)
                 {
                     Viewport?.HandleSceneSetupRequest();
-                    EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
-                    MainContentVisibilityChanged?.Invoke(Visibility.Visible);
+                    ViewModel.ShowMainContent(); // MVVM State Update
                 }
 
                 var transformData = new ViewerTransformData { Position = new Vector3D(0, SceneElements.GroundLevel, 0) };
@@ -245,7 +281,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 ModelsListBox.SelectedItem = newModel;
 
                 Viewport?.ResetCamera();
-
                 LoadAnimationButton.IsEnabled = true;
             }
         }
@@ -348,8 +383,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (newModel != null)
             {
                 Viewport?.HandleSceneSetupRequest();
-                EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
-                MainContentVisibilityChanged?.Invoke(Visibility.Visible);
+                ViewModel.ShowMainContent(); // MVVM State Update
 
                 Viewport?.AddModel(newModel);
                 MeshesListBox.ItemsSource = newModel.Parts;
@@ -362,7 +396,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _loadedModels.Add(newModel);
 
                 Viewport?.ResetCamera();
-
                 LoadModelButton.IsEnabled = false;
             }
         }
@@ -395,7 +428,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (_transformData.TryGetValue(selectedModel, out var transformData))
                 {
-                    // Update Sliders safely
                     PositionXSlider.Value = transformData.Position.X;
                     PositionYSlider.Value = transformData.Position.Y;
                     PositionZSlider.Value = transformData.Position.Z;
@@ -405,7 +437,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     ScaleSlider.Value = transformData.Scale;
                 }
 
-                // Reset locks
                 PositionXLock.IsChecked = false;
                 PositionYLock.IsChecked = false;
                 PositionZLock.IsChecked = false;
@@ -449,11 +480,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private void UpdateTransform(SceneModel model, ViewerTransformData data)
         {
             var transformGroup = new Transform3DGroup();
-
-            // Scale
             transformGroup.Children.Add(new ScaleTransform3D(data.Scale, data.Scale, data.Scale));
 
-            // Rotation
             var rotationX = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), data.Rotation.X));
             var rotationY = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), data.Rotation.Y));
             var rotationZ = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), data.Rotation.Z));
@@ -461,9 +489,7 @@ namespace AssetsManager.Views.Controls.Viewer
             transformGroup.Children.Add(rotationY);
             transformGroup.Children.Add(rotationZ);
 
-            // Position
             transformGroup.Children.Add(new TranslateTransform3D(data.Position.X, data.Position.Y, data.Position.Z));
-
             model.RootVisual.Transform = transformGroup;
         }
 
@@ -489,55 +515,29 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ResetPosition_Click(object sender, RoutedEventArgs e)
         {
-            if (PositionXLock.IsChecked == false)
-            {
-                PositionXSlider.Value = 0;
-            }
-            if (PositionYLock.IsChecked == false)
-            {
-                PositionYSlider.Value = SceneElements.GroundLevel;
-            }
-            if (PositionZLock.IsChecked == false)
-            {
-                PositionZSlider.Value = 0;
-            }
+            if (PositionXLock.IsChecked == false) PositionXSlider.Value = 0;
+            if (PositionYLock.IsChecked == false) PositionYSlider.Value = SceneElements.GroundLevel;
+            if (PositionZLock.IsChecked == false) PositionZSlider.Value = 0;
         }
 
         private void ResetRotation_Click(object sender, RoutedEventArgs e)
         {
-            if (RotationXLock.IsChecked == false)
-            {
-                RotationXSlider.Value = 0;
-            }
-            if (RotationYLock.IsChecked == false)
-            {
-                RotationYSlider.Value = 0;
-            }
-            if (RotationZLock.IsChecked == false)
-            {
-                RotationZSlider.Value = 0;
-            }
+            if (RotationXLock.IsChecked == false) RotationXSlider.Value = 0;
+            if (RotationYLock.IsChecked == false) RotationYSlider.Value = 0;
+            if (RotationZLock.IsChecked == false) RotationZSlider.Value = 0;
         }
 
         private void ResetScale_Click(object sender, RoutedEventArgs e)
         {
-            if (ScaleLock.IsChecked == false)
-            {
-                ScaleSlider.Value = 1;
-            }
+            if (ScaleLock.IsChecked == false) ScaleSlider.Value = 1;
         }
 
         public void ApplyAutoRotation(double angle)
         {
             if (_selectedModel != null && _transformData.TryGetValue(_selectedModel, out var transformData))
             {
-                var newRotationY = transformData.Rotation.Y + angle;
-                // Normalize the angle to be within -360 to 360
-                newRotationY %= 360;
+                var newRotationY = (transformData.Rotation.Y + angle) % 360;
                 transformData.Rotation = new Vector3D(transformData.Rotation.X, newRotationY, transformData.Rotation.Z);
-
-                // Update the slider, which will trigger the TransformSlider_ValueChanged event
-                // and update the visual transform.
                 RotationYSlider.Value = newRotationY;
             }
         }
@@ -545,10 +545,8 @@ namespace AssetsManager.Views.Controls.Viewer
         // STUDIO HANDLERS
         private void EnvironmentCheck_Changed(object sender, RoutedEventArgs e)
         {
-            // Safety check: Controls might be null during InitializeComponent
             if (TransparentBgCheck == null || ShowSkyboxCheck == null) return;
 
-            // Mutual exclusivity logic
             if (sender == TransparentBgCheck && TransparentBgCheck.IsChecked == true)
             {
                 ShowSkyboxCheck.IsChecked = false;
@@ -568,10 +566,7 @@ namespace AssetsManager.Views.Controls.Viewer
             bool isTransparent = TransparentBgCheck.IsChecked ?? false;
             bool showSkybox = ShowSkyboxCheck.IsChecked ?? true;
 
-            // TransparentBgCheck controls ground visibility
             Viewport.SetGroundVisibility(!isTransparent); 
-
-            // ShowSkyboxCheck directly controls skybox (mutual exclusivity logic ensures correctness)
             Viewport.SetSkyboxVisibility(showSkybox);
         }
 
@@ -591,23 +586,18 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void SnapshotButton_Click(object sender, RoutedEventArgs e)
         {
-            // Request 4K Snapshot (Scale 4.0)
             Viewport?.InitiateSnapshot(4.0);
         }
 
         private void ResetStudio_Click(object sender, RoutedEventArgs e)
         {
-            // Reset Sliders to Neutral
             FovSlider.Value = 45;
             LightRotationSlider.Value = 0;
             LightHeightSlider.Value = 0;
-            AmbientIntensitySlider.Value = 100; // Return to 100% (Normal mode)
-
-            // Reset Environment Toggles
+            AmbientIntensitySlider.Value = 100;
             TransparentBgCheck.IsChecked = false;
             ShowSkyboxCheck.IsChecked = true;
 
-            // Trigger Reset on Viewport and update visuals
             Viewport?.ResetStudioLighting();
             UpdateEnvironment();
         }

@@ -95,7 +95,7 @@
                     <Border Width="4" Height="24" Background="{StaticResource AccentBrush}" CornerRadius="2" Margin="0,0,15,0"/>
                     <StackPanel>
                         <TextBlock Text="CHROMA SELECTION GALLERY" FontSize="16" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.7" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding GalleryData.StatusText, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.7" Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
 
@@ -111,7 +111,10 @@
 
         <!-- 2. Chroma Grid -->
         <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding AvailableSkins}" ItemTemplate="{StaticResource ChromaCardTemplate}" Padding="16">
+            <ItemsControl ItemsSource="{Binding GalleryData.AvailableSkins, RelativeSource={RelativeSource AncestorType=UserControl}}" 
+                          ItemTemplate="{StaticResource ChromaCardTemplate}" 
+                          Padding="16"
+                          ScrollViewer.CanContentScroll="True">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="Uniform" />
@@ -122,7 +125,7 @@
 
         <!-- 3. Loading Overlay -->
         <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" Opacity="0.9"
-                Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                Visibility="{Binding GalleryData.IsLoading, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                 <materialIcons:MaterialIcon Kind="Sync" Width="48" Height="48" Foreground="{StaticResource AccentBrush}" Style="{StaticResource SpinningIconStyle}"/>
                 <TextBlock Text="ANALYZING CHARACTER SKINS..." FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,15,0,0" HorizontalAlignment="Center"/>

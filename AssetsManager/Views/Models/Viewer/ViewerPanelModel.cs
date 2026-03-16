@@ -4,12 +4,24 @@ using Material.Icons;
 
 namespace AssetsManager.Views.Models.Viewer
 {
+    /// <summary>
+    /// Master ViewModel for the Viewer Panel.
+    /// Orchestrates the sidebar logic and model-specific states.
+    /// </summary>
     public class ViewerPanelModel : INotifyPropertyChanged
     {
         private bool _isMapMode;
         private string _loadButtonText = "Model";
         private string _loadButtonTooltip = "Load Model";
         private MaterialIconKind _loadButtonIcon = MaterialIconKind.CubeOutline;
+
+        // --- UI State Properties (v3.2.2.0) ---
+        private bool _isChromaGalleryVisible = false;
+        public bool IsChromaGalleryVisible
+        {
+            get => _isChromaGalleryVisible;
+            set { if (_isChromaGalleryVisible != value) { _isChromaGalleryVisible = value; OnPropertyChanged(); } }
+        }
 
         public bool IsMapMode
         {
@@ -59,6 +71,24 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
+        /// <summary>
+        /// Switches the UI to the 3D Viewer mode (Viewport + Panel).
+        /// </summary>
+        public void ShowMainContent()
+        {
+            MainContentRequested?.Invoke();
+        }
+
+        /// <summary>
+        /// Switches the UI to the Empty/Landing state.
+        /// </summary>
+        public void ShowEmptyState()
+        {
+            EmptyStateRequested?.Invoke();
+        }
+
+        public event System.Action MainContentRequested;
+        public event System.Action EmptyStateRequested;
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

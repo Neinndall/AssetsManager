@@ -26,6 +26,7 @@ namespace AssetsManager.Services.Viewer
 
         /// <summary>
         /// Scans a directory for subdirectories containing textures (.tex) and links them to a model.
+        /// Implements a sequential look-back strategy for chromas sharing a parent skin model.
         /// </summary>
         public async Task<List<ChromaSkinModel>> ScanSkinsAsync(string rootPath)
         {
@@ -36,8 +37,12 @@ namespace AssetsManager.Services.Viewer
                 {
                     if (!Directory.Exists(rootPath)) return skins;
 
-                    // 1. Get all subdirectories (skins/skin0, skin1, etc.)
-                    string[] subDirs = Directory.GetDirectories(rootPath);
+                    // 1. Get all subdirectories and sort them (base, skin01, skin02...)
+                    string[] subDirs = Directory.GetDirectories(rootPath)
+                                                .OrderBy(d => d)
+                                                .ToArray();
+
+                    string lastFoundModelPath = null;
 
                     foreach (var dir in subDirs)
                     {
@@ -47,10 +52,18 @@ namespace AssetsManager.Services.Viewer
                         string[] texFiles = Directory.GetFiles(dir, "*.tex");
                         if (texFiles.Length == 0) continue;
 
+                        // Check if THIS specific directory has a .skn model
+                        string localSkn = Directory.GetFiles(dir, "*.skn").FirstOrDefault();
+                        if (localSkn != null)
+                        {
+                            lastFoundModelPath = localSkn;
+                        }
+
                         var skinModel = new ChromaSkinModel
                         {
                             Name = dirName.ToUpper(),
                             TexturePath = dir,
+                            ModelPath = lastFoundModelPath, // Use the last found model (handles chromas)
                             IsSelected = false
                         };
 
@@ -83,8 +96,17 @@ namespace AssetsManager.Services.Viewer
                     _logService.LogError(ex, "Error scanning for chromas");
                 }
 
-                return skins.OrderBy(s => s.Name).ToList();
+                return skins; // Already ordered by NaturalStringComparer
             });
+        }
+
+        // Helper for natural sorting (skin1, skin2, skin10 instead of skin1, skin10, skin2)
+        private class NaturalStringComparer : IComparer<string>
+        {
+            [System.Runtime.InteropServices.DllImport("shlwapi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+            private static extern int StrCmpLogicalW(string x, string y);
+
+            public int Compare(string x, string y) => StrCmpLogicalW(x, y);
         }
 
         /// <summary>
