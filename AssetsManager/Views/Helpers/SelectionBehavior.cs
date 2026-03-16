@@ -189,7 +189,14 @@ namespace AssetsManager.Views.Helpers
         {
             while (obj != null && obj is not T)
             {
-                obj = VisualTreeHelper.GetParent(obj);
+                if (obj is Visual || obj is System.Windows.Media.Media3D.Visual3D)
+                {
+                    obj = VisualTreeHelper.GetParent(obj);
+                }
+                else
+                {
+                    obj = LogicalTreeHelper.GetParent(obj);
+                }
             }
             return obj as T;
         }
