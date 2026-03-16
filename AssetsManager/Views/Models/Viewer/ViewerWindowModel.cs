@@ -9,16 +9,9 @@ namespace AssetsManager.Views.Models.Viewer
     /// </summary>
     public class ViewerWindowModel : INotifyPropertyChanged
     {
-        private bool _isMainContentVisible = false;
         private bool _isLoadingVisible = false;
         private string _loadingTitle = "Loading...";
         private string _loadingDescription = "Please wait.";
-
-        public bool IsMainContentVisible
-        {
-            get => _isMainContentVisible;
-            set { if (_isMainContentVisible != value) { _isMainContentVisible = value; OnPropertyChanged(); } }
-        }
 
         public bool IsLoadingVisible
         {

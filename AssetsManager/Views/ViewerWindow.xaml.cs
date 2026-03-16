@@ -80,8 +80,6 @@ namespace AssetsManager.Views
             ChromaSelectionOverlay.ParentPanel = PanelControl;
 
             // 3. Subscription to direct UI state events (Standard pattern)
-            PanelControl.EmptyStateVisibilityChanged += (v) => _viewModel.IsMainContentVisible = (v != Visibility.Visible);
-            PanelControl.MainContentVisibilityChanged += (v) => _viewModel.IsMainContentVisible = (v == Visibility.Visible);
             ViewportControl.SceneSetupRequested += SetupScene;
             ViewportControl.MapGeometryLoadRequested += OnMapGeometryLoadRequested;
         }

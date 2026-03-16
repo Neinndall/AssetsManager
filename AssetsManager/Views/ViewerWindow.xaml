@@ -10,7 +10,7 @@
         <!-- CUERPO -->
         <Grid>
             <!-- LANDING PAGE / EMPTY STATE -->
-            <Grid x:Name="EmptyStatePanel" Visibility="{Binding IsMainContentVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+            <Grid x:Name="EmptyStatePanel" Visibility="{Binding ViewModel.IsMainContentVisible, ElementName=PanelControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     
                     <!-- Default Content (Buttons) -->
@@ -136,7 +136,7 @@
             </Grid>
 
             <!-- MAIN CONTENT (Viewport + Panel) -->
-            <Grid x:Name="MainContentGrid" Visibility="{Binding IsMainContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid x:Name="MainContentGrid" Visibility="{Binding ViewModel.IsMainContentVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>

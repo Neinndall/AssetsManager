@@ -17,10 +17,18 @@ namespace AssetsManager.Views.Models.Viewer
 
         // --- UI State Properties (v3.2.2.0) ---
         private bool _isChromaGalleryVisible = false;
+        private bool _isMainContentVisible = false;
+
         public bool IsChromaGalleryVisible
         {
             get => _isChromaGalleryVisible;
             set { if (_isChromaGalleryVisible != value) { _isChromaGalleryVisible = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsMainContentVisible
+        {
+            get => _isMainContentVisible;
+            set { if (_isMainContentVisible != value) { _isMainContentVisible = value; OnPropertyChanged(); } }
         }
 
         public bool IsMapMode
@@ -76,6 +84,7 @@ namespace AssetsManager.Views.Models.Viewer
         /// </summary>
         public void ShowMainContent()
         {
+            IsMainContentVisible = true;
             MainContentRequested?.Invoke();
         }
 
@@ -84,6 +93,7 @@ namespace AssetsManager.Views.Models.Viewer
         /// </summary>
         public void ShowEmptyState()
         {
+            IsMainContentVisible = false;
             EmptyStateRequested?.Invoke();
         }
 
