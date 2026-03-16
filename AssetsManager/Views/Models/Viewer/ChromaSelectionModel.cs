@@ -115,19 +115,19 @@ namespace AssetsManager.Views.Models.Viewer
         {
             IsLoading = true;
             AvailableSkins.Clear();
-            StatusText = $"Scanning character skins in: {folderName.ToUpper()}";
+            StatusText = $"Scanning chromas in: {folderName.ToUpper()}";
         }
 
         public void SetEmptyState()
         {
             IsLoading = false;
-            StatusText = "No skins or textures found in this directory.";
+            StatusText = "No chromas or textures found in this directory.";
         }
 
         public void SetSuccessState(int count)
         {
             IsLoading = false;
-            StatusText = $"Found {count} available skins/chromas.";
+            StatusText = $"Found {count} available chromas.";
         }
 
         public void SetErrorState(string message)

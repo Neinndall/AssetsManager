@@ -64,7 +64,7 @@
                     <StackPanel Grid.Row="1" Margin="10,5,10,12" HorizontalAlignment="Center">
                         <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" 
                                    Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding TypeText}" FontSize="9" FontWeight="Black" 
+                        <TextBlock Text="CHROMA" FontSize="9" FontWeight="Black" 
                                    Foreground="{StaticResource TextMuted}" Opacity="0.5" 
                                    HorizontalAlignment="Center" Margin="0,2,0,0"/>
                     </StackPanel>
@@ -94,7 +94,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Border Width="4" Height="24" Background="{StaticResource AccentBrush}" CornerRadius="2" Margin="0,0,15,0"/>
                     <StackPanel>
-                        <TextBlock Text="CHROMA SELECTION GALLERY" FontSize="16" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="CHROMA SELECTION" FontSize="16" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="{Binding GalleryData.StatusText, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.7" Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
@@ -128,7 +128,7 @@
                 Visibility="{Binding GalleryData.IsLoading, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                 <materialIcons:MaterialIcon Kind="Sync" Width="48" Height="48" Foreground="{StaticResource AccentBrush}" Style="{StaticResource SpinningIconStyle}"/>
-                <TextBlock Text="ANALYZING CHARACTER SKINS..." FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,15,0,0" HorizontalAlignment="Center"/>
+                <TextBlock Text="ANALYZING CHROMAS..." FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,15,0,0" HorizontalAlignment="Center"/>
             </StackPanel>
         </Border>
     </Grid>

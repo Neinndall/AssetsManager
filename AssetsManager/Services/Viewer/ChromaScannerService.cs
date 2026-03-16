@@ -61,37 +61,40 @@ namespace AssetsManager.Services.Viewer
                             lastFoundModelPath = localSkn;
                         }
 
-                        var skinModel = new ChromaSkinModel
+                        // 3. Only add to list if it's a CHROMA (inherits model, doesn't have its own)
+                        if (!hasOwnModel)
                         {
-                            Name = dirName.ToUpper(),
-                            TexturePath = dir,
-                            ModelPath = lastFoundModelPath, // Use the last found model (handles chromas)
-                            TypeText = hasOwnModel ? "SKIN" : "CHROMA",
-                            IsSelected = false
-                        };
-
-                        // 2. Extract a preview (Swatch) from the first texture found
-                        try
-                        {
-                            string primaryTex = texFiles.FirstOrDefault(f => f.Contains("_tx_cm") || f.Contains("_base"));
-                            if (primaryTex == null) primaryTex = texFiles[0];
-
-                            using (Stream stream = File.OpenRead(primaryTex))
+                            var skinModel = new ChromaSkinModel
                             {
-                                BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex");
-                                if (bitmap != null)
+                                Name = dirName.ToUpper(),
+                                TexturePath = dir,
+                                ModelPath = lastFoundModelPath,
+                                IsSelected = false
+                            };
+
+                            // Extract preview...
+                            try
+                            {
+                                string primaryTex = texFiles.FirstOrDefault(f => f.Contains("_tx_cm") || f.Contains("_base"));
+                                if (primaryTex == null) primaryTex = texFiles[0];
+
+                                using (Stream stream = File.OpenRead(primaryTex))
                                 {
-                                    skinModel.PreviewImage = bitmap;
-                                    skinModel.SwatchColor = ExtractDominantColor(bitmap);
+                                    BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex");
+                                    if (bitmap != null)
+                                    {
+                                        skinModel.PreviewImage = bitmap;
+                                        skinModel.SwatchColor = ExtractDominantColor(bitmap);
+                                    }
                                 }
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logService.LogWarning($"Could not extract preview for chroma {dirName}: {ex.Message}");
-                        }
+                            catch (Exception ex)
+                            {
+                                _logService.LogWarning($"Could not extract preview for chroma {dirName}: {ex.Message}");
+                            }
 
-                        skins.Add(skinModel);
+                            skins.Add(skinModel);
+                        }
                     }
                 }
                 catch (Exception ex)
