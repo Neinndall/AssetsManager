@@ -20,6 +20,9 @@ namespace AssetsManager.Views
     /// </summary>
     public partial class ViewerWindow : UserControl
     {
+        private readonly ViewerWindowModel _viewModel;
+        public ViewerWindowModel ViewModel => _viewModel;
+
         private readonly SknLoadingService _sknLoadingService;
         private readonly ScoLoadingService _scoLoadingService;
         private readonly MapGeometryLoadingService _mapGeometryLoadingService;
@@ -44,6 +47,9 @@ namespace AssetsManager.Views
         {
             InitializeComponent();
             
+            _viewModel = new ViewerWindowModel();
+            DataContext = _viewModel;
+
             _sknLoadingService = sknLoadingService;
             _scoLoadingService = scoLoadingService;
             _mapGeometryLoadingService = mapGeometryLoadingService;
@@ -74,53 +80,28 @@ namespace AssetsManager.Views
             ChromaSelectionOverlay.ParentPanel = PanelControl;
 
             // 3. Subscription to direct UI state events (Standard pattern)
-            PanelControl.EmptyStateVisibilityChanged += OnEmptyStateVisibilityChanged;
-            PanelControl.MainContentVisibilityChanged += OnMainContentVisibilityChanged;
+            PanelControl.EmptyStateVisibilityChanged += (v) => _viewModel.IsMainContentVisible = (v != Visibility.Visible);
+            PanelControl.MainContentVisibilityChanged += (v) => _viewModel.IsMainContentVisible = (v == Visibility.Visible);
             ViewportControl.SceneSetupRequested += SetupScene;
             ViewportControl.MapGeometryLoadRequested += OnMapGeometryLoadRequested;
         }
 
-        private void OnEmptyStateVisibilityChanged(Visibility visibility)
-        {
-            EmptyStatePanel.Visibility = visibility;
-            if (visibility == Visibility.Visible) MainContentGrid.Visibility = Visibility.Collapsed;
-        }
-
-        private void OnMainContentVisibilityChanged(Visibility visibility)
-        {
-            MainContentGrid.Visibility = visibility;
-            if (visibility == Visibility.Visible) EmptyStatePanel.Visibility = Visibility.Collapsed;
-        }
         private void OnMapGeometryLoadRequested() => OpenGeometryFile_Click(null, null);
 
         public void ShowLoading(string title, string description)
         {
-            DefaultEmptyStateContent.Visibility = Visibility.Collapsed;
-            LoadingStateContent.Visibility = Visibility.Visible;
-            LoadingTitleText.Text = title;
-            LoadingDescriptionText.Text = description;
+            _viewModel.LoadingTitle = title;
+            _viewModel.LoadingDescription = description;
+            _viewModel.IsLoadingVisible = true;
         }
 
         public void HideLoading()
         {
-            DefaultEmptyStateContent.Visibility = Visibility.Visible;
-            LoadingStateContent.Visibility = Visibility.Collapsed;
+            _viewModel.IsLoadingVisible = false;
         }
 
         public void CleanupResources()
         {
-            if (PanelControl != null)
-            {
-                PanelControl.EmptyStateVisibilityChanged -= OnEmptyStateVisibilityChanged;
-                PanelControl.MainContentVisibilityChanged -= OnMainContentVisibilityChanged;
-            }
-
-            if (ViewportControl != null)
-            {
-                ViewportControl.SceneSetupRequested -= SetupScene;
-                ViewportControl.MapGeometryLoadRequested -= OnMapGeometryLoadRequested;
-            }
-
             _cameraController?.Dispose();
             ViewportControl?.Cleanup();
 
@@ -128,24 +109,6 @@ namespace AssetsManager.Views
             if (_skyVisual != null) ViewportControl.Viewport.Children.Remove(_skyVisual);
 
             PanelControl?.Cleanup();
-        }
-
-        private void ViewportControl_MaximizeClicked(object sender, bool isMaximized)
-        {
-            if (isMaximized)
-            {
-                MainGridSplitter.Visibility = Visibility.Collapsed;
-                PanelControl.Visibility = Visibility.Collapsed;
-                Grid.SetColumnSpan(ViewportControl, 3);
-                ViewportControl.Margin = new Thickness(0, 0, 4, 0);
-            }
-            else
-            {
-                MainGridSplitter.Visibility = Visibility.Visible;
-                PanelControl.Visibility = Visibility.Visible;
-                Grid.SetColumnSpan(ViewportControl, 1);
-                ViewportControl.Margin = new Thickness(0);
-            }
         }
 
         private void SetupScene()

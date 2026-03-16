@@ -21,7 +21,7 @@
                 <!-- 3D VIEWPORT -->
                 <helix:HelixViewport3D x:Name="Viewport3D" 
                                        Background="Transparent"
-                                       ShowFrameRate="False"
+                                       ShowFrameRate="{Binding IsFpsVisible}"
                                        ShowCameraInfo="False"
                                        ShowViewCube="False"
                                        IsRotationEnabled="False"
@@ -55,7 +55,7 @@
                         Padding="16,8"
                         BorderBrush="{StaticResource BorderColor}"
                         BorderThickness="1"
-                        Visibility="{Binding IsChecked, ElementName=ToolbarToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        Visibility="{Binding IsToolbarVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Border.Effect>
                         <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="4" Opacity="0.3"/>
                     </Border.Effect>
@@ -65,9 +65,8 @@
                         <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
                                       x:Name="FpsToggleButton"
                                       ToolTip="Show/Hide FPS"
-                                      Click="FpsToggleButton_Click"
-                                      Width="32" Height="32"
-                                      IsChecked="False">
+                                      IsChecked="{Binding IsFpsVisible}"
+                                      Width="32" Height="32">
                             <materialIcons:MaterialIcon Kind="Speedometer" Width="16" Height="16"/>
                         </ToggleButton>
                         
@@ -84,9 +83,8 @@
                         <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
                                       x:Name="AutoRotateToggleButton"
                                       ToolTip="Auto-Rotate"
-                                      Click="AutoRotateToggleButton_Click"
-                                      Width="32" Height="32"
-                                      IsChecked="False">
+                                      IsChecked="{Binding IsAutoRotateActive}"
+                                      Width="32" Height="32">
                             <materialIcons:MaterialIcon Kind="Autorenew" Width="16" Height="16"/>
                         </ToggleButton>
                         
@@ -106,9 +104,8 @@
                         <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
                                       x:Name="MaximizeToggleButton"
                                       ToolTip="Maximize/Restore Viewport"
-                                      Click="MaximizeToggleButton_Click"
-                                      Width="32" Height="32"
-                                      IsChecked="False">
+                                      IsChecked="{Binding IsMaximized}"
+                                      Width="32" Height="32">
                             <materialIcons:MaterialIcon Kind="AspectRatio" Width="16" Height="16"/>
                         </ToggleButton>
                     </StackPanel>
@@ -116,7 +113,7 @@
 
                 <!-- TOOLBAR TOGGLE FAB -->
                 <ToggleButton x:Name="ToolbarToggle"
-                              IsChecked="False"
+                              IsChecked="{Binding IsToolbarVisible}"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom"
                               Margin="0,0,24,24"

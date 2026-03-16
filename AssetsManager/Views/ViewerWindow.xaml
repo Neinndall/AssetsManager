@@ -10,11 +10,11 @@
         <!-- CUERPO -->
         <Grid>
             <!-- LANDING PAGE / EMPTY STATE -->
-            <Grid x:Name="EmptyStatePanel" Visibility="Visible">
+            <Grid x:Name="EmptyStatePanel" Visibility="{Binding IsMainContentVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     
                     <!-- Default Content (Buttons) -->
-                    <StackPanel x:Name="DefaultEmptyStateContent" Visibility="Visible">
+                    <StackPanel x:Name="DefaultEmptyStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <!-- HERO HEADER: Centered Model -->
                         <StackPanel Margin="0,0,0,32" HorizontalAlignment="Center">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
@@ -104,7 +104,7 @@
                     </StackPanel>
                     
                     <!-- Loading Indicator (Enhanced) -->
-                    <Grid x:Name="LoadingStateContent" Visibility="Collapsed" Margin="0">
+                    <Grid x:Name="LoadingStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                             <!-- Animated Spinner (Explorer Style) -->
                             <materialIcons:MaterialIcon Kind="Sync" 
@@ -115,7 +115,7 @@
 
                             <!-- Title -->
                             <TextBlock x:Name="LoadingTitleText"
-                                       Text="Loading MapGeometry..."
+                                       Text="{Binding LoadingTitle}"
                                        FontSize="24"
                                        FontWeight="Bold"
                                        Foreground="{StaticResource TextPrimary}"
@@ -124,7 +124,7 @@
 
                             <!-- Description -->
                             <TextBlock x:Name="LoadingDescriptionText"
-                                       Text="Processing geometry and resizing textures."
+                                       Text="{Binding LoadingDescription}"
                                        FontSize="14"
                                        Foreground="{StaticResource TextSecondary}"
                                        HorizontalAlignment="Center"
@@ -136,7 +136,7 @@
             </Grid>
 
             <!-- MAIN CONTENT (Viewport + Panel) -->
-            <Grid x:Name="MainContentGrid" Visibility="Collapsed">
+            <Grid x:Name="MainContentGrid" Visibility="{Binding IsMainContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -144,7 +144,20 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Column 0: Viewport -->
-                <viewer:ViewerViewportControl Grid.Column="0" x:Name="ViewportControl" MaximizeClicked="ViewportControl_MaximizeClicked"/>
+                <viewer:ViewerViewportControl Grid.Column="0" x:Name="ViewportControl">
+                    <viewer:ViewerViewportControl.Style>
+                        <Style TargetType="viewer:ViewerViewportControl">
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="Grid.ColumnSpan" Value="1"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
+                                    <Setter Property="Grid.ColumnSpan" Value="3"/>
+                                    <Setter Property="Margin" Value="0,0,4,0"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </viewer:ViewerViewportControl.Style>
+                </viewer:ViewerViewportControl>
 
                 <!-- Column 1: Splitter -->
                 <GridSplitter Grid.Column="1"
@@ -154,11 +167,14 @@
                               Width="4"
                               Background="Transparent"
                               ResizeBehavior="PreviousAndNext"
-                              ResizeDirection="Columns"/>
+                              ResizeDirection="Columns"
+                              Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
                 
                 <!-- Column 2: Controls Panel -->
-                <viewer:ViewerPanelControl Grid.Column="2" x:Name="PanelControl"/>
+                <viewer:ViewerPanelControl Grid.Column="2" x:Name="PanelControl"
+                                           Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
             </Grid>
+
 
             <!-- CHROMA SELECTION OVERLAY (v3.2.2.0) -->
             <viewer:ChromaSelectionControl x:Name="ChromaSelectionOverlay" 

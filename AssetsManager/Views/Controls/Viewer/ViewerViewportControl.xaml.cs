@@ -22,12 +22,14 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class ViewerViewportControl : UserControl
     {
+        private readonly ViewerViewportModel _viewModel;
+        public ViewerViewportModel ViewModel => _viewModel;
+
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
         public ViewerPanelControl Panel { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
-        public event EventHandler<bool> MaximizeClicked;
         public event Action SceneSetupRequested;
         public event Action MapGeometryLoadRequested;
 
@@ -36,7 +38,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private AnimationPlayer _animationPlayer;
         private DateTime _lastFrameTime;
 
-        private bool _isAutoRotating = false;
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
 
         private SceneModel _activeSceneModel;
@@ -50,6 +51,17 @@ namespace AssetsManager.Views.Controls.Viewer
         public ViewerViewportControl()
         {
             InitializeComponent();
+
+            _viewModel = new ViewerViewportModel();
+            DataContext = _viewModel;
+
+            _viewModel.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(ViewerViewportModel.IsAutoRotateActive))
+                {
+                    HandleAutoRotateChanged(_viewModel.IsAutoRotateActive);
+                }
+            };
 
             Loaded += (s, e) =>
             {
@@ -162,11 +174,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _loadedModels.Clear();
             _activeSceneModel = null;
             
-            if (AutoRotateToggleButton != null)
-            {
-                AutoRotateToggleButton.IsChecked = false;
-            }
-            _isAutoRotating = false;
+            _viewModel.IsAutoRotateActive = false;
             ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
 
             _skeletonVisual.Points?.Clear();
@@ -184,7 +192,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == _activeSceneModel)
             {
-                if (_isAutoRotating)
+                if (_viewModel.IsAutoRotateActive)
                 {
                     var transformGroup = model.RootVisual.Transform as Transform3DGroup;
                     if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
@@ -204,7 +212,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SetActiveModel(SceneModel model)
         {
-            if (_isAutoRotating && _activeSceneModel != null)
+            if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
             {
                 var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
                 if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
@@ -222,7 +230,7 @@ namespace AssetsManager.Views.Controls.Viewer
             var deltaTime = (now - _lastFrameTime).TotalSeconds;
             _lastFrameTime = now;
 
-            if (_isAutoRotating && _activeSceneModel != null)
+            if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
             {
                 var transform = _activeSceneModel.RootVisual.Transform;
                 Transform3DGroup transformGroup;
@@ -489,36 +497,16 @@ namespace AssetsManager.Views.Controls.Viewer
             InitiateSnapshot(1.0);
         }
 
-        private void FpsToggleButton_Click(object sender, RoutedEventArgs e)
+        private void HandleAutoRotateChanged(bool isAutoRotating)
         {
-            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            if (!isAutoRotating && _activeSceneModel != null)
             {
-                Viewport3D.ShowFrameRate = toggleButton.IsChecked ?? false;
-            }
-        }
-
-        private void MaximizeToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
-            {
-                MaximizeClicked?.Invoke(this, toggleButton.IsChecked ?? false);
-            }
-        }
-
-        private void AutoRotateToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
-            {
-                _isAutoRotating = toggleButton.IsChecked ?? false;
-                if (!_isAutoRotating && _activeSceneModel != null)
+                var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
+                if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
                 {
-                    var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
-                    if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
-                    {
-                        Panel?.ApplyAutoRotation(((AxisAngleRotation3D)_autoRotation.Rotation).Angle);
-                        transformGroup.Children.Remove(_autoRotation);
-                        ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
-                    }
+                    Panel?.ApplyAutoRotation(((AxisAngleRotation3D)_autoRotation.Rotation).Angle);
+                    transformGroup.Children.Remove(_autoRotation);
+                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                 }
             }
         }
