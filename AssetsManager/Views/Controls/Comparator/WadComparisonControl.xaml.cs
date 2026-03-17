@@ -20,15 +20,7 @@ namespace AssetsManager.Views.Controls.Comparator
         public WadComparatorService WadComparatorService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
-        public DirectoriesCreator DirectoriesCreator { get; set; }
-        public AssetDownloader AssetDownloaderService { get; set; }
-        public WadDifferenceService WadDifferenceService { get; set; }
-        public WadPackagingService WadPackagingService { get; set; }
-        public BackupManager BackupManager { get; set; }
         public AppSettings AppSettings { get; set; }
-        public IServiceProvider ServiceProvider { get; set; }
-        public DiffViewService DiffViewService { get; set; }
-        public HashResolverService HashResolverService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
 
         public WadComparisonModel ViewModel => DataContext as WadComparisonModel;
