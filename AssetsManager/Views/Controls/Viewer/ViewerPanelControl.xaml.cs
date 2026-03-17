@@ -58,13 +58,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public ViewerPanelControl()
         {
-            InitializeComponent();
-            
             _viewModel = new ViewerPanelModel();
             DataContext = _viewModel;
 
-            // Link Model requests to UI events
+            InitializeComponent();
+
             _viewModel.MainContentRequested += () => 
+ 
             {
                 EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
                 MainContentVisibilityChanged?.Invoke(Visibility.Visible);
@@ -101,7 +101,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _currentlyPlayingAnimation = null;
 
-            MeshesListBox.ItemsSource = null;
+            _viewModel.SelectedModelParts = null; // MVVM Cleanup
             _viewModel.AnimationModels.Clear();
             _viewModel.SelectedModel = null;
 
@@ -408,7 +408,15 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ModelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (e.AddedItems.Count > 0 && e.AddedItems[0] is SceneModel selectedModel)
+            if (e.AddedItems.Count == 0)
+            {
+                _viewModel.SelectedModel = null;
+                _viewModel.SelectedModelParts = null;
+                _viewModel.AnimationModels.Clear();
+                return;
+            }
+
+            if (e.AddedItems[0] is SceneModel selectedModel)
             {
                 _viewModel.SelectedModel = selectedModel;
                 Viewport?.SetActiveModel(selectedModel);
@@ -447,7 +455,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void TransformSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_viewModel.SelectedModel == null || !_transformData.TryGetValue(_viewModel.SelectedModel, out var transformData))
+            if (_viewModel == null || _viewModel.SelectedModel == null || !_transformData.TryGetValue(_viewModel.SelectedModel, out var transformData))
             {
                 return;
             }

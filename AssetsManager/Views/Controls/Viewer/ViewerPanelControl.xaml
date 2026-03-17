@@ -241,6 +241,7 @@
                 <Grid x:Name="MeshesPanel"
                       Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <ListBox x:Name="MeshesListBox" 
+                             ItemsSource="{Binding SelectedModelParts}"
                              Background="Transparent" 
                              BorderThickness="0"
                              VirtualizingStackPanel.IsVirtualizing="True"
