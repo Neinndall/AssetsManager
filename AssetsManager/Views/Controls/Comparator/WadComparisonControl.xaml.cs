@@ -1,17 +1,11 @@
 using System;
-using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Threading.Tasks;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Views.Models.Comparator;
 using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
-using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Views.Controls.Comparator
 {
