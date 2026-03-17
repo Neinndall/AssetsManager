@@ -51,12 +51,9 @@ namespace AssetsManager.Views.Controls.Viewer
         public event Action<Visibility> EmptyStateVisibilityChanged;
         public event Action<Visibility> MainContentVisibilityChanged;
 
-        public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
+        public ObservableRangeCollection<AnimationModel> AnimationModels => _viewModel.AnimationModels;
 
-        private readonly ObservableRangeCollection<SceneModel> _loadedModels = new();
-        private readonly ObservableRangeCollection<AnimationModel> _animationModels = new();
         private readonly Dictionary<SceneModel, ViewerTransformData> _transformData = new();
-        private SceneModel _selectedModel;
         private AnimationModel _currentlyPlayingAnimation;
 
         public ViewerPanelControl()
@@ -66,7 +63,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel = new ViewerPanelModel();
             DataContext = _viewModel;
 
-            // Link Model requests to UI events (v3.2.2.0)
+            // Link Model requests to UI events
             _viewModel.MainContentRequested += () => 
             {
                 EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
@@ -79,8 +76,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 EmptyStateVisibilityChanged?.Invoke(Visibility.Visible);
             };
 
-            ModelsListBox.ItemsSource = _loadedModels;
-            AnimationsListBox.ItemsSource = _animationModels;
+            ModelsListBox.ItemsSource = _viewModel.LoadedModels;
+            AnimationsListBox.ItemsSource = _viewModel.AnimationModels;
 
             Unloaded += (s, e) => Cleanup();
         }
@@ -95,18 +92,18 @@ namespace AssetsManager.Views.Controls.Viewer
         public void ResetScene()
         {
             // 1. CRÍTICO: Liberar recursos de TODOS los modelos
-            foreach (var model in _loadedModels)
+            foreach (var model in _viewModel.LoadedModels)
             {
                 model?.Dispose();
             }
-            _loadedModels.Clear();
+            _viewModel.LoadedModels.Clear();
             _transformData.Clear();
 
             _currentlyPlayingAnimation = null;
 
             MeshesListBox.ItemsSource = null;
-            _animationModels.Clear();
-            ModelsListBox.SelectedItem = null;
+            _viewModel.AnimationModels.Clear();
+            _viewModel.SelectedModel = null;
 
             LoadModelButton.IsEnabled = true;
             LoadChromaModelButton.IsEnabled = true;
@@ -123,11 +120,11 @@ namespace AssetsManager.Views.Controls.Viewer
             if (sender is Button button && button.Tag is SceneModel modelToDelete)
             {
                 modelToDelete?.Dispose();
-                _loadedModels.Remove(modelToDelete);
+                _viewModel.LoadedModels.Remove(modelToDelete);
                 _transformData.Remove(modelToDelete);
                 Viewport?.RemoveModel(modelToDelete);
 
-                if (_loadedModels.Count == 0)
+                if (_viewModel.LoadedModels.Count == 0)
                 {
                     ResetScene();
                     Viewport?.ResetScene();
@@ -147,7 +144,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 var openFileDialog = new CommonOpenFileDialog
                 {
                     Filters = { 
-                        new CommonFileDialogFilter("3D Model Files", "*.skn"), 
+                        new CommonFileDialogFilter("SKN files", "*.skn"), 
                         new CommonFileDialogFilter("SCO/SCB files", "*.sco;*.scb"),
                         new CommonFileDialogFilter("All files", "*.*") 
                     },
@@ -170,7 +167,7 @@ namespace AssetsManager.Views.Controls.Viewer
             var folderBrowserDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select the 'skins' folder of the character"
+                Title = "Select the skins folder of the character"
             };
 
             if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -180,7 +177,7 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         /// <summary>
-        /// Orchestrates the opening of the Chroma Gallery (v3.2.2.0).
+        /// Orchestrates the opening of the Chroma Gallery.
         /// </summary>
         public async void HandleChromaGalleryRequest(string skinsPath)
         {
@@ -214,16 +211,16 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void LoadSkeleton(string filePath)
         {
-            if (_selectedModel == null)
+            if (_viewModel.SelectedModel == null)
             {
                 CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model to associate the skeleton with.", Window.GetWindow(this));
                 return;
             }
             using (var stream = File.OpenRead(filePath))
             {
-                _selectedModel.Skeleton = new RigResource(stream);
+                _viewModel.SelectedModel.Skeleton = new RigResource(stream);
             }
-            LogService.LogDebug($"Loaded skeleton: {Path.GetFileName(filePath)} for model {_selectedModel.Name}");
+            LogService.LogDebug($"Loaded skeleton: {Path.GetFileName(filePath)} for model {_viewModel.SelectedModel.Name}");
         }
 
         public void ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
@@ -275,9 +272,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 UpdateTransform(newModel, transformData);
 
                 Viewport?.AddModel(newModel);
-                MeshesListBox.ItemsSource = newModel.Parts;
+                _viewModel.SelectedModelParts = newModel.Parts;
 
-                _loadedModels.Add(newModel);
+                _viewModel.LoadedModels.Add(newModel);
+                _viewModel.SelectedModel = newModel;
                 ModelsListBox.SelectedItem = newModel;
 
                 Viewport?.ResetCamera();
@@ -287,12 +285,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void LoadAnimationButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedModel == null && _loadedModels.Count == 1)
+            if (_viewModel.SelectedModel == null && _viewModel.LoadedModels.Count == 1)
             {
                 ModelsListBox.SelectedIndex = 0;
             }
 
-            if (_selectedModel == null)
+            if (_viewModel.SelectedModel == null)
             {
                 CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
                 return;
@@ -316,13 +314,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void LoadAnimation(string filePath)
         {
-            if (_selectedModel == null)
+            if (_viewModel.SelectedModel == null)
             {
                 CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
                 return;
             }
 
-            if (_selectedModel.Skeleton == null)
+            if (_viewModel.SelectedModel.Skeleton == null)
             {
                 CustomMessageBoxService.ShowWarning("Missing Skeleton", "Please load a skeleton (.skl) file first.", Window.GetWindow(this));
                 return;
@@ -332,20 +330,20 @@ namespace AssetsManager.Views.Controls.Viewer
                 var animationAsset = AnimationAsset.Load(stream);
                 var animationName = Path.GetFileNameWithoutExtension(filePath);
 
-                if (!_animationModels.Any(a => a.Name == animationName))
+                if (!_viewModel.AnimationModels.Any(a => a.Name == animationName))
                 {
                     var animationData = new AnimationData { AnimationAsset = animationAsset, Name = animationName };
                     var animationModel = new AnimationModel(animationData);
 
-                    _selectedModel.Animations.AddRange(new[] { animationData });
-                    _animationModels.AddRange(new[] { animationModel });
+                    _viewModel.SelectedModel.Animations.AddRange(new[] { animationData });
+                    _viewModel.AnimationModels.AddRange(new[] { animationModel });
                 }
             }
         }
 
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedModel == null)
+            if (_viewModel.SelectedModel == null)
             {
                 CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
                 return;
@@ -386,14 +384,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 ViewModel.ShowMainContent(); // MVVM State Update
 
                 Viewport?.AddModel(newModel);
-                MeshesListBox.ItemsSource = newModel.Parts;
+                _viewModel.SelectedModelParts = newModel.Parts;
 
-                foreach (var model in _loadedModels)
+                foreach (var model in _viewModel.LoadedModels)
                 {
                     model?.Dispose();
                 }
-                _loadedModels.Clear();
-                _loadedModels.Add(newModel);
+                _viewModel.LoadedModels.Clear();
+                _viewModel.LoadedModels.Add(newModel);
 
                 Viewport?.ResetCamera();
                 LoadModelButton.IsEnabled = false;
@@ -412,18 +410,18 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (e.AddedItems.Count > 0 && e.AddedItems[0] is SceneModel selectedModel)
             {
-                _selectedModel = selectedModel;
+                _viewModel.SelectedModel = selectedModel;
                 Viewport?.SetActiveModel(selectedModel);
-                MeshesListBox.ItemsSource = selectedModel.Parts;
+                _viewModel.SelectedModelParts = selectedModel.Parts;
 
                 if (selectedModel.Animations != null)
                 {
                     var animModels = selectedModel.Animations.Select(a => new AnimationModel(a));
-                    _animationModels.ReplaceRange(animModels);
+                    _viewModel.AnimationModels.ReplaceRange(animModels);
                 }
                 else
                 {
-                    _animationModels.Clear();
+                    _viewModel.AnimationModels.Clear();
                 }
 
                 if (_transformData.TryGetValue(selectedModel, out var transformData))
@@ -449,7 +447,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void TransformSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_selectedModel == null || !_transformData.TryGetValue(_selectedModel, out var transformData))
+            if (_viewModel.SelectedModel == null || !_transformData.TryGetValue(_viewModel.SelectedModel, out var transformData))
             {
                 return;
             }
@@ -458,7 +456,7 @@ namespace AssetsManager.Views.Controls.Viewer
             transformData.Rotation = new Vector3D(RotationXSlider.Value, RotationYSlider.Value, RotationZSlider.Value);
             transformData.Scale = ScaleSlider.Value;
 
-            UpdateTransform(_selectedModel, transformData);
+            UpdateTransform(_viewModel.SelectedModel, transformData);
         }
 
         public void SetAnimationPlayingState(AnimationModel animationModel, bool isPlaying)
@@ -534,7 +532,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void ApplyAutoRotation(double angle)
         {
-            if (_selectedModel != null && _transformData.TryGetValue(_selectedModel, out var transformData))
+            if (_viewModel.SelectedModel != null && _transformData.TryGetValue(_viewModel.SelectedModel, out var transformData))
             {
                 var newRotationY = (transformData.Rotation.Y + angle) % 360;
                 transformData.Rotation = new Vector3D(transformData.Rotation.X, newRotationY, transformData.Rotation.Z);

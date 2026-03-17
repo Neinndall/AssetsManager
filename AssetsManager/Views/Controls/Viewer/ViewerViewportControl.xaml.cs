@@ -61,6 +61,16 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     HandleAutoRotateChanged(_viewModel.IsAutoRotateActive);
                 }
+                else if (e.PropertyName == nameof(ViewerViewportModel.AmbientIntensity) ||
+                         e.PropertyName == nameof(ViewerViewportModel.LightRotation) ||
+                         e.PropertyName == nameof(ViewerViewportModel.LightHeight))
+                {
+                    UpdateStudioLighting();
+                }
+                else if (e.PropertyName == nameof(ViewerViewportModel.FieldOfView))
+                {
+                    UpdateFieldOfView();
+                }
             };
 
             Loaded += (s, e) =>
@@ -294,34 +304,35 @@ namespace AssetsManager.Views.Controls.Viewer
             camera.Position = position;
             camera.LookDirection = lookDirection;
             camera.UpDirection = upDirection;
-            camera.FieldOfView = 45;
-            camera.NearPlaneDistance = 1.0; // Evita clipping cercano
-            camera.FarPlaneDistance = 50000; // Asegura ver objetos lejanos (Mapas completos)
+            
+            _viewModel.FieldOfView = 45; // MVVM Update
+            
+            camera.NearPlaneDistance = 1.0; 
+            camera.FarPlaneDistance = 50000;
+        }
+
+        private void UpdateFieldOfView()
+        {
+            if (Viewport.Camera is PerspectiveCamera camera)
+            {
+                camera.FieldOfView = _viewModel.FieldOfView;
+            }
         }
 
         public void SetFieldOfView(double fov)
         {
-            if (Viewport.Camera is PerspectiveCamera camera)
-            {
-                camera.FieldOfView = fov;
-            }
+            _viewModel.FieldOfView = fov;
         }
-
-        private double _currentPhi = 0;
-        private double _currentTheta = 0;
-        private double _currentAmbient = 100;
 
         public void SetAmbientIntensity(double intensity)
         {
-            _currentAmbient = intensity;
-            UpdateStudioLighting();
+            _viewModel.AmbientIntensity = intensity;
         }
 
         public void SetLightDirection(double phi, double theta)
         {
-            _currentPhi = phi;
-            _currentTheta = theta;
-            UpdateStudioLighting();
+            _viewModel.LightRotation = phi;
+            _viewModel.LightHeight = theta;
         }
 
         private void UpdateStudioLighting()
@@ -329,13 +340,11 @@ namespace AssetsManager.Views.Controls.Viewer
             if (GlobalAmbientLight == null || StudioLight == null || FillLight == null) return;
 
             // 1. Set Ambient Color
-            byte ambVal = (byte)(255 * (_currentAmbient / 100.0));
+            byte ambVal = (byte)(255 * (_viewModel.AmbientIntensity / 100.0));
             GlobalAmbientLight.Color = Color.FromRgb(ambVal, ambVal, ambVal);
 
             // 2. Set Studio Lights Intensity (Inverse of Ambient)
-            // If Ambient is 100, Studio lights are 0 (Black).
-            // If Ambient is 0, Studio lights are 100 (Full Color).
-            double studioFactor = 1.0 - (_currentAmbient / 100.0);
+            double studioFactor = 1.0 - (_viewModel.AmbientIntensity / 100.0);
             
             if (studioFactor <= 0)
             {
@@ -351,8 +360,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             // 3. Update Studio Light Direction
-            double phiRad = _currentPhi * Math.PI / 180.0;
-            double thetaRad = _currentTheta * Math.PI / 180.0;
+            double phiRad = _viewModel.LightRotation * Math.PI / 180.0;
+            double thetaRad = _viewModel.LightHeight * Math.PI / 180.0;
             double x = Math.Cos(thetaRad) * Math.Sin(phiRad);
             double y = Math.Sin(thetaRad);
             double z = Math.Cos(thetaRad) * Math.Cos(phiRad);
@@ -361,11 +370,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void ResetStudioLighting()
         {
-            _currentAmbient = 100;
-            _currentPhi = 0;
-            _currentTheta = 0;
-            UpdateStudioLighting();
-            if (Viewport.Camera is PerspectiveCamera camera) camera.FieldOfView = 45;
+            _viewModel.AmbientIntensity = 100;
+            _viewModel.LightRotation = 0;
+            _viewModel.LightHeight = 0;
+            _viewModel.FieldOfView = 45;
+            // Reactive updates occur via PropertyChanged
         }
 
         public void SetSkyboxVisibility(bool isVisible)

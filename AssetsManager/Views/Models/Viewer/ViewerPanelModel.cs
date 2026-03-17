@@ -1,5 +1,8 @@
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using AssetsManager.Utils.Framework;
 using Material.Icons;
 
 namespace AssetsManager.Views.Models.Viewer
@@ -18,6 +21,34 @@ namespace AssetsManager.Views.Models.Viewer
         // --- UI State Properties (v3.2.2.0) ---
         private bool _isChromaGalleryVisible = false;
         private bool _isMainContentVisible = false;
+
+        // --- Data Collections (v3.2.2.0) ---
+        private readonly ObservableRangeCollection<SceneModel> _loadedModels = new();
+        private readonly ObservableRangeCollection<AnimationModel> _animationModels = new();
+        private ObservableRangeCollection<ModelPart> _selectedModelParts;
+        private SceneModel _selectedModel;
+        private AnimationModel _selectedAnimation;
+
+        public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;
+        public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
+
+        public ObservableRangeCollection<ModelPart> SelectedModelParts
+        {
+            get => _selectedModelParts;
+            set { if (_selectedModelParts != value) { _selectedModelParts = value; OnPropertyChanged(); } }
+        }
+
+        public SceneModel SelectedModel
+        {
+            get => _selectedModel;
+            set { if (_selectedModel != value) { _selectedModel = value; OnPropertyChanged(); } }
+        }
+
+        public AnimationModel SelectedAnimation
+        {
+            get => _selectedAnimation;
+            set { if (_selectedAnimation != value) { _selectedAnimation = value; OnPropertyChanged(); } }
+        }
 
         public bool IsChromaGalleryVisible
         {
