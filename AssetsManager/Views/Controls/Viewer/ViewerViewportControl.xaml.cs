@@ -71,6 +71,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     UpdateFieldOfView();
                 }
+                else if (e.PropertyName == nameof(ViewerViewportModel.IsTransparentBg))
+                {
+                    SetGroundVisibility(!_viewModel.IsTransparentBg);
+                }
+                else if (e.PropertyName == nameof(ViewerViewportModel.ShowSkybox))
+                {
+                    SetSkyboxVisibility(_viewModel.ShowSkybox);
+                }
             };
 
             Loaded += (s, e) =>
@@ -91,6 +99,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _skyVisual = sky;
             _groundVisual = ground;
+
+            // Ensure initial state is applied
+            SetGroundVisibility(!_viewModel.IsTransparentBg);
+            SetSkyboxVisibility(_viewModel.ShowSkybox);
         }
 
 
@@ -319,22 +331,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void SetFieldOfView(double fov)
-        {
-            _viewModel.FieldOfView = fov;
-        }
-
-        public void SetAmbientIntensity(double intensity)
-        {
-            _viewModel.AmbientIntensity = intensity;
-        }
-
-        public void SetLightDirection(double phi, double theta)
-        {
-            _viewModel.LightRotation = phi;
-            _viewModel.LightHeight = theta;
-        }
-
         private void UpdateStudioLighting()
         {
             if (GlobalAmbientLight == null || StudioLight == null || FillLight == null) return;
@@ -366,15 +362,6 @@ namespace AssetsManager.Views.Controls.Viewer
             double y = Math.Sin(thetaRad);
             double z = Math.Cos(thetaRad) * Math.Cos(phiRad);
             StudioLight.Direction = new Vector3D(-x, -y, -z);
-        }
-
-        public void ResetStudioLighting()
-        {
-            _viewModel.AmbientIntensity = 100;
-            _viewModel.LightRotation = 0;
-            _viewModel.LightHeight = 0;
-            _viewModel.FieldOfView = 45;
-            // Reactive updates occur via PropertyChanged
         }
 
         public void SetSkyboxVisibility(bool isVisible)

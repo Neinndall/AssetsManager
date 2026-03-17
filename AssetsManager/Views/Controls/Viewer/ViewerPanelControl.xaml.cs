@@ -22,13 +22,6 @@ using System.Linq;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
-    public class ViewerTransformData
-    {
-        public Vector3D Position { get; set; } = new Vector3D(0, 0, 0);
-        public Vector3D Rotation { get; set; } = new Vector3D(0, 0, 0);
-        public double Scale { get; set; } = 1.0;
-    }
-
     public partial class ViewerPanelControl : UserControl
     {
         private readonly ViewerPanelModel _viewModel;
@@ -44,7 +37,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
 
-        // Peer Controls (Direct communication v3.2.2.0)
+        // Peer Controls (Direct communication)
         public ViewerViewportControl Viewport { get; set; }
         public ChromaSelectionControl ChromaGallery { get; set; }
 
@@ -53,7 +46,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public ObservableRangeCollection<AnimationModel> AnimationModels => _viewModel.AnimationModels;
 
-        private readonly Dictionary<SceneModel, ViewerTransformData> _transformData = new();
         private AnimationModel _currentlyPlayingAnimation;
 
         public ViewerPanelControl()
@@ -64,22 +56,60 @@ namespace AssetsManager.Views.Controls.Viewer
             InitializeComponent();
 
             _viewModel.MainContentRequested += () => 
- 
             {
                 EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
                 MainContentVisibilityChanged?.Invoke(Visibility.Visible);
             };
-            
+
             _viewModel.EmptyStateRequested += () => 
             {
                 MainContentVisibilityChanged?.Invoke(Visibility.Collapsed);
                 EmptyStateVisibilityChanged?.Invoke(Visibility.Visible);
             };
 
-            ModelsListBox.ItemsSource = _viewModel.LoadedModels;
-            AnimationsListBox.ItemsSource = _viewModel.AnimationModels;
+            _viewModel.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(ViewerPanelModel.SelectedModel))
+                {
+                    HandleSelectedModelChanged();
+                }
+            };
 
             Unloaded += (s, e) => Cleanup();
+        }
+
+        private void HandleSelectedModelChanged()
+        {
+            var selectedModel = _viewModel.SelectedModel;
+            if (selectedModel == null)
+            {
+                _viewModel.SelectedModelParts = null;
+                _viewModel.AnimationModels.Clear();
+                _viewModel.SelectedAnimation = null;
+                return;
+            }
+
+            _viewModel.SelectedAnimation = null; // Limpiar selección previa
+            Viewport?.SetActiveModel(selectedModel);
+            _viewModel.SelectedModelParts = selectedModel.Parts;
+
+            if (selectedModel.Animations != null)
+            {
+                var animModels = selectedModel.Animations.Select(a => new AnimationModel(a));
+                _viewModel.AnimationModels.ReplaceRange(animModels);
+            }
+            else
+            {
+                _viewModel.AnimationModels.Clear();
+            }
+
+            PositionXLock.IsChecked = false;
+            PositionYLock.IsChecked = false;
+            PositionZLock.IsChecked = false;
+            RotationXLock.IsChecked = false;
+            RotationYLock.IsChecked = false;
+            RotationZLock.IsChecked = false;
+            ScaleLock.IsChecked = false;
         }
 
         public void Cleanup()
@@ -97,7 +127,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 model?.Dispose();
             }
             _viewModel.LoadedModels.Clear();
-            _transformData.Clear();
 
             _currentlyPlayingAnimation = null;
 
@@ -121,7 +150,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 modelToDelete?.Dispose();
                 _viewModel.LoadedModels.Remove(modelToDelete);
-                _transformData.Remove(modelToDelete);
                 Viewport?.RemoveModel(modelToDelete);
 
                 if (_viewModel.LoadedModels.Count == 0)
@@ -188,7 +216,7 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         /// <summary>
-        /// Handles the selection of a chroma from the gallery (v3.2.2.0).
+        /// Handles the selection of a chroma from the gallery.
         /// </summary>
         public void HandleChromaSelected(ChromaSkinModel skin)
         {
@@ -267,9 +295,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     ViewModel.ShowMainContent(); // MVVM State Update
                 }
 
-                var transformData = new ViewerTransformData { Position = new Vector3D(0, SceneElements.GroundLevel, 0) };
-                _transformData.Add(newModel, transformData);
-                UpdateTransform(newModel, transformData);
+                // Initialize Transform
+                newModel.PositionY = SceneElements.GroundLevel;
 
                 Viewport?.AddModel(newModel);
                 _viewModel.SelectedModelParts = newModel.Parts;
@@ -406,67 +433,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void ModelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (e.AddedItems.Count == 0)
-            {
-                _viewModel.SelectedModel = null;
-                _viewModel.SelectedModelParts = null;
-                _viewModel.AnimationModels.Clear();
-                return;
-            }
-
-            if (e.AddedItems[0] is SceneModel selectedModel)
-            {
-                _viewModel.SelectedModel = selectedModel;
-                Viewport?.SetActiveModel(selectedModel);
-                _viewModel.SelectedModelParts = selectedModel.Parts;
-
-                if (selectedModel.Animations != null)
-                {
-                    var animModels = selectedModel.Animations.Select(a => new AnimationModel(a));
-                    _viewModel.AnimationModels.ReplaceRange(animModels);
-                }
-                else
-                {
-                    _viewModel.AnimationModels.Clear();
-                }
-
-                if (_transformData.TryGetValue(selectedModel, out var transformData))
-                {
-                    PositionXSlider.Value = transformData.Position.X;
-                    PositionYSlider.Value = transformData.Position.Y;
-                    PositionZSlider.Value = transformData.Position.Z;
-                    RotationXSlider.Value = transformData.Rotation.X;
-                    RotationYSlider.Value = transformData.Rotation.Y;
-                    RotationZSlider.Value = transformData.Rotation.Z;
-                    ScaleSlider.Value = transformData.Scale;
-                }
-
-                PositionXLock.IsChecked = false;
-                PositionYLock.IsChecked = false;
-                PositionZLock.IsChecked = false;
-                RotationXLock.IsChecked = false;
-                RotationYLock.IsChecked = false;
-                RotationZLock.IsChecked = false;
-                ScaleLock.IsChecked = false;
-            }
-        }
-
-        private void TransformSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_viewModel == null || _viewModel.SelectedModel == null || !_transformData.TryGetValue(_viewModel.SelectedModel, out var transformData))
-            {
-                return;
-            }
-
-            transformData.Position = new Vector3D(PositionXSlider.Value, PositionYSlider.Value, PositionZSlider.Value);
-            transformData.Rotation = new Vector3D(RotationXSlider.Value, RotationYSlider.Value, RotationZSlider.Value);
-            transformData.Scale = ScaleSlider.Value;
-
-            UpdateTransform(_viewModel.SelectedModel, transformData);
-        }
-
         public void SetAnimationPlayingState(AnimationModel animationModel, bool isPlaying)
         {
             if (animationModel != null)
@@ -481,22 +447,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _currentlyPlayingAnimation.CurrentTime = currentTime;
             }
-        }
-
-        private void UpdateTransform(SceneModel model, ViewerTransformData data)
-        {
-            var transformGroup = new Transform3DGroup();
-            transformGroup.Children.Add(new ScaleTransform3D(data.Scale, data.Scale, data.Scale));
-
-            var rotationX = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), data.Rotation.X));
-            var rotationY = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), data.Rotation.Y));
-            var rotationZ = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), data.Rotation.Z));
-            transformGroup.Children.Add(rotationX);
-            transformGroup.Children.Add(rotationY);
-            transformGroup.Children.Add(rotationZ);
-
-            transformGroup.Children.Add(new TranslateTransform3D(data.Position.X, data.Position.Y, data.Position.Z));
-            model.RootVisual.Transform = transformGroup;
         }
 
         private bool _isSliderDragging = false;
@@ -521,75 +471,35 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ResetPosition_Click(object sender, RoutedEventArgs e)
         {
-            if (PositionXLock.IsChecked == false) PositionXSlider.Value = 0;
-            if (PositionYLock.IsChecked == false) PositionYSlider.Value = SceneElements.GroundLevel;
-            if (PositionZLock.IsChecked == false) PositionZSlider.Value = 0;
+            if (_viewModel.SelectedModel == null) return;
+            if (PositionXLock.IsChecked == false) _viewModel.SelectedModel.PositionX = 0;
+            if (PositionYLock.IsChecked == false) _viewModel.SelectedModel.PositionY = SceneElements.GroundLevel;
+            if (PositionZLock.IsChecked == false) _viewModel.SelectedModel.PositionZ = 0;
         }
 
         private void ResetRotation_Click(object sender, RoutedEventArgs e)
         {
-            if (RotationXLock.IsChecked == false) RotationXSlider.Value = 0;
-            if (RotationYLock.IsChecked == false) RotationYSlider.Value = 0;
-            if (RotationZLock.IsChecked == false) RotationZSlider.Value = 0;
+            if (_viewModel.SelectedModel == null) return;
+            if (RotationXLock.IsChecked == false) _viewModel.SelectedModel.RotationX = 0;
+            if (RotationYLock.IsChecked == false) _viewModel.SelectedModel.RotationY = 0;
+            if (RotationZLock.IsChecked == false) _viewModel.SelectedModel.RotationZ = 0;
         }
 
         private void ResetScale_Click(object sender, RoutedEventArgs e)
         {
-            if (ScaleLock.IsChecked == false) ScaleSlider.Value = 1;
+            if (_viewModel.SelectedModel == null) return;
+            if (ScaleLock.IsChecked == false) _viewModel.SelectedModel.Scale = 1;
         }
 
         public void ApplyAutoRotation(double angle)
         {
-            if (_viewModel.SelectedModel != null && _transformData.TryGetValue(_viewModel.SelectedModel, out var transformData))
+            if (_viewModel.SelectedModel != null)
             {
-                var newRotationY = (transformData.Rotation.Y + angle) % 360;
-                transformData.Rotation = new Vector3D(transformData.Rotation.X, newRotationY, transformData.Rotation.Z);
-                RotationYSlider.Value = newRotationY;
+                _viewModel.SelectedModel.RotationY = (_viewModel.SelectedModel.RotationY + angle) % 360;
             }
         }
 
         // STUDIO HANDLERS
-        private void EnvironmentCheck_Changed(object sender, RoutedEventArgs e)
-        {
-            if (TransparentBgCheck == null || ShowSkyboxCheck == null) return;
-
-            if (sender == TransparentBgCheck && TransparentBgCheck.IsChecked == true)
-            {
-                ShowSkyboxCheck.IsChecked = false;
-            }
-            else if (sender == ShowSkyboxCheck && ShowSkyboxCheck.IsChecked == true)
-            {
-                TransparentBgCheck.IsChecked = false;
-            }
-
-            UpdateEnvironment();
-        }
-
-        public void UpdateEnvironment()
-        {
-            if (Viewport == null || TransparentBgCheck == null || ShowSkyboxCheck == null) return;
-
-            bool isTransparent = TransparentBgCheck.IsChecked ?? false;
-            bool showSkybox = ShowSkyboxCheck.IsChecked ?? true;
-
-            Viewport.SetGroundVisibility(!isTransparent); 
-            Viewport.SetSkyboxVisibility(showSkybox);
-        }
-
-        private void FovSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            Viewport?.SetFieldOfView(e.NewValue);
-        }
-
-        private void LightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (LightRotationSlider != null && LightHeightSlider != null && AmbientIntensitySlider != null)
-            {
-                Viewport?.SetLightDirection(LightRotationSlider.Value, LightHeightSlider.Value);
-                Viewport?.SetAmbientIntensity(AmbientIntensitySlider.Value);
-            }
-        }
-
         private void SnapshotButton_Click(object sender, RoutedEventArgs e)
         {
             Viewport?.InitiateSnapshot(4.0);
@@ -597,15 +507,15 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ResetStudio_Click(object sender, RoutedEventArgs e)
         {
-            FovSlider.Value = 45;
-            LightRotationSlider.Value = 0;
-            LightHeightSlider.Value = 0;
-            AmbientIntensitySlider.Value = 100;
-            TransparentBgCheck.IsChecked = false;
-            ShowSkyboxCheck.IsChecked = true;
-
-            Viewport?.ResetStudioLighting();
-            UpdateEnvironment();
+            if (_viewModel.ViewportViewModel != null)
+            {
+                _viewModel.ViewportViewModel.AmbientIntensity = 100;
+                _viewModel.ViewportViewModel.LightRotation = 0;
+                _viewModel.ViewportViewModel.LightHeight = 0;
+                _viewModel.ViewportViewModel.FieldOfView = 45;
+                _viewModel.ViewportViewModel.IsTransparentBg = false;
+                _viewModel.ViewportViewModel.ShowSkybox = true;
+            }
         }
     }
 }

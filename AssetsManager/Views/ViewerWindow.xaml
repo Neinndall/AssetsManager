@@ -176,7 +176,7 @@
             </Grid>
 
 
-            <!-- CHROMA SELECTION OVERLAY (v3.2.2.0) -->
+            <!-- CHROMA SELECTION OVERLAY -->
             <viewer:ChromaSelectionControl x:Name="ChromaSelectionOverlay" 
                                            DataContext="{Binding ViewModel, ElementName=PanelControl}"
                                            Visibility="{Binding IsChromaGalleryVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>

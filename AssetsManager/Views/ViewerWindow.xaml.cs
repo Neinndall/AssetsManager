@@ -73,6 +73,7 @@ namespace AssetsManager.Views
             ChromaSelectionOverlay.ScannerService = _chromaScannerService;
 
             PanelControl.Viewport = ViewportControl;
+            PanelControl.ViewModel.ViewportViewModel = ViewportControl.ViewModel;
             PanelControl.ChromaGallery = ChromaSelectionOverlay;
             
             ViewportControl.Panel = PanelControl;
@@ -126,7 +127,6 @@ namespace AssetsManager.Views
             ViewportControl.Viewport.Children.Add(_skyVisual);
             
             ViewportControl.RegisterEnvironment(_skyVisual, _groundVisual);
-            PanelControl?.UpdateEnvironment();
         }
 
         private BitmapSource LoadSceneTexture(string path)

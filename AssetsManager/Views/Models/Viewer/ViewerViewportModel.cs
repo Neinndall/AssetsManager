@@ -14,7 +14,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isMaximized = false;
         private bool _isToolbarVisible = false;
 
-        // --- Studio Lighting Properties (v3.2.2.0) ---
+        // --- Studio Lighting Properties ---
         private double _ambientIntensity = 100;
         private double _lightRotation = 0; // Phi
         private double _lightHeight = 0;   // Theta
@@ -66,6 +66,38 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _fieldOfView;
             set { if (_fieldOfView != value) { _fieldOfView = value; OnPropertyChanged(); } }
+        }
+
+        // --- Environment Properties ---
+        private bool _isTransparentBg = false;
+        private bool _showSkybox = true;
+
+        public bool IsTransparentBg
+        {
+            get => _isTransparentBg;
+            set 
+            { 
+                if (_isTransparentBg != value) 
+                { 
+                    _isTransparentBg = value; 
+                    if (_isTransparentBg) ShowSkybox = false;
+                    OnPropertyChanged(); 
+                } 
+            }
+        }
+
+        public bool ShowSkybox
+        {
+            get => _showSkybox;
+            set 
+            { 
+                if (_showSkybox != value) 
+                { 
+                    _showSkybox = value; 
+                    if (_showSkybox) IsTransparentBg = false;
+                    OnPropertyChanged(); 
+                } 
+            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

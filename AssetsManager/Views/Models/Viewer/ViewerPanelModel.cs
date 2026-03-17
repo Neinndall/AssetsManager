@@ -21,8 +21,9 @@ namespace AssetsManager.Views.Models.Viewer
         // --- UI State Properties (v3.2.2.0) ---
         private bool _isChromaGalleryVisible = false;
         private bool _isMainContentVisible = false;
+        private ViewerViewportModel _viewportViewModel;
 
-        // --- Data Collections (v3.2.2.0) ---
+        // --- Data Collections ---
         private readonly ObservableRangeCollection<SceneModel> _loadedModels = new();
         private readonly ObservableRangeCollection<AnimationModel> _animationModels = new();
         private ObservableRangeCollection<ModelPart> _selectedModelParts;
@@ -60,6 +61,12 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _isMainContentVisible;
             set { if (_isMainContentVisible != value) { _isMainContentVisible = value; OnPropertyChanged(); } }
+        }
+
+        public ViewerViewportModel ViewportViewModel
+        {
+            get => _viewportViewModel;
+            set { if (_viewportViewModel != value) { _viewportViewModel = value; OnPropertyChanged(); } }
         }
 
         public bool IsMapMode

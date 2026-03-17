@@ -46,9 +46,10 @@
                 <Grid x:Name="ModelsPanel" 
                       Visibility="{Binding IsChecked, ElementName=TabModels, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <ListBox x:Name="ModelsListBox" 
+                             ItemsSource="{Binding LoadedModels}"
+                             SelectedItem="{Binding SelectedModel, Mode=TwoWay}"
                              Style="{StaticResource SmoothScrollListBox}" 
                              ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}"
-                             SelectionChanged="ModelsListBox_SelectionChanged" 
                              Background="Transparent" BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
@@ -108,9 +109,7 @@
                                 <!-- Skybox Toggle -->
                                 <ToggleButton x:Name="ShowSkyboxCheck" 
                                               Style="{StaticResource ModernTileToggleButton}" 
-                                              IsChecked="True" 
-                                              Checked="EnvironmentCheck_Changed" 
-                                              Unchecked="EnvironmentCheck_Changed"
+                                              IsChecked="{Binding ViewportViewModel.ShowSkybox, Mode=TwoWay}" 
                                               Margin="0,0,4,0"
                                               ToolTip="Show the 3D Skybox environment">
                                     <StackPanel>
@@ -122,8 +121,7 @@
                                 <!-- Transparent Toggle -->
                                 <ToggleButton x:Name="TransparentBgCheck" 
                                               Style="{StaticResource ModernTileToggleButton}" 
-                                              Checked="EnvironmentCheck_Changed" 
-                                              Unchecked="EnvironmentCheck_Changed"
+                                              IsChecked="{Binding ViewportViewModel.IsTransparentBg, Mode=TwoWay}" 
                                               Margin="4,0,0,0"
                                               ToolTip="Remove background for transparency">
                                     <StackPanel>
@@ -154,8 +152,8 @@
                                         <ColumnDefinition Width="40"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="FocusAuto" Width="16" Foreground="{StaticResource AccentBlue}" Margin="0,0,10,0" ToolTip="Field of View (FOV)"/>
-                                    <Slider Grid.Column="1" x:Name="FovSlider" Minimum="10" Maximum="120" Value="45" 
-                                            ValueChanged="FovSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="FovSlider" Minimum="10" Maximum="120" 
+                                            Value="{Binding ViewportViewModel.FieldOfView, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=FovSlider, StringFormat={}{0:F0}}" 
                                                FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -183,8 +181,8 @@
                                         <ColumnDefinition Width="40"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="LightbulbOnOutline" Width="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" ToolTip="Ambient Intensity (Base Light)"/>
-                                    <Slider Grid.Column="1" x:Name="AmbientIntensitySlider" Minimum="0" Maximum="100" Value="100" 
-                                            ValueChanged="LightSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="AmbientIntensitySlider" Minimum="0" Maximum="100" 
+                                            Value="{Binding ViewportViewModel.AmbientIntensity, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=AmbientIntensitySlider, StringFormat={}{0:F0}%}" 
                                                FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -196,8 +194,8 @@
                                         <ColumnDefinition Width="40"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="Orbit" Width="16" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0" ToolTip="Rotation"/>
-                                    <Slider Grid.Column="1" x:Name="LightRotationSlider" Minimum="0" Maximum="360" Value="0" 
-                                            ValueChanged="LightSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="LightRotationSlider" Minimum="0" Maximum="360" 
+                                            Value="{Binding ViewportViewModel.LightRotation, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=LightRotationSlider, StringFormat={}{0:F0}}" 
                                                FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -209,8 +207,8 @@
                                         <ColumnDefinition Width="40"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="ArrowUpBold" Width="16" Foreground="{StaticResource AccentYellow}" Margin="0,0,10,0" ToolTip="Altitude"/>
-                                    <Slider Grid.Column="1" x:Name="LightHeightSlider" Minimum="0" Maximum="90" Value="0" 
-                                            ValueChanged="LightSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="LightHeightSlider" Minimum="0" Maximum="90" 
+                                            Value="{Binding ViewportViewModel.LightHeight, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=LightHeightSlider, StringFormat={}{0:F0}}" 
                                                FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -331,7 +329,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="ArrowRight" Width="16" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0"/>
-                                    <Slider Grid.Column="1" x:Name="PositionXSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="PositionXSlider" Minimum="-1000" Maximum="1000" Value="{Binding SelectedModel.PositionX, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=PositionXSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="PositionXLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
@@ -346,7 +344,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="ArrowUp" Width="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0"/>
-                                    <Slider Grid.Column="1" x:Name="PositionYSlider" Minimum="-1000" Maximum="3000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="PositionYSlider" Minimum="-1000" Maximum="3000" Value="{Binding SelectedModel.PositionY, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=PositionYSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="PositionYLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
@@ -361,7 +359,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="ArrowDown" Width="16" Foreground="{StaticResource AccentBlue}" Margin="0,0,10,0"/>
-                                    <Slider Grid.Column="1" x:Name="PositionZSlider" Minimum="-1000" Maximum="1000" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="PositionZSlider" Minimum="-1000" Maximum="1000" Value="{Binding SelectedModel.PositionZ, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=PositionZSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="PositionZLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
@@ -377,7 +375,7 @@
                                 <DataTemplate>
                                     <Grid>
                                         <TextBlock Text="Rotation" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
-                                        <Button HorizontalAlignment="Right" Click="ResetPosition_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Position">
+                                        <Button HorizontalAlignment="Right" Click="ResetRotation_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Rotation">
                                             <materialIcons:MaterialIcon Kind="Refresh" Width="16"/>
                                         </Button>
                                     </Grid>
@@ -392,7 +390,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="Rotate3d" Width="16" Foreground="{StaticResource AccentOrange}" Margin="0,0,10,0"/>
-                                    <Slider Grid.Column="1" x:Name="RotationXSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="RotationXSlider" Minimum="-360" Maximum="360" Value="{Binding SelectedModel.RotationX, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=RotationXSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="RotationXLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
@@ -407,7 +405,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="Rotate3d" Width="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0"/>
-                                    <Slider Grid.Column="1" x:Name="RotationYSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="RotationYSlider" Minimum="-360" Maximum="360" Value="{Binding SelectedModel.RotationY, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=RotationYSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="RotationYLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
@@ -422,7 +420,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <materialIcons:MaterialIcon Kind="Rotate3d" Width="16" Foreground="{StaticResource AccentBlue}" Margin="0,0,10,0"/>
-                                    <Slider Grid.Column="1" x:Name="RotationZSlider" Minimum="-360" Maximum="360" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"
+                                    <Slider Grid.Column="1" x:Name="RotationZSlider" Minimum="-360" Maximum="360" Value="{Binding SelectedModel.RotationZ, Mode=TwoWay}" VerticalAlignment="Center"
                                             Style="{StaticResource HUDSliderStyle}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=RotationZSlider, StringFormat={}{0:F0}}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <ToggleButton Grid.Column="3" x:Name="RotationZLock" Style="{StaticResource TransparentIconToggleButton}" Width="28">
@@ -438,7 +436,7 @@
                                 <DataTemplate>
                                     <Grid>
                                         <TextBlock Text="Scale" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
-                                        <Button HorizontalAlignment="Right" Click="ResetPosition_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Position">
+                                        <Button HorizontalAlignment="Right" Click="ResetScale_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Reset Scale">
                                             <materialIcons:MaterialIcon Kind="Refresh" Width="16"/>
                                         </Button>
                                     </Grid>
@@ -452,7 +450,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <materialIcons:MaterialIcon Kind="Resize" Width="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,10,0"/>
-                                <Slider Grid.Column="1" x:Name="ScaleSlider" Minimum="0.1" Maximum="5" Value="1" ValueChanged="TransformSlider_ValueChanged" VerticalAlignment="Center"
+                                <Slider Grid.Column="1" x:Name="ScaleSlider" Minimum="0.1" Maximum="5" Value="{Binding SelectedModel.Scale, Mode=TwoWay}" VerticalAlignment="Center"
                                         Style="{StaticResource HUDSliderStyle}"/>
                                 <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=ScaleSlider, Converter={StaticResource ValueMultiplierConverter}, ConverterParameter=100, StringFormat={}{0:F0}%}" 
                                            FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -473,6 +471,8 @@
                     </Grid.RowDefinitions>
                     
                     <ListBox x:Name="AnimationsListBox" 
+                             ItemsSource="{Binding AnimationModels}"
+                             SelectedItem="{Binding SelectedAnimation, Mode=TwoWay}"
                              Background="Transparent" BorderThickness="0" 
                              Style="{StaticResource SmoothScrollListBox}"
                              ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}">
@@ -488,7 +488,7 @@
                             Background="{StaticResource CardBackground}" 
                             CornerRadius="12" Padding="12,10" Margin="0,8,0,8" 
                             BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
-                            DataContext="{Binding SelectedItem, ElementName=AnimationsListBox}"
+                            DataContext="{Binding SelectedAnimation}"
                             Visibility="{Binding SelectedItem, ElementName=AnimationsListBox, Converter={StaticResource NullToVisibilityConverter}}">
                         <StackPanel>
                             <Grid Margin="0,0,0,8">
