@@ -369,6 +369,25 @@ namespace AssetsManager.Views.Controls.Explorer
             FileExplorer?.SelectNode(node);
         }
 
+        public async Task HandleBatchDiffRequestAsync(List<FileSystemNodeModel> nodes)
+        {
+            if (nodes == null || nodes.Count == 0 || FileExplorer == null) return;
+
+            var diffs = nodes.Where(n => n.ChunkDiff != null).Select(n => n.ChunkDiff).ToList();
+            if (diffs.Count == 0) return;
+
+            // Get PBE paths from FileExplorer
+            string oldPath = FileExplorer.OldPbePath;
+            string newPath = FileExplorer.NewPbePath;
+            Window owner = Window.GetWindow(this);
+
+            var diffViewService = FileExplorer.DiffViewService;
+            if (diffViewService != null)
+            {
+                await diffViewService.ShowBatchWadDiffAsync(diffs, 0, oldPath, newPath, owner);
+            }
+        }
+
         public void HandleSelectionActionRequested(string action, List<FileSystemNodeModel> nodes)
         {
             if (FileExplorer == null) return;

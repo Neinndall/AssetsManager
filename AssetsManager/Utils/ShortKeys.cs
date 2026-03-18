@@ -16,6 +16,15 @@ namespace AssetsManager.Utils
             "Previous Difference", "PreviousDifference", typeof(ShortKeys), 
             new InputGestureCollection { new KeyGesture(Key.Up, ModifierKeys.Alt) });
 
+        // Batch Diff Navigation (Playlist)
+        public static readonly RoutedUICommand NextFile = new RoutedUICommand(
+            "Next File", "NextFile", typeof(ShortKeys),
+            new InputGestureCollection { new KeyGesture(Key.Right, ModifierKeys.Alt) });
+
+        public static readonly RoutedUICommand PreviousFile = new RoutedUICommand(
+            "Previous File", "PreviousFile", typeof(ShortKeys),
+            new InputGestureCollection { new KeyGesture(Key.Left, ModifierKeys.Alt) });
+
         // Future shortcuts can be added here (e.g., Search, Refresh, etc.)
     }
 }

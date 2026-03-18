@@ -17,6 +17,39 @@ namespace AssetsManager.Views.Dialogs.Controls
         public WadResultsTreeModel ViewModel => DataContext as WadResultsTreeModel;
         public object SelectedItem => resultsTreeView.SelectedItem;
 
+        public List<SerializableChunkDiff> SelectedDiffs
+        {
+            get
+            {
+                var selected = new List<SerializableChunkDiff>();
+                if (ViewModel?.WadGroups == null) return selected;
+
+                foreach (var wad in ViewModel.WadGroups)
+                {
+                    foreach (var typeGroup in wad.Types)
+                    {
+                        foreach (var diff in typeGroup.Diffs)
+                        {
+                            if (diff.IsMultiSelected) selected.Add(diff);
+                        }
+                    }
+                }
+
+                // If multi-selection is empty, use the single selected item if it's a file
+                if (selected.Count == 0 && resultsTreeView.SelectedItem is SerializableChunkDiff singleDiff)
+                {
+                    selected.Add(singleDiff);
+                }
+                else if (selected.Count > 0 && resultsTreeView.SelectedItem is SerializableChunkDiff activeDiff && !selected.Contains(activeDiff))
+                {
+                    // Ensure the primary clicked item is included
+                    selected.Insert(0, activeDiff);
+                }
+
+                return selected;
+            }
+        }
+
         public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
 
         public WadResultsTreeControl()
@@ -26,7 +59,9 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void Cleanup()
         {
-            resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
+            if (resultsTreeView != null)
+                resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
+            
             searchTextBox.TextChanged -= SearchTextBox_TextChanged;
             resultsTreeView.ItemsSource = null;
             ParentWindow = null;
@@ -39,30 +74,20 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void ResultsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            ParentWindow?.HandleTreeSelectionChanged(e.NewValue);
+            ParentWindow?.HandleTreeSelectionChanged(e.NewValue as SerializableChunkDiff);
         }
 
         private void ViewDifferences_Click(object sender, RoutedEventArgs e)
         {
-            ParentWindow?.HandleViewDifferencesRequest();
-        }
-
-        public void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (VisualUpwardSearch(e.OriginalSource as DependencyObject) is TreeViewItem treeViewItem)
+            var selectedDiffs = SelectedDiffs;
+            if (selectedDiffs.Count > 1)
             {
-                treeViewItem.IsSelected = true;
-                e.Handled = true;
+                ParentWindow?.HandleBatchViewDifferencesRequest(selectedDiffs);
             }
-        }
-
-        private static TreeViewItem VisualUpwardSearch(DependencyObject source)
-        {
-            while (source != null && !(source is TreeViewItem))
+            else
             {
-                source = VisualTreeHelper.GetParent(source);
+                ParentWindow?.HandleViewDifferencesRequest();
             }
-            return source as TreeViewItem;
         }
 
         private void ContextMenu_Opened(object sender, RoutedEventArgs e)

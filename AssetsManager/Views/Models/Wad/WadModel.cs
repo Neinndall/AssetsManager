@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 using LeagueToolkit.Core.Wad;
+using System.IO;
 
 namespace AssetsManager.Views.Models.Wad
 {
@@ -11,7 +13,7 @@ namespace AssetsManager.Views.Models.Wad
         Removed,
         Modified,
         Renamed,
-        Dependency // Represents a chunk that hasn't changed / an associated dependency
+        Dependency
     }
 
     public class ChunkDiff
@@ -35,8 +37,31 @@ namespace AssetsManager.Views.Models.Wad
         public bool WasTopLevelDiff { get; set; }
     }
 
-    public class SerializableChunkDiff
+    public class SerializableChunkDiff : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+        private bool _isSelected;
+        private bool _isMultiSelected;
+
+        [JsonIgnore]
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { if (_isSelected != value) { _isSelected = value; OnPropertyChanged(); } }
+        }
+
+        [JsonIgnore]
+        public bool IsMultiSelected
+        {
+            get => _isMultiSelected;
+            set { if (_isMultiSelected != value) { _isMultiSelected = value; OnPropertyChanged(); } }
+        }
+
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         public ChunkDiffType Type { get; set; }
         public string OldPath { get; set; }
         public string NewPath { get; set; }
@@ -45,8 +70,14 @@ namespace AssetsManager.Views.Models.Wad
         public ulong? NewUncompressedSize { get; set; }
         public ulong OldPathHash { get; set; }
         public ulong NewPathHash { get; set; }
+
+        [JsonIgnore]
         public string Path => NewPath ?? OldPath;
+
+        [JsonIgnore]
         public string FileName => System.IO.Path.GetFileName(Path);
+
+        [JsonIgnore]
         public string DisplayPath
         {
             get
@@ -58,6 +89,7 @@ namespace AssetsManager.Views.Models.Wad
 
         [JsonIgnore]
         public string OldSizeString => FormatSize(OldUncompressedSize);
+        
         [JsonIgnore]
         public string NewSizeString => FormatSize(NewUncompressedSize);
 
@@ -85,18 +117,9 @@ namespace AssetsManager.Views.Models.Wad
         private string FormatSize(ulong? sizeInBytes)
         {
             if (sizeInBytes == null) return "N/A";
-            
-            if (sizeInBytes < 1024)
-            {
-                return $"{sizeInBytes} Bytes";
-            }
-
+            if (sizeInBytes < 1024) return $"{sizeInBytes} Bytes";
             double sizeInKB = (double)sizeInBytes / 1024.0;
-            if (sizeInKB < 1024)
-            {
-                return $"{sizeInKB:F2} KB";
-            }
-
+            if (sizeInKB < 1024) return $"{sizeInKB:F2} KB";
             double sizeInMB = sizeInKB / 1024.0;
             return $"{sizeInMB:F2} MB";
         }

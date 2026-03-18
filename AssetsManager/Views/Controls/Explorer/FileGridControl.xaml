@@ -3,8 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
              mc:Ignorable="d">
     
     <Grid>
@@ -46,7 +46,9 @@
                  SelectionChanged="FileGridListBox_SelectionChanged">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource FileGridItemStyle}">
-                    <EventSetter Event="PreviewMouseLeftButtonDown" Handler="FileGridControl_Item_MouseLeftButtonDown"/>
+                    <Setter Property="helpers:SelectionBehavior.EnableUnifiedSelection" Value="True"/>
+                    <Setter Property="helpers:SelectionBehavior.PreserveSelectionOnRightClick" Value="True"/>
+                    <EventSetter Event="helpers:SelectionBehavior.PrimaryAction" Handler="SelectionBehavior_PrimaryAction"/>
                 </Style>
             </ListBox.ItemContainerStyle>
         </ListBox>

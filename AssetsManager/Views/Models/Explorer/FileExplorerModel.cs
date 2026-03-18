@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Explorer
@@ -39,6 +40,9 @@ namespace AssetsManager.Views.Models.Explorer
         private string _statusDescription;
         private bool _isSelectDirectoryActionVisible;
 
+        private FileSystemNodeModel _selectedItem;
+        private ObservableCollection<FileSystemNodeModel> _selectedNodes = new();
+
         public FileExplorerModel()
         {
             RootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
@@ -46,6 +50,48 @@ namespace AssetsManager.Views.Models.Explorer
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true; // Start empty
+        }
+
+        public FileSystemNodeModel SelectedItem
+        {
+            get => _selectedItem;
+            set
+            {
+                if (_selectedItem != value)
+                {
+                    _selectedItem = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(ViewChangesHeader));
+                    OnPropertyChanged(nameof(CanViewChanges));
+                }
+            }
+        }
+
+        public ObservableCollection<FileSystemNodeModel> SelectedNodes
+        {
+            get => _selectedNodes;
+            set
+            {
+                _selectedNodes = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewChangesHeader));
+                OnPropertyChanged(nameof(CanViewChanges));
+            }
+        }
+
+        public string ViewChangesHeader => SelectedNodes.Count > 1 
+            ? "View Selected Differences" 
+            : "View Differences";
+
+        public bool CanViewChanges
+        {
+            get
+            {
+                if (SelectedNodes.Count > 1)
+                    return SelectedNodes.Any(n => n.ChunkDiff != null && !SupportedFileTypes.IsAudioDataContainer(n.Name));
+
+                return (SelectedItem?.Status == DiffStatus.Modified || SelectedItem?.ChunkDiff != null) && !SupportedFileTypes.IsAudioDataContainer(SelectedItem?.Name);
+            }
         }
 
         public ExplorerToolbarModel Toolbar

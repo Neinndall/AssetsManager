@@ -79,6 +79,7 @@ namespace AssetsManager.Services.Explorer
 
                 if (isSortingEnabled)
                 {
+                    // PATHS MODE: Maintain original folder structure
                     foreach (var file in wadGroup)
                     {
                         string chunkPath = GetBackupChunkPath(backupRoot, file);
@@ -134,30 +135,68 @@ namespace AssetsManager.Services.Explorer
                     }
 
                     SortChildrenRecursively(wadNode);
-                    PostProcessAudioNodes(wadNode);
                 }
                 else
                 {
-                    var statusGroups = wadGroup.GroupBy(d => d.Type).ToDictionary(g => g.Key, g => g.ToList());
+                    // CATEGORIES MODE: Flatten structure and collect ALL items (files + dependencies)
+                    var allItemsToShow = new Dictionary<string, SerializableChunkDiff>();
+
+                    foreach (var file in wadGroup)
+                    {
+                        string key = file.NewPath ?? file.OldPath;
+                        if (!allItemsToShow.ContainsKey(key))
+                        {
+                            allItemsToShow[key] = file;
+                        }
+
+                        if (file.Dependencies != null)
+                        {
+                            foreach (var dep in file.Dependencies)
+                            {
+                                if (dep.WasTopLevelDiff && dep.Type.HasValue)
+                                {
+                                    if (!allItemsToShow.ContainsKey(dep.Path))
+                                    {
+                                        allItemsToShow[dep.Path] = new SerializableChunkDiff
+                                        {
+                                            Type = dep.Type.Value,
+                                            OldPath = dep.Path,
+                                            NewPath = dep.Path,
+                                            SourceWadFile = dep.SourceWad,
+                                            OldPathHash = dep.OldPathHash,
+                                            NewPathHash = dep.NewPathHash,
+                                            OldCompressionType = dep.CompressionType,
+                                            NewCompressionType = dep.CompressionType,
+                                            BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value, SourceWadFile = dep.SourceWad })
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     var statusOrder = new[] { ChunkDiffType.New, ChunkDiffType.Modified, ChunkDiffType.Renamed, ChunkDiffType.Removed, ChunkDiffType.Dependency };
+                    var statusGroups = allItemsToShow.Values.GroupBy(d => d.Type).ToDictionary(g => g.Key, g => g.ToList());
 
                     foreach (var statusType in statusOrder)
                     {
                         if (statusGroups.TryGetValue(statusType, out var filesInStatus))
                         {
-                            var statusNode = new FileSystemNodeModel(GetStatusPrefix(statusType), true, GetStatusPrefix(statusType), wadGroup.Key);
+                            string statusPrefix = GetStatusPrefix(statusType);
+                            var statusNode = new FileSystemNodeModel(statusPrefix, true, statusPrefix, wadGroup.Key);
                             statusNode.Status = GetDiffStatus(statusType);
                             statusNode.IsGroupingFolder = true;
                             wadNode.Children.Add(statusNode);
 
-                            var nodesToAdd = new List<FileSystemNodeModel>();
                             foreach (var file in filesInStatus.OrderBy(f => f.Path))
                             {
                                 string chunkPath = GetBackupChunkPath(backupRoot, file);
                                 file.BackupChunkPath = chunkPath;
                                 var status = GetDiffStatus(file.Type);
 
-                                var node = new FileSystemNodeModel(Path.GetFileName(file.Path), false, file.Path, wadGroup.Key)
+                                // The FullPath is the game path (for audio linker), the Name is just the file name
+                                string fileName = Path.GetFileName(file.Path);
+                                var node = new FileSystemNodeModel(fileName, false, file.Path, wadGroup.Key)
                                 {
                                     SourceChunkPathHash = file.NewPathHash,
                                     Status = status,
@@ -166,69 +205,13 @@ namespace AssetsManager.Services.Explorer
                                     OldPath = file.Type == ChunkDiffType.Renamed ? file.OldPath : null
                                 };
 
-                                if (file.Dependencies != null)
-                                {
-                                    var depNodesToAdd = new List<FileSystemNodeModel>();
-                                    foreach (var dep in file.Dependencies)
-                                    {
-                                        if (dep.WasTopLevelDiff && dep.Type.HasValue)
-                                        {
-                                            string depStatusPrefix = GetStatusPrefix(dep.Type.Value);
-                                            string depFileName = Path.GetFileName(dep.Path);
-                                            string prefixedFullPath = $"{depStatusPrefix}/{dep.Path}";
-
-                                            var depNode = new FileSystemNodeModel($"{depStatusPrefix} {depFileName}", false, prefixedFullPath, wadGroup.Key)
-                                            {
-                                                SourceChunkPathHash = dep.NewPathHash,
-                                                Status = GetDiffStatus(dep.Type.Value),
-                                                ChunkDiff = new SerializableChunkDiff
-                                                {
-                                                    Type = dep.Type.Value,
-                                                    OldPath = dep.Path,
-                                                    NewPath = dep.Path,
-                                                    SourceWadFile = dep.SourceWad,
-                                                    OldPathHash = dep.OldPathHash,
-                                                    NewPathHash = dep.NewPathHash,
-                                                    OldCompressionType = dep.CompressionType,
-                                                    NewCompressionType = dep.CompressionType,
-                                                    BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value, SourceWadFile = dep.SourceWad })
-                                                },
-                                                BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value, SourceWadFile = dep.SourceWad })
-                                            };
-                                            depNodesToAdd.Add(depNode);
-                                        }
-                                        else
-                                        {
-                                            string depFileName = Path.GetFileName(dep.Path);
-                                            var depNode = new FileSystemNodeModel(depFileName, false, dep.Path, wadGroup.Key)
-                                            {
-                                                SourceChunkPathHash = dep.NewPathHash,
-                                                Status = DiffStatus.Unchanged,
-                                                ChunkDiff = new SerializableChunkDiff
-                                                {
-                                                    Type = ChunkDiffType.Dependency,
-                                                    OldPath = dep.Path,
-                                                    NewPath = dep.Path,
-                                                    SourceWadFile = dep.SourceWad,
-                                                    OldPathHash = dep.OldPathHash,
-                                                    NewPathHash = dep.NewPathHash,
-                                                    OldCompressionType = dep.CompressionType,
-                                                    NewCompressionType = dep.CompressionType,
-                                                    BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified, SourceWadFile = dep.SourceWad })
-                                                },
-                                                BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = ChunkDiffType.Modified, SourceWadFile = dep.SourceWad })
-                                            };
-                                            depNodesToAdd.Add(depNode);
-                                        }
-                                    }
-                                    node.Children.AddRange(depNodesToAdd);
-                                }
-                                nodesToAdd.Add(node);
+                                statusNode.Children.Add(node);
                             }
-                            statusNode.Children.AddRange(nodesToAdd);
                         }
                     }
                 }
+                
+                PostProcessAudioNodes(wadNode);
                 rootNodes.Add(wadNode);
             }
 

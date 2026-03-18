@@ -1,37 +1,71 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class ImageDiffWindow : HudWindow
     {
+        // Batch Mode Properties
+        public static readonly DependencyProperty IsBatchModeProperty =
+            DependencyProperty.Register("IsBatchMode", typeof(bool), typeof(ImageDiffWindow), new PropertyMetadata(false));
+
+        public static readonly DependencyProperty CurrentFileIndexProperty =
+            DependencyProperty.Register("CurrentFileIndex", typeof(int), typeof(ImageDiffWindow), new PropertyMetadata(1));
+
+        public static readonly DependencyProperty TotalFilesCountProperty =
+            DependencyProperty.Register("TotalFilesCount", typeof(int), typeof(ImageDiffWindow), new PropertyMetadata(1));
+
+        public bool IsBatchMode
+        {
+            get => (bool)GetValue(IsBatchModeProperty);
+            set => SetValue(IsBatchModeProperty, value);
+        }
+
+        public int CurrentFileIndex
+        {
+            get => (int)GetValue(CurrentFileIndexProperty);
+            set => SetValue(CurrentFileIndexProperty, value);
+        }
+
+        public int TotalFilesCount
+        {
+            get => (int)GetValue(TotalFilesCountProperty);
+            set => SetValue(TotalFilesCountProperty, value);
+        }
+
+        private List<SerializableChunkDiff> _batchItems;
+        private string _oldPbePath;
+        private string _newPbePath;
+        private Func<SerializableChunkDiff, string, string, Task<(BitmapSource oldImage, BitmapSource newImage)>> _loadDataFunc;
+
         private bool _isInitialized = false;
         private Point _lastMousePosition;
         private bool _isDragging = false;
         private double _currentZoom = 1.0;
         private WriteableBitmap _diffMap;
 
+        public ImageDiffWindow() : this(null, null, null, null)
+        {
+        }
+
         public ImageDiffWindow(BitmapSource oldImage, BitmapSource newImage, string oldFileName, string newFileName)
         {
             InitializeComponent();
             
-            // Set data for both modes
-            OldImage.Source = oldImage;
-            NewImage.Source = newImage;
-            OldImageOverlay.Source = oldImage;
-            NewImageOverlay.Source = newImage;
-
-            OldFileNameLabel.Text = oldFileName;
-            NewFileNameLabel.Text = newFileName;
+            SetImageData(oldImage, newImage, oldFileName, newFileName);
 
             this.Closed += OnWindowClosed;
             this.SizeChanged += (s, e) => UpdateSliderEffect();
+            this.PreviewKeyDown += ImageDiffWindow_PreviewKeyDown;
 
             // Register Mouse Events for Zoom & Pan
             this.MouseWheel += ImageDiffWindow_MouseWheel;
@@ -46,6 +80,96 @@ namespace AssetsManager.Views.Dialogs
             // Force Side-by-Side as default
             SideBySideBtn.IsChecked = true;
             UpdateUIMode();
+        }
+
+        private void ImageDiffWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (Keyboard.Modifiers == ModifierKeys.Alt)
+            {
+                if (e.Key == Key.Right)
+                {
+                    BtnNextFile_Click(null, null);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Left)
+                {
+                    BtnPrevFile_Click(null, null);
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private void SetImageData(BitmapSource oldImage, BitmapSource newImage, string oldFileName, string newFileName)
+        {
+            // Clear previous diff map
+            _diffMap = null;
+            DiffImageOverlay.Source = null;
+
+            // Set data for both modes
+            OldImage.Source = oldImage;
+            NewImage.Source = newImage;
+            OldImageOverlay.Source = oldImage;
+            NewImageOverlay.Source = oldImage != null && newImage == null ? null : newImage; // Handle removals
+
+            OldFileNameLabel.Text = oldFileName ?? "N/A";
+            NewFileNameLabel.Text = newFileName ?? "N/A";
+
+            if (diffBtn_IsChecked()) GenerateDifferenceMap();
+        }
+
+        private bool diffBtn_IsChecked() => DiffBtn?.IsChecked == true;
+
+        public async Task LoadAndDisplayBatchDiffAsync(
+            List<SerializableChunkDiff> items,
+            int startIndex,
+            string oldPbePath,
+            string newPbePath,
+            Func<SerializableChunkDiff, string, string, Task<(BitmapSource oldImage, BitmapSource newImage)>> loadDataFunc)
+        {
+            _batchItems = items;
+            _oldPbePath = oldPbePath;
+            _newPbePath = newPbePath;
+            _loadDataFunc = loadDataFunc;
+
+            IsBatchMode = true;
+            TotalFilesCount = items.Count;
+            CurrentFileIndex = startIndex + 1;
+
+            await LoadCurrentBatchItemAsync();
+        }
+
+        private async Task LoadCurrentBatchItemAsync()
+        {
+            if (_batchItems == null || _batchItems.Count == 0 || _loadDataFunc == null) return;
+
+            var currentItem = _batchItems[CurrentFileIndex - 1];
+
+            // Show a loading indicator or similar if needed
+            var (oldImage, newImage) = await _loadDataFunc(currentItem, _oldPbePath, _newPbePath);
+
+            SetImageData(oldImage, newImage, currentItem.OldPath, currentItem.NewPath);
+            
+            // Reset zoom/pan when changing file? (Optional)
+            // _currentZoom = 1.0;
+            // ApplyTransform(scale: 1.0, deltaX: -OldTranslate.X, deltaY: -OldTranslate.Y);
+        }
+
+        private async void BtnPrevFile_Click(object sender, RoutedEventArgs e)
+        {
+            if (CurrentFileIndex > 1)
+            {
+                CurrentFileIndex--;
+                await LoadCurrentBatchItemAsync();
+            }
+        }
+
+        private async void BtnNextFile_Click(object sender, RoutedEventArgs e)
+        {
+            if (CurrentFileIndex < TotalFilesCount)
+            {
+                CurrentFileIndex++;
+                await LoadCurrentBatchItemAsync();
+            }
         }
 
         #region Difference Map Logic

@@ -37,7 +37,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         #endregion
 
         #region Properties
-        public JsonDiffModel State { get; } = new JsonDiffModel();
+        public JsonDiffModel ViewModel { get; } = new JsonDiffModel();
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public JsonFormatterService JsonFormatterService { get; set; }
         public JsonDiffWindow ParentWindow { get; set; }
@@ -47,7 +47,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         public JsonDiffControl()
         {
             InitializeComponent();
-            this.DataContext = State;
+            this.DataContext = ViewModel;
             
             // Peer injection
             DiffNavigationPanel.ParentControl = this;
@@ -173,6 +173,38 @@ namespace AssetsManager.Views.Dialogs.Controls
                 ParentWindow?.Close();
             }
         }
+
+        public async Task LoadAndDisplayBatchDiffAsync(
+            List<AssetsManager.Views.Models.Wad.SerializableChunkDiff> items,
+            int startIndex,
+            string oldPbePath,
+            string newPbePath,
+            Func<AssetsManager.Views.Models.Wad.SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> loadDataFunc)
+        {
+            ViewModel.BatchItems = items;
+            ViewModel.OldPbePath = oldPbePath;
+            ViewModel.NewPbePath = newPbePath;
+            ViewModel.LoadDataFunc = loadDataFunc;
+
+            ViewModel.IsBatchMode = true;
+            ViewModel.TotalFilesCount = items.Count;
+            ViewModel.CurrentFileIndex = startIndex + 1;
+
+            await LoadCurrentBatchItemAsync();
+        }
+
+        private async Task LoadCurrentBatchItemAsync()
+        {
+            if (ViewModel.BatchItems == null || ViewModel.BatchItems.Count == 0 || ViewModel.LoadDataFunc == null) return;
+
+            var currentItem = ViewModel.BatchItems[ViewModel.CurrentFileIndex - 1];
+
+            var (oldText, newText) = await ViewModel.LoadDataFunc(currentItem, ViewModel.OldPbePath, ViewModel.NewPbePath);
+
+            await LoadAndDisplayDiffAsync(oldText, newText, currentItem.OldPath, currentItem.NewPath);
+            FocusFirstDifference();
+            RefreshGuidePosition();
+        }
         #endregion
 
         #region View Logic
@@ -182,7 +214,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             try
             {
-                if (State.IsInlineMode)
+                if (ViewModel.IsInlineMode)
                 {
                     await SwitchToInlineView(percentageToRestore, explicitLine);
                 }
@@ -204,7 +236,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _unifiedModel = await Task.Run(() => new InlineDiffBuilder(new Differ()).BuildDiffModel(_oldText, _newText));
             }
 
-            var linesToShow = State.HideUnchangedLines
+            var linesToShow = ViewModel.HideUnchangedLines
                 ? _unifiedModel.Lines.Where(l => l.Type != ChangeType.Unchanged).ToList()
                 : _unifiedModel.Lines;
 
@@ -224,14 +256,14 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async Task SwitchToSideBySideView(double? percentageToRestore, int? explicitLine)
         {
-            var modelToShow = State.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
-            var originalModelForNav = State.HideUnchangedLines ? _originalDiffModel : null;
+            var modelToShow = ViewModel.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
+            var originalModelForNav = ViewModel.HideUnchangedLines ? _originalDiffModel : null;
 
             // Only recreate docs if not cached or if filtering changed content
-            bool needRecreate = _cachedOldDoc == null || State.HideUnchangedLines;
+            bool needRecreate = _cachedOldDoc == null || ViewModel.HideUnchangedLines;
 
             // Reuse cache if just switching modes without filtering
-            if (needRecreate && !State.HideUnchangedLines && _cachedOldDoc != null && OldJsonContent.Document == _cachedOldDoc)
+            if (needRecreate && !ViewModel.HideUnchangedLines && _cachedOldDoc != null && OldJsonContent.Document == _cachedOldDoc)
             {
                 needRecreate = false;
             }
@@ -295,6 +327,16 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             PreviousDiffButton_Click(null, null);
         }
+
+        private void NextFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+        {
+            BtnNextFile_Click(null, null);
+        }
+
+        private void PreviousFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+        {
+            BtnPrevFile_Click(null, null);
+        }
         #endregion
 
         #region Event Handlers
@@ -323,26 +365,44 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void WordWrapButton_Click(object sender, RoutedEventArgs e)
         {
-            OldJsonContent.WordWrap = State.IsWordWrapEnabled;
-            NewJsonContent.WordWrap = State.IsWordWrapEnabled;
-            UnifiedDiffEditor.WordWrap = State.IsWordWrapEnabled;
+            OldJsonContent.WordWrap = ViewModel.IsWordWrapEnabled;
+            NewJsonContent.WordWrap = ViewModel.IsWordWrapEnabled;
+            UnifiedDiffEditor.WordWrap = ViewModel.IsWordWrapEnabled;
         }
 
         private void NextDiffButton_Click(object sender, RoutedEventArgs e)
         {
-            var editor = State.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
             DiffNavigationPanel?.NavigateToNextDifference(GetCurrentLineRobust(editor));
         }
 
         private void PreviousDiffButton_Click(object sender, RoutedEventArgs e)
         {
-            var editor = State.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
             DiffNavigationPanel?.NavigateToPreviousDifference(GetCurrentLineRobust(editor));
+        }
+
+        public async void BtnPrevFile_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel.CurrentFileIndex > 1)
+            {
+                ViewModel.CurrentFileIndex--;
+                await LoadCurrentBatchItemAsync();
+            }
+        }
+
+        public async void BtnNextFile_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel.CurrentFileIndex < ViewModel.TotalFilesCount)
+            {
+                ViewModel.CurrentFileIndex++;
+                await LoadCurrentBatchItemAsync();
+            }
         }
 
         private void WordLevelDiffButton_Click(object sender, RoutedEventArgs e)
         {
-            var modelToShow = State.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
+            var modelToShow = ViewModel.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
             ApplyDiffHighlighting(modelToShow);
             OldJsonContent.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
             NewJsonContent.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
@@ -352,7 +412,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             _cachedOldDoc = null; // Force regeneration
 
-            var editor = State.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
             double currentPercentage = GetCurrentScrollPercentage(editor);
             
             await UpdateDiffView(currentPercentage, null);
@@ -405,7 +465,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void ScrollToPercentage(double percentage)
         {
-            if (State.IsInlineMode)
+            if (ViewModel.IsInlineMode)
             {
                 var targetY = (UnifiedDiffEditor.ExtentHeight - UnifiedDiffEditor.ViewportHeight) * percentage;
                 UnifiedDiffEditor.ScrollToVerticalOffset(targetY);
@@ -438,7 +498,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void ScrollToLine(int lineNumber)
         {
-            if (State.IsInlineMode)
+            if (ViewModel.IsInlineMode)
             {
                 UnifiedDiffEditor.ScrollTo(lineNumber, 0);
                 UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
@@ -500,8 +560,8 @@ namespace AssetsManager.Views.Dialogs.Controls
             OldJsonContent.TextArea.TextView.BackgroundRenderers.Clear();
             NewJsonContent.TextArea.TextView.BackgroundRenderers.Clear();
 
-            OldJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, State.IsWordLevelDiff, true));
-            NewJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, State.IsWordLevelDiff, false));
+            OldJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, ViewModel.IsWordLevelDiff, true));
+            NewJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, ViewModel.IsWordLevelDiff, false));
         }
         #endregion
     }

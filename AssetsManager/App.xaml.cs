@@ -154,6 +154,7 @@ namespace AssetsManager
       services.AddSingleton<SknLoadingService>();
       services.AddSingleton<ScoLoadingService>();
       services.AddSingleton<MapGeometryLoadingService>();
+      services.AddSingleton<ChromaScannerService>();
 
       // Audio Services
       services.AddSingleton<AudioBankService>();

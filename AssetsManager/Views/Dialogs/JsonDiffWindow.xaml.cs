@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -49,8 +51,19 @@ namespace AssetsManager.Views.Dialogs
         // Used by DiffViewService when the file content is already processed and available in memory.
         public async Task LoadAndDisplayDiffAsync(string oldText, string newText, string oldFileName, string newFileName)
         {
+            JsonDiffControl.ViewModel.IsBatchMode = false;
             JsonDiffControl.Visibility = Visibility.Visible;
             await JsonDiffControl.LoadAndDisplayDiffAsync(oldText, newText, oldFileName, newFileName);
+        }
+
+        public async Task LoadAndDisplayBatchDiffAsync(
+            List<SerializableChunkDiff> items, 
+            int startIndex, 
+            string oldPbePath, 
+            string newPbePath,
+            Func<SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> loadDataFunc)
+        {
+            await JsonDiffControl.LoadAndDisplayBatchDiffAsync(items, startIndex, oldPbePath, newPbePath, loadDataFunc);
         }
     }
 }

@@ -61,6 +61,9 @@ namespace AssetsManager.Views.Controls.Explorer
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
 
+        public string NewPbePath => NewLolPath ?? AppSettings.LolPbeDirectory;
+        public string OldPbePath => OldLolPath;
+
         public ObservableRangeCollection<FileSystemNodeModel> RootNodes => _viewModel.RootNodes;
 
         private readonly FileExplorerModel _viewModel;
@@ -639,18 +642,39 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void ViewChanges_Click(object sender, RoutedEventArgs e)
         {
-            if (FileTreeView.SelectedItem is not FileSystemNodeModel { ChunkDiff: not null } selectedNode) return;
+            // Use the TreeUIManager to get ALL multi-selected nodes, or the current one if none
+            var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
+            
+            // Filter only those that actually HAVE a difference to show
+            var nodesWithDiff = selectedNodes.Where(n => n.ChunkDiff != null).ToList();
 
-            string oldPbePath = this.OldLolPath;
-            string newPbePath = this.NewLolPath;
-
-            if (_viewModel.IsBackupMode)
+            if (nodesWithDiff.Count > 1 && FilePreviewer != null)
             {
-                oldPbePath = null;
-                newPbePath = null;
+                await FilePreviewer.HandleBatchDiffRequestAsync(nodesWithDiff);
+                return;
             }
 
-            await DiffViewService.ShowWadDiffAsync(selectedNode.ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _viewModel.IsBackupMode ? _backupJsonPath : null);
+            if (nodesWithDiff.Count == 1)
+            {
+                string oldPbePath = this.OldLolPath;
+                string newPbePath = this.NewLolPath;
+
+                if (_viewModel.IsBackupMode)
+                {
+                    oldPbePath = null;
+                    newPbePath = null;
+                }
+
+                await DiffViewService.ShowWadDiffAsync(nodesWithDiff[0].ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _viewModel.IsBackupMode ? _backupJsonPath : null);
+            }
+        }
+
+        public async void TriggerBatchDiff(List<FileSystemNodeModel> nodes)
+        {
+            if (FilePreviewer != null)
+            {
+                await FilePreviewer.HandleBatchDiffRequestAsync(nodes);
+            }
         }
 
         private void PinSelected_Click(object sender, RoutedEventArgs e)
@@ -747,11 +771,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     LogService.LogError(ex, $"Failed to add image '{node.Name}' to merger.");
                 }
             }
-
-            if (addedCount > 0)
-            {
-                LogService.LogSuccess($"Added {addedCount} images to collection tray.");
-            }
         }
 
         private void RemoveFavorite_Click(object sender, RoutedEventArgs e)
@@ -788,6 +807,11 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode) return;
 
+            // Update ViewModel selection so it can calculate values
+            _viewModel.SelectedItem = selectedNode;
+            _viewModel.SelectedNodes = new ObservableCollection<FileSystemNodeModel>(
+                TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, selectedNode));
+
             if (ExtractMenuItem is not null)
             {
                 ExtractMenuItem.IsEnabled = _viewModel.IsWadMode;
@@ -811,7 +835,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (ViewChangesMenuItem is not null)
             {
-                ViewChangesMenuItem.IsEnabled = selectedNode.Status == DiffStatus.Modified;
+                // Leverage ViewModel logic but assign manually to the Header/IsEnabled
+                ViewChangesMenuItem.Header = _viewModel.ViewChangesHeader;
+                ViewChangesMenuItem.IsEnabled = _viewModel.CanViewChanges;
             }
 
             if (AddToImageMergerMenuItem is not null)

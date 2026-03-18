@@ -17,7 +17,36 @@ namespace AssetsManager.Views.Models.Viewer
         public string Name { get; set; }
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
-        public TranslateTransform3D Transform { get; set; }
+
+        // --- Transformation Properties ---
+        private double _positionX;
+        private double _positionY;
+        private double _positionZ;
+        private double _rotationX;
+        private double _rotationY;
+        private double _rotationZ;
+        private double _scale = 1.0;
+
+        public double PositionX { get => _positionX; set { if (SetField(ref _positionX, value)) UpdateTransform(); } }
+        public double PositionY { get => _positionY; set { if (SetField(ref _positionY, value)) UpdateTransform(); } }
+        public double PositionZ { get => _positionZ; set { if (SetField(ref _positionZ, value)) UpdateTransform(); } }
+        public double RotationX { get => _rotationX; set { if (SetField(ref _rotationX, value)) UpdateTransform(); } }
+        public double RotationY { get => _rotationY; set { if (SetField(ref _rotationY, value)) UpdateTransform(); } }
+        public double RotationZ { get => _rotationZ; set { if (SetField(ref _rotationZ, value)) UpdateTransform(); } }
+        public double Scale { get => _scale; set { if (SetField(ref _scale, value)) UpdateTransform(); } }
+
+        private void UpdateTransform()
+        {
+            var group = new Transform3DGroup();
+            group.Children.Add(new ScaleTransform3D(_scale, _scale, _scale));
+            group.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), _rotationX)));
+            group.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), _rotationY)));
+            group.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), _rotationZ)));
+            group.Children.Add(new TranslateTransform3D(_positionX, _positionY, _positionZ));
+
+            if (RootVisual != null)
+                RootVisual.Transform = group;
+        }
 
         private ObservableRangeCollection<ModelPart> _parts;
         public ObservableRangeCollection<ModelPart> Parts
@@ -80,8 +109,7 @@ namespace AssetsManager.Views.Models.Viewer
         {
             Name = "New Model";
             RootVisual = new ModelVisual3D();
-            Transform = new TranslateTransform3D();
-            RootVisual.Transform = this.Transform;
+            UpdateTransform();
             Parts = new ObservableRangeCollection<ModelPart>();
             Animations = new ObservableRangeCollection<AnimationData>();
         }
@@ -123,33 +151,35 @@ namespace AssetsManager.Views.Models.Viewer
 
         public void Dispose()
         {
-            // Limpiar children del RootVisual
-            RootVisual?.Children.Clear();
-
-            // Limpiar Parts (geometrías y texturas)
-            if (Parts != null)
+            // 1. Limpiar transformaciones y visuales
+            if (RootVisual != null)
             {
-                Parts.CollectionChanged -= Parts_CollectionChanged;
-                foreach (var part in Parts)
+                RootVisual.Transform = null;
+                RootVisual.Children.Clear();
+            }
+
+            // 2. Limpiar Parts (geometrías y texturas críticas)
+            if (_parts != null)
+            {
+                _parts.CollectionChanged -= Parts_CollectionChanged;
+                foreach (var part in _parts)
                 {
                     part.PropertyChanged -= Part_PropertyChanged;
                     part.Dispose();
                 }
-                Parts.Clear();
+                _parts.Clear();
             }
 
-            // Limpiar animaciones
-            Animations.Clear();
-
+            // 3. Limpiar estado de animaciones
+            Animations?.Clear();
             CurrentAnimation = null;
             IsAnimationPaused = false;
             AnimationTime = 0;
 
-            // Limpiar referencias
+            // 4. Liberar referencias finales
             Skeleton = null;
             SkinnedMesh = null;
             RootVisual = null;
-            Transform = null;
         }
     }
 }

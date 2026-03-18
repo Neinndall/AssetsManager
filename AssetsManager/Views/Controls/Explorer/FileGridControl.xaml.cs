@@ -66,17 +66,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private void FileGridControl_Item_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is ListBoxItem itemContainer && itemContainer.DataContext is FileGridViewModel item)
-            {
-                if (InteractionHelper.IsPrimaryActionIntent())
-                {
-                    ParentPreviewer?.HandleNodeClicked(item.Node);
-                    e.Handled = true;
-                }
-            }
-        }
+
 
         private void FilterButton_Click(object sender, RoutedEventArgs e)
         {
@@ -110,6 +100,14 @@ namespace AssetsManager.Views.Controls.Explorer
             }).ToList();
 
             DisplayItems.ReplaceRange(filtered);
+        }
+
+        private void SelectionBehavior_PrimaryAction(object sender, RoutedEventArgs e)
+        {
+            if (e.OriginalSource is ListBoxItem item && item.DataContext is FileGridViewModel viewModel)
+            {
+                ParentPreviewer?.HandleNodeClicked(viewModel.Node);
+            }
         }
 
         private void ActionBar_Action_Click(object sender, RoutedEventArgs e)

@@ -109,75 +109,78 @@ namespace AssetsManager.Services.Viewer
 
         private SceneModel CreateSceneModel(SkinnedMesh skinnedMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)
         {
-            _logService.LogDebug("--- Displaying Model ---");
-            _logService.LogDebug($"Available texture keys: {string.Join(", ", loadedTextures.Keys)}");
-
-            var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh };
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
-
-            string defaultTextureKey = loadedTextures.Keys
-                .Where(k => k.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(k => k.Length)
-                .FirstOrDefault();
-
-            string skinName = modelName.Split('.')[0];
-            var parts = new List<ModelPart>();
-
-            foreach (var rangeObj in skinnedMesh.Ranges)
+            return Application.Current.Dispatcher.Invoke(() =>
             {
-                string materialName = rangeObj.Material.TrimEnd('\0');
-                MeshGeometry3D meshGeometry = new MeshGeometry3D();
+                _logService.LogDebug("--- Displaying Model ---");
+                _logService.LogDebug($"Available texture keys: {string.Join(", ", loadedTextures.Keys)}");
 
-                var positions = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
-                var subPositions = new Point3D[rangeObj.VertexCount];
-                for (int i = 0; i < rangeObj.VertexCount; i++)
+                var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh };
+                var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
+
+                string defaultTextureKey = loadedTextures.Keys
+                    .Where(k => k.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(k => k.Length)
+                    .FirstOrDefault();
+
+                string skinName = modelName.Split('.')[0];
+                var parts = new List<ModelPart>();
+
+                foreach (var rangeObj in skinnedMesh.Ranges)
                 {
-                    var p = positions[rangeObj.StartVertex + i];
-                    subPositions[i] = new Point3D(p.X, p.Y, p.Z);
+                    string materialName = rangeObj.Material.TrimEnd('\0');
+                    MeshGeometry3D meshGeometry = new MeshGeometry3D();
+
+                    var positions = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
+                    var subPositions = new Point3D[rangeObj.VertexCount];
+                    for (int i = 0; i < rangeObj.VertexCount; i++)
+                    {
+                        var p = positions[rangeObj.StartVertex + i];
+                        subPositions[i] = new Point3D(p.X, p.Y, p.Z);
+                    }
+                    meshGeometry.Positions = new Point3DCollection(subPositions);
+
+                    Int32Collection triangleIndices = new Int32Collection();
+                    var indices = skinnedMesh.Indices.Slice(rangeObj.StartIndex, rangeObj.IndexCount);
+                    foreach (var index in indices)
+                    {
+                        triangleIndices.Add((int)index - rangeObj.StartVertex);
+                    }
+                    meshGeometry.TriangleIndices = triangleIndices;
+
+                    var texCoords = skinnedMesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name).AsVector2Array();
+                    var subTexCoords = new System.Windows.Point[rangeObj.VertexCount];
+                    for (int i = 0; i < rangeObj.VertexCount; i++)
+                    {
+                        var uv = texCoords[rangeObj.StartVertex + i];
+                        subTexCoords[i] = new System.Windows.Point(uv.X, uv.Y);
+                    }
+                    meshGeometry.TextureCoordinates = new PointCollection(subTexCoords);
+
+                    string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey, _logService);
+
+                    var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
+
+                    var modelPart = new ModelPart
+                    {
+                        Name = string.IsNullOrEmpty(materialName) ? "Default" : materialName,
+                        Visual = new ModelVisual3D(),
+                        AllTextures = loadedTextures,
+                        AvailableTextureNames = availableTextureNames,
+                        SelectedTextureName = initialMatchingKey,
+                        Geometry = geometryModel
+                    };
+
+                    modelPart.Visual.Content = geometryModel;
+                    TextureUtils.UpdateMaterial(modelPart);
+
+                    parts.Add(modelPart);
+                    sceneModel.RootVisual.Children.Add(modelPart.Visual);
                 }
-                meshGeometry.Positions = new Point3DCollection(subPositions);
 
-                Int32Collection triangleIndices = new Int32Collection();
-                var indices = skinnedMesh.Indices.Slice(rangeObj.StartIndex, rangeObj.IndexCount);
-                foreach (var index in indices)
-                {
-                    triangleIndices.Add((int)index - rangeObj.StartVertex);
-                }
-                meshGeometry.TriangleIndices = triangleIndices;
-
-                var texCoords = skinnedMesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name).AsVector2Array();
-                var subTexCoords = new System.Windows.Point[rangeObj.VertexCount];
-                for (int i = 0; i < rangeObj.VertexCount; i++)
-                {
-                    var uv = texCoords[rangeObj.StartVertex + i];
-                    subTexCoords[i] = new System.Windows.Point(uv.X, uv.Y);
-                }
-                meshGeometry.TextureCoordinates = new PointCollection(subTexCoords);
-
-                string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey, _logService);
-
-                var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
-
-                var modelPart = new ModelPart
-                {
-                    Name = string.IsNullOrEmpty(materialName) ? "Default" : materialName,
-                    Visual = new ModelVisual3D(),
-                    AllTextures = loadedTextures,
-                    AvailableTextureNames = availableTextureNames,
-                    SelectedTextureName = initialMatchingKey,
-                    Geometry = geometryModel
-                };
-
-                modelPart.Visual.Content = geometryModel;
-                TextureUtils.UpdateMaterial(modelPart);
-
-                parts.Add(modelPart);
-                sceneModel.RootVisual.Children.Add(modelPart.Visual);
-            }
-
-            sceneModel.Parts.AddRange(parts);
-            _logService.LogDebug("--- Finished displaying model ---");
-            return sceneModel;
+                sceneModel.Parts.AddRange(parts);
+                _logService.LogDebug("--- Finished displaying model ---");
+                return sceneModel;
+            });
         }
     }
 }

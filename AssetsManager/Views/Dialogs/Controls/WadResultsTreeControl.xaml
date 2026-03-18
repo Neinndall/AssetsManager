@@ -112,61 +112,136 @@
                 </StackPanel>
             </Border>
 
-            <!-- 2. Professional Search & Filters Bar -->
+            <!-- 2. Unified Professional Tools Bar -->
             <Border Grid.Row="1" Padding="12,8" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/> <!-- Search Box -->
-                        <ColumnDefinition Width="Auto"/> <!-- Tools Section -->
-                    </Grid.ColumnDefinitions>
+                <DockPanel LastChildFill="True">
                     
-                    <!-- Search Box Area -->
-                    <TextBox x:Name="searchTextBox" 
-                             Style="{StaticResource StandardSearchBoxStyle}" 
-                             TextChanged="SearchTextBox_TextChanged"
-                             Margin="0,0,12,0"/>
-
-                    <!-- Tools Section -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- Surgical Filters Group -->
-                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="4,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <!-- 1. Technical Tools Group (Right Aligned) -->
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        
+                        <!-- Unified Technical Toolbox -->
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                             <StackPanel Orientation="Horizontal">
+                                
+                                <!-- 1.1 Analytical Insight -->
+                                <ToggleButton x:Name="DashboardToggle"
+                                              IsChecked="{Binding DashboardToggleChecked}"
+                                              Style="{StaticResource TransparentIconToggleButton}"
+                                              Width="28" Height="28"
+                                              ToolTip="Analytical Dashboard">
+                                    <materialIcons:MaterialIcon Kind="ChartBoxOutline" Width="16" Height="16" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon.Style>
+                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                        <Setter Property="Opacity" Value="1.0"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialIcons:MaterialIcon.Style>
+                                    </materialIcons:MaterialIcon>
+                                </ToggleButton>
+
+                                <!-- Internal Surgical Separator -->
+                                <Border Width="1" Height="16" Background="{StaticResource BorderColor}" Margin="4,0,4,0" Opacity="0.8"/>
+
+                                <!-- 1.2 Status Filters -->
+                                <!-- NEW -->
                                 <ToggleButton Style="{StaticResource TransparentIconToggleButton}" 
                                               IsChecked="{Binding ShowNew}" 
                                               ToolTip="Filter: New Assets" Width="28" Height="28">
-                                    <materialIcons:MaterialIcon Kind="PlusCircleOutline" Width="16" Height="16"/>
+                                    <materialIcons:MaterialIcon Kind="PlusCircleOutline" Width="16" Height="16">
+                                        <materialIcons:MaterialIcon.Style>
+                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                        <Setter Property="Opacity" Value="1.0"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialIcons:MaterialIcon.Style>
+                                    </materialIcons:MaterialIcon>
                                 </ToggleButton>
+                                
+                                <!-- MODIFIED -->
                                 <ToggleButton Style="{StaticResource TransparentIconToggleButton}" 
                                               IsChecked="{Binding ShowModified}" 
                                               ToolTip="Filter: Modified Assets" Width="28" Height="28" Margin="2,0,0,0">
-                                    <materialIcons:MaterialIcon Kind="PencilCircleOutline" Width="16" Height="16"/>
+                                    <materialIcons:MaterialIcon Kind="PencilCircleOutline" Width="16" Height="16">
+                                        <materialIcons:MaterialIcon.Style>
+                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                                        <Setter Property="Opacity" Value="1.0"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialIcons:MaterialIcon.Style>
+                                    </materialIcons:MaterialIcon>
                                 </ToggleButton>
+                                
+                                <!-- REMOVED -->
                                 <ToggleButton Style="{StaticResource TransparentIconToggleButton}" 
                                               IsChecked="{Binding ShowRemoved}" 
                                               ToolTip="Filter: Removed Assets" Width="28" Height="28" Margin="2,0,0,0">
-                                    <materialIcons:MaterialIcon Kind="MinusCircleOutline" Width="16" Height="16"/>
+                                    <materialIcons:MaterialIcon Kind="MinusCircleOutline" Width="16" Height="16">
+                                        <materialIcons:MaterialIcon.Style>
+                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                        <Setter Property="Opacity" Value="1.0"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialIcons:MaterialIcon.Style>
+                                    </materialIcons:MaterialIcon>
                                 </ToggleButton>
+                                
+                                <!-- RENAMED -->
                                 <ToggleButton Style="{StaticResource TransparentIconToggleButton}" 
                                               IsChecked="{Binding ShowRenamed}" 
                                               ToolTip="Filter: Renamed Assets" Width="28" Height="28" Margin="2,0,0,0">
-                                    <materialIcons:MaterialIcon Kind="SwapHorizontalCircleOutline" Width="16" Height="16"/>
+                                    <materialIcons:MaterialIcon Kind="SwapHorizontalCircleOutline" Width="16" Height="16">
+                                        <materialIcons:MaterialIcon.Style>
+                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                        <Setter Property="Opacity" Value="1.0"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialIcons:MaterialIcon.Style>
+                                    </materialIcons:MaterialIcon>
                                 </ToggleButton>
                             </StackPanel>
                         </Border>
-
-                        <!-- Visual Tools Separator -->
-                        <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0"/>
-
-                        <!-- View Toggles Group -->
-                        <ToggleButton x:Name="DashboardToggle"
-                                      IsChecked="{Binding DashboardToggleChecked}"
-                                      Style="{StaticResource TransparentIconToggleButton}"
-                                      Width="32" Height="32"
-                                      ToolTip="Toggle Analytical Dashboard">
-                            <materialIcons:MaterialIcon Kind="ChartPie" Width="18" Height="18" VerticalAlignment="Center"/>
-                        </ToggleButton>
                     </StackPanel>
-                </Grid>
+
+                    <!-- 2. Search Area (Fills remaining space) -->
+                    <Grid>
+                        <TextBox x:Name="searchTextBox" 
+                                 Style="{StaticResource StandardSearchBoxStyle}" 
+                                 TextChanged="SearchTextBox_TextChanged"
+                                 Margin="0,0,16,0"
+                                 Tag="Search differences..."/>
+                    </Grid>
+
+                </DockPanel>
             </Border>
 
             <!-- 3. Tree Content -->
@@ -236,8 +311,8 @@
                               SelectedItemChanged="ResultsTreeView_SelectedItemChanged">
                         <TreeView.ItemContainerStyle>
                             <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
+                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
                                 <Setter Property="ContextMenu" Value="{StaticResource WadDiffContextMenu}"/>
-                                <EventSetter Event="PreviewMouseRightButtonDown" Handler="TreeViewItem_PreviewMouseRightButtonDown"/>
                             </Style>
                         </TreeView.ItemContainerStyle>
                     </TreeView>

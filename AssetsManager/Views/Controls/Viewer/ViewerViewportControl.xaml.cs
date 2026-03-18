@@ -22,12 +22,14 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class ViewerViewportControl : UserControl
     {
+        private readonly ViewerViewportModel _viewModel;
+        public ViewerViewportModel ViewModel => _viewModel;
+
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
         public ViewerPanelControl Panel { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
-        public event EventHandler<bool> MaximizeClicked;
         public event Action SceneSetupRequested;
         public event Action MapGeometryLoadRequested;
 
@@ -36,7 +38,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private AnimationPlayer _animationPlayer;
         private DateTime _lastFrameTime;
 
-        private bool _isAutoRotating = false;
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
 
         private SceneModel _activeSceneModel;
@@ -50,6 +51,35 @@ namespace AssetsManager.Views.Controls.Viewer
         public ViewerViewportControl()
         {
             InitializeComponent();
+
+            _viewModel = new ViewerViewportModel();
+            DataContext = _viewModel;
+
+            _viewModel.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(ViewerViewportModel.IsAutoRotateActive))
+                {
+                    HandleAutoRotateChanged(_viewModel.IsAutoRotateActive);
+                }
+                else if (e.PropertyName == nameof(ViewerViewportModel.AmbientIntensity) ||
+                         e.PropertyName == nameof(ViewerViewportModel.LightRotation) ||
+                         e.PropertyName == nameof(ViewerViewportModel.LightHeight))
+                {
+                    UpdateStudioLighting();
+                }
+                else if (e.PropertyName == nameof(ViewerViewportModel.FieldOfView))
+                {
+                    UpdateFieldOfView();
+                }
+                else if (e.PropertyName == nameof(ViewerViewportModel.IsTransparentBg))
+                {
+                    SetGroundVisibility(!_viewModel.IsTransparentBg);
+                }
+                else if (e.PropertyName == nameof(ViewerViewportModel.ShowSkybox))
+                {
+                    SetSkyboxVisibility(_viewModel.ShowSkybox);
+                }
+            };
 
             Loaded += (s, e) =>
             {
@@ -69,6 +99,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _skyVisual = sky;
             _groundVisual = ground;
+
+            // Ensure initial state is applied
+            SetGroundVisibility(!_viewModel.IsTransparentBg);
+            SetSkyboxVisibility(_viewModel.ShowSkybox);
         }
 
 
@@ -162,11 +196,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _loadedModels.Clear();
             _activeSceneModel = null;
             
-            if (AutoRotateToggleButton != null)
-            {
-                AutoRotateToggleButton.IsChecked = false;
-            }
-            _isAutoRotating = false;
+            _viewModel.IsAutoRotateActive = false;
             ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
 
             _skeletonVisual.Points?.Clear();
@@ -184,7 +214,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == _activeSceneModel)
             {
-                if (_isAutoRotating)
+                if (_viewModel.IsAutoRotateActive)
                 {
                     var transformGroup = model.RootVisual.Transform as Transform3DGroup;
                     if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
@@ -204,7 +234,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SetActiveModel(SceneModel model)
         {
-            if (_isAutoRotating && _activeSceneModel != null)
+            if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
             {
                 var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
                 if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
@@ -222,7 +252,7 @@ namespace AssetsManager.Views.Controls.Viewer
             var deltaTime = (now - _lastFrameTime).TotalSeconds;
             _lastFrameTime = now;
 
-            if (_isAutoRotating && _activeSceneModel != null)
+            if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
             {
                 var transform = _activeSceneModel.RootVisual.Transform;
                 Transform3DGroup transformGroup;
@@ -286,34 +316,19 @@ namespace AssetsManager.Views.Controls.Viewer
             camera.Position = position;
             camera.LookDirection = lookDirection;
             camera.UpDirection = upDirection;
-            camera.FieldOfView = 45;
-            camera.NearPlaneDistance = 1.0; // Evita clipping cercano
-            camera.FarPlaneDistance = 50000; // Asegura ver objetos lejanos (Mapas completos)
+            
+            _viewModel.FieldOfView = 45; // MVVM Update
+            
+            camera.NearPlaneDistance = 1.0; 
+            camera.FarPlaneDistance = 50000;
         }
 
-        public void SetFieldOfView(double fov)
+        private void UpdateFieldOfView()
         {
             if (Viewport.Camera is PerspectiveCamera camera)
             {
-                camera.FieldOfView = fov;
+                camera.FieldOfView = _viewModel.FieldOfView;
             }
-        }
-
-        private double _currentPhi = 0;
-        private double _currentTheta = 0;
-        private double _currentAmbient = 100;
-
-        public void SetAmbientIntensity(double intensity)
-        {
-            _currentAmbient = intensity;
-            UpdateStudioLighting();
-        }
-
-        public void SetLightDirection(double phi, double theta)
-        {
-            _currentPhi = phi;
-            _currentTheta = theta;
-            UpdateStudioLighting();
         }
 
         private void UpdateStudioLighting()
@@ -321,13 +336,11 @@ namespace AssetsManager.Views.Controls.Viewer
             if (GlobalAmbientLight == null || StudioLight == null || FillLight == null) return;
 
             // 1. Set Ambient Color
-            byte ambVal = (byte)(255 * (_currentAmbient / 100.0));
+            byte ambVal = (byte)(255 * (_viewModel.AmbientIntensity / 100.0));
             GlobalAmbientLight.Color = Color.FromRgb(ambVal, ambVal, ambVal);
 
             // 2. Set Studio Lights Intensity (Inverse of Ambient)
-            // If Ambient is 100, Studio lights are 0 (Black).
-            // If Ambient is 0, Studio lights are 100 (Full Color).
-            double studioFactor = 1.0 - (_currentAmbient / 100.0);
+            double studioFactor = 1.0 - (_viewModel.AmbientIntensity / 100.0);
             
             if (studioFactor <= 0)
             {
@@ -343,21 +356,12 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             // 3. Update Studio Light Direction
-            double phiRad = _currentPhi * Math.PI / 180.0;
-            double thetaRad = _currentTheta * Math.PI / 180.0;
+            double phiRad = _viewModel.LightRotation * Math.PI / 180.0;
+            double thetaRad = _viewModel.LightHeight * Math.PI / 180.0;
             double x = Math.Cos(thetaRad) * Math.Sin(phiRad);
             double y = Math.Sin(thetaRad);
             double z = Math.Cos(thetaRad) * Math.Cos(phiRad);
             StudioLight.Direction = new Vector3D(-x, -y, -z);
-        }
-
-        public void ResetStudioLighting()
-        {
-            _currentAmbient = 100;
-            _currentPhi = 0;
-            _currentTheta = 0;
-            UpdateStudioLighting();
-            if (Viewport.Camera is PerspectiveCamera camera) camera.FieldOfView = 45;
         }
 
         public void SetSkyboxVisibility(bool isVisible)
@@ -489,36 +493,16 @@ namespace AssetsManager.Views.Controls.Viewer
             InitiateSnapshot(1.0);
         }
 
-        private void FpsToggleButton_Click(object sender, RoutedEventArgs e)
+        private void HandleAutoRotateChanged(bool isAutoRotating)
         {
-            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
+            if (!isAutoRotating && _activeSceneModel != null)
             {
-                Viewport3D.ShowFrameRate = toggleButton.IsChecked ?? false;
-            }
-        }
-
-        private void MaximizeToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
-            {
-                MaximizeClicked?.Invoke(this, toggleButton.IsChecked ?? false);
-            }
-        }
-
-        private void AutoRotateToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton)
-            {
-                _isAutoRotating = toggleButton.IsChecked ?? false;
-                if (!_isAutoRotating && _activeSceneModel != null)
+                var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
+                if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
                 {
-                    var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
-                    if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
-                    {
-                        Panel?.ApplyAutoRotation(((AxisAngleRotation3D)_autoRotation.Rotation).Angle);
-                        transformGroup.Children.Remove(_autoRotation);
-                        ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
-                    }
+                    Panel?.ApplyAutoRotation(((AxisAngleRotation3D)_autoRotation.Rotation).Angle);
+                    transformGroup.Children.Remove(_autoRotation);
+                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                 }
             }
         }

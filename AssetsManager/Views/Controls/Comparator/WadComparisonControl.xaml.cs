@@ -1,17 +1,11 @@
 using System;
-using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Threading.Tasks;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Views.Models.Comparator;
 using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
-using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Views.Controls.Comparator
 {
@@ -20,15 +14,7 @@ namespace AssetsManager.Views.Controls.Comparator
         public WadComparatorService WadComparatorService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
-        public DirectoriesCreator DirectoriesCreator { get; set; }
-        public AssetDownloader AssetDownloaderService { get; set; }
-        public WadDifferenceService WadDifferenceService { get; set; }
-        public WadPackagingService WadPackagingService { get; set; }
-        public BackupManager BackupManager { get; set; }
         public AppSettings AppSettings { get; set; }
-        public IServiceProvider ServiceProvider { get; set; }
-        public DiffViewService DiffViewService { get; set; }
-        public HashResolverService HashResolverService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
 
         public WadComparisonModel ViewModel => DataContext as WadComparisonModel;
