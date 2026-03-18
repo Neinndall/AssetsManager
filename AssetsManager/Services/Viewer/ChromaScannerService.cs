@@ -75,14 +75,33 @@ namespace AssetsManager.Services.Viewer
                             // Extract preview...
                             try
                             {
-                                string primaryTex = texFiles.FirstOrDefault(f => f.Contains("_tx_cm") || f.Contains("_base"));
-                                if (primaryTex == null) primaryTex = texFiles[0];
+                                // Strategy: Find all valid candidates and pick the one that is most likely the main diffuse map.
+                                // We look for textures containing both the chroma ID (dirName) and '_tx_cm'.
+                                var candidates = texFiles.Where(f => f.Contains(dirName, StringComparison.OrdinalIgnoreCase) && 
+                                                                    f.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase))
+                                                         .ToList();
 
-                                using (Stream stream = File.OpenRead(primaryTex))
+                                string primaryTex = null;
+
+                                if (candidates.Count > 0)
+                                {
+                                    // If we have multiple (like bigscreens, loadscreens, etc.), pick the SHORTEST filename.
+                                    // The main texture is usually the cleanest one: mordekaiser_skin58_tx_cm...
+                                    primaryTex = candidates.OrderBy(f => Path.GetFileName(f).Length).First();
+                                }
+                                else
+                                {
+                                    // Fallback to any '_tx_cm' or just the first file
+                                    primaryTex = texFiles.FirstOrDefault(f => f.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase)) 
+                                                 ?? texFiles[0];
+                                }
+
+                                using (FileStream stream = new FileStream(primaryTex, FileMode.Open, FileAccess.Read, FileShare.Read))
                                 {
                                     BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex");
                                     if (bitmap != null)
                                     {
+                                        if (bitmap.CanFreeze) bitmap.Freeze();
                                         skinModel.PreviewImage = bitmap;
                                         skinModel.SwatchColor = ExtractDominantColor(bitmap);
                                     }
