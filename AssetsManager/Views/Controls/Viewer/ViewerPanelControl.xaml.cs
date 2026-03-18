@@ -220,14 +220,17 @@ namespace AssetsManager.Views.Controls.Viewer
         /// </summary>
         public async void HandleChromaSelected(ChromaSkinModel skin)
         {
-            ViewModel.IsChromaGalleryVisible = false;
-            
             if (!string.IsNullOrEmpty(skin.ModelPath))
             {
+                // Cargamos primero el modelo en segundo plano
                 await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
+                
+                // Una vez cargado y con el viewport listo, ocultamos la galería
+                ViewModel.IsChromaGalleryVisible = false;
             }
             else
             {
+                ViewModel.IsChromaGalleryVisible = false;
                 CustomMessageBoxService.ShowWarning("Model Not Found", "Could not automatically find the .skn model for this skin folder.", Window.GetWindow(this));
             }
         }
