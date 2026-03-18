@@ -151,7 +151,7 @@ namespace AssetsManager.Views
             }
         }
 
-        private void OpenFile_Click(object sender, RoutedEventArgs e)
+        private async void OpenFile_Click(object sender, RoutedEventArgs e)
         {
             _isMapGeometry = false;
             var openFileDialog = new CommonOpenFileDialog
@@ -164,7 +164,7 @@ namespace AssetsManager.Views
             {
                 var extension = Path.GetExtension(openFileDialog.FileName).ToLower();
                 if (extension == ".skl") PanelControl.LoadSkeleton(openFileDialog.FileName);
-                else PanelControl.LoadInitialModel(openFileDialog.FileName);
+                else await PanelControl.LoadInitialModel(openFileDialog.FileName);
             }
         }
 

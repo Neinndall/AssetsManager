@@ -165,7 +165,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void LoadModelButton_Click(object sender, RoutedEventArgs e)
+        private async void LoadModelButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentMode == ViewerType.Skn)
             {
@@ -181,7 +181,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ProcessModelLoading(openFileDialog.FileName, null, false);
+                    await ProcessModelLoading(openFileDialog.FileName, null, false);
                 }
             }
             else
@@ -218,13 +218,13 @@ namespace AssetsManager.Views.Controls.Viewer
         /// <summary>
         /// Handles the selection of a chroma from the gallery.
         /// </summary>
-        public void HandleChromaSelected(ChromaSkinModel skin)
+        public async void HandleChromaSelected(ChromaSkinModel skin)
         {
             ViewModel.IsChromaGalleryVisible = false;
             
             if (!string.IsNullOrEmpty(skin.ModelPath))
             {
-                ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
+                await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
             }
             else
             {
@@ -232,9 +232,9 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void LoadInitialModel(string filePath)
+        public async Task LoadInitialModel(string filePath)
         {
-            ProcessModelLoading(filePath, null, true);
+            await ProcessModelLoading(filePath, null, true);
         }
 
         public void LoadSkeleton(string filePath)
@@ -251,7 +251,7 @@ namespace AssetsManager.Views.Controls.Viewer
             LogService.LogDebug($"Loaded skeleton: {Path.GetFileName(filePath)} for model {_viewModel.SelectedModel.Name}");
         }
 
-        public void ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
+        public async Task ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
         {
             _currentMode = ViewerType.Skn;
             ViewModel.IsMapMode = false;
@@ -261,17 +261,17 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (extension == ".sco" || extension == ".scb")
             {
-                newModel = ScoLoadingService.LoadModel(modelPath);
+                newModel = await Task.Run(() => ScoLoadingService.LoadModel(modelPath));
             }
             else
             {
                 if (string.IsNullOrEmpty(texturePath))
                 {
-                    newModel = SknLoadingService.LoadModel(modelPath);
+                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath));
                 }
                 else
                 {
-                    newModel = SknLoadingService.LoadModel(modelPath, texturePath);
+                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath));
                 }
             }
 

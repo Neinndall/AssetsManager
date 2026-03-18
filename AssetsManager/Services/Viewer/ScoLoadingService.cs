@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
@@ -122,73 +123,76 @@ namespace AssetsManager.Services.Viewer
 
         private SceneModel CreateSceneModel(StaticMesh staticMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)
         {
-            var sceneModel = new SceneModel { Name = modelName };
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
-            
-            // Group faces by material to create submeshes
-            var facesByMaterial = staticMesh.Faces.GroupBy(f => f.Material.TrimEnd('\0'));
-
-            foreach (var group in facesByMaterial)
+            return Application.Current.Dispatcher.Invoke(() =>
             {
-                string materialName = group.Key;
-                if (string.IsNullOrEmpty(materialName)) materialName = "Default";
+                var sceneModel = new SceneModel { Name = modelName };
+                var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
 
-                MeshGeometry3D meshGeometry = new MeshGeometry3D();
-                Point3DCollection positions = new Point3DCollection();
-                PointCollection textureCoordinates = new PointCollection();
-                Int32Collection triangleIndices = new Int32Collection();
+                // Group faces by material to create submeshes
+                var facesByMaterial = staticMesh.Faces.GroupBy(f => f.Material.TrimEnd('\0'));
 
-                int currentIndex = 0;
-
-                foreach (var face in group)
+                foreach (var group in facesByMaterial)
                 {
-                    // Vertex 0
-                    var v0 = staticMesh.Vertices[face.VertexId0];
-                    positions.Add(new Point3D(v0.X, v0.Y, v0.Z));
-                    textureCoordinates.Add(new System.Windows.Point(face.UV0.X, face.UV0.Y));
-                    triangleIndices.Add(currentIndex++);
+                    string materialName = group.Key;
+                    if (string.IsNullOrEmpty(materialName)) materialName = "Default";
 
-                    // Vertex 1
-                    var v1 = staticMesh.Vertices[face.VertexId1];
-                    positions.Add(new Point3D(v1.X, v1.Y, v1.Z));
-                    textureCoordinates.Add(new System.Windows.Point(face.UV1.X, face.UV1.Y));
-                    triangleIndices.Add(currentIndex++);
+                    MeshGeometry3D meshGeometry = new MeshGeometry3D();
+                    Point3DCollection positions = new Point3DCollection();
+                    PointCollection textureCoordinates = new PointCollection();
+                    Int32Collection triangleIndices = new Int32Collection();
 
-                    // Vertex 2
-                    var v2 = staticMesh.Vertices[face.VertexId2];
-                    positions.Add(new Point3D(v2.X, v2.Y, v2.Z));
-                    textureCoordinates.Add(new System.Windows.Point(face.UV2.X, face.UV2.Y));
-                    triangleIndices.Add(currentIndex++);
+                    int currentIndex = 0;
+
+                    foreach (var face in group)
+                    {
+                        // Vertex 0
+                        var v0 = staticMesh.Vertices[face.VertexId0];
+                        positions.Add(new Point3D(v0.X, v0.Y, v0.Z));
+                        textureCoordinates.Add(new System.Windows.Point(face.UV0.X, face.UV0.Y));
+                        triangleIndices.Add(currentIndex++);
+
+                        // Vertex 1
+                        var v1 = staticMesh.Vertices[face.VertexId1];
+                        positions.Add(new Point3D(v1.X, v1.Y, v1.Z));
+                        textureCoordinates.Add(new System.Windows.Point(face.UV1.X, face.UV1.Y));
+                        triangleIndices.Add(currentIndex++);
+
+                        // Vertex 2
+                        var v2 = staticMesh.Vertices[face.VertexId2];
+                        positions.Add(new Point3D(v2.X, v2.Y, v2.Z));
+                        textureCoordinates.Add(new System.Windows.Point(face.UV2.X, face.UV2.Y));
+                        triangleIndices.Add(currentIndex++);
+                    }
+
+                    meshGeometry.Positions = positions;
+                    meshGeometry.TextureCoordinates = textureCoordinates;
+                    meshGeometry.TriangleIndices = triangleIndices;
+
+                    // Attempt to find a matching texture
+                    // SCO files usually have material names that match texture names directly
+                    string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, modelName, loadedTextures.Keys, null, _logService);
+
+                    var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(Colors.White))); // White brush initially
+
+                    var modelPart = new ModelPart
+                    {
+                        Name = materialName,
+                        Visual = new ModelVisual3D(),
+                        AllTextures = loadedTextures,
+                        AvailableTextureNames = availableTextureNames,
+                        SelectedTextureName = initialMatchingKey,
+                        Geometry = geometryModel
+                    };
+
+                    modelPart.Visual.Content = geometryModel;
+                    TextureUtils.UpdateMaterial(modelPart); // Applies the texture if found
+
+                    sceneModel.Parts.Add(modelPart);
+                    sceneModel.RootVisual.Children.Add(modelPart.Visual);
                 }
 
-                meshGeometry.Positions = positions;
-                meshGeometry.TextureCoordinates = textureCoordinates;
-                meshGeometry.TriangleIndices = triangleIndices;
-
-                // Attempt to find a matching texture
-                // SCO files usually have material names that match texture names directly
-                string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, modelName, loadedTextures.Keys, null, _logService);
-
-                var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(Colors.White))); // White brush initially
-
-                var modelPart = new ModelPart
-                {
-                    Name = materialName,
-                    Visual = new ModelVisual3D(),
-                    AllTextures = loadedTextures,
-                    AvailableTextureNames = availableTextureNames,
-                    SelectedTextureName = initialMatchingKey,
-                    Geometry = geometryModel
-                };
-
-                modelPart.Visual.Content = geometryModel;
-                TextureUtils.UpdateMaterial(modelPart); // Applies the texture if found
-
-                sceneModel.Parts.Add(modelPart);
-                sceneModel.RootVisual.Children.Add(modelPart.Visual);
-            }
-
-            return sceneModel;
+                return sceneModel;
+            });
         }
     }
 }
