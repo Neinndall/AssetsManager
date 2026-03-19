@@ -101,11 +101,12 @@ namespace AssetsManager.Services.Viewer
                                     BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex");
                                     if (bitmap != null)
                                     {
-                                        if (bitmap.CanFreeze) bitmap.Freeze();
-                                        skinModel.PreviewImage = bitmap;
-                                        skinModel.SwatchColor = ExtractDominantColor(bitmap);
-                                    }
-                                }
+                                        bitmap.Freeze();
+                                            skinModel.PreviewImage = bitmap;
+                                            skinModel.SwatchColor = ExtractDominantColor(bitmap);
+                                            skinModel.PreviewTextureName = Path.GetFileNameWithoutExtension(primaryTex);
+                                        }
+                                        }
                             }
                             catch (Exception ex)
                             {

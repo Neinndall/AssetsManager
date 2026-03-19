@@ -64,9 +64,11 @@
                     <StackPanel Grid.Row="1" Margin="10,5,10,12" HorizontalAlignment="Center">
                         <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" 
                                    Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="CHROMA" FontSize="9" FontWeight="Black" 
+                        <TextBlock Text="{Binding PreviewTextureName}" FontSize="9" FontWeight="Black" 
                                    Foreground="{StaticResource TextMuted}" Opacity="0.5" 
-                                   HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                   HorizontalAlignment="Center" Margin="0,2,0,0"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="120"
+                                   ToolTip="{Binding PreviewTextureName}"/>
                     </StackPanel>
 
                     <!-- Selected Indicator -->
