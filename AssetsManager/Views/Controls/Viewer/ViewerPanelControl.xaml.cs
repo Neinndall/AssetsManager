@@ -235,6 +235,31 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        /// <summary>
+        /// Handles the selection of multiple chromas from the gallery.
+        /// </summary>
+        public async void HandleMultipleChromasSelected(List<ChromaSkinModel> skins)
+        {
+            var skinsWithModels = skins.Where(s => !string.IsNullOrEmpty(s.ModelPath)).ToList();
+            
+            if (skinsWithModels.Count > 0)
+            {
+                // Mantenemos la galería abierta durante la carga para mostrar el estado
+                foreach (var skin in skinsWithModels)
+                {
+                    await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
+                }
+
+                // Cerramos solo cuando todo está cargado
+                ViewModel.IsChromaGalleryVisible = false;
+            }
+            else
+            {
+                ViewModel.IsChromaGalleryVisible = false;
+                CustomMessageBoxService.ShowWarning("Models Not Found", "Could not automatically find the .skn models for the selected skins.", Window.GetWindow(this));
+            }
+        }
+
         public async Task LoadInitialModel(string filePath)
         {
             await ProcessModelLoading(filePath, null, true);
