@@ -102,9 +102,7 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 if (_selectedSkin != value)
                 {
-                    if (_selectedSkin != null) _selectedSkin.IsSelected = false;
                     _selectedSkin = value;
-                    if (_selectedSkin != null) _selectedSkin.IsSelected = true;
                     OnPropertyChanged();
                 }
             }

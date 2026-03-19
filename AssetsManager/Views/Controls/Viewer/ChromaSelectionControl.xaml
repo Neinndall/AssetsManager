@@ -101,13 +101,24 @@
                     </StackPanel>
                 </StackPanel>
 
-                <Button HorizontalAlignment="Right" Style="{StaticResource SecondaryButton}" 
-                        Padding="15,0" Height="32" Click="CloseButton_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" Margin="0,0,8,0"/>
-                        <TextBlock Text="CANCEL SELECTION" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource SecondaryButton}" 
+                            Padding="18,0" Height="32" Margin="0,0,10,0"
+                            Click="LoadSelectedButton_Click">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="PlayCircle" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="LOAD SELECTED" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource SecondaryButton}" 
+                            Padding="18,0" Height="32" Click="CloseButton_Click">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="CANCEL" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -64,10 +66,18 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (sender is FrameworkElement element && element.DataContext is ChromaSkinModel skin)
             {
+                // Toggle selection
+                skin.IsSelected = !skin.IsSelected;
                 _galleryData.SelectedSkin = skin;
-                
-                // Direct Peer Call
-                ParentPanel?.HandleChromaSelected(skin);
+            }
+        }
+
+        private void LoadSelectedButton_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedSkins = _galleryData.AvailableSkins.Where(s => s.IsSelected).ToList();
+            if (selectedSkins.Count > 0)
+            {
+                ParentPanel?.HandleMultipleChromasSelected(selectedSkins);
             }
         }
 
