@@ -10,26 +10,30 @@ using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
+    /// <summary>
+    /// ChromaSelectionControl: A specialized container for skin selection.
+    /// Following the "Contenedores (Dueños)" pattern from PBE.md.
+    /// </summary>
     public partial class ChromaSelectionControl : UserControl
     {
-        // Now using the shared ViewerPanelModel from the module
-        public ViewerPanelModel ViewModel => DataContext as ViewerPanelModel;
+        private readonly ChromaSelectionModel _viewModel;
 
-        // Internal list model for the gallery items (could be moved to ViewerPanelModel if needed)
-        // For now, we'll keep a dedicated model for the gallery logic to avoid bloating the panel model
-        private readonly ChromaSelectionModel _galleryData = new ChromaSelectionModel();
-        public ChromaSelectionModel GalleryData => _galleryData;
+        // The control owns its ViewModel
+        public ChromaSelectionModel ViewModel => _viewModel;
 
         // Dependency Injection via Property
         public ChromaScannerService ScannerService { get; set; }
 
-        // Peer Reference
+        // Peer Reference to the Parent Panel (Needed for model loading)
         public ViewerPanelControl ParentPanel { get; set; }
 
         public ChromaSelectionControl()
         {
             InitializeComponent();
-            // We don't set DataContext here anymore, it's injected from ViewerWindow.xaml
+            
+            // Pattern: Instancian su ViewModel en el constructor y lo asignan al DataContext
+            _viewModel = new ChromaSelectionModel();
+            DataContext = _viewModel;
         }
 
         /// <summary>
@@ -37,28 +41,28 @@ namespace AssetsManager.Views.Controls.Viewer
         /// </summary>
         public async Task InitializeAsync(string skinsPath)
         {
-            if (ScannerService == null) return;
+            if (ScannerService == null || _viewModel == null) return;
 
-            _galleryData.SetScanningState(System.IO.Path.GetFileName(skinsPath));
+            _viewModel.SetScanningState(System.IO.Path.GetFileName(skinsPath));
 
             try
             {
                 var skins = await ScannerService.ScanSkinsAsync(skinsPath);
-                _galleryData.AvailableSkins.ReplaceRange(skins);
-                _galleryData.ModelPath = ScannerService.FindAssociatedModel(skinsPath);
+                _viewModel.AvailableSkins.ReplaceRange(skins);
+                _viewModel.ModelPath = ScannerService.FindAssociatedModel(skinsPath);
 
                 if (skins.Count == 0)
                 {
-                    _galleryData.SetEmptyState();
+                    _viewModel.SetEmptyState();
                 }
                 else
                 {
-                    _galleryData.SetSuccessState(skins.Count);
+                    _viewModel.SetSuccessState(skins.Count);
                 }
             }
             catch (Exception ex)
             {
-                _galleryData.SetErrorState(ex.Message);
+                _viewModel.SetErrorState(ex.Message);
             }
         }
 
@@ -68,13 +72,13 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Toggle selection
                 skin.IsSelected = !skin.IsSelected;
-                _galleryData.SelectedSkin = skin;
+                _viewModel.SelectedSkin = skin;
             }
         }
 
         private void LoadSelectedButton_Click(object sender, RoutedEventArgs e)
         {
-            var selectedSkins = _galleryData.AvailableSkins.Where(s => s.IsSelected).ToList();
+            var selectedSkins = _viewModel.AvailableSkins.Where(s => s.IsSelected).ToList();
             if (selectedSkins.Count > 0)
             {
                 ParentPanel?.HandleMultipleChromasSelected(selectedSkins);
@@ -83,9 +87,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel != null)
+            // We use the Peer Reference to notify the parent to hide the gallery
+            if (ParentPanel?.ViewModel != null)
             {
-                ViewModel.IsChromaGalleryVisible = false;
+                ParentPanel.ViewModel.IsChromaGalleryVisible = false;
             }
         }
     }
