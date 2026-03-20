@@ -14,6 +14,7 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Views.Helpers;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
 using System.Windows.Threading;
@@ -33,6 +34,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public event Action SceneSetupRequested;
         public event Action MapGeometryLoadRequested;
 
+        private CustomCameraController _cameraController;
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
         private readonly PointsVisual3D _jointsVisual = new PointsVisual3D { Color = Colors.Blue, Size = 5 };
         private AnimationPlayer _animationPlayer;
@@ -84,6 +86,7 @@ namespace AssetsManager.Views.Controls.Viewer
             Loaded += (s, e) =>
             {
                 _animationPlayer = new AnimationPlayer(LogService);
+                _cameraController = new CustomCameraController(Viewport3D);
             };
 
             Unloaded += (s, e) => Cleanup();
@@ -129,6 +132,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             // 6. Limpiar referencias
             _animationPlayer = null;
+            _cameraController?.Dispose();
+            _cameraController = null;
             _skyVisual = null;
             _groundVisual = null;
         }
@@ -305,22 +310,54 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void ResetCamera()
+        public void ResetCamera(bool smooth = true)
         {
-            if (Viewport.Camera is not PerspectiveCamera camera) return;
+            var position = new Point3D(0.00, 2386.00, 670.00);
+            var lookDirection = new Vector3D(0.00, -250.00, -650.00);
+            var upDirection = new Vector3D(0.00, 1.00, 0.00);
 
-            var position = new Point3D(0, 2300, 465);
-            var lookDirection = new Vector3D(0, -164, -445);
-            var upDirection = new Vector3D(0, 1, 0);
+            if (smooth)
+            {
+                _cameraController?.Reset();
+            }
+            else
+            {
+                _cameraController?.SnapTo(position, lookDirection, upDirection);
+            }
 
-            camera.Position = position;
-            camera.LookDirection = lookDirection;
-            camera.UpDirection = upDirection;
-            
             _viewModel.FieldOfView = 45; // MVVM Update
-            
-            camera.NearPlaneDistance = 1.0; 
-            camera.FarPlaneDistance = 50000;
+        }
+
+        public void SnapCamera() => ResetCamera(false);
+
+        private void SetCameraView_Click(object sender, RoutedEventArgs e)
+        {
+            if (_cameraController == null || sender is not Button btn || btn.Tag is not string viewType) return;
+
+            switch (viewType)
+            {
+                case "Front":
+                    _cameraController.FlyTo(new Point3D(0.00, 2386.00, 670.00), new Vector3D(0.00, -250.00, -650.00), new Vector3D(0.00, 1.00, 0.00));
+                    break;
+                case "Back":
+                    _cameraController.FlyTo(new Point3D(11.53, 2363.16, -638.23), new Vector3D(-11.53, -227.16, 658.23), new Vector3D(0.00, 1.00, -0.03));
+                    break;
+                case "Left":
+                    _cameraController.FlyTo(new Point3D(-662.09, 2351.64, 8.41), new Vector3D(662.09, -215.64, 11.59), new Vector3D(-0.05, 1.00, -0.00));
+                    break;
+                case "Right":
+                    _cameraController.FlyTo(new Point3D(650.00, 2386.00, 20.00), new Vector3D(-650.00, -250.00, 0.00), new Vector3D(0.00, 1.00, 0.00));
+                    break;
+                case "Top":
+                    _cameraController.FlyTo(new Point3D(-1.43, 3658.20, 492.32), new Vector3D(-3.18, -675.83, -168.06), new Vector3D(0.00, 0.57, -0.82));
+                    break;
+                case "Bottom":
+                    _cameraController.FlyTo(new Point3D(3.62, 647.67, -135.37), new Vector3D(-0.74, 692.65, 72.33), new Vector3D(0.00, -0.45, 0.89));
+                    break;
+                case "Perspective":
+                    _cameraController.Reset();
+                    break;
+            }
         }
 
         private void UpdateFieldOfView()

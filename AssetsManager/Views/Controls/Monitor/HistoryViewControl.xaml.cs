@@ -71,7 +71,7 @@ namespace AssetsManager.Views.Controls.Monitor
             if (selectedEntry != null)
             {
                 var inputDialog = new InputDialog();
-                inputDialog.Initialize("Rename Comparison", "Enter a new name for this comparison:", selectedEntry.FileName);
+                inputDialog.Initialize("Rename Entry", "Enter a new name for this entry:", selectedEntry.FileName);
                 inputDialog.Owner = Window.GetWindow(this);
 
                 if (inputDialog.ShowDialog() == true)
@@ -81,7 +81,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     {
                         selectedEntry.FileName = newName;
                         AppSettings.Save();
-                        LogService.LogSuccess("Comparison renamed successfully.");
+                        LogService.LogSuccess("Renamed successfully.");
                     }
                 }
             }

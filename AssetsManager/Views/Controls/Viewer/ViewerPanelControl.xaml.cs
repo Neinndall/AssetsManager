@@ -333,7 +333,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewModel.SelectedModel = newModel;
                 ModelsListBox.SelectedItem = newModel;
 
-                Viewport?.ResetCamera();
+                Viewport?.SnapCamera();
                 LoadAnimationButton.IsEnabled = true;
             }
         }
@@ -448,7 +448,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewModel.LoadedModels.Clear();
                 _viewModel.LoadedModels.Add(newModel);
 
-                Viewport?.ResetCamera();
+                Viewport?.SnapCamera();
                 LoadModelButton.IsEnabled = false;
             }
         }

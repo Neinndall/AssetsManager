@@ -13,10 +13,13 @@ namespace AssetsManager.Views.Helpers
         private bool _isRotating;
         private System.Windows.Point _lastMousePosition;
         
-        // Smooth Zoom variables
+        // Smooth Zoom and Transition variables
         private Point3D _targetPosition;
-        private bool _isZooming;
-        private const double SmoothFactor = 0.15; // Adjusted for fluid feel (lower = smoother)
+        private Vector3D _targetLookDirection;
+        private Vector3D _targetUpDirection;
+        private bool _isTransitioning;
+        private const double SmoothFactor = 0.15; 
+        private const double TransitionThreshold = 0.05;
 
         public double ZoomSensitivity { get; set; } = 80.0;
 
@@ -31,10 +34,12 @@ namespace AssetsManager.Views.Helpers
             // Start the smooth update loop
             CompositionTarget.Rendering += OnRendering;
             
-            // Initialize target
+            // Initialize targets
             if (_viewport.Camera is ProjectionCamera camera)
             {
                 _targetPosition = camera.Position;
+                _targetLookDirection = camera.LookDirection;
+                _targetUpDirection = camera.UpDirection;
             }
         }
 
@@ -51,21 +56,76 @@ namespace AssetsManager.Views.Helpers
             }
         }
 
+        public void FlyTo(Vector3D lookDirection, Vector3D upDirection, double distance = 500)
+        {
+            lookDirection.Normalize();
+            var targetPos = new Point3D(0, 0, 0) - (lookDirection * distance);
+            FlyTo(targetPos, lookDirection, upDirection);
+        }
+
+        public void FlyTo(Point3D position, Vector3D lookDirection, Vector3D upDirection)
+        {
+            if (_viewport?.Camera is not ProjectionCamera camera) return;
+
+            _targetPosition = position;
+            _targetLookDirection = lookDirection;
+            _targetUpDirection = upDirection;
+            _isTransitioning = true;
+        }
+
+        public void SnapTo(Point3D position, Vector3D lookDirection, Vector3D upDirection)
+        {
+            if (_viewport?.Camera is not ProjectionCamera camera) return;
+
+            _targetPosition = position;
+            _targetLookDirection = lookDirection;
+            _targetUpDirection = upDirection;
+            _isTransitioning = false; // Instant
+
+            camera.Position = position;
+            camera.LookDirection = lookDirection;
+            camera.UpDirection = upDirection;
+        }
+
+        public void Reset()
+        {
+            // The "Professional League Front View" coordinates
+            var position = new Point3D(0.00, 2386.00, 670.00);
+            var lookDirection = new Vector3D(0.00, -250.00, -650.00);
+            var upDirection = new Vector3D(0.00, 1.00, 0.00);
+            
+            FlyTo(position, lookDirection, upDirection);
+        }
+
         private void OnRendering(object sender, EventArgs e)
         {
-            if (!_isZooming || _viewport?.Camera is not ProjectionCamera camera) return;
+            if (!_isTransitioning || _viewport?.Camera is not ProjectionCamera camera) return;
 
-            // Interpolate position (Lerp)
+            // Interpolate Position
             var currentPos = camera.Position;
             var newPos = currentPos + (_targetPosition - currentPos) * SmoothFactor;
-
             camera.Position = newPos;
 
+            // Interpolate LookDirection
+            var currentLook = camera.LookDirection;
+            var newLook = currentLook + (_targetLookDirection - currentLook) * SmoothFactor;
+            camera.LookDirection = newLook;
+
+            // Interpolate UpDirection
+            var currentUp = camera.UpDirection;
+            var newUp = currentUp + (_targetUpDirection - currentUp) * SmoothFactor;
+            camera.UpDirection = newUp;
+
             // Stop updating if we are close enough to the target
-            if ((newPos - _targetPosition).Length < 0.1)
+            bool posReached = (newPos - _targetPosition).Length < TransitionThreshold;
+            bool lookReached = (newLook - _targetLookDirection).Length < TransitionThreshold;
+
+            if (posReached && lookReached)
             {
                 camera.Position = _targetPosition;
-                _isZooming = false;
+                camera.LookDirection = _targetLookDirection;
+                camera.UpDirection = _targetUpDirection;
+                _isTransitioning = false;
             }
         }
 
@@ -81,8 +141,8 @@ namespace AssetsManager.Views.Helpers
                 _lastMousePosition = e.GetPosition(_viewport);
                 _viewport.Cursor = System.Windows.Input.Cursors.SizeAll;
                 
-                // Stop zooming if user starts rotating to prevent jerky camera
-                _isZooming = false;
+                // Stop transitions if user starts interacting
+                _isTransitioning = false;
             }
         }
 
@@ -108,10 +168,12 @@ namespace AssetsManager.Views.Helpers
 
                 _lastMousePosition = currentMousePosition;
                 
-                // Update target position after rotation to sync zoom target
+                // Update target position/dirs after rotation to sync
                 if (_viewport.Camera is ProjectionCamera camera)
                 {
                     _targetPosition = camera.Position;
+                    _targetLookDirection = camera.LookDirection;
+                    _targetUpDirection = camera.UpDirection;
                 }
             }
         }
@@ -135,14 +197,16 @@ namespace AssetsManager.Views.Helpers
                 speedMultiplier = 0.2; // Precision Mode
             }
 
-            // If we weren't already zooming, start from current camera position
-            if (!_isZooming)
+            // If we weren't already transitioning, start from current
+            if (!_isTransitioning)
             {
                 _targetPosition = camera.Position;
-                _isZooming = true;
+                _targetLookDirection = camera.LookDirection;
+                _targetUpDirection = camera.UpDirection;
+                _isTransitioning = true;
             }
 
-            // Increment the target, not the current position
+            // Increment the target position
             _targetPosition += lookDir * delta * ZoomSensitivity * speedMultiplier;
         }
 

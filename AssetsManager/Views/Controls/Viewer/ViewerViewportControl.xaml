@@ -46,6 +46,103 @@
                     </ModelVisual3D>
                 </helix:HelixViewport3D>
 
+                <!-- CAMERA GIMBAL HUD (Floating Orientation Controls) -->
+                <Border HorizontalAlignment="Right" 
+                        VerticalAlignment="Top" 
+                        Margin="0,24,24,0"
+                        Background="#CC18181B" 
+                        CornerRadius="20"
+                        Padding="4"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1"
+                        Visibility="{Binding IsToolbarVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="2" Opacity="0.3"/>
+                    </Border.Effect>
+
+                    <StackPanel Orientation="Vertical">
+                        <!-- Perspective View -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Perspective View"
+                                Click="SetCameraView_Click" Tag="Perspective"
+                                Width="32" Height="32" Margin="0,0,0,4">
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}"/>
+                        </Button>
+
+                        <Rectangle Height="1" Fill="#33FFFFFF" Margin="6,2" HorizontalAlignment="Stretch"/>
+
+                        <!-- Frontal (Y+) -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Front View"
+                                Click="SetCameraView_Click" Tag="Front"
+                                Width="32" Height="32">
+                            <materialIcons:MaterialIcon Kind="AxisYArrow" Width="16" Height="16" Foreground="#FF4CAF50"/> <!-- Green -->
+                        </Button>
+
+                        <!-- Trasera (Y-) -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Back View"
+                                Click="SetCameraView_Click" Tag="Back"
+                                Width="32" Height="32">
+                            <materialIcons:MaterialIcon Kind="AxisYArrow" Width="16" Height="16" Foreground="#FF4CAF50" Opacity="0.4" RenderTransformOrigin="0.5,0.5">
+                                <materialIcons:MaterialIcon.RenderTransform>
+                                    <ScaleTransform ScaleY="-1"/>
+                                </materialIcons:MaterialIcon.RenderTransform>
+                            </materialIcons:MaterialIcon>
+                        </Button>
+
+                        <!-- Derecha (X+) -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Right View"
+                                Click="SetCameraView_Click" Tag="Right"
+                                Width="32" Height="32">
+                             <materialIcons:MaterialIcon Kind="AxisXArrow" Width="16" Height="16" Foreground="#FFF44336" Opacity="0.4" RenderTransformOrigin="0.5,0.5">
+                                <materialIcons:MaterialIcon.RenderTransform>
+                                    <ScaleTransform ScaleX="-1"/>
+                                </materialIcons:MaterialIcon.RenderTransform>
+                            </materialIcons:MaterialIcon>
+                        </Button>
+
+                        <!-- Izquierda (X-) -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Left View"
+                                Click="SetCameraView_Click" Tag="Left"
+                                Width="32" Height="32">
+                            <materialIcons:MaterialIcon Kind="AxisXArrow" Width="16" Height="16" Foreground="#FFF44336" Opacity="0.4"/>
+                        </Button>
+
+                        <!-- Superior (Z+) -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Top View"
+                                Click="SetCameraView_Click" Tag="Top"
+                                Width="32" Height="32">
+                            <materialIcons:MaterialIcon Kind="AxisZArrow" Width="16" Height="16" Foreground="#FF2196F3"/> <!-- Blue -->
+                        </Button>
+
+                        <!-- Inferior (Z-) -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Bottom View"
+                                Click="SetCameraView_Click" Tag="Bottom"
+                                Width="32" Height="32">
+                            <materialIcons:MaterialIcon Kind="AxisZArrow" Width="16" Height="16" Foreground="#FF2196F3" Opacity="0.4" RenderTransformOrigin="0.5,0.5">
+                                <materialIcons:MaterialIcon.RenderTransform>
+                                    <ScaleTransform ScaleY="-1"/>
+                                </materialIcons:MaterialIcon.RenderTransform>
+                            </materialIcons:MaterialIcon>
+                        </Button>
+
+                        <Rectangle Height="1" Fill="#33FFFFFF" Margin="6,2" HorizontalAlignment="Stretch"/>
+
+                        <!-- Reset -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Reset All"
+                                Click="ResetCameraButton_Click"
+                                Width="32" Height="32" Margin="0,4,0,0">
+                            <materialIcons:MaterialIcon Kind="ArrowCollapseAll" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
                 <!-- FLOATING TOOLBAR -->
                 <Border HorizontalAlignment="Center" 
                         VerticalAlignment="Bottom" 
@@ -73,13 +170,6 @@
                         <Rectangle Width="1" Fill="#33FFFFFF" Margin="6,4" VerticalAlignment="Stretch"/>
 
                         <!-- Camera Controls -->
-                        <Button Style="{StaticResource TransparentIconButton}"
-                                ToolTip="Reset Camera"
-                                Click="ResetCameraButton_Click"
-                                Width="32" Height="32">
-                            <materialIcons:MaterialIcon Kind="Refresh" Width="16" Height="16"/>
-                        </Button>
-                        
                         <ToggleButton Style="{StaticResource TransparentIconToggleButton}"
                                       x:Name="AutoRotateToggleButton"
                                       ToolTip="Auto-Rotate"
