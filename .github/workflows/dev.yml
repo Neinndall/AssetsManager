@@ -38,16 +38,14 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: development
-        name: Development Builds (Latest Commits)
+        name: "AssetsManager Development Build"
         body: |
           ### 🛠 Automated Development Build
-          This release contains the latest automated build generated from the source code.
+          This release contains the latest automated builds generated from the `dev` branch.
           
-          **Last Commit:** ${{ github.event.head_commit.message }}
-          **SHA:** `${{ github.sha }}`
-          **Date:** ${{ github.event.head_commit.timestamp }}
+          **Last Commit SHA:** `${{ github.sha }}`
           
-          *Note: This is a pre-release build for testing new content and fixes.*
+          *Note: These are pre-release builds for testing purposes.*
         files: ./AssetsManager_Dev_${{ github.sha }}.zip
         prerelease: true
         generate_release_notes: false
