@@ -32,7 +32,7 @@ jobs:
 
     - name: Zip File
       shell: pwsh
-      run: Compress-Archive -Path ./publish/* -DestinationPath ./AssetsManager_Dev_${{ github.sha }}.zip
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./AssetsManager_dev_${{ github.sha }}.zip
 
     - name: Upload to Development Release
       uses: softprops/action-gh-release@v2
@@ -47,7 +47,7 @@ jobs:
           **SHA:** `${{ github.sha }}`
           
           *Note: These are pre-release builds for testing purposes.*
-        files: ./AssetsManager_Dev_${{ github.sha }}.zip
+        files: ./AssetsManager_dev_${{ github.sha }}.zip
         prerelease: true
         generate_release_notes: false
       env:
