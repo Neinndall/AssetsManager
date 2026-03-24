@@ -19,37 +19,47 @@
             </StackPanel>
         </Border>
 
-        <!-- NEW VERSION HUB CARD -->
-        <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="32" Margin="0,0,0,24">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+        <!-- HERO ACTION SECTION (Split) -->
+        <Grid Margin="0,0,0,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-                <!-- Icon Box -->
-                <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="12" Width="64" Height="64" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                    <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="32" Height="32" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+            <!-- Left: Development Center Info Card -->
+            <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Margin="0,0,10,0" Padding="20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <!-- Info -->
-                <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
-                    <TextBlock Text="DEVELOPMENT CENTER" FontWeight="Black" FontSize="16" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Explore the development history and download the latest builds directly from GitHub." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Width="48" Height="48" VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Github" Foreground="{StaticResource TextPrimary}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="Development Center" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Explore the development history and download the latest builds directly from GitHub." 
+                                   FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Right: Open Button -->
+            <Button Grid.Column="1"
+                    x:Name="btnOpenUpdateCenter" 
+                    Click="btnOpenUpdateCenter_Click"
+                    Style="{StaticResource SelectionCardButtonStyle}"
+                    Margin="0" Width="160" Padding="0"
+                    VerticalAlignment="Stretch">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="Open Center" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Check for updates" FontSize="11" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
-
-                <!-- Action -->
-                <Button Grid.Column="2" 
-                        x:Name="btnOpenUpdateCenter" 
-                        Content="OPEN UPDATE CENTER" 
-                        Click="btnOpenUpdateCenter_Click"
-                        Style="{StaticResource PrimaryButton}" 
-                        Height="40" Padding="24,0"
-                        FontSize="11" FontWeight="Black"
-                        VerticalAlignment="Center"/>
-            </Grid>
-        </Border>
+            </Button>
+        </Grid>
 
         <!-- INFORMATION SECTION -->
         <TextBlock Text="UPDATE POLICY" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,8,0,16"/>
