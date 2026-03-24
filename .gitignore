@@ -1,9 +1,3 @@
 # Ignorar carpetas de compilación
 bin/
 obj/
-
-# Ignorar carpetas de hashes
-hashes/
-
-# Ignorar archivos
-changelogs.txt
