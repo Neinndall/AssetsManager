@@ -48,8 +48,8 @@
 
             <!-- Right: Open Button -->
             <Button Grid.Column="1"
-                    x:Name="btnOpenUpdateCenter" 
-                    Click="btnOpenUpdateCenter_Click"
+                    x:Name="btnOpenUpdateCenter"
+                    Click="BtnOpenUpdateCenter_Click"
                     Style="{StaticResource SelectionCardButtonStyle}"
                     Margin="0" Width="160" Padding="0"
                     VerticalAlignment="Stretch">

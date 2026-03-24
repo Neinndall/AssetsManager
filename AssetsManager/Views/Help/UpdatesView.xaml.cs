@@ -49,9 +49,9 @@ namespace AssetsManager.Views.Help
             }
         }
 
-        private void btnOpenUpdateCenter_Click(object sender, RoutedEventArgs e)
+        private void BtnOpenUpdateCenter_Click(object sender, RoutedEventArgs e)
         {
-            var updatesWindow = App.ServiceProvider.GetRequiredService<Dialogs.UpdatesWindow>();
+            var updatesWindow = App.ServiceProvider.GetRequiredService<Dialogs.CommitHistoryWindow>();
             updatesWindow.Initialize(Model.CurrentVersion);
             updatesWindow.Owner = Application.Current.MainWindow;
             updatesWindow.ShowDialog();

@@ -199,7 +199,7 @@ namespace AssetsManager
       services.AddTransient<InputDialog>();
       services.AddTransient<ConfirmationDialog>();
       services.AddTransient<WadComparisonResultWindow>();
-      services.AddTransient<UpdatesWindow>();
+      services.AddTransient<CommitHistoryWindow>();
       services.AddTransient<NotepadWindow>();
       services.AddTransient<AudioPlayerWindow>();
       services.AddTransient<ConverterWindow>();

@@ -9,13 +9,13 @@ using AssetsManager.Services.Updater;
 
 namespace AssetsManager.Views.Dialogs
 {
-    public partial class UpdatesWindow
+    public partial class CommitHistoryWindow
     {
         private readonly UpdatesModel _viewModel;
         private readonly NotificationService _notificationService;
         private readonly UpdateManager _updateManager;
 
-        public UpdatesWindow(NotificationService notificationService, GitHubApiService gitHubApi, UpdateManager updateManager)
+        public CommitHistoryWindow(NotificationService notificationService, GitHubApiService gitHubApi, UpdateManager updateManager)
         {
             InitializeComponent();
             _notificationService = notificationService;
