@@ -18,16 +18,17 @@ jobs:
         fetch-depth: 0
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '10.0.x' # Configurado para .NET 10 (Preview)
+        dotnet-version: '10.0.x'
         include-prerelease: true
+        cache: true # Cache NuGet packages to speed up restore
 
     - name: .NET Restore
-      run: dotnet restore "./AssetsManager/AssetsManager.sln"
+      run: dotnet restore "./AssetsManager/AssetsManager.sln" -v minimal
 
     - name: .NET Publish
-      run: dotnet publish "./AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -p:PublishSingleFile=false -o "./publish/"
+      run: dotnet publish "./AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -p:PublishSingleFile=false -o "./publish/" -v minimal /p:AnalysisLevel=none
 
     - name: Zip File
       shell: pwsh
@@ -49,6 +50,6 @@ jobs:
           *Note: This is a pre-release build for testing new content and fixes.*
         files: ./AssetsManager_Dev_${{ github.sha }}.zip
         prerelease: true
-        generate_release_notes: true
+        generate_release_notes: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
