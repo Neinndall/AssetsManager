@@ -1,46 +1,6 @@
 AssetsManager - League of Legends | v3.2.2.3
 
 HOTFIX UPDATE
-This version introduces a comprehensive re-engineering of the Explorer Toolbar, transitioning from a static layout to a high-fidelity HUD multi-panel system with centralized style management and stabilized search mechanics.
-
-New Features
-  - Explorer / Professional HUD Toolbar
-    * Re-designed the **ExplorerToolbarControl** into a dual-panel architecture: a clean header for core actions and a professional expanded section for secondary tools.
-    * Implemented **Seamless Panel Fusion**: when expanded, the header and tools panel merge into a single visual unit by dynamically adjusting borders and corner radii.
-    * Integrated a **Compact Tools Suite**: secondary tools (Collapse, Backup, Mode, Grid, Path, Favs, Merger) are now aligned to the far left with a high-density footprint and 9pt typography for a cleaner engineering aesthetic.
-  - UI / Technical Settings Control
-    * Implemented the **ModernToggleSwitch** style: a professional industrial-grade toggle with a technical LED status indicator and 1.5px high-contrast hover feedback.
-
-Changes
-  - UI / Viewer Gimbal HUD Optimization
-    * Eliminated **Redundant Perspective View**: Removed the duplicate "Perspective" button from the ViewerViewportControl HUD to streamline the user interface and avoid confusion with the Front View/Reset actions.
-    * Corrected **Axis Iconography Standard**: Updated axis colors and icons to match the engineering standard (Z=Blue/Forward-Back, Y=Green/Top-Bottom, X=Red/Left-Right) for a more intuitive 3D navigation experience.
-
-Improvements
-  - UI / Settings Suite Evolution
-    * Re-engineered the Settings architecture into a **Horizontal Studio Layout**: transitioned from vertical blocks to a pro-tier action-on-the-right design for General and Advanced panels.
-    * Unified **HUD Spacing Standards**: implemented a mathematical grid system (6px subtitle gap, 18px item rhythm, 28px content indent) across all configuration views for pixel-perfect alignment.
-    * Optimized **Settings Sidebar**: refined the navigation header with a simplified "SETTINGS / PANEL" hierarchy and a more compact technical icon footprint.
-    * Path Management: re-designed **DefaultPathsSettingsView** with a high-width vertical layout to prevent path truncation while maintaining alignment consistency.
-  - UI / HUD Interactivity & Feedback
-    * Restored and refined the **AccentBrush Hover Protocol**: both icons and text now ignite with the system accent color upon interaction, providing instant visual feedback.
-    * Implemented **Forced White Iconography**: all toolbar icons now default to a high-contrast white/TextPrimary state for maximum visibility on dark HUD backgrounds.
-  - Architecture / Global Style Centralization
-    * Refactored **HUDToolItemStyle** and **HUDToolItemToggleStyle** from local resources to the global `ModernButton.xaml` dictionary, enhancing project maintainability and reusability.
-  - UI / Stabilized Search Experience
-    * Re-engineered the **AnimatedSearchBoxStyle**: stabilized the search placeholder (magnify icon + "Search...") to remain visible by default and perfectly steady during expansion/collapse animations.
-    * Optimized Search Geometry: increased the expanded search box width to **180px** for improved readability of complex queries.
-  - Explorer
-    * Reworked toolbar with vertical labels and dynamic action-oriented icons for Mode and Grouping tools.
-    * Adjusted main split proportions (850:900) to optimize tool layout and tree legibility.
-
-Bug Fixes
-  - Explorer / Search Placeholder Visibility
-    * Fixed a recurring bug where the search placeholder would flicker or disappear prematurely due to focus-state conflicts; implemented a content-based visibility trigger for 100% stability.
-  - UI / Double Border Artifacts
-    * Resolved a visual glitch where overlapping 1px borders created a "double line" effect between merged toolbar panels.
-  - JsonDiff
-    * Fixed inconsistent Next/Previous navigation by ensuring jumps are relative to the visible viewport when the caret is off-screen or at the document start.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
