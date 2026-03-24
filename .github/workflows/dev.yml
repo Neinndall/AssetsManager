@@ -43,7 +43,8 @@ jobs:
           ### 🛠 Automated Development Build
           This release contains the latest automated builds generated from the `dev` branch.
           
-          **Last Commit SHA:** `${{ github.sha }}`
+          **Last Commit:** ${{ github.event.head_commit.message }}
+          **SHA:** `${{ github.sha }}`
           
           *Note: These are pre-release builds for testing purposes.*
         files: ./AssetsManager_Dev_${{ github.sha }}.zip
