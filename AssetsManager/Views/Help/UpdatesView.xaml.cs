@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Info;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Core;
@@ -46,6 +47,14 @@ namespace AssetsManager.Views.Help
                 Model.IsUpdateAvailable = false;
                 Model.AvailableVersion = string.Empty;
             }
+        }
+
+        private void btnOpenUpdateCenter_Click(object sender, RoutedEventArgs e)
+        {
+            var updatesWindow = App.ServiceProvider.GetRequiredService<Dialogs.UpdatesWindow>();
+            updatesWindow.Initialize(Model.CurrentVersion);
+            updatesWindow.Owner = Application.Current.MainWindow;
+            updatesWindow.ShowDialog();
         }
 
         private async void buttonInstallUpdate_Click(object sender, RoutedEventArgs e)

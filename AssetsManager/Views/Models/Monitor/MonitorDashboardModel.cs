@@ -178,16 +178,23 @@ namespace AssetsManager.Views.Models.Monitor
             _statusService = statusService;
             _updateCheckService = updateCheckService;
 
-            // Set Initial App Version State (Normal)
+            // Set Initial App Version State based on Build Type (Stable vs Dev)
             AppVersionText = ApplicationInfos.Version;
-            AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
-            AppVersionIconKind = Material.Icons.MaterialIconKind.TagOutline;
+            
+            // Map ApplicationInfos color name to actual Brush
+            string colorHex = ApplicationInfos.IsStable ? "#2ECC71" : "#E67E22"; // Green vs Orange
+            AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colorHex));
+            
+            // Map Icon Kind
+            AppVersionIconKind = ApplicationInfos.IsStable ? 
+                Material.Icons.MaterialIconKind.CheckDecagram : 
+                Material.Icons.MaterialIconKind.FlaskOutline;
 
-            // Check if an update was already found before this model was created
+            // Check if an update was already found (Higher priority than Build Type)
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
             {
                 AppVersionText = $"{_updateCheckService.AvailableVersion} ready!";
-                AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
+                AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")); // Blue for available updates
                 AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
             }
 

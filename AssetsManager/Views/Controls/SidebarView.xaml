@@ -32,7 +32,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" 
-                                                   Kind="{Binding IsExpanded, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='MenuOpen,Menu'}" 
+                                                   Kind="{Binding IsExpanded, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='MenuOpen,Menu'}" 
                                                    Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         <TextBlock Grid.Column="1" Text="Panel" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
@@ -126,15 +126,15 @@
                     </Grid>
                 </RadioButton>
 
-                <!-- Version Info -->
-                <Border Margin="0,16,0,8" Opacity="0.6">
-                    <TextBlock Text="{x:Static info:ApplicationInfos.Version}" 
-                               FontWeight="Medium" 
-                               FontSize="9" 
-                               Foreground="{StaticResource TextMuted}" 
-                               HorizontalAlignment="Center" 
-                               Style="{StaticResource SidebarMenuTextStyle}"/>
-                </Border>
+                <!-- Version Display (Clean & Muted) -->
+                <TextBlock Text="{Binding Version}" 
+                           FontWeight="Medium"
+                           FontSize="9" 
+                           Foreground="{StaticResource TextMuted}" 
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           Margin="0,16,0,16"
+                           Style="{StaticResource SidebarMenuTextStyle}"/>
             </StackPanel>
             
         </Grid>

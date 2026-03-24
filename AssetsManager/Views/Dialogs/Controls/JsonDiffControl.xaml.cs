@@ -89,14 +89,15 @@ namespace AssetsManager.Views.Dialogs.Controls
                 OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
                 NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
                 
-                // Solo el editor de la derecha (New) actualiza la guía para evitar conflictos dobles
+                // Ambos editores actualizan la guía (v3.2.1.0 style) para máxima robustez ante asincronismo
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
                 NewJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
             };
         }
 
         private void Editor_GuideScrollChanged(object sender, EventArgs e)
         {
-            // Esto arregla el scroll arrastrando la guia (evita rebotes visuales)
+            // Esto asegura que la guía se mueva en tiempo real durante el scroll manual o arrastre
             RefreshGuidePosition();
         }
         #endregion
@@ -429,14 +430,31 @@ namespace AssetsManager.Views.Dialogs.Controls
         private int GetCurrentLineRobust(ICSharpCode.AvalonEdit.TextEditor editor)
         {
             if (editor == null) return 1;
+
             int caretLine = editor.TextArea.Caret.Line;
             double verticalOffset = editor.TextArea.TextView.ScrollOffset.Y;
 
-            if (caretLine == 1 && verticalOffset > 20)
+            // Determine the line at the top of the viewport
+            var visualTop = editor.TextArea.TextView.GetDocumentLineByVisualTop(verticalOffset);
+            int topVisibleLine = visualTop?.LineNumber ?? 1;
+
+            // Check if caret is visible in the current viewport
+            var textView = editor.TextArea.TextView;
+            bool isCaretVisible = false;
+            if (textView.VisualLines.Any())
             {
-                var visualTop = editor.TextArea.TextView.GetDocumentLineByVisualTop(verticalOffset);
-                if (visualTop != null) return visualTop.LineNumber;
+                int firstLine = textView.VisualLines.First().FirstDocumentLine.LineNumber;
+                int lastLine = textView.VisualLines.Last().LastDocumentLine.LineNumber;
+                isCaretVisible = caretLine >= firstLine && caretLine <= lastLine;
             }
+
+            // If the caret is at the default starting position (1) or not visible in current viewport,
+            // prioritize the top visible line as the reference for navigation.
+            if (caretLine == 1 || !isCaretVisible)
+            {
+                if (topVisibleLine > 0) return topVisibleLine;
+            }
+
             return caretLine;
         }
 
@@ -444,17 +462,14 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (target == null || target.TextArea?.TextView == null) return;
 
-            // Bloquear eventos de scroll en el destino mientras sincronizamos
             if (target == OldJsonContent) target.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
             else target.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
 
             try
             {
                 var sourceView = (TextView)sender;
-                var newV = Math.Min(sourceView.VerticalOffset, target.ExtentHeight - target.ViewportHeight);
-                var newH = Math.Min(sourceView.HorizontalOffset, target.ExtentWidth - target.ViewportWidth);
-                target.ScrollToVerticalOffset(newV);
-                target.ScrollToHorizontalOffset(newH);
+                target.ScrollToVerticalOffset(sourceView.VerticalOffset);
+                target.ScrollToHorizontalOffset(sourceView.HorizontalOffset);
             }
             finally
             {
@@ -467,33 +482,15 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (ViewModel.IsInlineMode)
             {
-                var targetY = (UnifiedDiffEditor.ExtentHeight - UnifiedDiffEditor.ViewportHeight) * percentage;
-                UnifiedDiffEditor.ScrollToVerticalOffset(targetY);
+                UnifiedDiffEditor.ScrollToVerticalOffset((UnifiedDiffEditor.ExtentHeight - UnifiedDiffEditor.ViewportHeight) * percentage);
                 return;
             }
 
-            if (OldJsonContent == null || NewJsonContent == null) return;
-
-            // DESCONEXIÓN FÍSICA de eventos (Método v3.0 ultra-seguro)
-            OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
-            NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
-            NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= Editor_GuideScrollChanged;
-
-            try
-            {
-                var oldTargetY = (OldJsonContent.ExtentHeight - OldJsonContent.ViewportHeight) * percentage;
-                var newTargetY = (NewJsonContent.ExtentHeight - NewJsonContent.ViewportHeight) * percentage;
-
-                OldJsonContent.ScrollToVerticalOffset(oldTargetY);
-                NewJsonContent.ScrollToVerticalOffset(newTargetY);
-            }
-            finally
-            {
-                // RECONEXIÓN
-                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
-            }
+            var oldTarget = (OldJsonContent.ExtentHeight - OldJsonContent.ViewportHeight) * percentage;
+            var newTarget = (NewJsonContent.ExtentHeight - NewJsonContent.ViewportHeight) * percentage;
+            
+            OldJsonContent.ScrollToVerticalOffset(oldTarget);
+            NewJsonContent.ScrollToVerticalOffset(newTarget);
         }
 
         public void ScrollToLine(int lineNumber)
@@ -502,40 +499,15 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 UnifiedDiffEditor.ScrollTo(lineNumber, 0);
                 UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
-                UnifiedDiffEditor.Focus();
                 return;
             }
 
-            if (OldJsonContent?.TextArea?.TextView == null || NewJsonContent?.TextArea?.TextView == null) return;
+            OldJsonContent.ScrollTo(lineNumber, 0);
+            NewJsonContent.ScrollTo(lineNumber, 0);
 
-            // Desconexión física de eventos de sincronización de scroll
-            OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
-            NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
-
-            try
-            {
-                OldJsonContent.ScrollTo(lineNumber, 0);
-                NewJsonContent.ScrollTo(lineNumber, 0);
-
-                if (DiffNavigationPanel != null)
-                {
-                    DiffNavigationPanel.CurrentLine = lineNumber;
-                    DiffNavigationPanel.UpdateViewportGuide();
-                }
-
-                // Layout global del control (como en v3.0)
-                this.UpdateLayout();
-
-                NewJsonContent.TextArea.Caret.Line = lineNumber;
-                NewJsonContent.TextArea.Caret.Column = 1;
-                NewJsonContent.Focus();
-            }
-            finally
-            {
-                // Reconexión
-                OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
-            }
+            OldJsonContent.TextArea.Caret.Line = lineNumber;
+            NewJsonContent.TextArea.Caret.Line = lineNumber;
+            NewJsonContent.Focus();
         }
 
         private SideBySideDiffModel FilterDiffModel(SideBySideDiffModel originalModel)

@@ -64,6 +64,7 @@ namespace AssetsManager
       // Core Services
       services.AddSingleton<LogService>();
       services.AddSingleton<NotificationService>();
+      services.AddSingleton<GitHubApiService>();
       services.AddSingleton<TaskCancellationManager>();
       services.AddSingleton<DiffViewService>();
       services.AddSingleton<CustomMessageBoxService>();
@@ -198,6 +199,7 @@ namespace AssetsManager
       services.AddTransient<InputDialog>();
       services.AddTransient<ConfirmationDialog>();
       services.AddTransient<WadComparisonResultWindow>();
+      services.AddTransient<UpdatesWindow>();
       services.AddTransient<NotepadWindow>();
       services.AddTransient<AudioPlayerWindow>();
       services.AddTransient<ConverterWindow>();

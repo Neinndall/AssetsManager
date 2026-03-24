@@ -7,131 +7,95 @@
              mc:Ignorable="d" 
              d:DesignHeight="1200" d:DesignWidth="850">
 
-    <StackPanel Margin="0,0,0,40">
-        <!-- MODERN INTEGRATED HEADER (Compact) -->
-        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+    <StackPanel Margin="0,16,0,40">
+        <!-- SECTION: GAME INSTALLATIONS -->
+        <StackPanel Margin="0,0,0,40">
+            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
+                <StackPanel Orientation="Horizontal">
+                    <materialIcons:MaterialIcon Kind="MonitorDashboard" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="GAME INSTALLATIONS" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,1,0,0"/>
+                </StackPanel>
+            </Border>
 
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="FolderOutline" Width="22" Height="22" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Default Paths" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Configure default directories for the application" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+            <StackPanel Margin="28,0,0,0">
+                <!-- PBE -->
+                <StackPanel Margin="0,0,0,28">
+                    <TextBlock Text="PBE Client Directory" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                    <TextBlock Text="Main location for League of Legends Public Beta Environment files" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,12"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolPbeDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="1" Click="btnBrowseLol_Click" Style="{StaticResource BrowseButtonStyle}" Width="44" Height="38">
+                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
+                        </Button>
+                    </Grid>
                 </StackPanel>
 
-                <!-- Subtle Decorative Background Icon -->
-                <materialIcons:MaterialIcon Grid.Column="1" Kind="GamepadVariantOutline" Width="64" Height="64" Foreground="{StaticResource AccentGreen}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
-            </Grid>
-        </Border>
-
-        <!-- SECTION 2: LoL Client Directories -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <!-- Header -->
-                <Grid Margin="0,0,0,24">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="40" Height="40" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <materialIcons:MaterialIcon Kind="MonitorDashboard" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
-                        <TextBlock Text="Game Installations" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Pointing to your local League of Legends game files" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Grid>
-
-                <Grid Margin="8,0,0,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Width="2" Background="{StaticResource AccentBrush}" Opacity="0.2" CornerRadius="1" Margin="0,4,20,4"/>
-
-                    <StackPanel Grid.Column="1">
-                        <!-- PBE Directory -->
-                        <TextBlock Text="PBE Client Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Directory for the Public Beta server" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                        <Grid Margin="0,0,0,24">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBox x:Name="textBoxLolPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolPbeDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button x:Name="btnBrowseLol" Grid.Column="1" Click="btnBrowseLol_Click" Style="{StaticResource BrowseButtonStyle}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-
-                        <!-- Live Directory -->
-                        <TextBlock Text="Live Client Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Directory for the official server" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBox x:Name="textBoxLolLivePath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolLiveDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button x:Name="btnBrowseLolLive" Grid.Column="1" Click="btnBrowseLolLive_Click" Style="{StaticResource BrowseButtonStyle}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </StackPanel>
-                </Grid>
+                <!-- Live -->
+                <StackPanel>
+                    <TextBlock Text="Live Client Directory" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                    <TextBlock Text="Main location for League of Legends Live Environment files" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,12"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolLiveDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="1" Click="btnBrowseLolLive_Click" Style="{StaticResource BrowseButtonStyle}" Width="44" Height="38">
+                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
+                        </Button>
+                    </Grid>
+                </StackPanel>
             </StackPanel>
-        </Border>
+        </StackPanel>
 
-        <!-- SECTION 3: Visual & Output -->
-        <Border Style="{StaticResource SettingsCard}">
-            <StackPanel>
-                <!-- Header -->
-                <Grid Margin="0,0,0,24">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="40" Height="40" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <materialIcons:MaterialIcon Kind="PaletteSwatchOutline" Foreground="{StaticResource AccentBlue}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
-                        <TextBlock Text="Visual &amp; Output Resources" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Customize viewport textures and extraction defaults" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Grid>
+        <Separator Background="{StaticResource BorderColor}" Margin="0,0,0,32" Opacity="0.3"/>
 
-                <Grid Margin="8,0,0,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Width="2" Background="{StaticResource AccentBlue}" Opacity="0.2" CornerRadius="1" Margin="0,4,20,4"/>
+        <!-- SECTION: RESOURCES & OUTPUT -->
+        <StackPanel>
+            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
+                <StackPanel Orientation="Horizontal">
+                    <materialIcons:MaterialIcon Kind="PaletteSwatchOutline" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="RESOURCES &amp; OUTPUT" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,1,0,0"/>
+                </StackPanel>
+            </Border>
 
-                    <StackPanel Grid.Column="1">
-                        <!-- Custom Floor -->
-                        <TextBlock Text="Custom Floor Texture" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Custom image file for the 3D viewer's floor plane" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                        <Grid Margin="0,0,0,24">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBox x:Name="textBoxCustomFloorTexturePath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.CustomFloorTexturePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button x:Name="btnBrowseCustomFloorTexture" Grid.Column="1" Click="btnBrowseCustomFloorTexture_Click" Style="{StaticResource BrowseButtonStyle}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="ImageOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
+            <StackPanel Margin="28,0,0,0">
+                <!-- Custom Floor -->
+                <StackPanel Margin="0,0,0,28">
+                    <TextBlock Text="Viewport Floor Texture" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                    <TextBlock Text="Custom image source for the 3D viewer floor plane" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,12"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.CustomFloorTexturePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="1" Click="btnBrowseCustomFloorTexture_Click" Style="{StaticResource BrowseButtonStyle}" Width="44" Height="38">
+                            <materialIcons:MaterialIcon Kind="ImageOutline" Width="18" Height="18"/>
+                        </Button>
+                    </Grid>
+                </StackPanel>
 
-                        <!-- Extraction Select Directory -->
-                        <TextBlock Text="Default Extraction Directory" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Preset folder for exporting manual asset selections" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBox x:Name="textBoxDefaultExtractedPath" Grid.Column="0" Style="{StaticResource ModernTextBox}" Height="36" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.DefaultExtractedSelectDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button x:Name="btnBrowseDefaultExtracted" Grid.Column="1" Click="btnBrowseDefaultExtracted_Click" Style="{StaticResource BrowseButtonStyle}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="FolderDownloadOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </StackPanel>
-                </Grid>
+                <!-- Extraction -->
+                <StackPanel>
+                    <TextBlock Text="Default Extraction Directory" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                    <TextBlock Text="Target folder for manual asset exports" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,12"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.DefaultExtractedSelectDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="1" Click="btnBrowseDefaultExtracted_Click" Style="{StaticResource BrowseButtonStyle}" Width="44" Height="38">
+                            <materialIcons:MaterialIcon Kind="FolderDownloadOutline" Width="18" Height="18"/>
+                        </Button>
+                    </Grid>
+                </StackPanel>
             </StackPanel>
-        </Border>
+        </StackPanel>
     </StackPanel>
 </UserControl>

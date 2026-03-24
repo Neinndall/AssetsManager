@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using Material.Icons;
 
 namespace AssetsManager.Info
 {
@@ -20,5 +21,10 @@ namespace AssetsManager.Info
                 return baseVersion;
             }
         }
+
+        public static bool IsStable => true;
+        public static string BuildType => IsStable ? "STABLE BUILD" : "DEVELOPMENT BUILD";
+        public static MaterialIconKind BuildIcon => IsStable ? MaterialIconKind.CheckDecagram : MaterialIconKind.FlaskOutline;
+        public static string BuildColorKey => IsStable ? "AccentGreen" : "AccentOrange";
     }
 }

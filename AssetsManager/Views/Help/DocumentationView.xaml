@@ -6,27 +6,16 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="1200" d:DesignWidth="900">
-    <StackPanel Margin="0">
-        <!-- 1. MODERN INTEGRATED HEADER (Compact) -->
-        <Border Margin="0,0,0,32" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="BookOpenVariant" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Documentation" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Essential guides and modules to master AssetsManager" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+    <StackPanel Margin="0,16,0,40">
+        <!-- SECTION: TECHNICAL DOCUMENTATION -->
+        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
+            <StackPanel Orientation="Horizontal">
+                <materialIcons:MaterialIcon Kind="BookOpenVariant" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="TECHNICAL DOCUMENTATION" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0"/>
+                    <TextBlock Text="Essential guides and modules to master AssetsManager" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Opacity="0.8" Margin="0,2,0,0"/>
                 </StackPanel>
-
-                <!-- Subtle Decorative Background Icon -->
-                <materialIcons:MaterialIcon Grid.Column="1" Kind="Library" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
-            </Grid>
+            </StackPanel>
         </Border>
 
         <!-- 2. CORE MODULES GRID -->

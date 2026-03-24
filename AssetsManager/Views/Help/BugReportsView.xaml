@@ -6,26 +6,16 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="800">
-    <StackPanel>
-        <!-- MODERN INTEGRATED HEADER (Compact) -->
-        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="BugOutline" Width="22" Height="22" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Bug Reports" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Help us improve the application by providing quality feedback" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+    <StackPanel Margin="0,16,0,40">
+        <!-- SECTION: QUALITY ASSURANCE -->
+        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
+            <StackPanel Orientation="Horizontal">
+                <materialIcons:MaterialIcon Kind="BugOutline" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="QUALITY ASSURANCE" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0"/>
+                    <TextBlock Text="Submit and track technical issues for continuous system improvement" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Opacity="0.8" Margin="0,2,0,0"/>
                 </StackPanel>
-
-                <materialIcons:MaterialIcon Grid.Column="1" Kind="Bug" Width="64" Height="64" Foreground="{StaticResource AccentOrange}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
-            </Grid>
+            </StackPanel>
         </Border>
 
         <!-- HERO ACTION SECTION (Split) -->

@@ -285,6 +285,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (_isBackupMode != value) 
                 { 
                     _isBackupMode = value; 
+                    Toolbar.IsBackupMode = value;
                     OnPropertyChanged(); 
                     OnPropertyChanged(nameof(AreFavoritesVisible));
                     OnPropertyChanged(nameof(IsFavoritesToggleVisible));

@@ -354,9 +354,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 case "Bottom":
                     _cameraController.FlyTo(new Point3D(3.62, 647.67, -135.37), new Vector3D(-0.74, 692.65, 72.33), new Vector3D(0.00, -0.45, 0.89));
                     break;
-                case "Perspective":
-                    _cameraController.Reset();
-                    break;
             }
         }
 

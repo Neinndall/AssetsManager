@@ -22,8 +22,8 @@ public class ManifestDownloader
     private readonly HttpClient _httpClient;
     private readonly LogService _logService;
     private readonly DirectoriesCreator _directoriesCreator;
+    private readonly HashService _hashService;
     private readonly string _bundleBaseUrl = "https://lol.dyn.riotcdn.net/channels/public/bundles";
-    private readonly HashService _hashService = new HashService();
     
     // Pools de recursos reutilizables
     private readonly ConcurrentStack<Decompressor> _decompressorPool = new ConcurrentStack<Decompressor>();
@@ -32,11 +32,12 @@ public class ManifestDownloader
 
     public event Action<string, string, int, int> ProgressChanged;
 
-    public ManifestDownloader(HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator)
+    public ManifestDownloader(HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator, HashService hashService)
     {
         _httpClient = httpClient;
         _logService = logService;
         _directoriesCreator = directoriesCreator;
+        _hashService = hashService;
         
         // Inicializar pools
         for (int i = 0; i < 4; i++) _decompressorPool.Push(new Decompressor());
