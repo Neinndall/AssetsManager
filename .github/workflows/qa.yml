@@ -1,8 +1,8 @@
-name: AssetsManager DEV Builder
+name: AssetsManager QA Builder
 
 on:
   push:
-    branches: [ dev ] # Se activa al subir cambios a la rama 'dev'
+    branches: [ qa ] # Se activa al subir cambios a la rama 'qa'
 
 permissions:
   contents: write
@@ -32,22 +32,22 @@ jobs:
 
     - name: Zip File
       shell: pwsh
-      run: Compress-Archive -Path ./publish/* -DestinationPath ./AssetsManager_dev_${{ github.sha }}.zip
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./AssetsManager_qa_${{ github.sha }}.zip
 
-    - name: Upload to Development Release
+    - name: Upload to QA Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: development
-        name: "AssetsManager Development Build"
+        tag_name: qa
+        name: "AssetsManager QA Build"
         body: |
-          ### 🛠 Automated Development Build
-          This release contains the latest automated builds generated from the `dev` branch.
+          ### 🛠 Automated QA Build
+          This release contains the latest automated builds generated from the `qa` branch.
           
           **Last Commit:** ${{ github.event.head_commit.message }}
           **SHA:** `${{ github.sha }}`
           
           *Note: These are pre-release builds for testing purposes.*
-        files: ./AssetsManager_dev_${{ github.sha }}.zip
+        files: ./AssetsManager_qa_${{ github.sha }}.zip
         prerelease: true
         generate_release_notes: false
       env:
