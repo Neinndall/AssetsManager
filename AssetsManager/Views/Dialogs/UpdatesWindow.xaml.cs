@@ -37,11 +37,6 @@ namespace AssetsManager.Views.Dialogs
             await _viewModel.LoadUpdatesAsync();
         }
 
-        private void BtnClose_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
-
         private async void BtnDownload_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement element && element.DataContext is GitHubCommit commit)

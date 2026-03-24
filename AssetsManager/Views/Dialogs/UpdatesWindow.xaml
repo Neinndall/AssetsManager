@@ -129,8 +129,6 @@
                     <materialIcons:MaterialIcon Kind="Github" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Opacity="0.6"/>
                     <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMuted}" FontSize="11" FontWeight="SemiBold" Margin="10,0,0,0"/>
                 </StackPanel>
-
-                <Button Content="CLOSE WINDOW" HorizontalAlignment="Right" Style="{StaticResource SecondaryButton}" Height="32" Padding="20,0" Click="BtnClose_Click"/>
             </Grid>
         </Border>
     </Grid>
