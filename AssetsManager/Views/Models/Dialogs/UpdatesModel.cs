@@ -69,7 +69,7 @@ namespace AssetsManager.Views.Models.Dialogs
                     if (isOrphan)
                     {
                         // Extract SHA from filename (AssetsManager_Dev_SHA.zip)
-                        string sha = asset.Name.Contains("Dev_") ? asset.Name.Split("Dev_").Last().Replace(".zip", "") : "unknown";
+                        string sha = asset.Name.Contains("dev_") ? asset.Name.Split("dev_").Last().Replace(".zip", "") : "unknown";
                         
                         commits.Add(new GitHubCommit
                         {

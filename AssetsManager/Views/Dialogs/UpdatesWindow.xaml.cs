@@ -13,13 +13,14 @@ namespace AssetsManager.Views.Dialogs
     {
         private readonly UpdatesModel _viewModel;
         private readonly NotificationService _notificationService;
+        private readonly UpdateManager _updateManager;
 
-        public UpdatesWindow(NotificationService notificationService, GitHubApiService gitHubApi)
+        public UpdatesWindow(NotificationService notificationService, GitHubApiService gitHubApi, UpdateManager updateManager)
         {
             InitializeComponent();
             _notificationService = notificationService;
+            _updateManager = updateManager;
             
-            // The model can now use the injected service instance
             _viewModel = new UpdatesModel(gitHubApi);
             DataContext = _viewModel;
 
@@ -41,16 +42,18 @@ namespace AssetsManager.Views.Dialogs
             Close();
         }
 
-        private void BtnDownload_Click(object sender, RoutedEventArgs e)
+        private async void BtnDownload_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement element && element.DataContext is GitHubCommit commit)
             {
                 if (commit.DownloadableAsset != null)
                 {
-                    // Open browser for download
-                    Process.Start(new ProcessStartInfo(commit.DownloadableAsset.DownloadUrl) { UseShellExecute = true });
-                    
-                    _notificationService.AddNotification("Download started", $"Downloading build for commit {commit.ShortSha}", NotificationType.Info);
+                    // Delegate the download and install process to the UpdateManager service
+                    await _updateManager.DownloadAndInstallDevelopmentBuildAsync(
+                        commit.DownloadableAsset.DownloadUrl,
+                        commit.DownloadableAsset.Size,
+                        commit.ShortSha,
+                        this);
                 }
             }
         }

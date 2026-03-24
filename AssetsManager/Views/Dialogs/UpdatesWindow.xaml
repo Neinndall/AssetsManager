@@ -102,20 +102,19 @@
 
                                     <!-- Download Action -->
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="16,0,0,0">
-                                        <Button x:Name="BtnDownload" 
-                                                Content="DOWNLOAD VERSION" 
-                                                Style="{StaticResource PrimaryButton}" 
-                                                Height="30" Padding="14,0" 
+                                        <Button x:Name="BtnDownload"
+                                                Content="DOWNLOAD &amp; INSTALL"
+                                                Style="{StaticResource PrimaryButton}"
+                                                Height="30" Padding="14,0"
                                                 FontSize="10" FontWeight="Black"
                                                 Click="BtnDownload_Click"
                                                 Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}"/>
-                                        
-                                        <TextBlock Text="No build available" 
-                                                 FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" 
+
+                                        <TextBlock Text="No build available"
+                                                 FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
                                                  HorizontalAlignment="Right"
                                                  Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
-                                    </StackPanel>
-                                </Grid>
+                                    </StackPanel>                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
