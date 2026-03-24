@@ -18,11 +18,11 @@ jobs:
         fetch-depth: 0
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '10.0.x'
-        include-prerelease: true
-        cache: true # Cache NuGet packages to speed up restore
+        cache: true
+        cache-dependency-path: 'AssetsManager/AssetsManager.csproj'
 
     - name: .NET Restore
       run: dotnet restore "./AssetsManager/AssetsManager.sln" -v minimal
