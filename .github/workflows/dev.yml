@@ -1,0 +1,54 @@
+name: AssetsManager DEV Builder
+
+on:
+  push:
+    branches: [ dev ] # Se activa al subir cambios a la rama 'dev'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '10.0.x' # Configurado para .NET 10 (Preview)
+        include-prerelease: true
+
+    - name: .NET Restore
+      run: dotnet restore "./AssetsManager/AssetsManager.sln"
+
+    - name: .NET Publish
+      run: dotnet publish "./AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -p:PublishSingleFile=false -o "./publish/"
+
+    - name: Zip File
+      shell: pwsh
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./AssetsManager_Dev_${{ github.sha }}.zip
+
+    - name: Upload to Development Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: development
+        name: Development Builds (Latest Commits)
+        body: |
+          ### 🛠 Automated Development Build
+          This release contains the latest automated build generated from the source code.
+          
+          **Last Commit:** ${{ github.event.head_commit.message }}
+          **SHA:** `${{ github.sha }}`
+          **Date:** ${{ github.event.head_commit.timestamp }}
+          
+          *Note: This is a pre-release build for testing new content and fixes.*
+        files: ./AssetsManager_Dev_${{ github.sha }}.zip
+        prerelease: true
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
