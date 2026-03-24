@@ -36,7 +36,7 @@ namespace AssetsManager.Views.Models.Dialogs
         public UpdatesModel(GitHubApiService gitHubApi)
         {
             _gitHubApi = gitHubApi;
-            StatusMessage = "Checking for development history...";
+            StatusMessage = "Checking for QA history...";
         }
 
         public async Task LoadUpdatesAsync()
@@ -44,14 +44,14 @@ namespace AssetsManager.Views.Models.Dialogs
             IsLoading = true;
             try
             {
-                // 1. Fetch real commit history from 'dev' branch
-                var commits = await _gitHubApi.GetCommitsAsync("dev", 20);
+                // 1. Fetch real commit history from 'qa' branch
+                var commits = await _gitHubApi.GetCommitsAsync("qa", 20);
                 
-                // 2. Fetch specific development release (like FModel's 'qa')
-                var developmentRelease = await _gitHubApi.GetReleaseAsync("development");
+                // 2. Fetch specific QA release (like FModel's 'qa')
+                var developmentRelease = await _gitHubApi.GetReleaseAsync("qa");
                 var assets = developmentRelease?.Assets?.OrderByDescending(a => a.CreatedAt).ToList() ?? new List<GitHubAsset>();
 
-                Log.Information("Fetched {CommitCount} commits and {AssetCount} assets from development release", commits.Count, assets.Count);
+                Log.Information("Fetched {CommitCount} commits and {AssetCount} assets from QA release", commits.Count, assets.Count);
 
                 // 3. Link real commits with assets
                 foreach (var commit in commits)
@@ -68,15 +68,15 @@ namespace AssetsManager.Views.Models.Dialogs
                     bool isOrphan = !commits.Any(c => c.DownloadableAsset?.DownloadUrl == asset.DownloadUrl);
                     if (isOrphan)
                     {
-                        // Extract SHA from filename (AssetsManager_Dev_SHA.zip)
-                        string sha = asset.Name.Contains("dev_") ? asset.Name.Split("dev_").Last().Replace(".zip", "") : "unknown";
+                        // Extract SHA from filename (AssetsManager_qa_SHA.zip)
+                        string sha = asset.Name.Contains("qa_") ? asset.Name.Split("qa_").Last().Replace(".zip", "") : "unknown";
                         
                         commits.Add(new GitHubCommit
                         {
                             Sha = sha,
                             Commit = new CommitInfo 
                             { 
-                                Message = $"Build found in development release ({asset.Name})",
+                                Message = $"Build found in QA release ({asset.Name})",
                                 Author = new CommitAuthor { Name = "GitHub Action", Date = asset.CreatedAt }
                             },
                             DownloadableAsset = asset,
@@ -89,11 +89,11 @@ namespace AssetsManager.Views.Models.Dialogs
                 var finalSorted = commits.OrderByDescending(c => c.Commit.Author.Date).ToList();
                 
                 Commits.ReplaceRange(finalSorted);
-                StatusMessage = Commits.Count > 0 ? "Development history synchronized" : "No history found";
+                StatusMessage = Commits.Count > 0 ? "QA history synchronized" : "No history found";
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to synchronize development updates");
+                Log.Error(ex, "Failed to synchronize QA updates");
                 StatusMessage = "Sync failed. Check connection to GitHub.";
             }
             finally

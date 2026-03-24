@@ -31,7 +31,7 @@ namespace AssetsManager.Services.Core
         /// <summary>
         /// Fetches the recent commit history from a specific branch.
         /// </summary>
-        public async Task<List<GitHubCommit>> GetCommitsAsync(string branch = "dev", int count = 20)
+        public async Task<List<GitHubCommit>> GetCommitsAsync(string branch = "qa", int count = 20)
         {
             try
             {

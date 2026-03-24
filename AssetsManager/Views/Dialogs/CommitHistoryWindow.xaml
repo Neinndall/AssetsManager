@@ -10,7 +10,7 @@
         MinHeight="650" MinWidth="850"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource SidebarBackground}"
-        HeaderTitle="Development History" 
+        HeaderTitle="Commit History" 
         HeaderIcon="Update"
         Style="{StaticResource HudWindowStyle}"
         FontFamily="{StaticResource AppFontFamily}">
@@ -30,7 +30,7 @@
                         <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Margin="16,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="DEVELOPMENT BRANCH" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="QA BRANCH" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                             <TextBlock Text="Current Version: " FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"/>
                             <TextBlock Text="{Binding CurrentVersion}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
@@ -62,7 +62,7 @@
                         </EventTrigger>
                     </materialIcons:MaterialIcon.Triggers>
                 </materialIcons:MaterialIcon>
-                <TextBlock Text="Updating development history..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Margin="0,12,0,0" HorizontalAlignment="Center"/>
+                <TextBlock Text="Updating QA history..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Margin="0,12,0,0" HorizontalAlignment="Center"/>
             </StackPanel>
 
             <!-- Commits List -->
@@ -114,7 +114,8 @@
                                                  FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
                                                  HorizontalAlignment="Right"
                                                  Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
-                                    </StackPanel>                                </Grid>
+                                    </StackPanel>                                
+                               </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
