@@ -11,7 +11,7 @@ namespace AssetsManager.Views.Dialogs
 {
     public partial class CommitHistoryWindow
     {
-        private readonly UpdatesModel _viewModel;
+        private readonly CommitHistoryModel _viewModel;
         private readonly NotificationService _notificationService;
         private readonly UpdateManager _updateManager;
 
@@ -21,7 +21,7 @@ namespace AssetsManager.Views.Dialogs
             _notificationService = notificationService;
             _updateManager = updateManager;
             
-            _viewModel = new UpdatesModel(gitHubApi);
+            _viewModel = new CommitHistoryModel(gitHubApi);
             DataContext = _viewModel;
 
             Loaded += async (s, e) => await _viewModel.LoadUpdatesAsync();

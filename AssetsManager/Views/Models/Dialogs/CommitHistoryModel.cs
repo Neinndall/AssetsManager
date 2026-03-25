@@ -12,7 +12,7 @@ using Serilog;
 
 namespace AssetsManager.Views.Models.Dialogs
 {
-    public class UpdatesModel : INotifyPropertyChanged
+    public class CommitHistoryModel : INotifyPropertyChanged
     {
         private readonly GitHubApiService _gitHubApi;
         
@@ -33,7 +33,7 @@ namespace AssetsManager.Views.Models.Dialogs
         private string _statusMessage;
         public string StatusMessage { get => _statusMessage; set { _statusMessage = value; OnPropertyChanged(); } }
 
-        public UpdatesModel(GitHubApiService gitHubApi)
+        public CommitHistoryModel(GitHubApiService gitHubApi)
         {
             _gitHubApi = gitHubApi;
             StatusMessage = "Checking for revisions...";

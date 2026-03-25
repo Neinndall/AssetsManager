@@ -14,7 +14,7 @@ namespace AssetsManager.Views.Help
         private readonly UpdateCheckService _updateCheckService;
         
         // The State Model
-        public UpdatesModel Model { get; } = new UpdatesModel();
+        public AppUpdatesModel Model { get; } = new AppUpdatesModel();
 
         public UpdatesView(UpdateManager updateManager, UpdateCheckService updateCheckService)
         {
