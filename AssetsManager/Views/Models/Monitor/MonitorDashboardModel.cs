@@ -103,6 +103,8 @@ namespace AssetsManager.Views.Models.Monitor
             set { _appVersionText = value; OnPropertyChanged(); }
         }
 
+        public string BuildType => ApplicationInfos.BuildType;
+
         private Brush _appVersionColor;
         public Brush AppVersionColor
         {
@@ -178,17 +180,12 @@ namespace AssetsManager.Views.Models.Monitor
             _statusService = statusService;
             _updateCheckService = updateCheckService;
 
-            // Set Initial App Version State based on Build Type (Stable vs Dev)
+            // Set Initial App Version State based on Build Type (Stable vs Experimental)
             AppVersionText = ApplicationInfos.Version;
-            
-            // Map ApplicationInfos color name to actual Brush
-            string colorHex = ApplicationInfos.IsStable ? "#2ECC71" : "#E67E22"; // Green vs Orange
-            AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colorHex));
-            
-            // Map Icon Kind
-            AppVersionIconKind = ApplicationInfos.IsStable ? 
-                Material.Icons.MaterialIconKind.CheckDecagram : 
-                Material.Icons.MaterialIconKind.FlaskOutline;
+
+            // Map ApplicationInfos color and icon dynamically
+            AppVersionColor = (Brush)System.Windows.Application.Current.FindResource(ApplicationInfos.BuildColorKey);
+            AppVersionIconKind = ApplicationInfos.BuildIcon;
 
             // Check if an update was already found (Higher priority than Build Type)
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
