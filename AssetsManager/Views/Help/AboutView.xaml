@@ -71,7 +71,7 @@
                         </Grid.ColumnDefinitions>
                         
                         <TextBlock Grid.Column="0" 
-                                 Text="The definitive high-performance tool for League of Legends PBE analysis and asset management. Engineered for precision and built for scale with multi-threaded extraction and real-time surveillance capabilities."
+                                 Text="The definitive high-performance tool for League of Legends game data analysis and asset management. Engineered for precision and built for scale with multi-threaded extraction and real-time surveillance capabilities."
                                  Foreground="{StaticResource TextSecondary}"
                                  FontSize="13"
                                  LineHeight="22"

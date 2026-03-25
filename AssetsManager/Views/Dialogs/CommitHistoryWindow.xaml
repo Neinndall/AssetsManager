@@ -40,11 +40,13 @@
 
                 <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button x:Name="BtnRefresh" 
-                            Style="{StaticResource TransparentIconButton}" 
-                            ToolTip="Refresh History"
-                            Width="34" Height="34" 
+                            Style="{StaticResource SecondaryButton}" 
+                            Height="34" Padding="16,0" 
                             Click="BtnRefresh_Click">
-                        <materialIcons:MaterialIcon Kind="Refresh" Width="20" Height="20"/>
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="Refresh" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="REFRESH HISTORY" VerticalAlignment="Center" FontSize="11" FontWeight="Black"/>
+                        </StackPanel>
                     </Button>
                 </StackPanel>
             </Grid>
@@ -109,12 +111,14 @@
                                     <!-- Download Action -->
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="16,0,0,0">
                                         <Button x:Name="BtnDownload"
-                                                Style="{StaticResource TransparentIconButton}"
-                                                ToolTip="Download &amp; Install"
-                                                Width="34" Height="34"
+                                                Style="{StaticResource PrimaryButton}"
+                                                Height="30" Padding="12,0"
                                                 Click="BtnDownload_Click"
                                                 Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}">
-                                            <materialIcons:MaterialIcon Kind="CloudDownloadOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialIcons:MaterialIcon Kind="CloudDownloadOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="White"/>
+                                                <TextBlock Text="INSTALL" VerticalAlignment="Center" FontSize="10" FontWeight="Black"/>
+                                            </StackPanel>
                                         </Button>
 
                                         <TextBlock Text="No build available"
@@ -132,12 +136,16 @@
 
         <!-- FOOTER: INFO -->
         <Border Grid.Row="2" Background="{StaticResource CardBackground}" Padding="32,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0">
-            <Grid>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="Github" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Opacity="0.6"/>
-                    <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMuted}" FontSize="11" FontWeight="SemiBold" Margin="10,0,0,0"/>
-                </StackPanel>
-            </Grid>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <materialIcons:MaterialIcon Kind="Github" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Opacity="0.8"/>
+                <TextBlock Text="GITHUB REVISION HISTORY" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Black" VerticalAlignment="Center" Margin="10,1,0,0" Opacity="0.9"/>
+
+                <Rectangle Width="1" Height="12" Fill="{StaticResource BorderColor}" Margin="16,0" VerticalAlignment="Center"/>
+
+                <materialIcons:MaterialIcon Kind="CloudCheckOutline" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Opacity="0.8" 
+                                            Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="6,1,0,0" Opacity="0.7"/>
+            </StackPanel>
         </Border>
     </Grid>
 </base:HudWindow>

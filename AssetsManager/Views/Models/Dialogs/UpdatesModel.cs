@@ -36,7 +36,7 @@ namespace AssetsManager.Views.Models.Dialogs
         public UpdatesModel(GitHubApiService gitHubApi)
         {
             _gitHubApi = gitHubApi;
-            StatusMessage = "Checking for QA history...";
+            StatusMessage = "Checking for revisions...";
         }
 
         public async Task LoadUpdatesAsync()
@@ -89,12 +89,12 @@ namespace AssetsManager.Views.Models.Dialogs
                 var finalSorted = commits.OrderByDescending(c => c.Commit.Author.Date).ToList();
                 
                 Commits.ReplaceRange(finalSorted);
-                StatusMessage = Commits.Count > 0 ? "QA history synchronized" : "No history found";
+                StatusMessage = Commits.Count > 0 ? "Revisions synchronized" : "No revisions found";
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Failed to synchronize QA updates");
-                StatusMessage = "Sync failed. Check connection to GitHub.";
+                StatusMessage = "Synchronization failed";
             }
             finally
             {
