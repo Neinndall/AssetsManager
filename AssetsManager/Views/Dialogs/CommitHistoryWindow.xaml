@@ -70,7 +70,7 @@
                         </EventTrigger>
                     </materialIcons:MaterialIcon.Triggers>
                 </materialIcons:MaterialIcon>
-                <TextBlock Text="Updating QA history..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Margin="0,12,0,0" HorizontalAlignment="Center"/>
+                <TextBlock Text="Updating history..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Margin="0,12,0,0" HorizontalAlignment="Center"/>
             </StackPanel>
 
             <!-- Commits List -->
