@@ -24,11 +24,16 @@ jobs:
         cache: true
         cache-dependency-path: 'AssetsManager/AssetsManager.csproj'
 
-    - name: .NET Restore
-      run: dotnet restore "./AssetsManager/AssetsManager.sln" -v minimal
+    - name: Extract Version from CSProj
+      id: get_version
+      shell: pwsh
+      run: |
+        [xml]$xml = Get-Content "./AssetsManager/AssetsManager.csproj"
+        $ver = $xml.Project.PropertyGroup.Version
+        echo "PROJECT_VERSION=$ver" >> $env:GITHUB_ENV
 
     - name: .NET Publish
-      run: dotnet publish "./AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -p:PublishSingleFile=false -o "./publish/" -v minimal /p:AnalysisLevel=none
+      run: dotnet publish "./AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -p:PublishSingleFile=false -o "./publish/" -v minimal /p:AnalysisLevel=none /p:InformationalVersion="${{ env.PROJECT_VERSION }}-${{ github.sha }}"
 
     - name: Zip File
       shell: pwsh
