@@ -39,7 +39,13 @@
                 </StackPanel>
 
                 <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button x:Name="BtnRefresh" Content="REFRESH HISTORY" Style="{StaticResource SecondaryButton}" Height="34" Padding="16,0" Click="BtnRefresh_Click"/>
+                    <Button x:Name="BtnRefresh" 
+                            Style="{StaticResource TransparentIconButton}" 
+                            ToolTip="Refresh History"
+                            Width="34" Height="34" 
+                            Click="BtnRefresh_Click">
+                        <materialIcons:MaterialIcon Kind="Refresh" Width="20" Height="20"/>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
@@ -103,12 +109,13 @@
                                     <!-- Download Action -->
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="16,0,0,0">
                                         <Button x:Name="BtnDownload"
-                                                Content="DOWNLOAD &amp; INSTALL"
-                                                Style="{StaticResource PrimaryButton}"
-                                                Height="30" Padding="14,0"
-                                                FontSize="10" FontWeight="Black"
+                                                Style="{StaticResource TransparentIconButton}"
+                                                ToolTip="Download &amp; Install"
+                                                Width="34" Height="34"
                                                 Click="BtnDownload_Click"
-                                                Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                                Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}">
+                                            <materialIcons:MaterialIcon Kind="CloudDownloadOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}"/>
+                                        </Button>
 
                                         <TextBlock Text="No build available"
                                                  FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
