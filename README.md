@@ -14,8 +14,9 @@ AssetsManager is a powerful tool designed for League of Legends enthusiasts who 
 
 *   **Advanced WAD Comparator**: A high-speed comparison engine featuring **Fast Mode** (Reflection-based) to identify new, modified, or deleted assets in seconds.
 *   **Archive Explorer**: A professional navigation suite for the WAD game files with advanced toolbar tools:
+    *   **Adaptive Engineering Toolbar**: A dual-panel architecture featuring a clean header for core actions and an expanded technical suite for secondary tools (Collapse, Backup, Mode, Grid, Path, Favs, Merger) with seamless visual fusion.
     *   **Premium Gallery (Grid View)**: High-performance visual explorer with asynchronous thumbnail generation and rich metadata badges.
-    *    **Load Backups**: Ability to load your previous comparison backups from WAD Explorer.
+    *   **Load Backups**: Ability to load your previous comparison backups from WAD Explorer.
     *   **Image Merger**: Specialized tray to "collect" and composite multiple textures into professional contact sheets.
     *   **Quick Access (Favorites)**: Persistent system to pin frequently used assets for instant cross-session navigation.
     *   **Intelligent Search**: Deep-seek engine with real-time filtering and asynchronous "Go To" capabilities.
@@ -33,6 +34,7 @@ AssetsManager is a powerful tool designed for League of Legends enthusiasts who 
 
 ## 🦾 High-Performance Architecture
 
+*   **Clean MVVM Architecture**: Unified pattern across core UI components using private field instantiation for model owners and public property exposure for external orchestration.
 *   **Parallel Sync Engine**: Simultaneous multi-file acquisition with atomic `.tmp` protection to guarantee local database integrity.
 *   **Optimized Hash Engine**: Re-engineered startup sequence with linear-seek parsing and proactive memory allocation for near-instant hash loading.
 *   **Blake3 Cryptography**: Implementation of Pure C# Blake3 for high-speed integrity verification across massive asset sets.
@@ -40,6 +42,7 @@ AssetsManager is a powerful tool designed for League of Legends enthusiasts who 
 
 ## 📡 Monitoring Engine (`MonitorWindow`)
 
+*   **Development Center**: Real-time commit history tracking from the `dev` branch with integrated one-click installation of experimental builds by linking unique SHAs with GitHub Release Assets.
 *   **Live Dashboard**: Real-time telemetry for background services, PBE server status, and global system health.
 *   **File Watcher**: Automated tracking of remote JSON updates with version history and granular diff logging.
 *   **History**: Storage where you will find your comparison backups and monitored remotes.
