@@ -33,7 +33,7 @@ jobs:
         echo "PROJECT_VERSION=$ver" >> $env:GITHUB_ENV
 
     - name: .NET Publish
-      run: dotnet publish "./AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -p:PublishSingleFile=false -o "./publish/" -v minimal /p:AnalysisLevel=none /p:InformationalVersion="${{ env.PROJECT_VERSION }}-${{ github.sha }}"
+      run: dotnet publish "./AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -o "./publish/" /p:AnalysisLevel=None -p:DebugType=None -p:GenerateDocumentationFile=false /p:InformationalVersion="${{ env.PROJECT_VERSION }}-${{ github.sha }}"
 
     - name: Zip File
       shell: pwsh
@@ -42,10 +42,10 @@ jobs:
     - name: Upload to QA Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: qa
-        name: "AssetsManager QA Build"
+        tag_name: qa-testing
+        name: "AssetsManager QA Testing"
         body: |
-          ### 🛠 Automated QA Build
+          ### 🛠 Automated QA Testing
           This release contains the latest automated builds generated from the `qa` branch.
           
           **Last Commit:** ${{ github.event.head_commit.message }}
