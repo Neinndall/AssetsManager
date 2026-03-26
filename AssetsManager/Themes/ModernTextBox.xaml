@@ -5,6 +5,7 @@
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
         <ResourceDictionary Source="/Themes/Animations.xaml"/>
+        <ResourceDictionary Source="/Themes/Converters.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
     <!-- Modern TextBox Style for Browse -->
@@ -91,6 +92,22 @@
                             <ScrollViewer x:Name="PART_ContentHost"
                                           Margin="5,2,25,2"
                                           VerticalAlignment="Center"/>
+                            
+                            <!-- Placeholder Panel (Moved from View to Style) -->
+                            <StackPanel x:Name="PlaceholderPanel" 
+                                        Orientation="Horizontal" 
+                                        IsHitTestVisible="False" 
+                                        VerticalAlignment="Center" 
+                                        HorizontalAlignment="Left" 
+                                        Margin="12,0,0,0"
+                                        Visibility="Collapsed">
+                                <materialIcons:MaterialIcon Kind="Magnify" Width="14" Height="14" Foreground="{StaticResource TextSecondary}" Opacity="0.8" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Search files..." 
+                                           Foreground="{StaticResource TextSecondary}" 
+                                           Opacity="0.8" 
+                                           FontSize="12" 
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
                             <Button x:Name="ClearTextButton" 
                                     Style="{StaticResource TransparentIconButton}"
                                     HorizontalAlignment="Right"
@@ -110,6 +127,24 @@
                                 IsHitTestVisible="False"/>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <!-- Placeholder visibility logic (Simplified for maximum stability) -->
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="PlaceholderPanel" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        
+                        <!-- Cuando tiene el foco Y hay texto, se oculta (o si quieres que se oculte nada más clicar, mantén este) -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsFocused" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PlaceholderPanel" Property="Opacity" Value="0.3"/>
+                        </MultiTrigger>
+
+                        <!-- Si el texto NO está vacío, ocultamos el panel totalmente -->
+                        <DataTrigger Binding="{Binding Text.Length, RelativeSource={RelativeSource Self}, Converter={StaticResource CountToVisibilityConverter}}" Value="Visible">
+                            <Setter TargetName="PlaceholderPanel" Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                             <Setter TargetName="border" Property="BorderThickness" Value="1.5"/>

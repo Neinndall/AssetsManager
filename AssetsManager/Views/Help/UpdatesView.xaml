@@ -7,74 +7,59 @@
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="800">
              
-    <StackPanel>
-        <!-- MODERN INTEGRATED HEADER (Compact) -->
-        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="Update" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Application Updates" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Keep your application up to date with the latest features" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+    <StackPanel Margin="0,16,0,40">
+        <!-- SECTION: APPLICATION UPDATES -->
+        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
+            <StackPanel Orientation="Horizontal">
+                <materialIcons:MaterialIcon Kind="Update" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="APPLICATION UPDATES" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0"/>
+                    <TextBlock Text="Acquire latest software packages and critical performance patches" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Opacity="0.8" Margin="0,2,0,0"/>
                 </StackPanel>
-                <materialIcons:MaterialIcon Grid.Column="1" Kind="CloudSyncOutline" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
-            </Grid>
+            </StackPanel>
         </Border>
 
-        <!-- VERSION HUB CARD -->
-        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24" Margin="0,0,0,20">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-                    <Style.Triggers>
-                        <!-- Style for when an update is available -->
-                        <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
-                            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                            <Setter Property="BorderBrush" Value="Transparent"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
+        <!-- HERO ACTION SECTION (Split) -->
+        <Grid Margin="0,0,0,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-            <Grid>
-                <StackPanel>
-                    <!-- Up to Date State -->
-                    <StackPanel Visibility="{Binding IsUpdateAvailable, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                        <materialIcons:MaterialIcon Kind="CheckCircleOutline" Foreground="{StaticResource AccentGreen}" Width="40" Height="40" HorizontalAlignment="Center"/>
-                        <TextBlock Text="You are up to date!" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
-                        <TextBlock HorizontalAlignment="Center" Margin="0,4,0,0" Foreground="{StaticResource TextSecondary}">
-                            <Run Text="AssetsManager"/>
-                            <Run Text="{Binding CurrentVersion}"/>
-                            <Run Text="is the latest version."/>
-                        </TextBlock>
-                    </StackPanel>
+            <!-- Left: Development Center Info Card -->
+            <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Margin="0,0,10,0" Padding="20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                    <!-- Update Available State -->
-                    <StackPanel Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Foreground="White" Width="40" Height="40" HorizontalAlignment="Center"/>
-                        <TextBlock Text="New Version Available!" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0,12,0,0"/>
-                        <TextBlock HorizontalAlignment="Center" Margin="0,4,0,24" Foreground="White" Opacity="0.8">
-                            <Run Text="Version"/>
-                            <Run Text="{Binding AvailableVersion}" FontWeight="Bold"/>
-                            <Run Text="is ready to be installed."/>
-                        </TextBlock>
-                        
-                        <Button x:Name="buttonInstallUpdate" 
-                                Content="Download &amp; Install" 
-                                Click="buttonInstallUpdate_Click"
-                                Style="{StaticResource PrimaryButton}" 
-                                HorizontalAlignment="Center"/>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Width="48" Height="48" VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Github" Foreground="{StaticResource TextPrimary}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="Development Center" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Explore the development history and download the latest builds directly from GitHub." 
+                                   FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8" TextWrapping="Wrap" Margin="0,2,0,0"/>
                     </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Right: Open Button -->
+            <Button Grid.Column="1"
+                    x:Name="btnOpenUpdateCenter"
+                    Click="BtnOpenUpdateCenter_Click"
+                    Style="{StaticResource SelectionCardButtonStyle}"
+                    Margin="0" Width="160" Padding="0"
+                    VerticalAlignment="Stretch">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="Open Center" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Check for updates" FontSize="11" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
-            </Grid>
-        </Border>
+            </Button>
+        </Grid>
 
         <!-- INFORMATION SECTION -->
         <TextBlock Text="UPDATE POLICY" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,8,0,16"/>

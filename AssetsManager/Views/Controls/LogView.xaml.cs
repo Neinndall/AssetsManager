@@ -9,7 +9,9 @@ namespace AssetsManager.Views.Controls
     public partial class LogView : UserControl
     {
         public MainWindow ParentWindow { get; set; }
-        public LogViewModel ViewModel { get; } = new LogViewModel();
+        private readonly LogViewModel _viewModel;
+
+        public LogViewModel ViewModel => _viewModel;
 
         public RichTextBox LogRichTextBox => richTextBoxLogs;
 
@@ -27,14 +29,15 @@ namespace AssetsManager.Views.Controls
         {
             if (d is LogView logView)
             {
-                logView.ViewModel.HasActiveStatus = !string.IsNullOrEmpty((string)e.NewValue);
+                logView._viewModel.HasActiveStatus = !string.IsNullOrEmpty((string)e.NewValue);
             }
         }
 
         public LogView()
         {
             InitializeComponent();
-            DataContext = ViewModel;
+            _viewModel = new LogViewModel();
+            DataContext = _viewModel;
             this.SizeChanged += LogView_SizeChanged;
         }
 
@@ -42,13 +45,13 @@ namespace AssetsManager.Views.Controls
         {
             if (e.NewSize.Height <= 45)
             {
-                ViewModel.SetLogVisibility(false);
+                _viewModel.SetLogVisibility(false);
             }
             else
             {
-                if (!ViewModel.IsLogVisible)
+                if (!_viewModel.IsLogVisible)
                 {
-                    ViewModel.SetLogVisibility(true);
+                    _viewModel.SetLogVisibility(true);
                     if (ParentWindow != null)
                     {
                         ParentWindow.HandleLogExpandedManually();

@@ -11,9 +11,9 @@
         <!-- Cuerpo Principal -->
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="750*" MinWidth="250"/>
+                <ColumnDefinition Width="850*" MinWidth="250"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="1000*" MinWidth="220"/>
+                <ColumnDefinition Width="900*" MinWidth="220"/>
             </Grid.ColumnDefinitions>
 
             <!-- Panel Izquierdo: Explorador -->

@@ -7,27 +7,16 @@
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="800">
              
-    <StackPanel Margin="0,0,0,40">
-        <!-- MODERN INTEGRATED HEADER (Compact) -->
-        <Border Margin="0,0,0,20" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialIcons:MaterialIcon Kind="History" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Changelogs" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Version history and feature updates" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+    <StackPanel Margin="0,16,0,40">
+        <!-- SECTION: VERSION TRACKING -->
+        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
+            <StackPanel Orientation="Horizontal">
+                <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="VERSION HISTORY" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0"/>
+                    <TextBlock Text="Historical record of software deployments and feature refinement" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Opacity="0.8" Margin="0,2,0,0"/>
                 </StackPanel>
-
-                <!-- Subtle Decorative Background Icon -->
-                <materialIcons:MaterialIcon Grid.Column="1" Kind="Tag" Width="64" Height="64" Foreground="{StaticResource AccentBrush}" Opacity="0.05" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-8,0"/>
-            </Grid>
+            </StackPanel>
         </Border>
 
         <ItemsControl x:Name="ChangelogItemsControl">
@@ -55,7 +44,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Timeline Icon Box -->
-                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="15" BorderThickness="2" Panel.ZIndex="1">
+                                <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16" BorderThickness="2" Panel.ZIndex="1">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="{StaticResource CardBackground}"/>
@@ -67,7 +56,7 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
-                                    <materialIcons:MaterialIcon Kind="Tag" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="Tag" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <materialIcons:MaterialIcon.Style>
                                             <Style TargetType="materialIcons:MaterialIcon">
                                                 <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
@@ -103,7 +92,8 @@
                                             <TextBlock Text="{Binding UpdateType}" FontSize="9" FontWeight="Bold" Foreground="{Binding UpdateTypeColor}" VerticalAlignment="Center"/>
                                         </Border>
                                         
-                                        <Border Margin="10,0,0,0" CornerRadius="12" Padding="8,1" BorderThickness="1" VerticalAlignment="Center" Height="20">
+                                        <!-- Release Status Badge -->
+                                        <Border Margin="10,0,0,0" CornerRadius="12" Padding="10,2" BorderThickness="1" VerticalAlignment="Center" Height="22">
                                             <Border.Style>
                                                 <Style TargetType="Border">
                                                     <Style.Triggers>
@@ -112,8 +102,8 @@
                                                             <Setter Property="Background" Value="#1A5577CC"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsLatest}" Value="False">
-                                                            <Setter Property="BorderBrush" Value="{StaticResource TextSecondary}"/>
-                                                            <Setter Property="Background" Value="Transparent"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                                            <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
                                                             <Setter Property="Opacity" Value="0.6"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
@@ -128,8 +118,8 @@
                                                                 <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding IsLatest}" Value="False">
-                                                                <Setter Property="Text" Value="PREVIOUS"/>
-                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                                <Setter Property="Text" Value="ARCHIVED"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>

@@ -2,26 +2,20 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
+using AssetsManager.Views.Models.Controls;
 
 namespace AssetsManager.Views.Controls
 {
     public partial class SidebarView : UserControl
     {
+        private readonly SidebarViewModel _viewModel;
         public MainWindow ParentWindow { get; set; }
-
-        public static readonly DependencyProperty IsExpandedProperty =
-            DependencyProperty.Register("IsExpanded", typeof(bool), typeof(SidebarView),
-                new PropertyMetadata(false));
-
-        public bool IsExpanded
-        {
-            get { return (bool)GetValue(IsExpandedProperty); }
-            set { SetValue(IsExpandedProperty, value); }
-        }
 
         public SidebarView()
         {
             InitializeComponent();
+            _viewModel = new SidebarViewModel();
+            DataContext = _viewModel;
         }
 
         private void MenuButton_Click(object sender, RoutedEventArgs e)
@@ -35,9 +29,9 @@ namespace AssetsManager.Views.Controls
 
         private void ToggleExpansion_Click(object sender, RoutedEventArgs e)
         {
-            IsExpanded = !IsExpanded;
+            _viewModel.IsExpanded = !_viewModel.IsExpanded;
 
-            if (IsExpanded)
+            if (_viewModel.IsExpanded)
             {
                 ExpandSidebar();
             }

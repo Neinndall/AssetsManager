@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace AssetsManager.Views.Models.Help
 {
-    public class UpdatesModel : INotifyPropertyChanged
+    public class AppUpdatesModel : INotifyPropertyChanged
     {
         private string _currentVersion;
         public string CurrentVersion

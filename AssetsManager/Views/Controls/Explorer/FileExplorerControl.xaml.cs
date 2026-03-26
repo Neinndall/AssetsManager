@@ -246,7 +246,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async void HandleSortStateChanged(bool isEnabled)
         {
-            _viewModel.IsSortingEnabled = isEnabled;
+            // Toolbar 'IsEnabled' means Categories mode (IsSortingEnabled = false)
+            // Default (Unchecked) is Path Mode (IsSortingEnabled = true)
+            _viewModel.IsSortingEnabled = !isEnabled;
             if (_viewModel.IsBackupMode)
             {
                 await BuildTreeFromBackupAsync(_backupJsonPath);
@@ -314,7 +316,6 @@ namespace AssetsManager.Views.Controls.Explorer
             var cancellationToken = TaskCancellationManager.PrepareNewOperation();
 
             _viewModel.SetLoadingState(loadingState);
-            _viewModel.Toolbar.IsSortButtonVisible = isBackupMode;
 
             try
             {

@@ -1,16 +1,17 @@
 using System.Windows.Controls;
-using AssetsManager.Info;
+using AssetsManager.Views.Models.Help;
 
 namespace AssetsManager.Views.Help
 {
     public partial class AboutView : UserControl
     {
-        public string ApplicationVersion => ApplicationInfos.Version;
+        private readonly AboutModel _viewModel;
 
         public AboutView()
         {
             InitializeComponent();
-            DataContext = this;
+            _viewModel = new AboutModel();
+            DataContext = _viewModel;
         }
     }
 }

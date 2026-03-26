@@ -124,8 +124,7 @@ namespace AssetsManager.Services.Updater
                                                 int progressPercentage = (int)((bytesDownloaded * 100.0) / totalBytes);
                                                 progressWindow.Dispatcher.Invoke(() =>
                                                 {
-                                                    progressWindow.SetProgress(progressPercentage,
-                                                                                $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
+                                                    progressWindow.SetProgress(progressPercentage, $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
                                                 });
                                             }
                                         }
@@ -167,6 +166,82 @@ namespace AssetsManager.Services.Updater
             {
                 _logService.LogError(ex, "Error checking for updates in UpdateManager.");
                 _customMessageBoxService.ShowError("Error", "Error checking for updates:\n" + ex.Message, owner);
+            }
+        }
+
+        public async Task DownloadAndInstallDevelopmentBuildAsync(string downloadUrl, long totalBytes, string shortSha, Window owner)
+        {
+            try
+            {
+                string fileName = $"AssetsManager_dev_{shortSha}.zip";
+                _directoriesCreator.CreateDirectory(_directoriesCreator.UpdateCachePath);
+                string downloadPath = Path.Combine(_directoriesCreator.UpdateCachePath, fileName);
+
+                UpdateProgressWindow progressWindow = null;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    progressWindow = _serviceProvider.GetRequiredService<UpdateProgressWindow>();
+                    if (owner != null) progressWindow.Owner = owner;
+                    progressWindow.Show();
+                    progressWindow.UpdateLayout();
+                });
+
+                string downloadSize = $"{(totalBytes / 1024.0 / 1024.0):0.00} MB";
+
+                progressWindow.Dispatcher.Invoke(() =>
+                {
+                    progressWindow.SetProgress(0, $"Downloading {shortSha} ({downloadSize})...");
+                });
+
+                using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
+                {
+                    response.EnsureSuccessStatusCode();
+                    long bytesDownloaded = 0;
+
+                    using (var fs = new FileStream(downloadPath, FileMode.Create))
+                    {
+                        byte[] buffer = new byte[8192];
+                        int bytesRead;
+
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        {
+                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                            {
+                                await fs.WriteAsync(buffer, 0, bytesRead);
+                                bytesDownloaded += bytesRead;
+
+                                if (totalBytes > 0)
+                                {
+                                    int progressPercentage = (int)((bytesDownloaded * 100.0) / totalBytes);
+                                    progressWindow.Dispatcher.Invoke(() =>
+                                    {
+                                        progressWindow.SetProgress(progressPercentage, $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                progressWindow.Dispatcher.Invoke(() => progressWindow.Close());
+
+                var dialog = _serviceProvider.GetRequiredService<UpdateModeDialog>();
+                dialog.Owner = owner;
+                bool? dialogResult = dialog.ShowDialog();
+
+                if (dialogResult == true)
+                {
+                    var notificationService = _serviceProvider.GetRequiredService<NotificationService>();
+                    notificationService.AddNotification("Installing Update", $"Extracting build for commit {shortSha}...", AssetsManager.Views.Models.Notifications.NotificationType.Info);
+
+                    bool saveSettings = dialog.SelectedMode == UpdateMode.CleanWithSaving;
+                    await _updateExtractor.ExtractAndRestart(downloadPath, saveSettings, owner);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to download and install development build.");
+                _customMessageBoxService.ShowError("Installation Error", "Failed to download or install the development build:\n" + ex.Message, owner);
             }
         }
 

@@ -1,0 +1,342 @@
+AssetsManager - League of Legends | v3.2.3.0
+
+MEDIUM UPDATE
+This update introduces the new Development Center for real-time version tracking, a direct download system for experimental builds, and a complete overhaul of the explorer toolbar for a cleaner and more professional engineering experience.
+
+New Features
+  - Help / Development Center & Commit History
+    * Implemented the **CommitHistoryWindow** (Development Center) integrated with the GitHub API to fetch real-time commit history from the `dev` branch.
+    * Integrated a **Direct Download System**: users can now download and install specific development builds (ZIP) directly from the commit list by linking unique SHAs with GitHub Release Assets.
+    * Re-engineered **UpdatesView**: implemented a high-fidelity "Hero Action" layout with a dual-panel design (Info Card / Selection Button) for the Update Center gateway.
+  - Infrastructure / Rolling Release CI/CD
+    * Configured **GitHub Actions (dev.yml)** for automated "Rolling Releases": new builds are compiled and attached to a permanent `development` tag to avoid release history clutter.
+    * Implemented **Optimized NuGet Caching** and minimal-verbosity build protocols to reduce deployment time by ~40% per commit.
+  - Explorer / Professional HUD Toolbar
+    * Re-designed the **ExplorerToolbarControl** into a dual-panel architecture: a clean header for core actions and a professional expanded section for secondary tools.
+    * Implemented **Seamless Panel Fusion**: when expanded, the header and tools panel merge into a single visual unit by dynamically adjusting borders and corner radii.
+    * Integrated a **Compact Tools Suite**: secondary tools (Collapse, Backup, Mode, Grid, Path, Favs, Merger) are now aligned to the far left with a high-density footprint and 9pt typography for a cleaner engineering aesthetic.
+  - UI / Technical Settings Control
+    * Implemented the **ModernToggleSwitch** style: a professional industrial-grade toggle with a technical LED status indicator and 1.5px high-contrast hover feedback.
+
+Changes
+  - UI / Viewer Gimbal HUD Optimization
+    * Eliminated **Redundant Perspective View**: Removed the duplicate "Perspective" button from the ViewerViewportControl HUD to streamline the user interface and avoid confusion with the Front View/Reset actions.
+    * Corrected **Axis Iconography Standard**: Updated axis colors and icons to match the engineering standard (Z=Blue/Forward-Back, Y=Green/Top-Bottom, X=Red/Left-Right) for a more intuitive 3D navigation experience.
+
+Improvements
+  - UI / Settings Suite Evolution
+    * Re-engineered the Settings architecture into a **Horizontal Studio Layout**: transitioned from vertical blocks to a pro-tier action-on-the-right design for General and Advanced panels.
+    * Unified **HUD Spacing Standards**: implemented a mathematical grid system (6px subtitle gap, 18px item rhythm, 28px content indent) across all configuration views for pixel-perfect alignment.
+    * Optimized **Settings Sidebar**: refined the navigation header with a simplified "SETTINGS / PANEL" hierarchy and a more compact technical icon footprint.
+    * Path Management: re-designed **DefaultPathsSettingsView** with a high-width vertical layout to prevent path truncation while maintaining alignment consistency.
+  - UI / HUD Interactivity & Feedback
+    * Restored and refined the **AccentBrush Hover Protocol**: both icons and text now ignite with the system accent color upon interaction, providing instant visual feedback.
+    * Implemented **Forced White Iconography**: all toolbar icons now default to a high-contrast white/TextPrimary state for maximum visibility on dark HUD backgrounds.
+  - UI / Commit History Evolution
+    * Optimized the **CommitHistoryWindow** by replacing legacy text-based buttons with a minimalist HUD icon-only architecture.
+  - UI / Stabilized Search Experience
+    * Re-engineered the **AnimatedSearchBoxStyle**: stabilized the search placeholder (magnify icon + "Search...") to remain visible by default and perfectly steady during expansion/collapse animations.
+    * Optimized Search Geometry: increased the expanded search box width to **180px** for improved readability of complex queries.
+  - Explorer
+    * Reworked toolbar with vertical labels and dynamic action-oriented icons for Mode and Grouping tools.
+    * Adjusted main split proportions (850:900) to optimize tool layout and tree legibility.
+
+Bug Fixes
+  - Explorer / Search Placeholder Visibility
+    * Fixed a recurring bug where the search placeholder would flicker or disappear prematurely due to focus-state conflicts; implemented a content-based visibility trigger for 100% stability.
+  - UI / Double Border Artifacts
+    * Resolved a visual glitch where overlapping 1px borders created a "double line" effect between merged toolbar panels.
+  - JsonDiff
+    * Fixed inconsistent Next/Previous navigation by ensuring jumps are relative to the visible viewport when the caret is off-screen or at the document start.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v3.2.2.2
+
+HOTFIX UPDATE
+This update introduces a professional Camera Gimbal system for the 3D Viewer and unifies the historical monitoring experience with a streamlined naming architecture.
+
+New Features
+  - 3D Viewer / Camera Gimbal HUD
+    * Implemented a professional **Orientation Gimbal HUD**: a technical overlay providing instant access to 7 calibrated views (Front, Back, Left, Right, Top, Bottom, and Perspective).
+    * Integrated a **Smooth Flight Engine**: transitions between camera angles now utilize a specialized Lerp-based interpolation for a high-end cinematic feel.
+    * Added **Snap-to-View Logic**: initial model loading now performs an instant camera snap to the "Professional Front View", eliminating jarring transitions on startup.
+
+
+Improvements
+  - UI / Refined Camera Iconography
+    * Designed a specialized icon set for the Gimbal HUD with semantic axis coloring (Green: Y, Red: X, Blue: Z) and mirrored orientations for improved spatial awareness.
+  - Architecture / Camera Controller Rework
+    * Enhanced **CustomCameraController** with dual-mode operational states: `FlyTo` (interpolated) and `SnapTo` (instant), providing precise control over the user experience.
+  - Monitor / Unified History Experience
+    * Refactored the **History Module** to be fully content-agnostic: unified naming conventions ("Edit Name", "Rename Entry") for both WAD comparisons and JSON remote files.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v3.2.2.1
+
+HOTFIX UPDATE
+This hotfix introduces batch loading capabilities for chromas and enhances technical asset identification through direct texture naming, significantly optimizing the 3D viewer workflow.
+
+New Features
+  - 3D Viewer / Multi-Chroma Loading
+    * Implemented **Multi-Selection Support** in the Chroma Gallery: users can now select multiple skins using a toggle-based interaction (CheckCircle indicator).
+
+Improvements
+  - Viewer / Chroma Asset Identification
+    * Enhanced chroma cards to display the **Technical Texture Name** (e.g., `tx_cm`) instead of a generic label, significantly improving asset traceability.
+    * Integrated **Smart Text Trimming** and **Detailed ToolTips** for long texture filenames, ensuring a clean and readable grid layout.
+    * Refined the **Loading Sequence**: the gallery now stays visible during batch operations, providing continuous feedback until the last model is rendered.
+  - UI / HUD Aesthetics & Alignment
+    * Achieved **Mathematical Centering** for all gallery controls through refined StackPanel alignments and standardized 18px horizontal padding.
+  - Viewer / Chroma Preview 
+    * Implemented a prioritized hierarchical search that favors the `_tx_cm` pattern (main chroma texture) and ensures matching with the chroma directory name for 100% accurate previews.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v3.2.2.0
+
+MEDIUM UPDATE
+This version redefines the technical agility of AssetsManager through a deep re-engineering of the 3D Viewer and the comparison engine. It introduces multi-threaded asynchronous loading (Async/Await) for SKN, SCO, and SCB assets, eliminating interface locks and guaranteeing absolute fluidity. This version consolidates the new interactive Chroma Gallery with real-time swatch analysis and debuts the Difference Playlist system for high-performance sequential navigation. Under a Peer-to-Peer communication architecture and high-fidelity HUD aesthetics, this version transforms asset analysis into a symmetrical, reactive, and professional engineering environment.
+
+New Features
+  - 3D Viewer / Interactive Chroma Gallery
+    * Introduced a high-fidelity **Chroma Selection Center**: an intelligent station that automatically detects and filters skin variations for any character.
+    * Integrated the **ChromaScannerService**: automated directory analysis that identifies .skn models and generates color-accurate swatches from textures using pixel-sampling algorithms.
+    * Features a professional **HUD Selection Overlay** with virtualized grid technology for ultra-smooth navigation through large chroma collections.
+  - Comparator / Batch Diff Playlist
+    * Implemented a high-performance sequential navigation system ("Playlist") for both Text and Image difference viewers.
+    * Added dynamic batch detection: the interface automatically adapts when multiple files are selected for comparison.
+    * Integrated full keyboard support: navigate between files in a batch using Alt + Left/Right shortcuts.
+
+Improvements
+  - Architecture / Passive Injector Pattern
+    * Refactored the **ViewerWindow** into a pure passive container, delegating orchestration to specialized child controls and improving modularity.
+    * Implemented **Direct Peer-to-Peer Communication** between viewer components (Panel, Viewport, Gallery), eliminating event-bubbling overhead.
+  - Viewer / Asynchronous Asset Loading
+    * Implemented **Background Model Loading (async/await)** for SKN, SCO, and SCB files, ensuring a zero-blocking UI experience during heavy geometry parsing.
+    * Re-engineered **SknLoadingService** and **ScoLoadingService** to utilize UI thread synchronization via `Dispatcher`, allowing parallel loading of meshes and textures.
+    * Optimized the **Chroma Selection Workflow** to provide seamless transitions by delaying gallery dismissal until the new model is fully prepared in the viewport.
+  - UI / Symmetrical Toolbar Architecture
+    * Standardized the tool capsule layout across all difference viewers: logic follows a unified FILES > MODES > TOOLS hierarchy.
+    * Redesigned the Image Diff toolbar into a single HUD capsule, eliminating visual clutter and achieving perfect horizontal centering.
+  - Comparison Results UI / Professional Toolbar
+    * Redesigned the results toolbar into a unified "Command Console" layout using a cohesive capsule design.
+    * Integrated the **Analytical Dashboard** and **Status Filters** into a single technical block with surgical separators (0.8 opacity).
+    * Implemented high-contrast state visualization: tools now fade to greyscale (30% opacity) when inactive and ignite with vibrant semantic colors (Green/Orange/Red/Blue) when active.
+  - UI / Dynamic Context Menu
+    * Implemented a "live" context menu in the Explorer: automatically switches label to "View Selected Differences" and adjusts its state based on multi-selection content.
+  - UI / Visual Consistency Standard
+    * Standardized toolbar separators across all difference viewers: implemented a unified **80% Opacity Protocol** to ensure a balanced, high-fidelity HUD aesthetic without visual distractions.
+  - UI / UX Refinements
+    * Enhanced the 3D Workspace flow: the editor state now persists after model deletion, ensuring a continuous engineering environment.
+    * Refined the window status bars to provide clear shortcut information for both change navigation (Alt+Up/Down) and file navigation (Alt+Left/Right).
+
+Bug Fixes
+  - Explorer / Virtualization Stability
+    * Fixed a critical selection bug where scrolling through large directories caused accidental preview changes (Breadcrumbs) due to container recycling; migrated the **TreeView** to **Standard Virtualization Mode** with an optimized 4-page pre-render cache.
+  - UI / Visual-Logical Tree Navigation
+    * Fixed a critical UI crash (`InvalidOperationException`) when interacting with highlighted search results; re-engineered the **FindAncestor** helper to support hybrid navigation between Visual and Logical trees, ensuring compatibility with content elements like `Run`.
+  - Explorer / Multi-Selection Logic
+    * Resolved a fundamental selection bug: the primary focused item is now correctly included alongside secondary multi-selected nodes in all batch operations (Merger, Extraction, Diffs).
+  - Explorer / Backup Tree Hierarchy
+    * Fixed a critical bug in Backup mode where disabling "Group by paths" (Categories mode) caused dependencies to be incorrectly nested inside other files, breaking the category structure.
+    * Resolved an issue where the **"Dependency"** category folder disappeared in Category mode; implemented a comprehensive item collection strategy to ensure all top-level dependencies are displayed.
+    * Fixed a technical regression in audio bank processing: implemented a **Visual-Technical Path Separation Protocol** that preserves original game paths for the `AudioBankLinkerService` while using simplified paths for visual categorization.
+  - UI / Window Persistence Protocol
+    * Fixed a bug in the **Image Merger** tool where the window would fail to reopen after being closed via the 'X' button; implemented a robust persistence and visibility protocol to ensure the tool is always accessible from the context menu.
+  - UI / Resource Dictionary Integrity
+    * Fixed a XAML runtime exception caused by missing local resources; transitioned to a 100% globalized converter architecture.
+  - Comparator / .BIN Format Support
+    * Optimized the batch detection algorithm to properly identify and allow proprietary data formats (.bin, .json, .troybin) in the multi-file text viewer.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v3.2.1.1
+
+HOTFIX UPDATE
+This update redefines the robustness of the comparison engine and the reliability of the monitoring system. It introduces a new percentage-based synchronization architecture and an interactive minimap of the entire surface area, eliminating any instability when navigating large files. Furthermore, it optimizes the PBE maintenance radar through strict JSON verification and refines the HUD geometry, ensuring a flawless visual experience and precise adjustment in maximized windows.
+
+Improvements
+  - UI / Full-Surface Minimap Experience
+    * Re-engineered the text navigation map into a professional interactive minimap: the entire panel surface is now clickable for proportional scrolling.
+  - Comparator / Intelligent Block-Jump Navigation
+    * Implemented advanced logic for 'Next' and 'Previous' buttons to jump directly to change starts, significantly increasing navigation speed in large documents.
+  - UI / Update Progress Experience
+    * Redesigned the **UpdateProgressWindow** with a modern, high-density HUD aesthetic.
+    * Re-engineered the **ModernProgressBar** into a solid, 8px "pill" design with perfect 100% rounding and zero-artifact clipping.
+    * Refined the progress telemetry: automatically strips redundant "Downloading..." prefixes to show clean, high-precision MB data.
+  - UI / Technical Animation Smoothing
+    * Optimized the **TechnicalGlowStyle** with a subtle, slow-tempo opacity pulse (0.04 to 0.08) for a more professional and integrated atmosphere.
+  - UI / Refined CheckBox Design
+    * Redesigned checkboxes to a sharper 16x16px footprint with a persistent 1.5px AccentBrush border.
+  - UI / Title Bar Control Alignment
+    * Achieved mathematically perfect vertical centering for all window controls (Minimize, Maximize, Close).
+
+Bug Fixes
+  - Monitor / PBE Maintenance Tracking
+    * Resolved a critical logic error in **PbeStatusService** that caused premature "Maintenance ended" notifications; now relies strictly on real-time server JSON.
+    * Fixed a regex limitation for single-digit dates and implemented high-precision keyword filtering to ignore informational updates.
+  - Comparator / Text Navigation Stability
+    * Resolved the "crazy scroll" bug in the navigation map by implementing percentage-based synchronization and physical event unsubscription.
+    * Fixed a logic error where deletion blocks (red) were skipped in the navigation map; now monitors both source and target documents.
+    * Perfected HUD Design: resolved broken rounded corners and inconsistent borders in the navigation panel through precise margin alignment (1,0,1,1).
+  - Explorer / Smart Grouping Logic
+    * Fixed a bug in the Explorer Toolbar where the "Group by paths" button would disappear when deactivated; now correctly separates tool visibility from its activation state.
+  - UI / Maximized Window Precision
+    * Fixed a common WindowChrome bug where maximizing would cause the window to overflow into secondary monitors using a dynamic 7px compensation.
+  - UI / Pixel-Perfect Corner Geometry
+    * Resolved "ghost pixel" artifacts and perfected the overlap logic for HUD window corners, ensuring a solid curve.
+  - UI / Scrollbar Hitbox Interaction
+    * Fixed a bug where the window resize hitbox would hijack mouse clicks intended for the vertical scrollbar.
+  - Explorer / Multi-Selection Context Menu
+    * Fixed a critical bug where right-clicking an item within a multi-selection would clear the previous selection.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v3.2.1.0
+
+MEDIUM UPDATE
+This update marks the definitive technical consolidation of the AssetsManager ecosystem, unifying engineering standards, performance mandates, and the Native HUD architecture under a single, rigorous critical framework. It introduces deep optimizations in reactive data management through atomic collection deployment and refines the Container-Control-Service flow, ensuring absolute integrity in high-volume asset processing and delivering a high-fidelity, framework-free native experience.
+
+New Features
+  - Architecture / Global HUD Consolidation
+    * Successfully migrated all secondary dialogs and utilities (**ConfirmationDialog**, **InputDialog**, **JsonDiffWindow**, **ImageMergerWindow**, **UpdateProgressWindow**, **ProgressDetailsWindow**) to the high-performance `HudWindow` base class.
+    * Unified Title Bar Standard: All windows now share the same native chrome, title bar styles, and semantic iconography, ensuring 100% visual consistency across the entire suite.
+  - Comparator / Surgical Filtering Engine
+    * Introduced a new **Smart Filter Toolbox** in the Differences Explorer, enabling instant multi-criteria asset discovery.
+    * State-Based Toggles: Added monochromatic "Badge" buttons to toggle the visibility of **New**, **Modified**, **Removed**, and **Renamed** assets in real-time.
+    * Unified Search Logic: Re-engineered the filtering engine to combine text search with state filters, allowing complex queries (e.g., "new skins only").
+    * Dynamic Tree Cleanup: El explorer tree ahora automáticamente oculta carpetas WAD vacías y categorías que no coinciden con los filtros actuales.
+    * Intelligent Summary Updates: El pie de página adapta dinámicamente su reporte basado en el set de filtros activos.
+  - Monitor / Refined Notification Hub
+    * Implemented a new **Persistent Visibility Protocol**: el Notification Hub ahora se restaura y enfoca inteligentemente al clicar su icono.
+    * Redesigned Header/Footer Hierarchy: Los contadores de no leídos y acciones globales se han movido a secciones dedicadas de alto contraste.
+    * Re-engineered Reactivity: Transición de todos los badges de no leídos a propiedades `.Count` de colecciones atómicas para respuesta instantánea.
+  - Monitor / Reactive Progress Architecture
+    * Formally migrated the **ProgressDetailsWindow** to a full MVVM pattern using the new **ProgressDetailsModel**.
+    * Centralized all progress parsing logic, estimated time calculations, and sub-process (Chunks) visibility management.
+  - Settings / Original Format Support
+    * Introduced the new **"Original"** option for Preferred Image Format.
+    * Integrated high-speed raw extraction logic in the **WadSavingService** that bypasses texture processing, preserving 100% of the asset's source integrity.
+  - Comparator / Analytical Insight Dashboard
+    * Integrated a high-fidelity diagnostic dashboard within the **WadComparisonResultWindow**.
+    * Category Distribution: Real-time breakdown of asset types with visual progress bars.
+    * Top Size Impact: Identifica automáticamente el Top 5 de archivos con mayor variación de tamaño.
+    * Affected Areas Mapping: Agrupa los cambios por directorio raíz para localizar el impacto en regiones del juego.
+  - Comparator / Redesigned Asset Inspector
+    * Overhauled **WadDiffDetailsControl** into a professional "Asset Inspector" with high-density layout.
+    * Aligned single-row specification bar for Previous, Current, and Variation sizes.
+    * Improved Traceability: Restaurados los logs dedicados de "Origin" vs "Target" para archivos renombrados.
+  - RMAN / Sequential Download Priority
+    * Re-engineered the bundle download orchestrator to prioritize files alphabetically according to the manifest.
+  - Monitor / Detailed Technical Progress
+    * New Format: `Chunks: x of x (A/B)`, showing both current file and global operation progress.
+  - Monitor / History Entry Renaming
+    * Added capability to rename historical comparison entries via **InputDialog**.
+  - UI / Technical Iconography
+    * Added dedicated icons for static mesh files (.scb, .sco) improving visual differentiation.
+
+Improvements
+  - UI / Performance & Architecture
+    * **Framework Elimination:** Formalmente eliminadas las dependencias de **MahApps.Metro** y **WPF-UI**, reduciendo el consumo de RAM.
+    * **Standardized HUD Controls:** Unificados todos los botones de control de ventana bajo un footprint de 46x36px.
+    * **Precision Hitbox Fix:** Implementado `IsHitTestVisibleInChrome="True"` para asegurar respuesta al 100% en clics de la barra de título.
+    * **Native Windows Integration:** Cambio a **SystemCommands** para todas las operaciones de ventana, asegurando compatibilidad con Aero Snap y animaciones de Windows.
+    * **Reactive Collection Fix:** Resuelto un bug en **ObservableRangeCollection** donde operaciones bulk no notificaban cambios de `Count`.
+    * Optimized **TreeView Performance** with advanced virtualization.
+    * Centralized category iconography in the **PathToIconConverter**.
+  - UI / Redesigned Update Workflow
+    * **UpdateModeDialog Overhaul:** Rediseñada la interfaz de selección de actualización en un diálogo técnico de alta densidad.
+  - UI / Clean StatusBar Logic
+    * Intelligent metadata filter in the **ProgressUIManager** to strip technical delimiters from the main UI.
+  - Settings / Enhanced Reset Logic
+    * Refined **Reset to Defaults** workflow to intelligently preserve the **HashesSizes** cache.
+  - Monitor / Asset Tracker UI Overhaul
+    * **High-Fidelity Thumbnails:** Thumbnails ahora respetan los bordes redondeados de 12px sin sangrado.
+    * **Technical Framing:** Añadido borde de 1px con color de acento técnico a todas las miniaturas.
+  - Explorer / Workspace Layout
+    * Refined main splitter proportion to **750/1000** to maximize preview area.
+  - Explorer / File Grid View Overhaul
+    * Implemented **Dual Folder Counters** for sub-containers and assets.
+    * Added **Quick Filter Icons** for instant grid sorting.
+    * Implemented interactive **Floating Action Bar** for multi-selected items.
+
+Bug Fixes
+  - Monitor / Memory Leak Protection
+    * Resolved architectural memory leak in background progress windows using a **Conditional Disposal Flag**.
+  - UI / Title Bar Stability
+    * Resuelto conflicto visual de WPF donde el icono de maximizar desaparecía al abrir otros diálogos.
+  - Monitor / Notification Hub Reactivity
+    * Fixed UI bug where the empty state failed to trigger after clearing notifications.
+  - Explorer / JSON Viewer Readability
+    * Unicode escape sequences are now correctly unescaped for enhanced readability.
+  - Audio Player / Drag & Drop Reactivity
+    * Fixed bug where added files would not visually update until window restart.
+  - Comparator / Backup Status Mapping
+    * Resolved logic error where direct enum cast caused incorrect status assignment.
+  - Monitor / PBE Status Notification Filtering
+    * Implemented intelligent scanner to filter out non-maintenance messages.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v3.2.0.2
+
+HOTFIX UPDATE
+This update introduces a major architectural rework of the File Explorer and migrates the 3D Model Panel to a reactive MVVM architecture.
+
+New Features
+  - Explorer / Toolbar Toolbox Redesign
+    * Re-engineered explorer toolbar into a "Toolbox" layout with animated expandable search.
+  - Explorer / Dual-View Preview Engine
+    * Dynamic slot strategy allowing simultaneous viewing of Images and Content.
+  - Explorer / Metadata Details Tab
+    * Displays "Old Path" vs "New Path" metadata for renamed assets.
+
+Improvements
+  - Performance / Global UI Virtualization
+    * Migrated all TreeViews to high-performance **VirtualizingStackPanel**.
+  - Architecture / ModelPanelModel Rework
+    * Refactored 3D Model Panel using reactive ViewModel, eliminating manual UI manipulation.
+  - Workflow / Pinned Files & Tab Rework
+    * Recyclable slot logic (max 2 temporary tabs) to prevent UI clutter.
+
+Bug Fixes
+  - System / Hash Synchronization Race Condition
+    * Re-engineered lock strategy in the **Status** service to protect the update check cycle.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v3.2.0.1
+
+HOTFIX UPDATE
+This update addresses critical data collisions in localized assets and introduces a 100% asynchronous architecture.
+
+Improvements
+  - Workflow / Session Comparison Intelligence
+    * Implemented **Comparison Fingerprinting** to prevent redundant auto-saves.
+  - System / Full Asynchronous Rework
+    * Re-engineered heavy disk operations to be fully asynchronous.
+  - Architecture / Stateless Directory Management
+    * Refactored **DirectoriesCreator** into a high-performance utility service.
+
+Bug Fixes
+  - Comparator / Localized Asset Collision
+    * Resolved bug where localized files from different language WADs would overwrite each other.
+    * Implemented **WAD-based subdirectory structure** in the backup environment.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v3.2.0.0
+
+MAJOR UPDATE
+Landmark update redefining core infrastructure with parallel synchronization and a professional Universal Converter.
+
+New Features
+  - Explorer / MVVM State Management
+    * Fully migrated "Empty State" UI to the MVVM pattern.
+  - Home / Universal Converter
+    * High-performance engine supporting mixed image and audio queues.
+  - System / Optimized Performance Engine
+    * **Fast Mode Engine:** Advanced Reflection for near-instant WAD comparisons.
+    * **Blake3 Integration:** industry-leading hashing performance.

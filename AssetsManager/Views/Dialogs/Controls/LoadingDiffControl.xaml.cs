@@ -6,12 +6,15 @@ namespace AssetsManager.Views.Dialogs.Controls
 {
     public partial class LoadingDiffControl : UserControl
     {
-        public LoadingDiffModel ViewModel { get; } = new LoadingDiffModel();
+        private readonly LoadingDiffModel _viewModel;
+
+        public LoadingDiffModel ViewModel => _viewModel;
 
         public LoadingDiffControl()
         {
             InitializeComponent();
-            DataContext = ViewModel;
+            _viewModel = new LoadingDiffModel();
+            DataContext = _viewModel;
         }
 
         public void ShowLoading(bool show)
@@ -19,28 +22,28 @@ namespace AssetsManager.Views.Dialogs.Controls
             Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             if (show)
             {
-                ViewModel.Reset();
-                ViewModel.IsBusy = true;
+                _viewModel.Reset();
+                _viewModel.IsBusy = true;
             }
             else
             {
-                ViewModel.IsBusy = false;
+                _viewModel.IsBusy = false;
             }
         }
 
         public void SetProgress(double value)
         {
-            ViewModel.ProgressValue = value;
+            _viewModel.ProgressValue = value;
         }
 
         public void SetDescription(string text)
         {
-            ViewModel.Description = text;
+            _viewModel.Description = text;
         }
 
         public void SetState(DiffLoadingState state)
         {
-            ViewModel.SetState(state);
+            _viewModel.SetState(state);
         }
     }
 }

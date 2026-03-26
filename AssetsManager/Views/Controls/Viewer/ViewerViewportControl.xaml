@@ -61,30 +61,20 @@
                     </Border.Effect>
 
                     <StackPanel Orientation="Vertical">
-                        <!-- Perspective View -->
-                        <Button Style="{StaticResource TransparentIconButton}"
-                                ToolTip="Perspective View"
-                                Click="SetCameraView_Click" Tag="Perspective"
-                                Width="32" Height="32" Margin="0,0,0,4">
-                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}"/>
-                        </Button>
-
-                        <Rectangle Height="1" Fill="#33FFFFFF" Margin="6,2" HorizontalAlignment="Stretch"/>
-
-                        <!-- Frontal (Y+) -->
+                        <!-- Frontal (Z+) -->
                         <Button Style="{StaticResource TransparentIconButton}"
                                 ToolTip="Front View"
                                 Click="SetCameraView_Click" Tag="Front"
                                 Width="32" Height="32">
-                            <materialIcons:MaterialIcon Kind="AxisYArrow" Width="16" Height="16" Foreground="#FF4CAF50"/> <!-- Green -->
+                            <materialIcons:MaterialIcon Kind="AxisZArrow" Width="16" Height="16" Foreground="#FF2196F3"/> <!-- Blue -->
                         </Button>
 
-                        <!-- Trasera (Y-) -->
+                        <!-- Trasera (Z-) -->
                         <Button Style="{StaticResource TransparentIconButton}"
                                 ToolTip="Back View"
                                 Click="SetCameraView_Click" Tag="Back"
                                 Width="32" Height="32">
-                            <materialIcons:MaterialIcon Kind="AxisYArrow" Width="16" Height="16" Foreground="#FF4CAF50" Opacity="0.4" RenderTransformOrigin="0.5,0.5">
+                            <materialIcons:MaterialIcon Kind="AxisZArrow" Width="16" Height="16" Foreground="#FF2196F3" Opacity="0.4" RenderTransformOrigin="0.5,0.5">
                                 <materialIcons:MaterialIcon.RenderTransform>
                                     <ScaleTransform ScaleY="-1"/>
                                 </materialIcons:MaterialIcon.RenderTransform>
@@ -111,20 +101,20 @@
                             <materialIcons:MaterialIcon Kind="AxisXArrow" Width="16" Height="16" Foreground="#FFF44336" Opacity="0.4"/>
                         </Button>
 
-                        <!-- Superior (Z+) -->
+                        <!-- Superior (Y+) -->
                         <Button Style="{StaticResource TransparentIconButton}"
                                 ToolTip="Top View"
                                 Click="SetCameraView_Click" Tag="Top"
                                 Width="32" Height="32">
-                            <materialIcons:MaterialIcon Kind="AxisZArrow" Width="16" Height="16" Foreground="#FF2196F3"/> <!-- Blue -->
+                            <materialIcons:MaterialIcon Kind="AxisYArrow" Width="16" Height="16" Foreground="#FF4CAF50"/> <!-- Green -->
                         </Button>
 
-                        <!-- Inferior (Z-) -->
+                        <!-- Inferior (Y-) -->
                         <Button Style="{StaticResource TransparentIconButton}"
                                 ToolTip="Bottom View"
                                 Click="SetCameraView_Click" Tag="Bottom"
                                 Width="32" Height="32">
-                            <materialIcons:MaterialIcon Kind="AxisZArrow" Width="16" Height="16" Foreground="#FF2196F3" Opacity="0.4" RenderTransformOrigin="0.5,0.5">
+                            <materialIcons:MaterialIcon Kind="AxisYArrow" Width="16" Height="16" Foreground="#FF4CAF50" Opacity="0.4" RenderTransformOrigin="0.5,0.5">
                                 <materialIcons:MaterialIcon.RenderTransform>
                                     <ScaleTransform ScaleY="-1"/>
                                 </materialIcons:MaterialIcon.RenderTransform>

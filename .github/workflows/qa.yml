@@ -1,0 +1,59 @@
+name: AssetsManager QA Builder
+
+on:
+  push:
+    branches: [ qa ] # Se activa al subir cambios a la rama 'qa'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '10.0.x'
+        cache: true
+        cache-dependency-path: 'AssetsManager/AssetsManager.csproj'
+
+    - name: Extract Version from CSProj
+      id: get_version
+      shell: pwsh
+      run: |
+        [xml]$xml = Get-Content "./AssetsManager/AssetsManager.csproj"
+        $ver = $xml.Project.PropertyGroup.Version
+        echo "PROJECT_VERSION=$ver" >> $env:GITHUB_ENV
+
+    - name: .NET Publish
+      run: dotnet publish "./AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -p:PublishSingleFile=false -o "./publish/" -v minimal /p:AnalysisLevel=none /p:InformationalVersion="${{ env.PROJECT_VERSION }}-${{ github.sha }}"
+
+    - name: Zip File
+      shell: pwsh
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./AssetsManager_qa_${{ github.sha }}.zip
+
+    - name: Upload to QA Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: qa
+        name: "AssetsManager QA Build"
+        body: |
+          ### 🛠 Automated QA Build
+          This release contains the latest automated builds generated from the `qa` branch.
+          
+          **Last Commit:** ${{ github.event.head_commit.message }}
+          **SHA:** `${{ github.sha }}`
+          
+          *Note: These are pre-release builds for testing purposes.*
+        files: ./AssetsManager_qa_${{ github.sha }}.zip
+        prerelease: true
+        generate_release_notes: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
