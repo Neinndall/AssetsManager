@@ -8,19 +8,22 @@ namespace AssetsManager.Views.Controls
     public partial class StatusBarView : UserControl
     {
         public MainWindow ParentWindow { get; set; }
-        public StatusBarViewModel ViewModel { get; } = new StatusBarViewModel();
+        private readonly StatusBarViewModel _viewModel;
+
+        public StatusBarViewModel ViewModel => _viewModel;
 
         public StatusBarView()
         {
             InitializeComponent();
-            DataContext = ViewModel;
+            _viewModel = new StatusBarViewModel();
+            DataContext = _viewModel;
         }
 
         public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
         {
             Dispatcher.Invoke(() =>
             {
-                ViewModel.ShowNotification(show, message);
+                _viewModel.ShowNotification(show, message);
             });
         }
 

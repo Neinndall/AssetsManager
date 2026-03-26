@@ -12,20 +12,21 @@ namespace AssetsManager.Views.Help
     {
         private readonly UpdateManager _updateManager;
         private readonly UpdateCheckService _updateCheckService;
-        
-        // The State Model
-        public AppUpdatesModel Model { get; } = new AppUpdatesModel();
+        private readonly AppUpdatesModel _viewModel;
+
+        public AppUpdatesModel ViewModel => _viewModel;
 
         public UpdatesView(UpdateManager updateManager, UpdateCheckService updateCheckService)
         {
             InitializeComponent();
-            DataContext = Model;
+            _viewModel = new AppUpdatesModel();
+            DataContext = _viewModel;
 
             _updateManager = updateManager;
             _updateCheckService = updateCheckService;
 
             // Initialize Model Data
-            Model.CurrentVersion = ApplicationInfos.Version;
+            _viewModel.CurrentVersion = ApplicationInfos.Version;
             UpdateModelState();
 
             // Subscribe to background update checks
@@ -39,20 +40,20 @@ namespace AssetsManager.Views.Help
             var available = _updateCheckService.AvailableVersion;
             if (available != null)
             {
-                Model.IsUpdateAvailable = true;
-                Model.AvailableVersion = available.ToString();
+                _viewModel.IsUpdateAvailable = true;
+                _viewModel.AvailableVersion = available.ToString();
             }
             else
             {
-                Model.IsUpdateAvailable = false;
-                Model.AvailableVersion = string.Empty;
+                _viewModel.IsUpdateAvailable = false;
+                _viewModel.AvailableVersion = string.Empty;
             }
         }
 
         private void BtnOpenUpdateCenter_Click(object sender, RoutedEventArgs e)
         {
             var updatesWindow = App.ServiceProvider.GetRequiredService<Dialogs.CommitHistoryWindow>();
-            updatesWindow.Initialize(Model.CurrentVersion);
+            updatesWindow.Initialize(_viewModel.CurrentVersion);
             updatesWindow.Owner = Application.Current.MainWindow;
             updatesWindow.ShowDialog();
         }

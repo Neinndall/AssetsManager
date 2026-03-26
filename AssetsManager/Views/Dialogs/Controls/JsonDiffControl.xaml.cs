@@ -37,7 +37,8 @@ namespace AssetsManager.Views.Dialogs.Controls
         #endregion
 
         #region Properties
-        public JsonDiffModel ViewModel { get; } = new JsonDiffModel();
+        private readonly JsonDiffModel _viewModel;
+        public JsonDiffModel ViewModel => _viewModel;
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public JsonFormatterService JsonFormatterService { get; set; }
         public JsonDiffWindow ParentWindow { get; set; }
@@ -47,7 +48,8 @@ namespace AssetsManager.Views.Dialogs.Controls
         public JsonDiffControl()
         {
             InitializeComponent();
-            this.DataContext = ViewModel;
+            _viewModel = new JsonDiffModel();
+            this.DataContext = _viewModel;
             
             // Peer injection
             DiffNavigationPanel.ParentControl = this;

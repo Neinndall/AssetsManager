@@ -12,6 +12,7 @@ namespace AssetsManager.Views.Dialogs
     public partial class CommitHistoryWindow
     {
         private readonly CommitHistoryModel _viewModel;
+        public CommitHistoryModel ViewModel => _viewModel;
         private readonly NotificationService _notificationService;
         private readonly UpdateManager _updateManager;
 
