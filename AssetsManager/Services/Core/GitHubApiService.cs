@@ -20,10 +20,13 @@ namespace AssetsManager.Services.Core
         private const string RepoName = "AssetsManager";
         private const string UserAgent = "AssetsManager-Update-Client";
 
-        public GitHubApiService()
+        public GitHubApiService(HttpClient httpClient)
         {
-            _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
+            _httpClient = httpClient;
+            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
+            {
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
+            }
             // Optional: If you have a GitHub token for higher rate limits
             // _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "YOUR_TOKEN");
         }
