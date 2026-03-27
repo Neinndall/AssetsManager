@@ -68,8 +68,9 @@ namespace AssetsManager.Views.Models.Dialogs
                     bool isOrphan = !commits.Any(c => c.DownloadableAsset?.DownloadUrl == asset.DownloadUrl);
                     if (isOrphan)
                     {
-                        // Extract SHA from filename (AssetsManager_qa_SHA.zip)
-                        string sha = asset.Name.Contains("qa_") ? asset.Name.Split("qa_").Last().Replace(".zip", "") : "unknown";
+                        // Extract SHA from filename (SHA.zip or AssetsManager_qa_SHA.zip)
+                        string sha = asset.Name.Replace(".zip", "");
+                        if (sha.Contains("qa_")) sha = sha.Split("qa_").Last();
                         
                         commits.Add(new GitHubCommit
                         {
