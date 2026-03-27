@@ -27,10 +27,10 @@
             <Grid>
                 <StackPanel Orientation="Horizontal">
                     <Border Background="{StaticResource CardBackground}" CornerRadius="12" Width="48" Height="48" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Margin="16,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="EXPERIMENTAL BRANCH" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="QA BRANCH" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                             <TextBlock Text="Current Version: " FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"/>
                             <TextBlock Text="{Binding CurrentVersion}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
