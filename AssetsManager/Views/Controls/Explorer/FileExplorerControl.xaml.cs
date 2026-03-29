@@ -32,12 +32,13 @@ namespace AssetsManager.Views.Controls.Explorer
     {
         public FilePreviewerControl FilePreviewer { get; set; }
 
-        public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "PinMenuItem");
-        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "AddToFavoritesMenuItem");
-        public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewChangesMenuItem");
-        public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ExtractMenuItem");
-        public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "SaveMenuItem");
-        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "AddToImageMergerMenuItem");
+        public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Pin to Tabs");
+        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "To Favorites");
+        public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString()?.Contains("Differences") == true || m.Header?.ToString()?.Contains("Changes") == true);
+        public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Extract");
+        public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Save");
+        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "To Image Merger");
+        public MenuItem CopyMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Copy");
 
         // Injected Services
         public LogService LogService { get; set; }
@@ -687,6 +688,22 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private void CopyName_Click(object sender, RoutedEventArgs e)
+        {
+            if (FileTreeView.SelectedItem is FileSystemNodeModel node)
+            {
+                Clipboard.SetText(node.Name);
+            }
+        }
+
+        private void CopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            if (FileTreeView.SelectedItem is FileSystemNodeModel node)
+            {
+                Clipboard.SetText(node.FullPath);
+            }
+        }
+
         private void AddToFavorites_Click(object sender, RoutedEventArgs e)
         {
             if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode)
@@ -813,35 +830,18 @@ namespace AssetsManager.Views.Controls.Explorer
             _viewModel.SelectedNodes = new ObservableCollection<FileSystemNodeModel>(
                 TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, selectedNode));
 
-            if (ExtractMenuItem is not null)
-            {
-                ExtractMenuItem.IsEnabled = _viewModel.IsWadMode;
-            }
+            if (ExtractMenuItem != null) ExtractMenuItem.IsEnabled = _viewModel.IsWadMode;
+            if (SaveMenuItem != null) SaveMenuItem.IsEnabled = _viewModel.IsWadMode;
+            if (PinMenuItem != null) PinMenuItem.IsEnabled = selectedNode.Type != NodeType.RealDirectory && selectedNode.Type != NodeType.VirtualDirectory && selectedNode.Type != NodeType.WadFile;
+            if (AddToFavoritesMenuItem != null) AddToFavoritesMenuItem.IsEnabled = _viewModel.IsWadMode && !_viewModel.IsBackupMode; 
 
-            if (SaveMenuItem is not null)
+            if (ViewChangesMenuItem != null)
             {
-                SaveMenuItem.IsEnabled = _viewModel.IsWadMode;
-            }
-
-            if (PinMenuItem is not null)
-            {
-                PinMenuItem.IsEnabled = selectedNode.Type != NodeType.RealDirectory && selectedNode.Type != NodeType.VirtualDirectory && selectedNode.Type != NodeType.WadFile;
-            }
-
-            if (AddToFavoritesMenuItem is not null)
-            {
-                // Favorites are only supported in pure WAD Mode (not Backup, not Directory)
-                 AddToFavoritesMenuItem.IsEnabled = _viewModel.IsWadMode && !_viewModel.IsBackupMode; 
-            }
-
-            if (ViewChangesMenuItem is not null)
-            {
-                // Leverage ViewModel logic but assign manually to the Header/IsEnabled
                 ViewChangesMenuItem.Header = _viewModel.ViewChangesHeader;
                 ViewChangesMenuItem.IsEnabled = _viewModel.CanViewChanges;
             }
 
-            if (AddToImageMergerMenuItem is not null)
+            if (AddToImageMergerMenuItem != null)
             {
                 AddToImageMergerMenuItem.IsEnabled = (SupportedFileTypes.Images.Contains(selectedNode.Extension) || SupportedFileTypes.Textures.Contains(selectedNode.Extension)) && 
                                                     (selectedNode.Type == NodeType.VirtualFile || selectedNode.Type == NodeType.RealFile);
@@ -943,6 +943,16 @@ namespace AssetsManager.Views.Controls.Explorer
             }
 
             var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, LoadAllChildrenForSearch);
+
+            // Update No Results found UI
+            if (!string.IsNullOrEmpty(searchText))
+            {
+                _viewModel.IsNoResultsFound = _viewModel.RootNodes.All(n => !n.IsVisible);
+            }
+            else
+            {
+                _viewModel.IsNoResultsFound = false;
+            }
 
             if (nodeToSelect != null)
             {
