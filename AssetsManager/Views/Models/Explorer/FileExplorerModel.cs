@@ -25,6 +25,7 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isBusy;
         private bool _isTreeReady;
         private bool _isEmptyState;
+        private bool _isNoResultsFound;
         private bool _isWadMode = true; // Default WAD mode
         private bool _isBackupMode = false;
         private bool _isSortingEnabled = true;
@@ -38,6 +39,8 @@ namespace AssetsManager.Views.Models.Explorer
 
         private string _statusTitle;
         private string _statusDescription;
+        private string _searchNoResultsTitle;
+        private string _searchNoResultsDescription;
         private bool _isSelectDirectoryActionVisible;
 
         private FileSystemNodeModel _selectedItem;
@@ -50,6 +53,9 @@ namespace AssetsManager.Views.Models.Explorer
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true; // Start empty
+
+            SearchNoResultsTitle = "No Matching Results";
+            SearchNoResultsDescription = "Try adjusting your search or filters.";
         }
 
         public FileSystemNodeModel SelectedItem
@@ -132,6 +138,18 @@ namespace AssetsManager.Views.Models.Explorer
         {
             get => _statusDescription;
             set { if (_statusDescription != value) { _statusDescription = value; OnPropertyChanged(); } }
+        }
+
+        public string SearchNoResultsTitle
+        {
+            get => _searchNoResultsTitle;
+            set { if (_searchNoResultsTitle != value) { _searchNoResultsTitle = value; OnPropertyChanged(); } }
+        }
+
+        public string SearchNoResultsDescription
+        {
+            get => _searchNoResultsDescription;
+            set { if (_searchNoResultsDescription != value) { _searchNoResultsDescription = value; OnPropertyChanged(); } }
         }
 
         public bool IsSelectDirectoryActionVisible
@@ -255,6 +273,19 @@ namespace AssetsManager.Views.Models.Explorer
                 if (_isEmptyState != value) 
                 { 
                     _isEmptyState = value; 
+                    OnPropertyChanged(); 
+                } 
+            }
+        }
+
+        public bool IsNoResultsFound
+        {
+            get => _isNoResultsFound;
+            set 
+            { 
+                if (_isNoResultsFound != value) 
+                { 
+                    _isNoResultsFound = value; 
                     OnPropertyChanged(); 
                 } 
             }

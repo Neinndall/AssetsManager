@@ -24,6 +24,21 @@
                     <materialIcons:MaterialIcon Kind="CompareHorizontal"/>
                 </MenuItem.Icon>
             </MenuItem>
+            <MenuItem Header="Copy" x:Name="CopyMenuItem">
+                <MenuItem.Icon>
+                    <materialIcons:MaterialIcon Kind="ContentCopy"/>
+                </MenuItem.Icon>
+                <MenuItem Header="Copy Name" Click="CopyName_Click">
+                    <MenuItem.Icon>
+                        <materialIcons:MaterialIcon Kind="Pencil" Width="14" Height="14"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Copy Full Path" Click="CopyPath_Click">
+                    <MenuItem.Icon>
+                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="14" Height="14"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
             <MenuItem Header="To Favorites" x:Name="AddToFavoritesMenuItem" Click="AddToFavorites_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="StarOutline"/>
@@ -315,6 +330,32 @@
                 </StackPanel>
             </StackPanel>
         </Grid>
+
+        <!-- No Results Search Overlay -->
+        <StackPanel x:Name="NoResultsMessage"
+                    Grid.Row="1"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Margin="10"
+                    Visibility="{Binding IsNoResultsFound, Converter={StaticResource BoolToVisibilityConverter}}">
+            <materialIcons:MaterialIcon Kind="FileFindOutline"
+                                        Width="64" Height="64"
+                                        HorizontalAlignment="Center"
+                                        Foreground="{StaticResource TextMuted}"
+                                        Opacity="0.5"/>
+            <TextBlock Text="{Binding SearchNoResultsTitle}"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimary}"
+                       HorizontalAlignment="Center"
+                       Margin="0,16,0,0"/>
+            <TextBlock Text="{Binding SearchNoResultsDescription}"
+                       FontSize="14"
+                       Foreground="{StaticResource TextSecondary}"
+                       HorizontalAlignment="Center"
+                       Margin="0,8,0,0"/>
+        </StackPanel>
 
         <!-- Empty State (Overlay) -->
         <StackPanel x:Name="NoDirectoryMessage"
