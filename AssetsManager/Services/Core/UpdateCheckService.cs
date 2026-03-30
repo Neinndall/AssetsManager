@@ -52,7 +52,6 @@ namespace AssetsManager.Services.Core
                 }
                 _updateTimer.Interval = _appSettings.UpdateCheckFrequency * 60 * 1000;
                 _updateTimer.Enabled = true;
-                _logService.LogDebug($"Background update timer started. Frequency: {_appSettings.UpdateCheckFrequency} minutes.");
             }
 
             // Start Asset Tracker timer
@@ -66,7 +65,6 @@ namespace AssetsManager.Services.Core
                 }
                 _assetTrackerTimer.Interval = _appSettings.AssetTrackerFrequency * 60 * 1000;
                 _assetTrackerTimer.Enabled = true;
-                _logService.LogDebug($"Asset Tracker timer started. Frequency: {_appSettings.AssetTrackerFrequency} minutes.");
             }
 
             // Start PBE Status timer
@@ -80,7 +78,6 @@ namespace AssetsManager.Services.Core
                 }
                 _pbeStatusTimer.Interval = _appSettings.PbeStatusFrequency * 60 * 1000;
                 _pbeStatusTimer.Enabled = true;
-                _logService.LogDebug($"PBE Status timer started. Frequency: {_appSettings.PbeStatusFrequency} minutes.");
             }
         }
 

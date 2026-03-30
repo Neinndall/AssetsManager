@@ -245,6 +245,9 @@ namespace AssetsManager.Services.Updater
             }
         }
 
+        private string _lastReleaseEtag;
+        private string _lastLatestVersionRaw;
+
         public async Task<(bool, string)> IsNewVersionAvailableAsync()
         {
             string currentVersionRaw = Assembly.GetExecutingAssembly().GetName().Version.ToString();
@@ -254,9 +257,34 @@ namespace AssetsManager.Services.Updater
 
             try
             {
-                var response = await _httpClient.GetStringAsync(apiUrl);
-                var releaseData = JsonConvert.DeserializeObject<dynamic>(response);
-                string latestVersionRaw = releaseData.tag_name;
+                var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+                if (!string.IsNullOrEmpty(_lastReleaseEtag))
+                {
+                    request.Headers.TryAddWithoutValidation("If-None-Match", _lastReleaseEtag);
+                }
+
+                var response = await _httpClient.SendAsync(request);
+
+                string latestVersionRaw;
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotModified && !string.IsNullOrEmpty(_lastLatestVersionRaw))
+                {
+                    latestVersionRaw = _lastLatestVersionRaw;
+                }
+                else
+                {
+                    response.EnsureSuccessStatusCode();
+                    
+                    if (response.Headers.ETag != null)
+                    {
+                        _lastReleaseEtag = response.Headers.ETag.Tag;
+                    }
+
+                    var content = await response.Content.ReadAsStringAsync();
+                    var releaseData = JsonConvert.DeserializeObject<dynamic>(content);
+                    latestVersionRaw = releaseData.tag_name;
+                    _lastLatestVersionRaw = latestVersionRaw;
+                }
 
                 string parsedCurrentVersion = Regex.Match(currentVersionRaw, @"\d+(\.\d+){1,3}").Value;
                 string parsedLatestVersion = Regex.Match(latestVersionRaw.ToString(), @"\d+(\.\d+){1,3}").Value;
