@@ -73,9 +73,32 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     HandleSelectedModelChanged();
                 }
+                else if (e.PropertyName == nameof(ViewerPanelModel.IsAnimationSyncEnabled))
+                {
+                    if (_viewModel.IsAnimationSyncEnabled)
+                    {
+                        SyncLoadingForAllModels();
+                    }
+                }
             };
 
             Unloaded += (s, e) => Cleanup();
+        }
+
+        private void SyncLoadingForAllModels()
+        {
+            if (_viewModel.AnimationModels.Count == 0) return;
+
+            foreach (var model in _viewModel.LoadedModels)
+            {
+                foreach (var animModel in _viewModel.AnimationModels)
+                {
+                    if (!model.Animations.Any(a => a.Name == animModel.Name))
+                    {
+                        model.Animations.Add(animModel.AnimationData);
+                    }
+                }
+            }
         }
 
         private void HandleSelectedModelChanged()
@@ -329,6 +352,18 @@ namespace AssetsManager.Views.Controls.Viewer
                 Viewport?.AddModel(newModel);
                 _viewModel.SelectedModelParts = newModel.Parts;
 
+                // Sync current animations (v3.2.3.1)
+                if (_viewModel.IsAnimationSyncEnabled && _viewModel.AnimationModels.Count > 0)
+                {
+                    foreach (var animModel in _viewModel.AnimationModels)
+                    {
+                        if (!newModel.Animations.Any(a => a.Name == animModel.Name))
+                        {
+                            newModel.Animations.Add(animModel.AnimationData);
+                        }
+                    }
+                }
+
                 _viewModel.LoadedModels.Add(newModel);
                 _viewModel.SelectedModel = newModel;
                 ModelsListBox.SelectedItem = newModel;
@@ -390,8 +425,22 @@ namespace AssetsManager.Views.Controls.Viewer
                     var animationData = new AnimationData { AnimationAsset = animationAsset, Name = animationName };
                     var animationModel = new AnimationModel(animationData);
 
-                    _viewModel.SelectedModel.Animations.AddRange(new[] { animationData });
-                    _viewModel.AnimationModels.AddRange(new[] { animationModel });
+                    if (_viewModel.IsAnimationSyncEnabled)
+                    {
+                        foreach (var model in _viewModel.LoadedModels)
+                        {
+                            if (!model.Animations.Any(a => a.Name == animationName))
+                            {
+                                model.Animations.Add(animationData);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _viewModel.SelectedModel.Animations.Add(animationData);
+                    }
+
+                    _viewModel.AnimationModels.Add(animationModel);
                 }
             }
         }

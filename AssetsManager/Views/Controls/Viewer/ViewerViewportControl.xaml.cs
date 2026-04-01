@@ -282,31 +282,41 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
 
-            if (_animationPlayer != null && _activeSceneModel?.CurrentAnimation != null && _activeSceneModel.Skeleton != null && _activeSceneModel.SkinnedMesh != null)
+            if (_animationPlayer != null && _loadedModels.Count > 0)
             {
-                if (!_activeSceneModel.IsAnimationPaused)
+                foreach (var model in _loadedModels)
                 {
-                    var speed = _activeAnimationModel?.Speed ?? 1.0;
-                    _activeSceneModel.AnimationTime += deltaTime * speed;
-
-                    var duration = _activeSceneModel.CurrentAnimation.Duration;
-                    if (duration > 0 && _activeSceneModel.AnimationTime >= duration)
+                    if (model.CurrentAnimation != null && model.Skeleton != null && model.SkinnedMesh != null)
                     {
-                        _activeSceneModel.AnimationTime = 0;
-                    }
+                        if (!model.IsAnimationPaused)
+                        {
+                            var speed = _activeAnimationModel?.Speed ?? 1.0;
+                            model.AnimationTime += deltaTime * speed;
 
-                    Panel?.UpdateAnimationProgress(_activeSceneModel.AnimationTime);
+                            var duration = model.CurrentAnimation.Duration;
+                            if (duration > 0 && model.AnimationTime >= duration)
+                            {
+                                model.AnimationTime = 0;
+                            }
+                        }
+
+                        // Update skinning for all models that have an animation to ensure they are visible and moving
+                        _animationPlayer.Update(
+                            (float)model.AnimationTime,
+                            model.CurrentAnimation,
+                            model.Skeleton,
+                            model.SkinnedMesh,
+                            model.Parts.ToList(),
+                            model == _activeSceneModel ? _skeletonVisual : null,
+                            model == _activeSceneModel ? _jointsVisual : null
+                        );
+                    }
                 }
 
-                _animationPlayer.Update(
-                    (float)_activeSceneModel.AnimationTime,
-                    _activeSceneModel.CurrentAnimation,
-                    _activeSceneModel.Skeleton,
-                    _activeSceneModel.SkinnedMesh,
-                    _activeSceneModel.Parts.ToList(),
-                    _skeletonVisual,
-                    _jointsVisual
-                );
+                if (_activeSceneModel != null && _activeSceneModel.CurrentAnimation != null)
+                {
+                    Panel?.UpdateAnimationProgress(_activeSceneModel.AnimationTime);
+                }
             }
         }
 
