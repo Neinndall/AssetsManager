@@ -3,10 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Downloads;
+using AssetsManager.Info;
 
 namespace AssetsManager.Services.Core
 {
@@ -199,19 +202,19 @@ namespace AssetsManager.Services.Core
                 {
                     AvailableVersion = newVersion;
                     
-                    // Compare versions to decide the message
-                    string currentVersionRaw = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-                    string parsedCurrentVersion = System.Text.RegularExpressions.Regex.Match(currentVersionRaw, @"\d+(\.\d+){1,3}").Value;
-                    string parsedLatestVersion = System.Text.RegularExpressions.Regex.Match(newVersion, @"\d+(\.\d+){1,3}").Value;
+                    // Decide notification message
+                    string currentVerStr = ApplicationInfos.Version.Split('-')[0].Replace("v", "");
+                    string latestVerStr = newVersion.Replace("v", "");
 
-                    Version currentVer = new Version(parsedCurrentVersion);
-                    Version latestVer = new Version(parsedLatestVersion);
+                    if (Version.TryParse(currentVerStr, out var currentVer) && 
+                        Version.TryParse(latestVerStr, out var latestVer))
+                    {
+                        string message = ApplicationInfos.IsQA && latestVer <= currentVer
+                            ? $"A stable version {newVersion} is available."
+                            : $"Version {newVersion} is available";
 
-                    string message = AssetsManager.Info.ApplicationInfos.IsQA && latestVer.CompareTo(currentVer) <= 0
-                        ? $"A stable version ({newVersion}) is available. Click to return to the stable branch."
-                        : $"Version {newVersion} is available";
-
-                    UpdatesFound?.Invoke(message, newVersion);
+                        UpdatesFound?.Invoke(message, newVersion);
+                    }
                 }
                 else
                 {
