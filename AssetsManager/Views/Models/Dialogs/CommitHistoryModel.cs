@@ -48,7 +48,7 @@ namespace AssetsManager.Views.Models.Dialogs
                 var commits = await _gitHubApi.GetCommitsAsync("qa", 20);
                 
                 // 2. Fetch specific QA release (like FModel's 'qa')
-                var developmentRelease = await _gitHubApi.GetReleaseAsync("qa");
+                var developmentRelease = await _gitHubApi.GetReleaseAsync("qa-testing");
                 var assets = developmentRelease?.Assets?.OrderByDescending(a => a.CreatedAt).ToList() ?? new List<GitHubAsset>();
 
                 Log.Information("Fetched {CommitCount} commits and {AssetCount} assets from QA release", commits.Count, assets.Count);
