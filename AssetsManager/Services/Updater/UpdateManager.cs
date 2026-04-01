@@ -11,6 +11,7 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
+using AssetsManager.Info;
 
 namespace AssetsManager.Services.Updater
 {
@@ -66,17 +67,24 @@ namespace AssetsManager.Services.Updater
                 Version currentVer = new Version(parsedCurrentVersion);
                 Version latestVer = new Version(parsedLatestVersion);
 
-                if (latestVer.CompareTo(currentVer) > 0)
+                bool isNewer = latestVer.CompareTo(currentVer) > 0;
+                bool isExperimentalToStable = ApplicationInfos.IsQA;
+
+                if (isNewer || isExperimentalToStable)
                 {
+                    string message = isExperimentalToStable && !isNewer 
+                        ? $"A stable version ({latestVersionRaw}) is available. Do you want to return to the stable branch?" 
+                        : $"New version available {latestVersionRaw}. Do you want to download it?";
+
                     bool? result = _customMessageBoxService.ShowYesNo(
                         "Update available",
-                        $"New version available {latestVersionRaw}. Do you want to download it?",
+                        message,
                         owner
                     );
 
                     if (result == true)
                     {
-                        string fileName = $"PBE_AssetsDownloader_{latestVersionRaw}.zip";
+                        string fileName = $"AssetsManager{latestVersionRaw}.zip";
                         string downloadPath = Path.Combine(_directoriesCreator.UpdateCachePath, fileName);
 
                         // Check if the file already exists and has the correct size
@@ -297,8 +305,14 @@ namespace AssetsManager.Services.Updater
                 Version currentVer = new Version(parsedCurrentVersion);
                 Version latestVer = new Version(parsedLatestVersion);
 
-                if (latestVer.CompareTo(currentVer) > 0)
+                bool isQA = ApplicationInfos.IsQA;
+                bool isNewer = latestVer.CompareTo(currentVer) > 0;
+
+                _logService.Log($"IsNewVersionAvailableAsync check: Current={parsedCurrentVersion}, Latest={parsedLatestVersion}, isNewer={isNewer}, isQA={isQA}");
+
+                if (isNewer || isQA)
                 {
+                    _logService.Log($"Update available detected in background! (Latest: {latestVersionRaw})");
                     return (true, latestVersionRaw);
                 }
             }

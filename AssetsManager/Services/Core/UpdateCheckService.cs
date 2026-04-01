@@ -198,7 +198,20 @@ namespace AssetsManager.Services.Core
                 if (appUpdateAvailable)
                 {
                     AvailableVersion = newVersion;
-                    UpdatesFound?.Invoke($"Version {newVersion} is available", newVersion);
+                    
+                    // Compare versions to decide the message
+                    string currentVersionRaw = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
+                    string parsedCurrentVersion = System.Text.RegularExpressions.Regex.Match(currentVersionRaw, @"\d+(\.\d+){1,3}").Value;
+                    string parsedLatestVersion = System.Text.RegularExpressions.Regex.Match(newVersion, @"\d+(\.\d+){1,3}").Value;
+
+                    Version currentVer = new Version(parsedCurrentVersion);
+                    Version latestVer = new Version(parsedLatestVersion);
+
+                    string message = AssetsManager.Info.ApplicationInfos.IsQA && latestVer.CompareTo(currentVer) <= 0
+                        ? $"A stable version ({newVersion}) is available. Click to return to the stable branch."
+                        : $"Version {newVersion} is available";
+
+                    UpdatesFound?.Invoke(message, newVersion);
                 }
                 else
                 {
