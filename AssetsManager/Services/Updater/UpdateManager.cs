@@ -190,7 +190,7 @@ namespace AssetsManager.Services.Updater
 
                 progressWindow.Dispatcher.Invoke(() =>
                 {
-                    progressWindow.SetProgress(0, $"Downloading {shortSha} ({downloadSize})...");
+                    progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
                 });
 
                 using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
