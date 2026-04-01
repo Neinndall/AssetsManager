@@ -24,7 +24,7 @@
                     Margin="0,0,0,10" 
                     BorderBrush="{StaticResource BorderColor}" 
                     BorderThickness="1"
-                    Padding="16,14"
+                    Padding="16,10"
                     Cursor="Hand">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -59,47 +59,44 @@
 
                     <!-- 2. Content Column -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                        <!-- Category/Title (Aligned with Icon Top) -->
-                        <TextBlock Text="{Binding Title, Converter={StaticResource StringCaseConverter}}" 
-                                   FontWeight="ExtraBold" 
-                                   FontSize="11" 
-                                   Foreground="{StaticResource TextMuted}" 
-                                   TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Center"
-                                   Margin="0,1,0,5"/>
+                        <!-- Technical Header: TITLE - TIME -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="{Binding Title, Converter={StaticResource StringCaseConverter}}" 
+                                       FontWeight="ExtraBold" 
+                                       FontSize="10.5" 
+                                       Foreground="{StaticResource TextMuted}" 
+                                       TextTrimming="CharacterEllipsis"/>
+                            
+                            <TextBlock Text="-" 
+                                       FontSize="10.5" 
+                                       Foreground="{StaticResource TextMuted}" 
+                                       Margin="6,0" 
+                                       Opacity="0.5"/>
+
+                            <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm'}" 
+                                       FontSize="10.5" 
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
                         
-                        <!-- Main Message (Comfortable size and spacing) -->
+                        <!-- Main Message (Anchored Top) -->
                         <TextBlock Text="{Binding Message}" 
                                    FontSize="12" 
                                    Foreground="{StaticResource TextPrimary}" 
                                    TextWrapping="Wrap"
-                                   LineHeight="16"
+                                   LineHeight="15"
                                    LineStackingStrategy="BlockLineHeight"
-                                   Opacity="0.9"/>
+                                   Opacity="0.9"
+                                   VerticalAlignment="Top"/>
                     </StackPanel>
 
-                    <!-- 3. Meta Column (Time and Close Action) -->
-                    <Grid Grid.Column="2" VerticalAlignment="Top" Margin="16,0,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/> <!-- Time -->
-                            <RowDefinition Height="*"/>    <!-- Spacer -->
-                            <RowDefinition Height="Auto"/> <!-- Close Button -->
-                        </Grid.RowDefinitions>
-                        
-                        <TextBlock Grid.Row="0" 
-                                   Text="{Binding Timestamp, StringFormat='HH:mm'}" 
-                                   FontSize="10" 
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextMuted}" 
-                                   HorizontalAlignment="Right"
-                                   VerticalAlignment="Top"
-                                   Margin="0,2,0,10"/>
-
-                        <Button Grid.Row="2"
-                                Style="{StaticResource TransparentIconButton}" 
+                    <!-- 3. Meta Column (Close Action Only) -->
+                    <Grid Grid.Column="2" VerticalAlignment="Stretch" Margin="16,0,0,0">
+                        <!-- Close Button strictly Centered relative to the card height -->
+                        <Button Style="{StaticResource TransparentIconButton}" 
                                 Width="24" Height="24" 
                                 HorizontalAlignment="Right"
-                                VerticalAlignment="Bottom"
+                                VerticalAlignment="Center"
                                 Click="RemoveNotification_Click"
                                 ToolTip="Dismiss">
                             <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14" Opacity="0.4"/>
