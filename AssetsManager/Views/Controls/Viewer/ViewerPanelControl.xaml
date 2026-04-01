@@ -102,7 +102,8 @@
                     </Grid>
 
                     <!-- INSPECTOR NAVIGATION -->
-                    <Border Grid.Row="1" Margin="0,12,0,12" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Grid.Row="1" Margin="0,12,0,12" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                            Visibility="{Binding LoadedModels.Count, Converter={StaticResource CountToVisibilityConverter}}">
                         <UniformGrid Columns="3">
                             <RadioButton x:Name="TabTransform" IsChecked="True" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Height="36" Padding="0" ToolTip="Position, Rotation &amp; Scale">
                                 <materialIcons:MaterialIcon Kind="AxisArrow" Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -117,7 +118,8 @@
                     </Border>
 
                     <!-- INSPECTOR CONTENT -->
-                    <Grid Grid.Row="2" Margin="0,0,0,12">
+                    <Grid Grid.Row="2" Margin="0,0,0,12"
+                          Visibility="{Binding LoadedModels.Count, Converter={StaticResource CountToVisibilityConverter}}">
                         <!-- TRANSFORM -->
                         <ScrollViewer x:Name="TransformPanel" VerticalScrollBarVisibility="Auto"
                                       Visibility="{Binding IsChecked, ElementName=TabTransform, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -343,7 +345,7 @@
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="LinkVariant" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,12,0" VerticalAlignment="Center"/>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Sync Load" FontWeight="Bold" FontSize="11" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="Sync Anims Load" FontWeight="Bold" FontSize="11" Foreground="{StaticResource TextPrimary}"/>
                                             <TextBlock Text="Apply to all models" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
                                         </StackPanel>
                                     </Grid>

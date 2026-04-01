@@ -4,20 +4,14 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Animation;
-using LeagueToolkit.Core.Mesh;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Core;
 using Material.Icons;
 using System.Threading.Tasks;
-using AssetsManager.Utils;
-using System.Windows.Media.Media3D;
 using AssetsManager.Views.Helpers;
-using System.Windows.Media;
-using System.Windows.Controls.Primitives;
 using System.Linq;
 
 namespace AssetsManager.Views.Controls.Viewer
