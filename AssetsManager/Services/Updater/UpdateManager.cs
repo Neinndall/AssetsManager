@@ -305,14 +305,8 @@ namespace AssetsManager.Services.Updater
                 Version currentVer = new Version(parsedCurrentVersion);
                 Version latestVer = new Version(parsedLatestVersion);
 
-                bool isQA = ApplicationInfos.IsQA;
-                bool isNewer = latestVer.CompareTo(currentVer) > 0;
-
-                _logService.Log($"IsNewVersionAvailableAsync check: Current={parsedCurrentVersion}, Latest={parsedLatestVersion}, isNewer={isNewer}, isQA={isQA}");
-
-                if (isNewer || isQA)
+                if (latestVer.CompareTo(currentVer) > 0 || ApplicationInfos.IsQA)
                 {
-                    _logService.Log($"Update available detected in background! (Latest: {latestVersionRaw})");
                     return (true, latestVersionRaw);
                 }
             }
