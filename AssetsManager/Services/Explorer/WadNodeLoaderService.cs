@@ -492,7 +492,7 @@ namespace AssetsManager.Services.Explorer
                             string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
                             if (string.IsNullOrEmpty(virtualPath) || virtualPath == chunk.PathHash.ToString("x16"))
                             {
-                                virtualPath = "unknown/" + chunk.PathHash.ToString("x16"); // Group unknown hashes in a folder
+                                virtualPath = chunk.PathHash.ToString("x16"); // Just the hash as the name
                             }
 
                             AddNodeToVirtualTree(virtualRoot, virtualPath, wadPath, chunk.PathHash);
