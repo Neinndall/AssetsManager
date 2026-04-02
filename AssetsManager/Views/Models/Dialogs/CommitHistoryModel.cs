@@ -62,6 +62,28 @@ namespace AssetsManager.Views.Models.Dialogs
                     commit.IsLatest = commits.IndexOf(commit) == 0;
                 }
 
+                // --- 3.5 Build Inheritance Logic ---
+                // If a commit doesn't have an asset, find the nearest build that includes its changes.
+                // We iterate from newest to oldest.
+                GitHubAsset currentActiveAsset = null;
+                string currentActiveSha = null;
+
+                foreach (var commit in commits.OrderByDescending(c => c.Commit.Author.Date))
+                {
+                    if (commit.DownloadableAsset != null)
+                    {
+                        // This commit has its own build, it becomes the active one for older commits
+                        currentActiveAsset = commit.DownloadableAsset;
+                        currentActiveSha = commit.ShortSha;
+                    }
+                    else if (currentActiveAsset != null)
+                    {
+                        // Inherit the nearest build found in the future
+                        commit.ParentBuildAsset = currentActiveAsset;
+                        commit.ParentBuildSha = currentActiveSha;
+                    }
+                }
+
                 // 4. FModel Logic: Add virtual commits for orphaned assets (assets without a commit in the recent list)
                 foreach (var asset in assets)
                 {

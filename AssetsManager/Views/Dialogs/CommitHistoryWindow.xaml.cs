@@ -42,13 +42,16 @@ namespace AssetsManager.Views.Dialogs
         {
             if (sender is FrameworkElement element && element.DataContext is GitHubCommit commit)
             {
-                if (commit.DownloadableAsset != null)
+                var asset = commit.DownloadableAsset ?? commit.ParentBuildAsset;
+                var sha = commit.DownloadableAsset != null ? commit.ShortSha : commit.ParentBuildSha;
+
+                if (asset != null)
                 {
                     // Delegate the download and install process to the UpdateManager service
                     await _updateManager.DownloadAndInstallDevelopmentBuildAsync(
-                        commit.DownloadableAsset.DownloadUrl,
-                        commit.DownloadableAsset.Size,
-                        commit.ShortSha,
+                        asset.DownloadUrl,
+                        asset.Size,
+                        sha,
                         this);
                 }
             }

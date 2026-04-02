@@ -108,8 +108,9 @@
                                         <TextBlock Text="{Binding Commit.Author.Date, StringFormat='{}Committed {0:MMM dd, yyyy HH:mm}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Opacity="0.7" Margin="0,4,0,0"/>
                                     </StackPanel>
 
-                                    <!-- Download Action -->
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="16,0,0,0">
+                                    <!-- Download Action (Mutually Exclusive States via Grid) -->
+                                    <Grid Grid.Column="2" VerticalAlignment="Center" Margin="16,0,0,0">
+                                        <!-- 1. Direct Build Available -->
                                         <Button x:Name="BtnDownload"
                                                 Style="{StaticResource PrimaryButton}"
                                                 Height="30" Padding="12,0"
@@ -121,11 +122,37 @@
                                             </StackPanel>
                                         </Button>
 
+                                        <!-- 2. Included in Later Build (Minimalist Label) -->
+                                        <StackPanel Visibility="{Binding HasInheritedBuild, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                    VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <materialIcons:MaterialIcon Kind="PackageVariant" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" Opacity="0.6" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding ParentBuildSha, StringFormat='Included in build {0}'}"
+                                                         FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"
+                                                         VerticalAlignment="Center" Opacity="0.8"/>
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <!-- 3. No Build Found Anywhere -->
                                         <TextBlock Text="No build available"
                                                  FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
-                                                 HorizontalAlignment="Right"
-                                                 Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
-                                    </StackPanel>                                
+                                                 HorizontalAlignment="Right" Opacity="0.6">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}" Value="Collapsed"/>
+                                                                <Condition Binding="{Binding HasInheritedBuild}" Value="False"/>
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </MultiDataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>                                
                                </Grid>
                             </Border>
                         </DataTemplate>

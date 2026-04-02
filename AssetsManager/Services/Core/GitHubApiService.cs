@@ -200,6 +200,9 @@ namespace AssetsManager.Services.Core
 
         // Local helper for UI to link with a build asset
         public GitHubAsset DownloadableAsset { get; set; }
+        public GitHubAsset ParentBuildAsset { get; set; }
+        public string ParentBuildSha { get; set; }
+        public bool HasInheritedBuild => DownloadableAsset == null && ParentBuildAsset != null;
         public bool IsLatest { get; set; }
         public string ShortSha => Sha?.Substring(0, 7) ?? "";
     }
