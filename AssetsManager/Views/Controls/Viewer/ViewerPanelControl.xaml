@@ -363,12 +363,21 @@
                                      ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,2" TextTrimming="CharacterEllipsis"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,2" TextTrimming="CharacterEllipsis"/>
+                                            <Button Grid.Column="1" Click="DeleteAnimationButton_Click" Tag="{Binding}" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Remove Animation">
+                                                <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="14" Foreground="{StaticResource AccentRed}"/>
+                                            </Button>
+                                        </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>                
                             
-                            <!-- Professional Mini-Player (v3.2.3.1) -->
+                            <!-- Professional Mini-Player -->
                             <Border Grid.Row="2" x:Name="AnimationControlsPanel" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="12,10" Margin="0,10,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" DataContext="{Binding SelectedAnimation}" Visibility="{Binding SelectedItem, ElementName=AnimationsListBox, Converter={StaticResource NullToVisibilityConverter}}">
                                 <StackPanel>
                                     <!-- Timeline & Time Labels -->

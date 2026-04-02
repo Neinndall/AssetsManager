@@ -183,6 +183,27 @@ namespace AssetsManager.Views.Controls.Viewer
             _activeSceneModel.IsAnimationPaused = true;
         }
 
+        public void RemoveAnimation(AnimationModel animationModel)
+        {
+            if (animationModel == null) return;
+
+            // 1. Stop if it's currently playing
+            if (_activeAnimationModel == animationModel)
+            {
+                StopAnimation();
+            }
+
+            // 2. Remove from all loaded models
+            foreach (var model in _loadedModels)
+            {
+                var animData = model.Animations.FirstOrDefault(a => a.Name == animationModel.Name);
+                if (animData != null)
+                {
+                    model.Animations.Remove(animData);
+                }
+            }
+        }
+
         public void ResetScene()
         {
             StopAnimation();

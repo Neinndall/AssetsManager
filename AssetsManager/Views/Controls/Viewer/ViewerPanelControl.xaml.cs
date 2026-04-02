@@ -182,6 +182,28 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private void DeleteAnimationButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is AnimationModel animationToDelete)
+            {
+                // 1. Remove from all model animation collections
+                Viewport?.RemoveAnimation(animationToDelete);
+
+                // 2. Remove from global UI collection
+                _viewModel.AnimationModels.Remove(animationToDelete);
+
+                if (_currentlyPlayingAnimation == animationToDelete)
+                {
+                    _currentlyPlayingAnimation = null;
+                }
+
+                if (_viewModel.SelectedAnimation == animationToDelete)
+                {
+                    _viewModel.SelectedAnimation = null;
+                }
+            }
+        }
+
         private async void LoadModelButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentMode == ViewerType.Skn)
