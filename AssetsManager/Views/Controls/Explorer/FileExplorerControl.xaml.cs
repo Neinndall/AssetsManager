@@ -313,8 +313,7 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 Title = "Select a WAD file",
                 Filters = { 
-                    new CommonFileDialogFilter("WAD Client", "*.wad.client"), 
-                    new CommonFileDialogFilter("WAD Plugins", "*.wad"), 
+                    new CommonFileDialogFilter("WAD Files (*.wad.client, *.wad)", "*.wad.client;*.wad"), 
                     new CommonFileDialogFilter("All files", "*.*") 
                 }
             };
