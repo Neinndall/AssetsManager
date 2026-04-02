@@ -180,6 +180,80 @@ namespace AssetsManager.Services.Core
                 return new List<GitHubAsset>();
             }
         }
+
+        /// <summary>
+        /// Fetches commits and automatically links them with their direct or inherited builds.
+        /// Centralizes revision domain logic in the service layer for a cleaner architecture.
+        /// </summary>
+        public async Task<List<GitHubCommit>> GetEnrichedCommitsAsync(string branch = "qa", string releaseTag = "qa-testing", int count = 20)
+        {
+            try
+            {
+                // 1. Fetch raw data
+                var commits = await GetCommitsAsync(branch, count);
+                var release = await GetReleaseAsync(releaseTag);
+                var assets = release?.Assets?.OrderByDescending(a => a.CreatedAt).ToList() ?? new List<GitHubAsset>();
+
+                // 2. Direct Linking
+                foreach (var commit in commits)
+                {
+                    commit.DownloadableAsset = assets.FirstOrDefault(a => 
+                        !string.IsNullOrEmpty(commit.Sha) && a.Name.Contains(commit.Sha, StringComparison.OrdinalIgnoreCase));
+                    
+                    commit.IsLatest = commits.IndexOf(commit) == 0;
+                }
+
+                // 3. Build Inheritance Logic
+                // Links commits without a direct ZIP to the nearest future build containing their changes.
+                GitHubAsset currentActiveAsset = null;
+                string currentActiveSha = null;
+
+                foreach (var commit in commits.OrderByDescending(c => c.Commit.Author.Date))
+                {
+                    if (commit.DownloadableAsset != null)
+                    {
+                        currentActiveAsset = commit.DownloadableAsset;
+                        currentActiveSha = commit.ShortSha;
+                    }
+                    else if (currentActiveAsset != null)
+                    {
+                        commit.ParentBuildAsset = currentActiveAsset;
+                        commit.ParentBuildSha = currentActiveSha;
+                    }
+                }
+
+                // 4. Virtual Commits for Orphaned Assets
+                // Ensures builds that don't have a corresponding commit in the recent list are still visible.
+                foreach (var asset in assets)
+                {
+                    bool isOrphan = !commits.Any(c => c.DownloadableAsset?.DownloadUrl == asset.DownloadUrl);
+                    if (isOrphan)
+                    {
+                        string sha = asset.Name.Replace(".zip", "");
+                        if (sha.Contains("qa_")) sha = sha.Split("qa_").Last();
+                        
+                        commits.Add(new GitHubCommit
+                        {
+                            Sha = sha,
+                            Commit = new CommitInfo 
+                            { 
+                                Message = $"Build found in QA release ({asset.Name})",
+                                Author = new CommitAuthor { Name = "GitHub Action", Date = asset.CreatedAt }
+                            },
+                            DownloadableAsset = asset,
+                            IsLatest = false
+                        });
+                    }
+                }
+
+                return commits.OrderByDescending(c => c.Commit.Author.Date).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to fetch enriched GitHub commits");
+                return new List<GitHubCommit>();
+            }
+        }
     }
 
     #region Models
