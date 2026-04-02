@@ -6,7 +6,8 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:models="clr-namespace:AssetsManager.Views.Models.Explorer"
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
-             mc:Ignorable="d">
+             mc:Ignorable="d"
+             AllowDrop="True" Drop="FileExplorerControl_Drop" PreviewDragOver="FileExplorerControl_PreviewDragOver">
     <UserControl.Resources>
         <ContextMenu x:Key="ExplorerContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="Extract" x:Name="ExtractMenuItem" Click="ExtractSelected_Click">
@@ -386,7 +387,7 @@
                        TextAlignment="Center"
                        Margin="10,8,10,0"/>
             <Button x:Name="SelectLolDirButton"
-                    Content="Open Folder"
+                    Content="SELECT DIRECTORY"
                     Style="{StaticResource SecondaryButton}"
                     Click="SelectLolDirButton_Click"
                     Visibility="{Binding IsSelectDirectoryActionVisible, Converter={StaticResource BoolToVisibilityConverter}}"

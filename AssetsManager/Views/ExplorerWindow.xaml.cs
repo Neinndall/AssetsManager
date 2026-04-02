@@ -30,6 +30,7 @@ namespace AssetsManager.Views
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
             WadSavingService wadSavingService,
+            WadNodeLoaderService wadNodeLoaderService,
             HashResolverService hashResolverService,
             TaskCancellationManager taskCancellationManager,
             FavoritesManager favoritesManager,
@@ -42,6 +43,7 @@ namespace AssetsManager.Views
             FileExplorer.CustomMessageBoxService = customMessageBoxService;
             FileExplorer.WadExtractionService = wadExtractionService;
             FileExplorer.WadSavingService = wadSavingService;
+            FileExplorer.WadNodeLoaderService = wadNodeLoaderService;
             FileExplorer.WadSearchBoxService = wadSearchBoxService;
             FileExplorer.DiffViewService = diffViewService;
             FileExplorer.DirectoriesCreator = directoriesCreator;

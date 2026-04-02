@@ -31,7 +31,12 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void LoadComparisonButton_Click(object sender, RoutedEventArgs e)
         {
-            ViewModel?.ParentExplorer?.HandleLoadComparison();
+            ViewModel?.ParentExplorer?.HandleLoadBackup();
+        }
+
+        private void OpenStandaloneWad_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.ParentExplorer?.HandleOpenStandaloneWad();
         }
 
         private void SwitchModeButton_Click(object sender, RoutedEventArgs e)

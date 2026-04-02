@@ -46,6 +46,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public WadExtractionService WadExtractionService { get; set; }
         public WadSavingService WadSavingService { get; set; }
         public WadSearchBoxService WadSearchBoxService { get; set; }
+        public WadNodeLoaderService WadNodeLoaderService { get; set; }
         public DiffViewService DiffViewService { get; set; }
         public DirectoriesCreator DirectoriesCreator { get; set; }
         public AppSettings AppSettings { get; set; }
@@ -287,7 +288,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        public async void HandleLoadComparison()
+        public async void HandleLoadBackup()
         {
             var openFileDialog = new CommonOpenFileDialog
             {
@@ -303,6 +304,87 @@ namespace AssetsManager.Views.Controls.Explorer
                     await FilePreviewer.ResetToDefaultState();
                 }
                 await BuildTreeFromBackupAsync(openFileDialog.FileName);
+            }
+        }
+
+        public async void HandleOpenStandaloneWad()
+        {
+            var openFileDialog = new CommonOpenFileDialog
+            {
+                Title = "Select a WAD file",
+                Filters = { 
+                    new CommonFileDialogFilter("WAD Client", "*.wad.client"), 
+                    new CommonFileDialogFilter("WAD Plugins", "*.wad"), 
+                    new CommonFileDialogFilter("All files", "*.*") 
+                }
+            };
+
+            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                await LoadStandaloneWadAsync(openFileDialog.FileName);
+            }
+        }
+
+        public async Task LoadStandaloneWadAsync(string wadPath)
+        {
+            if (FilePreviewer != null)
+            {
+                await FilePreviewer.ResetToDefaultState();
+            }
+            await BuildStandaloneWadTreeAsync(wadPath);
+        }
+
+        private async Task BuildStandaloneWadTreeAsync(string wadPath)
+        {
+            _currentRootPath = wadPath;
+            NewLolPath = null;
+            OldLolPath = null;
+
+            await ExecuteTreeBuildInternalAsync(
+                async ct => await this.WadNodeLoaderService.LoadWadContentAsync(wadPath),
+                ExplorerLoadingState.LoadingWads,
+                "Failed to load standalone WAD file.",
+                false,
+                onSuccess: (nodes) => 
+                {
+                    _viewModel.IsStandaloneMode = true;
+                });
+        }
+
+        private void FileExplorerControl_PreviewDragOver(object sender, DragEventArgs e)
+        {
+            bool isFile = e.Data.GetDataPresent(DataFormats.FileDrop);
+            if (isFile)
+            {
+                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length > 0)
+                {
+                    string file = files[0].ToLower();
+                    if (file.EndsWith(".wad.client") || file.EndsWith(".wad"))
+                    {
+                        e.Effects = DragDropEffects.Copy;
+                        e.Handled = true;
+                        return;
+                    }
+                }
+            }
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        private async void FileExplorerControl_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length > 0)
+                {
+                    string file = files[0].ToLower();
+                    if (file.EndsWith(".wad.client") || file.EndsWith(".wad"))
+                    {
+                        await LoadStandaloneWadAsync(files[0]);
+                    }
+                }
             }
         }
 
