@@ -118,7 +118,7 @@ namespace AssetsManager.Views.Models.Explorer
             if (isWadMode)
             {
                 StatusTitle = "Asset explorer";
-                StatusDescription = "Select your LoL installation or drag and drop a WAD file to start exploring assets.";
+                StatusDescription = "Select your LoL installation directory to start exploring game assets.";
                 IsSelectDirectoryActionVisible = true;
             }
             else

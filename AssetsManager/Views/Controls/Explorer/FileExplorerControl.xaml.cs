@@ -350,43 +350,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 });
         }
 
-        private void FileExplorerControl_PreviewDragOver(object sender, DragEventArgs e)
-        {
-            bool isFile = e.Data.GetDataPresent(DataFormats.FileDrop);
-            if (isFile)
-            {
-                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (files != null && files.Length > 0)
-                {
-                    string file = files[0].ToLower();
-                    if (file.EndsWith(".wad.client") || file.EndsWith(".wad"))
-                    {
-                        e.Effects = DragDropEffects.Copy;
-                        e.Handled = true;
-                        return;
-                    }
-                }
-            }
-            e.Effects = DragDropEffects.None;
-            e.Handled = true;
-        }
-
-        private async void FileExplorerControl_Drop(object sender, DragEventArgs e)
-        {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (files != null && files.Length > 0)
-                {
-                    string file = files[0].ToLower();
-                    if (file.EndsWith(".wad.client") || file.EndsWith(".wad"))
-                    {
-                        await LoadStandaloneWadAsync(files[0]);
-                    }
-                }
-            }
-        }
-
         private async Task ExecuteTreeBuildInternalAsync(
             Func<CancellationToken, Task<ObservableRangeCollection<FileSystemNodeModel>>> buildFunc, 
             ExplorerLoadingState loadingState, 

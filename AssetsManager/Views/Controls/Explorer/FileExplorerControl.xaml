@@ -6,8 +6,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:models="clr-namespace:AssetsManager.Views.Models.Explorer"
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Explorer"
-             mc:Ignorable="d"
-             AllowDrop="True" Drop="FileExplorerControl_Drop" PreviewDragOver="FileExplorerControl_PreviewDragOver">
+             mc:Ignorable="d">
     <UserControl.Resources>
         <ContextMenu x:Key="ExplorerContextMenu" Opened="ContextMenu_Opened">
             <MenuItem Header="Extract" x:Name="ExtractMenuItem" Click="ExtractSelected_Click">
