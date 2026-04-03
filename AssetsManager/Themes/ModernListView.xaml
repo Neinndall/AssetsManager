@@ -117,13 +117,13 @@
 
                         <!-- 2. Content Layer -->
                         <Grid Margin="1">
-                            <Grid Margin="12,6">
+                            <Grid Margin="12,5">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <ContentPresenter Grid.Column="0" />
-                                <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="1" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="8,0,0,0" Visibility="Hidden"/>
+                                <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="1" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="16" Height="16" Margin="8,0,0,0" Visibility="Hidden"/>
                             </Grid>
                         </Grid>
 
