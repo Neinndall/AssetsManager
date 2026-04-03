@@ -364,7 +364,11 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_animationPlayer != null && _loadedModels.Count > 0)
             {
                 // Synchronize playback timing across all models if enabled (v3.2.3.2)
-                bool isPlaybackSync = Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true;
+                // IMPORTANT: Only sync if the master model actually has an animation to sync from.
+                bool isPlaybackSync = Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true && 
+                                     _activeSceneModel != null && 
+                                     _activeSceneModel.CurrentAnimation != null;
+                
                 double masterTime = _activeSceneModel?.AnimationTime ?? 0;
 
                 foreach (var model in _loadedModels)
@@ -374,7 +378,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         if (isPlaybackSync && model != _activeSceneModel)
                         {
                             model.AnimationTime = masterTime;
-                            model.IsAnimationPaused = _activeSceneModel?.IsAnimationPaused ?? true;
+                            model.IsAnimationPaused = _activeSceneModel.IsAnimationPaused;
                         }
                         else if (!model.IsAnimationPaused)
                         {
