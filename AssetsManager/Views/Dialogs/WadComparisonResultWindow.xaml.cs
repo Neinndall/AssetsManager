@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Wad;
@@ -35,6 +36,7 @@ namespace AssetsManager.Views.Dialogs
         private readonly DiffViewService _diffViewService;
         private readonly HashResolverService _hashResolverService;
         private readonly AppSettings _appSettings;
+        private readonly WadExtractionService _wadExtractionService;
 
         private string _oldPbePath;
         private string _newPbePath;
@@ -71,14 +73,74 @@ namespace AssetsManager.Views.Dialogs
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
             _appSettings = appSettings;
+            _wadExtractionService = serviceProvider.GetRequiredService<WadExtractionService>();
 
             // Peer Injection
             ResultsTree.ParentWindow = this;
 
             _viewModel.TreeModel.FilterChanged += OnTreeFilterChanged;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
             Loaded += WadComparisonResultWindow_Loaded;
             Closed += OnWindowClosed;
+        }
+
+        private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(WadComparisonResultModel.ActiveView))
+            {
+                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+                {
+                    _ = LoadGalleryThumbnailsAsync();
+                }
+            }
+        }
+
+        private async Task LoadGalleryThumbnailsAsync()
+        {
+            var itemsToLoad = _viewModel.DiscoveryItems.Where(i => i.ImagePreview == null).ToList();
+            if (!itemsToLoad.Any()) return;
+
+            foreach (var item in itemsToLoad)
+            {
+                try
+                {
+                    byte[] data = await _wadExtractionService.GetDiffFileBytesAsync(item, _oldPbePath, _newPbePath);
+                    if (data != null)
+                    {
+                        string ext = Path.GetExtension(item.Path).ToLowerInvariant();
+                        System.Windows.Media.ImageSource image = null;
+
+                        if (SupportedFileTypes.Images.Contains(ext))
+                        {
+                            image = await Task.Run(() =>
+                            {
+                                using var stream = new MemoryStream(data);
+                                var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                                bmp.BeginInit();
+                                bmp.StreamSource = stream;
+                                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                                bmp.EndInit();
+                                bmp.Freeze();
+                                return bmp;
+                            });
+                        }
+                        else if (SupportedFileTypes.Textures.Contains(ext))
+                        {
+                            image = await Task.Run(() => TextureUtils.LoadTexture(new MemoryStream(data), ext));
+                        }
+
+                        if (image != null)
+                        {
+                            item.ImagePreview = image;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogDebug($"Failed to load gallery thumbnail for {item.Path}: {ex.Message}");
+                }
+            }
         }
 
         private void OnTreeFilterChanged(object sender, EventArgs e)

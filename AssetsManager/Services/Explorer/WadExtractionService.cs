@@ -15,6 +15,7 @@ using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -246,6 +247,69 @@ namespace AssetsManager.Services.Explorer
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.FullPath}");
+                    return null;
+                }
+            }, cancellationToken);
+        }
+
+        // Obtiene los bytes descomprimidos de un diff (desde WAD o backup)
+        public Task<byte[]> GetDiffFileBytesAsync(SerializableChunkDiff diff, string oldLolPath, string newLolPath, CancellationToken cancellationToken = default)
+        {
+            return Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    byte[] decompressedData;
+
+                    if (!string.IsNullOrEmpty(diff.BackupChunkPath) && File.Exists(diff.BackupChunkPath))
+                    {
+                        byte[] compressedData = File.ReadAllBytes(diff.BackupChunkPath);
+                        bool useOld = diff.BackupChunkPath.Contains(Path.Combine("wad_chunks", "old"));
+                        var compressionType = useOld ? diff.OldCompressionType : diff.NewCompressionType;
+                        decompressedData = WadChunkUtils.DecompressChunk(compressedData, compressionType ?? WadChunkCompression.None);
+                    }
+                    else
+                    {
+                        // Determinar la ruta del WAD según si el cambio es New o Modified
+                        bool useOld = (diff.Type == ChunkDiffType.Removed);
+                        string basePath = useOld ? oldLolPath : newLolPath;
+                        
+                        if (string.IsNullOrEmpty(basePath))
+                        {
+                            _logService.LogWarning($"Base path for extraction is null. Cannot extract {diff.Path}");
+                            return null;
+                        }
+
+                        string wadPath = Path.Combine(basePath, diff.SourceWadFile);
+                        ulong hash = useOld ? diff.OldPathHash : diff.NewPathHash;
+
+                        if (!File.Exists(wadPath))
+                        {
+                            _logService.LogWarning($"WAD file not found: {wadPath}");
+                            return null;
+                        }
+
+                        using var wadFile = new WadFile(wadPath);
+                        if (!wadFile.Chunks.TryGetValue(hash, out var chunk))
+                        {
+                            _logService.LogWarning($"Chunk with hash {hash:x16} not found in {wadPath}");
+                            return null;
+                        }
+                        using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
+                        decompressedData = decompressedDataOwner.Span.ToArray();
+                    }
+
+                    return decompressedData;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to get bytes for diff: {diff.Path}");
                     return null;
                 }
             }, cancellationToken);

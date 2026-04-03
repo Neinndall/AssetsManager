@@ -551,13 +551,13 @@
                             <TextBlock x:Name="LoadModelText" Text="{Binding LoadButtonText}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="LoadChromaModelButton" Click="LoadChromaModelButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,3,0" Padding="0" Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=!Map}">
+                    <Button x:Name="LoadChromaModelButton" Click="LoadChromaModelButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,3,0" Padding="0" Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityConverter}, ConverterParameter=!Map}">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon x:Name="LoadChromaModelIcon" Kind="Palette" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Chroma" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,0,0" Padding="0" Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=!Map}">
+                    <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,0,0" Padding="0" Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityConverter}, ConverterParameter=!Map}">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="AnimationPlay" Width="16" Height="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Anims" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>

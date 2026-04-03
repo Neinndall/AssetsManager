@@ -132,6 +132,14 @@ namespace AssetsManager.Views.Models.Wad
 
         [JsonIgnore]
         public string BackupChunkPath { get; set; }
+
+        private System.Windows.Media.ImageSource _imagePreview;
+        [JsonIgnore]
+        public System.Windows.Media.ImageSource ImagePreview
+        {
+            get => _imagePreview;
+            set { if (_imagePreview != value) { _imagePreview = value; OnPropertyChanged(); } }
+        }
     }
 
     public class WadComparisonData

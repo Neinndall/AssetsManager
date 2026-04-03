@@ -11,6 +11,13 @@ using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Dialogs
 {
+    public enum ComparisonViewMode
+    {
+        Overview,
+        Discovery,
+        Advanced
+    }
+
     public enum ComparisonLoadingState
     {
         Idle,
@@ -32,12 +39,20 @@ namespace AssetsManager.Views.Models.Dialogs
         private string _countRenamed = "0";
         private string _filterText = string.Empty;
         private int _totalDiffsCount = -1;
+        private ComparisonViewMode _activeView = ComparisonViewMode.Advanced;
 
         private SerializableChunkDiff _selectedItem;
         private List<SerializableChunkDiff> _selectedNodes = new();
 
+        public ComparisonViewMode ActiveView
+        {
+            get => _activeView;
+            set { if (_activeView != value) { _activeView = value; OnPropertyChanged(); } }
+        }
+
         // Sub-Models (Encapsulated responsibilities)
         public WadResultsTreeModel TreeModel { get; } = new WadResultsTreeModel();
+        public ObservableRangeCollection<SerializableChunkDiff> DiscoveryItems { get; } = new();
 
         public SerializableChunkDiff SelectedItem
         {
@@ -123,7 +138,13 @@ namespace AssetsManager.Views.Models.Dialogs
         public string SummaryText
         {
             get => _summaryText;
-            set { _summaryText = value; OnPropertyChanged(); }
+            set { if (_summaryText != value) { _summaryText = value; OnPropertyChanged(); } }
+        }
+
+        public string ComparisonSummary
+        {
+            get => _summaryText; // They are the same for now, but let's keep the alias for future expansion
+            set { if (_summaryText != value) { _summaryText = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryText)); } }
         }
 
         public string CountNew
@@ -179,10 +200,16 @@ namespace AssetsManager.Views.Models.Dialogs
             // Store total count on the first real results load
             if (_totalDiffsCount == -1) _totalDiffsCount = diffs.Count;
 
-            // 1. Update the Results Model (The Tree)
+            // 1. Update Technical Tree
             TreeModel.WadGroups.ReplaceRange(groups);
             
-            // 2. Update Summary Text (Logic inside Model as it is 'Info')
+            // 2. Populate Discovery Grid (Visual Assets)
+            var visualAssets = diffs
+                .Where(d => d.Type != ChunkDiffType.Removed && SupportedFileTypes.IsImage(d.Path))
+                .ToList();
+            DiscoveryItems.ReplaceRange(visualAssets);
+
+            // 3. Update Summary & Stats
             if (diffs.Count == _totalDiffsCount)
             {
                 SummaryText = $"Found {diffs.Count} differences across {groups.Count} WAD files.";
@@ -192,7 +219,6 @@ namespace AssetsManager.Views.Models.Dialogs
                 SummaryText = $"Showing {diffs.Count} of {_totalDiffsCount} differences across {groups.Count} WAD files.";
             }
 
-            // 3. Update Global Stats (only on initial load)
             if (diffs.Count == _totalDiffsCount)
             {
                 CountNew = diffs.Count(d => d.Type == ChunkDiffType.New).ToString();
@@ -201,7 +227,7 @@ namespace AssetsManager.Views.Models.Dialogs
                 CountRenamed = diffs.Count(d => d.Type == ChunkDiffType.Renamed).ToString();
             }
 
-            // 4. Perform Analysis (Populates Dashboard in TreeModel)
+            // 4. Perform Analysis
             CalculateInsights(diffs);
         }
 

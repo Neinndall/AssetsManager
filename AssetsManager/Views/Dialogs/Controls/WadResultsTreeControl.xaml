@@ -138,31 +138,6 @@
                         <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                             <StackPanel Orientation="Horizontal">
                                 
-                                <!-- 1.1 Analytical Insight -->
-                                <ToggleButton x:Name="DashboardToggle"
-                                              IsChecked="{Binding DashboardToggleChecked}"
-                                              Style="{StaticResource TransparentIconToggleButton}"
-                                              Width="28" Height="28"
-                                              ToolTip="Analytical Dashboard">
-                                    <materialIcons:MaterialIcon Kind="ChartBoxOutline" Width="16" Height="16" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon.Style>
-                                            <Style TargetType="materialIcons:MaterialIcon">
-                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
-                                                <Setter Property="Opacity" Value="0.3"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                                        <Setter Property="Opacity" Value="1.0"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialIcons:MaterialIcon.Style>
-                                    </materialIcons:MaterialIcon>
-                                </ToggleButton>
-
-                                <!-- Internal Surgical Separator -->
-                                <Border Width="1" Height="16" Background="{StaticResource BorderColor}" Margin="4,0,4,0" Opacity="0.8"/>
-
                                 <!-- 1.2 Status Filters -->
                                 <!-- NEW -->
                                 <ToggleButton Style="{StaticResource TransparentIconToggleButton}" 

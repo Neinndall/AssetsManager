@@ -32,5 +32,12 @@ namespace AssetsManager.Utils
             string lower = fileName.ToLowerInvariant();
             return lower.EndsWith(".wpk") || (lower.EndsWith(".bnk") && lower.Contains("_audio"));
         }
+
+        public static bool IsImage(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return false;
+            string extension = System.IO.Path.GetExtension(fileName).ToLowerInvariant();
+            return Images.Contains(extension) || Textures.Contains(extension);
+        }
     }
 }
