@@ -15,7 +15,7 @@
                 ShowMaximizeButton="False"
                 ShowMinimizeButton="False"
                 ResizeMode="NoResize">
-
+                
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
