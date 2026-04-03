@@ -110,5 +110,16 @@ namespace AssetsManager.Utils
             }
             return text.Substring(0, maxLength) + "...";
         }
+
+        /// <summary>
+        /// Truncates the given name at the first occurrence of a dot ('.').
+        /// e.g. "character_skin01.skins_character" -> "character_skin01"
+        /// </summary>
+        public static string TruncateAtDot(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            int dotIndex = name.IndexOf('.');
+            return dotIndex == -1 ? name : name.Substring(0, dotIndex);
+        }
     }
 }
