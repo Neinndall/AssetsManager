@@ -981,6 +981,12 @@ namespace AssetsManager.Views.Controls.Explorer
             _searchTimer.Stop();
             string searchText = _viewModel.Toolbar.SearchText;
 
+            // CRITICAL: Immediate UI feedback when clearing search
+            if (string.IsNullOrEmpty(searchText))
+            {
+                _viewModel.IsNoResultsFound = false;
+            }
+
             if (FilePreviewer != null)
             {
                 FilePreviewer.SetSearchFilter(searchText);
@@ -988,13 +994,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
             var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, LoadAllChildrenForSearch);
 
-            // Update No Results found UI
+            // Update No Results found UI after search completes
             if (!string.IsNullOrEmpty(searchText))
             {
                 _viewModel.IsNoResultsFound = _viewModel.RootNodes.All(n => !n.IsVisible);
             }
             else
             {
+                // Already set above, but ensuring consistency
                 _viewModel.IsNoResultsFound = false;
             }
 
