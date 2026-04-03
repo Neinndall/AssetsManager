@@ -84,7 +84,7 @@ namespace AssetsManager.Services.Updater
 
                     if (result == true)
                     {
-                        string fileName = $"AssetsManager{latestVersionRaw}.zip";
+                        string fileName = $"AssetsManager_{latestVersionRaw}.zip";
                         string downloadPath = Path.Combine(_directoriesCreator.UpdateCachePath, fileName);
 
                         // Check if the file already exists and has the correct size

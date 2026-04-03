@@ -20,17 +20,15 @@ namespace AssetsManager.Services.Updater
 
         public UpdateExtractor(LogService logService, DirectoriesCreator directoriesCreator, CustomMessageBoxService customMessageBoxService)
         {
-            _logService = logService ?? throw new ArgumentNullException(nameof(logService));
-            _directoriesCreator = directoriesCreator ?? throw new ArgumentNullException(nameof(directoriesCreator));
-            _customMessageBoxService = customMessageBoxService ?? throw new ArgumentNullException(nameof(customMessageBoxService));
+            _logService = logService;
+            _directoriesCreator = directoriesCreator;
+            _customMessageBoxService = customMessageBoxService;
         }
 
         public async Task ExtractAndRestart(string zipPath, bool preserveConfig, Window owner = null)
         {
             try
             {
-                _logService.Log("Starting update extraction process...");
-
                 var updaterInfo = _directoriesCreator.GetUpdaterInfo();
                 string executablePath = Process.GetCurrentProcess().MainModule.FileName;
                 string appDirectory = Path.GetDirectoryName(executablePath)!;
@@ -63,10 +61,8 @@ namespace AssetsManager.Services.Updater
                                 stream.CopyTo(fileStream);
                             }
                         }
-                        _logService.Log($"Extracted {resource} to {destinationPath}");
                     }
                 }
-                _logService.Log("Updater files extracted successfully to cache.");
 
                 var processId = Process.GetCurrentProcess().Id;
                 var arguments = new string[]
@@ -93,8 +89,6 @@ namespace AssetsManager.Services.Updater
                 }
 
                 Process.Start(startInfo);
-
-                _logService.Log("Update process started. Application will now shut down.");
                 Application.Current.Shutdown();
             }
             catch (Exception ex)
