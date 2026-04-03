@@ -22,6 +22,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isChromaGalleryVisible = false;
         private bool _isMainContentVisible = false;
         private bool _isAnimationSyncEnabled = false;
+        private bool _isAnimationPlaybackSyncEnabled = false;
         private ViewerViewportModel _viewportViewModel;
 
         // --- Data Collections ---
@@ -38,6 +39,12 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _isAnimationSyncEnabled;
             set { if (_isAnimationSyncEnabled != value) { _isAnimationSyncEnabled = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsAnimationPlaybackSyncEnabled
+        {
+            get => _isAnimationPlaybackSyncEnabled;
+            set { if (_isAnimationPlaybackSyncEnabled != value) { _isAnimationPlaybackSyncEnabled = value; OnPropertyChanged(); } }
         }
 
         public ObservableRangeCollection<ModelPart> SelectedModelParts

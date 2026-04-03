@@ -333,26 +333,49 @@
                             </Grid.RowDefinitions>
                             
                             <!-- Sync Header with Subtitle -->
-                            <Border Grid.Row="0" Margin="0,0,0,10" Padding="12,8" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialIcons:MaterialIcon Kind="LinkVariant" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="Sync Anims Load" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="Apply to all models" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                            <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                                <Border Margin="0,0,0,6" Padding="12,8" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialIcons:MaterialIcon Kind="LinkVariant" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="Sync Anims Load" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                                <TextBlock Text="Apply to all models" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                            </StackPanel>
                                         </StackPanel>
-                                    </StackPanel>
-                                    <CheckBox Grid.Column="1" IsChecked="{Binding IsAnimationSyncEnabled, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}" VerticalAlignment="Center">
-                                        <CheckBox.LayoutTransform>
-                                            <ScaleTransform ScaleX="0.85" ScaleY="0.85"/>
-                                        </CheckBox.LayoutTransform>
-                                    </CheckBox>
-                                </Grid>
-                            </Border>
+                                        <CheckBox Grid.Column="1" IsChecked="{Binding IsAnimationSyncEnabled, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}" VerticalAlignment="Center">
+                                            <CheckBox.LayoutTransform>
+                                                <ScaleTransform ScaleX="0.85" ScaleY="0.85"/>
+                                            </CheckBox.LayoutTransform>
+                                        </CheckBox>
+                                    </Grid>
+                                </Border>
+
+                                <Border Padding="12,8" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialIcons:MaterialIcon Kind="PlayBoxMultiple" Width="16" Height="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="Sync Anims" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                                <TextBlock Text="Sync playback state" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <CheckBox Grid.Column="1" IsChecked="{Binding IsAnimationPlaybackSyncEnabled, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}" VerticalAlignment="Center">
+                                            <CheckBox.LayoutTransform>
+                                                <ScaleTransform ScaleX="0.85" ScaleY="0.85"/>
+                                            </CheckBox.LayoutTransform>
+                                        </CheckBox>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
                             
                             <ListBox x:Name="AnimationsListBox" 
                                      Grid.Row="1"
