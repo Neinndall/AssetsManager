@@ -117,7 +117,7 @@
 
                         <!-- 2. Content Layer -->
                         <Grid Margin="1">
-                            <Grid Margin="12,8">
+                            <Grid Margin="12,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>

@@ -15,6 +15,7 @@ namespace AssetsManager.Views.Models.Viewer
     public class SceneModel : INotifyPropertyChanged, IDisposable
     {
         public string Name { get; set; }
+        public string SourceType { get; set; } = "Model"; // "Model" or "Chroma"
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
 

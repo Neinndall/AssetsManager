@@ -364,6 +364,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 // Initialize Transform
                 newModel.PositionY = SceneElements.GroundLevel;
+                newModel.SourceType = string.IsNullOrEmpty(texturePath) ? "Model" : "Chroma";
 
                 Viewport?.AddModel(newModel);
                 _viewModel.SelectedModelParts = newModel.Parts;
