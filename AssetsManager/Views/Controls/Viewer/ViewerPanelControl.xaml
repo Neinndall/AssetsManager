@@ -44,7 +44,7 @@
                 <Grid x:Name="ScenePanel" 
                       Visibility="{Binding IsChecked, ElementName=TabScene, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="160"/> <!-- Increased Hierarchy Height for 3 models -->
+                        <RowDefinition Height="150"/> <!-- Adjusted Hierarchy Height for optimal balance -->
                         <RowDefinition Height="Auto"/> <!-- Separator/SubNav -->
                         <RowDefinition Height="*"/>    <!-- Inspector Content -->
                     </Grid.RowDefinitions>
