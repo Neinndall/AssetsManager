@@ -35,6 +35,58 @@ namespace AssetsManager.Views.Models.Shared
             }
         }
 
+        public string LolPbeDirectory
+        {
+            get => _settings.LolPbeDirectory;
+            set
+            {
+                if (_settings.LolPbeDirectory != value)
+                {
+                    _settings.LolPbeDirectory = value;
+                    OnPropertyChanged(nameof(LolPbeDirectory));
+                }
+            }
+        }
+
+        public string LolLiveDirectory
+        {
+            get => _settings.LolLiveDirectory;
+            set
+            {
+                if (_settings.LolLiveDirectory != value)
+                {
+                    _settings.LolLiveDirectory = value;
+                    OnPropertyChanged(nameof(LolLiveDirectory));
+                }
+            }
+        }
+
+        public string DefaultExtractedSelectDirectory
+        {
+            get => _settings.DefaultExtractedSelectDirectory;
+            set
+            {
+                if (_settings.DefaultExtractedSelectDirectory != value)
+                {
+                    _settings.DefaultExtractedSelectDirectory = value;
+                    OnPropertyChanged(nameof(DefaultExtractedSelectDirectory));
+                }
+            }
+        }
+
+        public string CustomFloorTexturePath
+        {
+            get => _settings.CustomFloorTexturePath;
+            set
+            {
+                if (_settings.CustomFloorTexturePath != value)
+                {
+                    _settings.CustomFloorTexturePath = value;
+                    OnPropertyChanged(nameof(CustomFloorTexturePath));
+                }
+            }
+        }
+
         public List<AudioFormatOption> AudioFormatOptions { get; } = new List<AudioFormatOption>
         {
             new AudioFormatOption { Name = "OGG", Value = AudioExportFormat.Ogg },
