@@ -39,12 +39,12 @@
             </Grid>
         </Border>
 
-        <!-- Discovery Grid (Selection Disabled for pure visual discovery) -->
+        <!-- Discovery Grid (Visual selection disabled by removing Triggers) -->
         <ListBox Grid.Row="1" 
                  ItemsSource="{Binding DiscoveryItems}" 
                  Style="{StaticResource ModernFileGridListBox}"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 SelectionMode="None">
+                 SelectionMode="Single">
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <Grid Width="160" Margin="4">

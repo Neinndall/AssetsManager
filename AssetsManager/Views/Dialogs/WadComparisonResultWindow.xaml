@@ -80,57 +80,72 @@
                         <TextBlock Text="Asset Distribution &amp; Payload Analysis" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                     </StackPanel>
 
-                    <!-- Global Search Box (Back to Stats section) -->
-                    <Grid Grid.Column="1" MaxWidth="380" Margin="40,0">
-                        <TextBox x:Name="globalSearchBox" 
-                                 Style="{StaticResource StandardSearchBoxStyle}" 
-                                 TextChanged="GlobalSearchBox_TextChanged"
-                                 Tag="Search differences in all views..."/>
-                    </Grid>
+                    <!-- Unified Diagnostic Control Hub (Search + Filters) -->
+                    <Border Grid.Column="1" Grid.ColumnSpan="2" 
+                            HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Background="{StaticResource SidebarBackground}"
+                            BorderBrush="{StaticResource BorderColor}" 
+                            BorderThickness="1"
+                            CornerRadius="10" 
+                            Padding="2">
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Global Search Zone -->
+                            <TextBox x:Name="globalSearchBox" 
+                                     Style="{StaticResource StandardSearchBoxStyle}" 
+                                     Width="280" 
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     TextChanged="GlobalSearchBox_TextChanged"
+                                     Tag="Search files..."/>
 
-                    <!-- Global Interactive Filters -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
-                                      IsChecked="{Binding TreeModel.ShowNew}"
-                                      ToolTip="Toggle: New Assets">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <icons:MaterialIcon Kind="PlusCircleOutline" Foreground="{StaticResource AccentGreen}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
-                                <TextBlock Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
-                            </StackPanel>
-                        </ToggleButton>
+                            <!-- Technical Separator -->
+                            <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="12,6" VerticalAlignment="Stretch"/>
 
-                        <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
-                                      IsChecked="{Binding TreeModel.ShowModified}"
-                                      ToolTip="Toggle: Modified Assets">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <icons:MaterialIcon Kind="PencilCircleOutline" Foreground="{StaticResource AccentOrange}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="MODIFIED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
-                                <TextBlock Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
-                            </StackPanel>
-                        </ToggleButton>
+                            <!-- Global Interactive Filters -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                                <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                              IsChecked="{Binding TreeModel.ShowNew}"
+                                              ToolTip="Toggle: New Assets">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <icons:MaterialIcon Kind="PlusCircleOutline" Foreground="{StaticResource AccentGreen}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                        <TextBlock Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </ToggleButton>
 
-                        <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
-                                      IsChecked="{Binding TreeModel.ShowRemoved}"
-                                      ToolTip="Toggle: Removed Assets">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <icons:MaterialIcon Kind="MinusCircleOutline" Foreground="{StaticResource AccentRed}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="REMOVED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
-                                <TextBlock Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
-                            </StackPanel>
-                        </ToggleButton>
+                                <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                              IsChecked="{Binding TreeModel.ShowModified}"
+                                              ToolTip="Toggle: Modified Assets">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <icons:MaterialIcon Kind="PencilCircleOutline" Foreground="{StaticResource AccentOrange}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="MODIFIED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                        <TextBlock Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </ToggleButton>
 
-                        <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
-                                      IsChecked="{Binding TreeModel.ShowRenamed}"
-                                      ToolTip="Toggle: Renamed Assets"
-                                      Margin="0">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <icons:MaterialIcon Kind="SwapHorizontalCircleOutline" Foreground="{StaticResource AccentBlue}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="RENAMED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
-                                <TextBlock Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
+                                <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                              IsChecked="{Binding TreeModel.ShowRemoved}"
+                                              ToolTip="Toggle: Removed Assets">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <icons:MaterialIcon Kind="MinusCircleOutline" Foreground="{StaticResource AccentRed}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="REMOVED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                        <TextBlock Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </ToggleButton>
+
+                                <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                              IsChecked="{Binding TreeModel.ShowRenamed}"
+                                              ToolTip="Toggle: Renamed Assets"
+                                              Margin="0">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <icons:MaterialIcon Kind="SwapHorizontalCircleOutline" Foreground="{StaticResource AccentBlue}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="RENAMED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                        <TextBlock Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </ToggleButton>
                             </StackPanel>
-                        </ToggleButton>
-                    </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
 
