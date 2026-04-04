@@ -61,49 +61,75 @@
         <!-- 2. MAIN CONTENT AREA -->
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> <!-- Global Toolbar -->
-                <RowDefinition Height="*"/>    <!-- View Container -->
-                <RowDefinition Height="Auto"/> <!-- Footer -->
+                <RowDefinition Height="Auto"/> <!-- A. Global Smart Toolbar (Stats + Search) -->
+                <RowDefinition Height="*"/>    <!-- B. View Container -->
+                <RowDefinition Height="Auto"/> <!-- C. Footer -->
             </Grid.RowDefinitions>
 
             <!-- A. GLOBAL SMART TOOLBAR -->
             <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="24,10">
                 <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
                     <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Left">
                         <TextBlock Text="DIAGNOSTIC OVERVIEW" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
                         <TextBlock Text="Asset Distribution &amp; Payload Analysis" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                     </StackPanel>
 
-                    <!-- Global Stats -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal">
+                    <!-- Global Search Box (Back to Stats section) -->
+                    <Grid Grid.Column="1" MaxWidth="380" Margin="40,0">
+                        <TextBox x:Name="globalSearchBox" 
+                                 Style="{StaticResource StandardSearchBoxStyle}" 
+                                 TextChanged="GlobalSearchBox_TextChanged"
+                                 Tag="Search differences in all views..."/>
+                    </Grid>
+
+                    <!-- Global Interactive Filters -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                      IsChecked="{Binding TreeModel.ShowNew}"
+                                      ToolTip="Toggle: New Assets">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <icons:MaterialIcon Kind="PlusCircleOutline" Foreground="{StaticResource AccentGreen}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
-                                <TextBlock Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                <TextBlock Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
                             </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal">
+                        </ToggleButton>
+
+                        <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                      IsChecked="{Binding TreeModel.ShowModified}"
+                                      ToolTip="Toggle: Modified Assets">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <icons:MaterialIcon Kind="PencilCircleOutline" Foreground="{StaticResource AccentOrange}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="MODIFIED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
-                                <TextBlock Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="MODIFIED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                <TextBlock Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
                             </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal">
+                        </ToggleButton>
+
+                        <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                      IsChecked="{Binding TreeModel.ShowRemoved}"
+                                      ToolTip="Toggle: Removed Assets">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <icons:MaterialIcon Kind="MinusCircleOutline" Foreground="{StaticResource AccentRed}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="REMOVED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
-                                <TextBlock Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="REMOVED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                <TextBlock Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
                             </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" Margin="0">
-                            <StackPanel Orientation="Horizontal">
+                        </ToggleButton>
+
+                        <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                      IsChecked="{Binding TreeModel.ShowRenamed}"
+                                      ToolTip="Toggle: Renamed Assets"
+                                      Margin="0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <icons:MaterialIcon Kind="SwapHorizontalCircleOutline" Foreground="{StaticResource AccentBlue}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="RENAMED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
-                                <TextBlock Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="RENAMED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                <TextBlock Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
                             </StackPanel>
-                        </Border>
+                        </ToggleButton>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -116,20 +142,20 @@
                 <!-- Discovery View -->
                 <controls:WadComparisonGalleryControl Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Discovery}}"/>
                 
-                <!-- Advanced View (Legacy Tree + Details) -->
+                <!-- Advanced View (Hierarchy + Details) -->
                 <Grid Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}}">
                     <Grid Margin="24">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" MinWidth="300"/>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*" MinWidth="300"/>
                         </Grid.ColumnDefinitions>
-                        
+
                         <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0" DataContext="{Binding TreeModel}"/>
                         <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ShowsPreview="False"/>
                         <controls:WadDiffDetailsControl x:Name="DiffDetails" Grid.Column="2" DataContext="{Binding DetailsModel.SelectedDiff}"/>
+                    </Grid>
                 </Grid>
-            </Grid>
             </Grid>
 
             <!-- C. FOOTER ACTIONS -->

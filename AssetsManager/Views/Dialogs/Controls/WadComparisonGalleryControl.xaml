@@ -39,12 +39,12 @@
             </Grid>
         </Border>
 
-        <!-- Discovery Grid -->
+        <!-- Discovery Grid (Selection Disabled for pure visual discovery) -->
         <ListBox Grid.Row="1" 
                  ItemsSource="{Binding DiscoveryItems}" 
                  Style="{StaticResource ModernFileGridListBox}"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 SelectionMode="Extended">
+                 SelectionMode="None">
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <Grid Width="160" Margin="4">
@@ -78,12 +78,6 @@
                              </StackPanel>
                         </Border>
                     </Grid>
-                    <DataTemplate.Triggers>
-                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="2"/>
-                        </DataTrigger>
-                    </DataTemplate.Triggers>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>

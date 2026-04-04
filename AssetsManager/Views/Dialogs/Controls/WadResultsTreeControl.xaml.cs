@@ -63,14 +63,8 @@ namespace AssetsManager.Views.Dialogs.Controls
             if (resultsTreeView != null)
                 resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
             
-            searchTextBox.TextChanged -= SearchTextBox_TextChanged;
             resultsTreeView.ItemsSource = null;
             ParentWindow = null;
-        }
-
-        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            ParentWindow?.HandleSearchTextChanged(searchTextBox.Text);
         }
 
         private void ResultsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

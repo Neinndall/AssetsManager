@@ -206,6 +206,12 @@ namespace AssetsManager.Views.Dialogs
 
         // --- Handle methods for direct peer communication ---
 
+        private void GlobalSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _viewModel.FilterText = globalSearchBox.Text;
+            ApplyFilters();
+        }
+
         public void HandleSearchTextChanged(string text)
         {
             _viewModel.FilterText = text;

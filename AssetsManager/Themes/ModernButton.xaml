@@ -1005,4 +1005,74 @@
         </Setter>
     </Style>
 
+    <!-- [WadComparisonResultWindow] Interactive Badge Style (Overlay Pattern) -->
+    <Style x:Key="DiagnosticBadgeToggleStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="Padding" Value="12,5"/>
+        <Setter Property="Margin" Value="0,0,8,0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid x:Name="RootGrid">
+                        <!-- 1. Background Layer (Constant SidebarBackground) -->
+                        <Border x:Name="BackgroundBorder" 
+                                Background="{TemplateBinding Background}" 
+                                CornerRadius="6"/>
+
+                        <!-- 2. Content Layer (Fixed Padding) -->
+                        <Border Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- 3. Overlay Border (Dynamic Stroke) -->
+                        <Border x:Name="InteractiveBorder"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                IsHitTestVisible="False"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- Hover State -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="InteractiveBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="InteractiveBorder" Property="BorderThickness" Value="1.5"/>
+                        </Trigger>
+                        
+                        <!-- Checked State (Active Filter) -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter Property="Opacity" Value="1.0"/>
+                            <Setter TargetName="InteractiveBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="InteractiveBorder" Property="BorderThickness" Value="1.5"/>
+                            <!-- Technical Glow -->
+                            <Setter Property="Effect">
+                                <Setter.Value>
+                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="{Binding Color, Source={StaticResource AccentBrush}}" Opacity="0.2"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+
+                        <!-- Unchecked State (Inactive Filter) -->
+                        <Trigger Property="IsChecked" Value="False">
+                            <Setter Property="Opacity" Value="0.6"/>
+                            <!-- Background stays SidebarBackground by default -->
+                        </Trigger>
+
+                        <!-- Recover Opacity on Hover even if unchecked -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsChecked" Value="False"/>
+                            </MultiTrigger.Conditions>
+                            <Setter Property="Opacity" Value="1.0"/>
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
