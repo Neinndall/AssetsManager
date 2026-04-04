@@ -87,7 +87,7 @@
                             BorderBrush="{StaticResource BorderColor}" 
                             BorderThickness="1"
                             CornerRadius="10" 
-                            Padding="2">
+                            Padding="0">
                         <StackPanel Orientation="Horizontal">
                             <!-- Global Search Zone -->
                             <TextBox x:Name="globalSearchBox" 
