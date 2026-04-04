@@ -43,8 +43,8 @@ namespace AssetsManager.Views.Controls.Explorer
         // Injected Services
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
-        public WadExtractionService WadExtractionService { get; set; }
-        public WadSavingService WadSavingService { get; set; }
+        public WadContentProvider WadContentProvider { get; set; }
+        public WadExportService WadExportService { get; set; }
         public WadSearchBoxService WadSearchBoxService { get; set; }
         public WadNodeLoaderService WadNodeLoaderService { get; set; }
         public DiffViewService DiffViewService { get; set; }
@@ -446,13 +446,13 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async void TriggerExtractNodes(List<FileSystemNodeModel> nodes)
         {
-            if (WadExtractionService == null || nodes == null || nodes.Count == 0) return;
+            if (WadExportService == null || nodes == null || nodes.Count == 0) return;
             await ExecuteExtractionAsync(nodes);
         }
 
         public async void TriggerSaveNodes(List<FileSystemNodeModel> nodes)
         {
-            if (WadSavingService == null || nodes == null || nodes.Count == 0) return;
+            if (WadExportService == null || nodes == null || nodes.Count == 0) return;
             await ExecuteSaveAsync(nodes);
         }
 
@@ -464,9 +464,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (WadExtractionService == null)
+            if (WadExportService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "Extraction Service is not available.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "Wad Export Service is not available.", Window.GetWindow(this));
                 return;
             }
 
@@ -508,8 +508,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     // Show immediate activity
                     ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", 0));
 
-                    // Calculate total files for accurate progress
-                    int totalFiles = await WadExtractionService.CalculateTotalAsync(selectedNodes, cancellationToken);
+                    // Calculate total files for accurate progress (Original Mode)
+                    int totalFiles = await WadExportService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, WadExportMode.Original, cancellationToken);
                     
                     // Update with real total
                     ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", totalFiles));
@@ -519,10 +519,10 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         
-                        await WadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken, (fileName) => 
+                        await WadExportService.ExportAsync(node, destinationPath, WadExportMode.Original, _viewModel.RootNodes, _currentRootPath, cancellationToken, (fileName) => 
                         {
                             processedCount++;
-                            ProgressUIManager?.OnExtractionProgressChanged(processedCount, totalFiles, fileName);
+                            ProgressUIManager?.OnExtractionProgressChanged(processedCount, totalFiles, Path.GetFileName(fileName));
                         });
                     }
 
@@ -538,7 +538,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
                     else
                     {
-                        string folderName = Path.GetFileName(destinationPath);
                         LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items", destinationPath, "Extracted Assets");
                     }
                     
@@ -556,7 +555,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 finally
                 {
                     ProgressUIManager?.OnExtractionCompleted();
-                    // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;
                 }
@@ -565,9 +563,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void SaveSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (WadSavingService == null)
+            if (WadExportService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "Wad Saving Service is not available.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "Wad Export Service is not available.", Window.GetWindow(this));
                 return;
             }
 
@@ -609,7 +607,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     // Show immediate activity
                     ProgressUIManager?.OnSavingStarted(0);
 
-                    int totalFiles = await WadSavingService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, cancellationToken);
+                    // Calculate total files for accurate progress (Smart Mode)
+                    int totalFiles = await WadExportService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, WadExportMode.Smart, cancellationToken);
                     
                     // Update with real total
                     ProgressUIManager?.OnSavingStarted(totalFiles);
@@ -623,7 +622,7 @@ namespace AssetsManager.Views.Controls.Explorer
                         cancellationToken.ThrowIfCancellationRequested();
 
                         var savedFiles = new List<string>();
-                        await WadSavingService.ProcessAndSaveAsync(node, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => 
+                        await WadExportService.ExportAsync(node, destinationPath, WadExportMode.Smart, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => 
                         {
                             processedCount++;
                             ProgressUIManager?.OnSavingProgressChanged(processedCount, totalFiles, Path.GetFileName(path));
@@ -661,7 +660,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
                     else
                     {
-                        string folderName = Path.GetFileName(destinationPath);
                         LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items", destinationPath, "Saved Assets");
                     }
 
@@ -679,7 +677,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 finally
                 {
                     ProgressUIManager?.OnSavingCompleted();
-                    // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;
                 }
@@ -789,7 +786,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     byte[] data = null;
                     if (node.Type == NodeType.VirtualFile)
-                        data = await WadExtractionService.GetVirtualFileBytesAsync(node);
+                        data = await WadContentProvider.GetVirtualFileBytesAsync(node);
                     else if (node.Type == NodeType.RealFile)
                         data = await File.ReadAllBytesAsync(node.FullPath);
 
@@ -976,6 +973,11 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
+        {
+            await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
+        }
+
         private async void SearchTimer_Tick(object sender, EventArgs e)
         {
             _searchTimer.Stop();
@@ -1023,11 +1025,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     }), DispatcherPriority.ContextIdle);
                 }
             }
-        }
-
-        private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
-        {
-            await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
         }
 
         public void SelectNode(FileSystemNodeModel node)

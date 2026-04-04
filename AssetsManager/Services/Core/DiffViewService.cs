@@ -23,25 +23,25 @@ namespace AssetsManager.Services.Core
     public class DiffViewService
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly WadDifferenceService _wadDifferenceService;
+        private readonly WadDiffProvider _wadDiffProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly LogService _logService;
         private readonly ContentFormatterService _contentFormatterService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
         private readonly AudioBankService _audioBankService;
-        private readonly WadExtractionService _wadExtractionService;
+        private readonly WadContentProvider _wadContentProvider;
         private readonly JsonFormatterService _jsonFormatterService;
 
-        public DiffViewService(IServiceProvider serviceProvider, WadDifferenceService wadDifferenceService, CustomMessageBoxService customMessageBoxService, LogService logService, ContentFormatterService contentFormatterService, AudioBankLinkerService audioBankLinkerService, AudioBankService audioBankService, WadExtractionService wadExtractionService, JsonFormatterService jsonFormatterService)
+        public DiffViewService(IServiceProvider serviceProvider, WadDiffProvider wadDiffProvider, CustomMessageBoxService customMessageBoxService, LogService logService, ContentFormatterService contentFormatterService, AudioBankLinkerService audioBankLinkerService, AudioBankService audioBankService, WadContentProvider wadContentProvider, JsonFormatterService jsonFormatterService)
         {
             _serviceProvider = serviceProvider;
-            _wadDifferenceService = wadDifferenceService;
+            _wadDiffProvider = wadDiffProvider;
             _customMessageBoxService = customMessageBoxService;
             _logService = logService;
             _contentFormatterService = contentFormatterService;
             _audioBankLinkerService = audioBankLinkerService;
             _audioBankService = audioBankService;
-            _wadExtractionService = wadExtractionService;
+            _wadContentProvider = wadContentProvider;
             _jsonFormatterService = jsonFormatterService;
         }
 
@@ -114,7 +114,7 @@ namespace AssetsManager.Services.Core
 
                 var imageDiffWindow = new ImageDiffWindow { Owner = owner };
                 await imageDiffWindow.LoadAndDisplayBatchDiffAsync(diffs, startIndex, oldPbePath, newPbePath, async (diff, oldPath, newPath) => {
-                    var (dataType, oldData, newData, _, _) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPath, newPath);
+                    var (dataType, oldData, newData, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPath, newPath);
                     var ext = Path.GetExtension(diff.NewPath ?? diff.OldPath).ToLowerInvariant();
                     var oldImg = ToBitmapSource((byte[])oldData, ext);
                     var newImg = ToBitmapSource((byte[])newData, ext);
@@ -138,7 +138,7 @@ namespace AssetsManager.Services.Core
                 var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayBatchDiffAsync(diffs, startIndex, oldPbePath, newPbePath, async (diff, oldPath, newPath) => {
-                    var (dataType, oldData, newData, _, _) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPath, newPath);
+                    var (dataType, oldData, newData, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPath, newPath);
                     var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
                     return (oldText, newText);
                 });
@@ -241,9 +241,9 @@ namespace AssetsManager.Services.Core
         {
             if (linkedBank == null) return "{}";
 
-            var wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-            var audioBnkData = linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
-            var eventsBnkData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
+            var wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
+            var audioBnkData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
+            var eventsBnkData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
 
             List<AudioEventNode> result;
             if (linkedBank.BinData != null)
@@ -262,7 +262,7 @@ namespace AssetsManager.Services.Core
         private async Task HandleTextDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)
         {
             loadingWindow.SetState(DiffLoadingState.AcquiringBinaryData);
-            var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
+            var (dataType, oldData, newData, oldPath, newPath) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
             
             loadingWindow.SetState(DiffLoadingState.ParsingTextContent);
             var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
@@ -287,7 +287,7 @@ namespace AssetsManager.Services.Core
         private async Task HandleImageDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string extension, LoadingDiffWindow loadingWindow)
         {
             loadingWindow.SetState(DiffLoadingState.AcquiringTextureData);
-            var (dataType, oldData, newData, oldPath, newPath) = await _wadDifferenceService.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
+            var (dataType, oldData, newData, oldPath, newPath) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
 
             loadingWindow.SetState(DiffLoadingState.DecodingTextures);
             var oldImage = ToBitmapSource((byte[])oldData, extension);
@@ -320,7 +320,7 @@ namespace AssetsManager.Services.Core
             try
             {
                 loadingWindow.SetState(DiffLoadingState.ReadingLocalFiles);
-                var (dataType, oldData, newData) = await _wadDifferenceService.PrepareFileDifferenceDataAsync(oldFilePath, newFilePath);
+                var (dataType, oldData, newData) = await _wadDiffProvider.PrepareFileDifferenceDataAsync(oldFilePath, newFilePath);
                 
                 loadingWindow.SetState(DiffLoadingState.ParsingTextContent);
                 var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);

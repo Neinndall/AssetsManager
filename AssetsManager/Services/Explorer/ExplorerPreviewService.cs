@@ -44,19 +44,19 @@ namespace AssetsManager.Services.Explorer
 
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly WadDifferenceService _wadDifferenceService;
+        private readonly WadDiffProvider _wadDiffProvider;
         private readonly ContentFormatterService _contentFormatterService;
         private readonly AudioConversionService _audioConversionService;
-        private readonly WadExtractionService _wadExtractionService;
+        private readonly WadContentProvider _wadContentProvider;
 
-        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDifferenceService wadDifferenceService, ContentFormatterService contentFormatterService, AudioConversionService audioConversionService, WadExtractionService wadExtractionService)
+        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDiffProvider wadDiffProvider, ContentFormatterService contentFormatterService, AudioConversionService audioConversionService, WadContentProvider wadContentProvider)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
-            _wadDifferenceService = wadDifferenceService;
+            _wadDiffProvider = wadDiffProvider;
             _contentFormatterService = contentFormatterService;
             _audioConversionService = audioConversionService;
-            _wadExtractionService = wadExtractionService;
+            _wadContentProvider = wadContentProvider;
         }
 
         public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FilePreviewerModel viewModel)
@@ -111,9 +111,9 @@ namespace AssetsManager.Services.Explorer
             try
             {
                 byte[] data = null;
-                if (node.Type == NodeType.VirtualFile) { data = await _wadExtractionService.GetVirtualFileBytesAsync(node); }
+                if (node.Type == NodeType.VirtualFile) { data = await _wadContentProvider.GetVirtualFileBytesAsync(node); }
                 else if (node.Type == NodeType.RealFile) { if (File.Exists(node.FullPath)) data = await File.ReadAllBytesAsync(node.FullPath); }
-                else if (node.Type == NodeType.WemFile) { data = await _wadExtractionService.GetWemFileBytesAsync(node); }
+                else if (node.Type == NodeType.WemFile) { data = await _wadContentProvider.GetWemFileBytesAsync(node); }
 
                 if (data != null) { await DispatchPreview(data, node.Extension, node); }
                 else { await ShowUnsupportedPreviewAsync(node.Extension); }
@@ -145,7 +145,7 @@ namespace AssetsManager.Services.Explorer
 
         private async Task PreviewWadFile(FileSystemNodeModel node)
         {
-            byte[] decompressedData = await _wadExtractionService.GetVirtualFileBytesAsync(node);
+            byte[] decompressedData = await _wadContentProvider.GetVirtualFileBytesAsync(node);
 
             if (decompressedData == null)
             {
@@ -523,7 +523,7 @@ namespace AssetsManager.Services.Explorer
             {
                 byte[] data = node.Type switch
                 {
-                    NodeType.VirtualFile => await _wadExtractionService.GetVirtualFileBytesAsync(node),
+                    NodeType.VirtualFile => await _wadContentProvider.GetVirtualFileBytesAsync(node),
                     NodeType.RealFile => await File.ReadAllBytesAsync(node.FullPath),
                     _ => null
                 };

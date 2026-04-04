@@ -22,7 +22,7 @@ namespace AssetsManager.Services.Explorer.Tree
         private readonly HashResolverService _hashResolverService;
         private readonly LogService _logService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
-        private readonly WadExtractionService _wadExtractionService;
+        private readonly WadContentProvider _wadContentProvider;
         private readonly AudioBankService _audioBankService;
 
         public TreeBuilderService(
@@ -30,14 +30,14 @@ namespace AssetsManager.Services.Explorer.Tree
             HashResolverService hashResolverService, 
             LogService logService,
             AudioBankLinkerService audioBankLinkerService,
-            WadExtractionService wadExtractionService,
+            WadContentProvider wadContentProvider,
             AudioBankService audioBankService)
         {
             _wadNodeLoaderService = wadNodeLoaderService;
             _hashResolverService = hashResolverService;
             _logService = logService;
             _audioBankLinkerService = audioBankLinkerService;
-            _wadExtractionService = wadExtractionService;
+            _wadContentProvider = wadContentProvider;
             _audioBankService = audioBankService;
         }
 
@@ -96,9 +96,9 @@ namespace AssetsManager.Services.Explorer.Tree
             }
 
             // Read other file data from the WAD.
-            var eventsData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
-            byte[] wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
+            var eventsData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
+            byte[] wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
+            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
 
             List<AudioEventNode> audioTree;
             if (linkedBank.BinData != null)
