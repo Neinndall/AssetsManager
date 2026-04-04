@@ -6,6 +6,7 @@ using LeagueToolkit.Core.Wad;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Explorer;
 
 namespace AssetsManager.Services.Comparator
 {
