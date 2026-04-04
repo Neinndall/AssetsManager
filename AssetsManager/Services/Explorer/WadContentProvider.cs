@@ -151,7 +151,7 @@ namespace AssetsManager.Services.Explorer
         }
 
         // Genera una miniatura para un diff, integrando extracción y procesado de imagen
-        public async Task<ImageSource> GetDiffThumbnailAsync(SerializableChunkDiff diff, string oldLolPath, string newLolPath, int maxWidth = 256, CancellationToken cancellationToken = default)
+        public async Task<ImageSource> GetDiffThumbnailAsync(SerializableChunkDiff diff, string oldLolPath, string newLolPath, int maxWidth = 0, CancellationToken cancellationToken = default)
         {
             byte[] data = await GetDiffFileBytesAsync(diff, oldLolPath, newLolPath, cancellationToken);
             if (data == null) return null;
@@ -162,7 +162,10 @@ namespace AssetsManager.Services.Explorer
                 {
                     string ext = Path.GetExtension(diff.Path).ToLowerInvariant();
                     using var ms = new MemoryStream(data);
-                    return TextureUtils.LoadTexture(ms, ext, maxWidth, maxWidth);
+                    
+                    // Solo pasamos el tamaño si es mayor que 0 para evitar imágenes de 0x0
+                    int? size = maxWidth > 0 ? maxWidth : null;
+                    return TextureUtils.LoadTexture(ms, ext, size, size);
                 }
                 catch
                 {

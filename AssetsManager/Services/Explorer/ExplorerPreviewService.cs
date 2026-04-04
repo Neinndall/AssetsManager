@@ -512,7 +512,7 @@ namespace AssetsManager.Services.Explorer
             await SetPreviewerAsync(Previewer.StatusPanel, extension);
         }
 
-        public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node)
+        public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node, int maxWidth = 0)
         {
             if (node == null || (!SupportedFileTypes.Images.Contains(node.Extension) && !SupportedFileTypes.Textures.Contains(node.Extension) && !SupportedFileTypes.VectorImages.Contains(node.Extension)))
             {
@@ -530,6 +530,8 @@ namespace AssetsManager.Services.Explorer
 
                 if (data == null) return null;
 
+                int? size = maxWidth > 0 ? maxWidth : null;
+
                 if (SupportedFileTypes.Images.Contains(node.Extension))
                 {
                     return await Task.Run(() =>
@@ -538,6 +540,7 @@ namespace AssetsManager.Services.Explorer
                         var bmp = new BitmapImage();
                         bmp.BeginInit();
                         bmp.StreamSource = stream;
+                        if (size.HasValue) bmp.DecodePixelWidth = size.Value;
                         bmp.CacheOption = BitmapCacheOption.OnLoad;
                         bmp.EndInit();
                         bmp.Freeze();
@@ -546,7 +549,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 else if (SupportedFileTypes.Textures.Contains(node.Extension))
                 {
-                    return await Task.Run(() => TextureUtils.LoadTexture(new MemoryStream(data), node.Extension));
+                    return await Task.Run(() => TextureUtils.LoadTexture(new MemoryStream(data), node.Extension, size, size));
                 }
                 else if (SupportedFileTypes.VectorImages.Contains(node.Extension))
                 {

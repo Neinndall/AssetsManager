@@ -103,28 +103,19 @@ namespace AssetsManager.Views.Dialogs
             var itemsToLoad = _viewModel.DiscoveryItems.Where(i => i.ImagePreview == null).ToList();
             if (!itemsToLoad.Any()) return;
 
-            // Use a semaphore to limit concurrency (e.g., 8 parallel loads)
-            using var semaphore = new SemaphoreSlim(8);
-            var tasks = itemsToLoad.Select(async item =>
+            foreach (var item in itemsToLoad)
             {
-                await semaphore.WaitAsync();
                 try
                 {
                     // Delegamos todo al servicio: extracción + procesado (TextureUtils)
-                    // Pasamos 256 como maxWidth para optimizar memoria
+                    // Mantenemos el límite de 256px para optimizar memoria
                     item.ImagePreview = await _wadContentProvider.GetDiffThumbnailAsync(item, _oldPbePath, _newPbePath, 256);
                 }
                 catch (Exception ex)
                 {
                     _logService.LogDebug($"Failed to load gallery thumbnail for {item.Path}: {ex.Message}");
                 }
-                finally
-                {
-                    semaphore.Release();
-                }
-            });
-
-            await Task.WhenAll(tasks);
+            }
         }
 
         private void OnTreeFilterChanged(object sender, EventArgs e)
