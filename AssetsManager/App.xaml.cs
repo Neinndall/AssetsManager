@@ -26,6 +26,8 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Manifests;
+using AssetsManager.Services.Library;
+using AssetsManager.Views.Models.Library;
 
 namespace AssetsManager
 {
@@ -162,10 +164,15 @@ namespace AssetsManager
       services.AddSingleton<AudioBankLinkerService>();
       services.AddSingleton<AudioPlayerService>();
 
+      // Library Services
+      services.AddSingleton<LibraryIndexService>();
+      services.AddTransient<LibraryViewModel>();
+
       // Views
       services.AddTransient<MainWindow>();
       services.AddTransient<HomeWindow>();
       services.AddTransient<ExplorerWindow>();
+      services.AddTransient<LibraryWindow>();
       services.AddTransient<ComparatorWindow>();
       services.AddTransient<ViewerWindow>();
       services.AddTransient<MonitorWindow>();
