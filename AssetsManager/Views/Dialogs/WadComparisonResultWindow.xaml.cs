@@ -113,7 +113,7 @@ namespace AssetsManager.Views.Dialogs
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogDebug($"Failed to load gallery thumbnail for {item.Path}: {ex.Message}");
+                    _logService.LogError(ex, $"Failed to load gallery thumbnail for {item.Path}");
                 }
             }
         }
