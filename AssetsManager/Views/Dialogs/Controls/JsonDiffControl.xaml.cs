@@ -280,7 +280,9 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                 _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
 
-                UpdateMetricsAndMetadata(oldText, newText, oldFileName, newFileName);
+                // Delegate to ViewModel
+                ViewModel.UpdateMetrics(oldText, newText);
+                UpdateChangeCounts();
 
                 await UpdateDiffView();
             }
@@ -291,9 +293,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
-        private void UpdateMetricsAndMetadata(string oldText, string newText, string oldPath, string newPath)
+        private void UpdateChangeCounts()
         {
-            // 1. Calculate Metrics (One single pass over the model)
+            // Calculate detailed metrics (One single pass over the built model)
             int ins = 0, del = 0, mod = 0;
             
             if (_originalDiffModel?.NewText?.Lines != null)
@@ -319,25 +321,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             ViewModel.InsertionsCount = ins;
             ViewModel.DeletionsCount = del;
             ViewModel.ModificationsCount = mod;
-
-            // 2. Metadata Updates
-            ViewModel.OldSize = FormatUtils.FormatSize((ulong)(oldText?.Length ?? 0));
-            ViewModel.NewSize = FormatUtils.FormatSize((ulong)(newText?.Length ?? 0));
-            ViewModel.OldOrigin = InferOrigin(oldPath);
-            ViewModel.NewOrigin = InferOrigin(newPath);
-        }
-
-        private string InferOrigin(string path)
-        {
-            if (string.IsNullOrEmpty(path)) return "N/A";
-            string lower = path.ToLowerInvariant();
-            
-            if (lower.Contains("wad_chunks")) return "WAD CHUNK";
-            if (lower.Contains("backup"))     return "BACKUP";
-            if (lower.Contains("pbe"))        return "PBE CLIENT";
-            if (lower.Contains("live"))       return "LIVE CLIENT";
-            
-            return "LOCAL FILE";
         }
 
         private void BtnCopyPath_Click(object sender, RoutedEventArgs e)
