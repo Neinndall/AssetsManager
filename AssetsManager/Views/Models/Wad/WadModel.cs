@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Text.Json.Serialization;
 using LeagueToolkit.Core.Wad;
 using System.IO;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models.Wad
 {
@@ -88,10 +89,10 @@ namespace AssetsManager.Views.Models.Wad
         }
 
         [JsonIgnore]
-        public string OldSizeString => FormatSize(OldUncompressedSize);
+        public string OldSizeString => OldUncompressedSize.HasValue ? FormatUtils.FormatSize(OldUncompressedSize.Value) : "N/A";
         
         [JsonIgnore]
-        public string NewSizeString => FormatSize(NewUncompressedSize);
+        public string NewSizeString => NewUncompressedSize.HasValue ? FormatUtils.FormatSize(NewUncompressedSize.Value) : "N/A";
 
         [JsonIgnore]
         public string SizeDifferenceString
@@ -110,18 +111,8 @@ namespace AssetsManager.Views.Models.Wad
 
                 if (diff == 0 && Type == ChunkDiffType.Modified) return "N/A";
                 
-                return (diff > 0 ? "+" : "") + FormatSize((ulong)Math.Abs(diff));
+                return (diff > 0 ? "+" : "") + FormatUtils.FormatSize((ulong)Math.Abs(diff));
             }
-        }
-
-        private string FormatSize(ulong? sizeInBytes)
-        {
-            if (sizeInBytes == null) return "N/A";
-            if (sizeInBytes < 1024) return $"{sizeInBytes} Bytes";
-            double sizeInKB = (double)sizeInBytes / 1024.0;
-            if (sizeInKB < 1024) return $"{sizeInKB:F2} KB";
-            double sizeInMB = sizeInKB / 1024.0;
-            return $"{sizeInMB:F2} MB";
         }
 
         public WadChunkCompression? OldCompressionType { get; set; }

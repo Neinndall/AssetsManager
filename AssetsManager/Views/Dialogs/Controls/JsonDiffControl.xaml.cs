@@ -18,6 +18,7 @@ using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using ICSharpCode.AvalonEdit.Rendering;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
+using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs.Controls;
 
@@ -320,8 +321,8 @@ namespace AssetsManager.Views.Dialogs.Controls
             ViewModel.ModificationsCount = mod;
 
             // 2. Metadata Updates
-            ViewModel.OldSize = FormatSize((ulong)(oldText?.Length ?? 0));
-            ViewModel.NewSize = FormatSize((ulong)(newText?.Length ?? 0));
+            ViewModel.OldSize = FormatUtils.FormatSize((ulong)(oldText?.Length ?? 0));
+            ViewModel.NewSize = FormatUtils.FormatSize((ulong)(newText?.Length ?? 0));
             ViewModel.OldOrigin = InferOrigin(oldPath);
             ViewModel.NewOrigin = InferOrigin(newPath);
         }
@@ -337,15 +338,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             if (lower.Contains("live"))       return "LIVE CLIENT";
             
             return "LOCAL FILE";
-        }
-
-        private string FormatSize(ulong sizeInBytes)
-        {
-            if (sizeInBytes < 1024) return $"{sizeInBytes} B";
-            double sizeInKB = (double)sizeInBytes / 1024.0;
-            if (sizeInKB < 1024) return $"{sizeInKB:F1} KB";
-            double sizeInMB = sizeInKB / 1024.0;
-            return $"{sizeInMB:F1} MB";
         }
 
         private void BtnCopyPath_Click(object sender, RoutedEventArgs e)
