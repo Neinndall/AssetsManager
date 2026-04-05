@@ -117,7 +117,7 @@
                                               IsChecked="{Binding TreeModel.ShowModified}"
                                               ToolTip="Toggle: Modified Assets">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <icons:MaterialIcon Kind="PencilCircleOutline" Foreground="{StaticResource AccentOrange}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <icons:MaterialIcon Kind="PencilCircleOutline" Foreground="{StaticResource AccentBlue}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="MODIFIED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
                                         <TextBlock Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
                                     </StackPanel>
@@ -138,7 +138,7 @@
                                               ToolTip="Toggle: Renamed Assets"
                                               Margin="0">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <icons:MaterialIcon Kind="SwapHorizontalCircleOutline" Foreground="{StaticResource AccentBlue}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <icons:MaterialIcon Kind="SwapHorizontalCircleOutline" Foreground="{StaticResource AccentOrange}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="RENAMED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
                                         <TextBlock Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
                                     </StackPanel>
