@@ -99,50 +99,74 @@ namespace AssetsManager.Services.Core
             var pathForCheck = firstDiff.NewPath ?? firstDiff.OldPath;
             string extension = Path.GetExtension(pathForCheck).ToLowerInvariant();
 
-            if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
-            {
-                // Verify all files are images
-                if (!diffs.All(d => {
-                    var p = d.NewPath ?? d.OldPath;
-                    var ext = Path.GetExtension(p).ToLowerInvariant();
-                    return SupportedFileTypes.Images.Contains(ext) || SupportedFileTypes.Textures.Contains(ext);
-                }))
-                {
-                    _customMessageBoxService.ShowError("Error", "Batch comparison only supports files of the same category (all Images or all Text/Data).", owner);
-                    return;
-                }
+            var loadingWindow = new LoadingDiffWindow { Owner = owner };
+            loadingWindow.Show();
 
-                var imageDiffWindow = new ImageDiffWindow { Owner = owner };
-                await imageDiffWindow.LoadAndDisplayBatchDiffAsync(diffs, startIndex, oldPbePath, newPbePath, async (diff, oldPath, newPath) => {
-                    var (dataType, oldData, newData, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPath, newPath);
-                    var ext = Path.GetExtension(diff.NewPath ?? diff.OldPath).ToLowerInvariant();
-                    var oldImg = ToBitmapSource((byte[])oldData, ext);
-                    var newImg = ToBitmapSource((byte[])newData, ext);
-                    return (oldImg, newImg);
-                });
-                imageDiffWindow.Show();
+            try
+            {
+                if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
+                {
+                    // Verify all files are images
+                    if (!diffs.All(d => {
+                        var p = d.NewPath ?? d.OldPath;
+                        var ext = Path.GetExtension(p).ToLowerInvariant();
+                        return SupportedFileTypes.Images.Contains(ext) || SupportedFileTypes.Textures.Contains(ext);
+                    }))
+                    {
+                        loadingWindow.Close();
+                        _customMessageBoxService.ShowError("Error", "Batch comparison only supports files of the same category (all Images or all Text/Data).", owner);
+                        return;
+                    }
+
+                    loadingWindow.SetState(DiffLoadingState.AcquiringTextureData);
+                    var imageDiffWindow = new ImageDiffWindow { Owner = owner };
+                    await imageDiffWindow.LoadAndDisplayBatchDiffAsync(diffs, startIndex, oldPbePath, newPbePath, async (diff, oldPath, newPath) => {
+                        var (dataType, oldData, newData, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPath, newPath);
+                        var ext = Path.GetExtension(diff.NewPath ?? diff.OldPath).ToLowerInvariant();
+                        var oldImg = ToBitmapSource((byte[])oldData, ext);
+                        var newImg = ToBitmapSource((byte[])newData, ext);
+                        return (oldImg, newImg);
+                    });
+
+                    loadingWindow.SetState(DiffLoadingState.Ready);
+                    loadingWindow.Close();
+                    imageDiffWindow.Show();
+                }
+                else // Default to Text/Data Diff if it's not an image and it's supported
+                {
+                    // Verify all files are NOT images (to allow text/bin/json/etc)
+                    if (diffs.Any(d => {
+                        var p = d.NewPath ?? d.OldPath;
+                        var ext = Path.GetExtension(p).ToLowerInvariant();
+                        return SupportedFileTypes.Images.Contains(ext) || SupportedFileTypes.Textures.Contains(ext);
+                    }))
+                    {
+                        loadingWindow.Close();
+                        _customMessageBoxService.ShowError("Error", "Mixed file types (Images + Text) are not supported in batch comparison.", owner);
+                        return;
+                    }
+
+                    loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
+                    var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
+                    diffWindow.Owner = owner;
+                    await diffWindow.LoadAndDisplayBatchDiffAsync(diffs, startIndex, oldPbePath, newPbePath, async (diff, oldPath, newPath) => {
+                        var (dataType, oldData, newData, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPath, newPath);
+                        var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
+                        return (oldText, newText);
+                    });
+
+                    loadingWindow.SetState(DiffLoadingState.Ready);
+                    loadingWindow.Close();
+
+                    // HudWindow standard: ShowDialog for text diffs if owner is provided (consistent with ShowWadDiffAsync)
+                    diffWindow.ShowDialog();
+                }
             }
-            else // Default to Text/Data Diff if it's not an image and it's supported
+            catch (Exception ex)
             {
-                // Verify all files are NOT images (to allow text/bin/json/etc)
-                if (diffs.Any(d => {
-                    var p = d.NewPath ?? d.OldPath;
-                    var ext = Path.GetExtension(p).ToLowerInvariant();
-                    return SupportedFileTypes.Images.Contains(ext) || SupportedFileTypes.Textures.Contains(ext);
-                }))
-                {
-                    _customMessageBoxService.ShowError("Error", "Mixed file types (Images + Text) are not supported in batch comparison.", owner);
-                    return;
-                }
-
-                var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
-                diffWindow.Owner = owner;
-                await diffWindow.LoadAndDisplayBatchDiffAsync(diffs, startIndex, oldPbePath, newPbePath, async (diff, oldPath, newPath) => {
-                    var (dataType, oldData, newData, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPath, newPath);
-                    var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
-                    return (oldText, newText);
-                });
-                diffWindow.Show();
+                loadingWindow.Close();
+                _customMessageBoxService.ShowError("Comparison Error", $"An unexpected error occurred while preparing batch comparison: {ex.Message}", owner);
+                _logService.LogError(ex, "Error showing batch WAD diff");
             }
         }
 
