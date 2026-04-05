@@ -698,6 +698,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 UnifiedDiffEditor.ScrollTo(lineNumber, 0);
                 UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
+                UpdateJsonPath(lineNumber);
                 return;
             }
 
@@ -706,6 +707,8 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             OldJsonContent.TextArea.Caret.Line = lineNumber;
             NewJsonContent.TextArea.Caret.Line = lineNumber;
+            
+            UpdateJsonPath(lineNumber);
             NewJsonContent.Focus();
         }
 
