@@ -221,6 +221,8 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             for (int i = 0; i < lines.Count; i++)
             {
+                // A line is a change if either side is not Unchanged/Imaginary (Side-by-Side)
+                // or the line itself is not Unchanged/Imaginary (Unified)
                 bool isChange = _diffModel != null 
                     ? (_diffModel.OldText.Lines[i].Type != ChangeType.Unchanged && _diffModel.OldText.Lines[i].Type != ChangeType.Imaginary) ||
                       (_diffModel.NewText.Lines[i].Type != ChangeType.Unchanged && _diffModel.NewText.Lines[i].Type != ChangeType.Imaginary)
@@ -228,6 +230,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                 if (isChange)
                 {
+                    // Group contiguous changes into a single jump point
                     bool isStart = i == 0 || (_diffModel != null 
                         ? _diffModel.OldText.Lines[i].Type != _diffModel.OldText.Lines[i - 1].Type || _diffModel.NewText.Lines[i].Type != _diffModel.NewText.Lines[i - 1].Type
                         : lines[i].Type != lines[i - 1].Type);
@@ -251,6 +254,48 @@ namespace AssetsManager.Views.Dialogs.Controls
             int prev = _diffLines.LastOrDefault(l => l < currentLine);
             if (prev == 0) prev = _diffLines.Last();
             ParentControl?.ScrollToLine(prev);
+        }
+
+        public void NavigateToFirstChangeByType(ChangeType type)
+        {
+            if (_diffModel == null && _unifiedLines == null) return;
+
+            // In Unified mode, everything is in _unifiedLines
+            if (ParentControl?.ViewModel.IsInlineMode == true)
+            {
+                if (_unifiedLines == null) return;
+                var match = _unifiedLines.Select((l, idx) => new { l, idx }).FirstOrDefault(x => x.l.Type == type);
+                if (match != null) ParentControl?.ScrollToLine(match.idx + 1);
+                return;
+            }
+
+            // In Side-by-Side mode:
+            // For Deletions, we navigate to 'Imaginary' lines in the NewText (the ghost placeholders)
+            if (type == ChangeType.Deleted)
+            {
+                var newLines = _diffModel.NewText.Lines;
+                for (int i = 0; i < newLines.Count; i++)
+                {
+                    if (newLines[i].Type == ChangeType.Imaginary)
+                    {
+                        ParentControl?.ScrollToLine(i + 1);
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                // For Insertions/Modifications, check the NewText as usual
+                var newLines = _diffModel.NewText.Lines;
+                for (int i = 0; i < newLines.Count; i++)
+                {
+                    if (newLines[i].Type == type)
+                    {
+                        ParentControl?.ScrollToLine(i + 1);
+                        return;
+                    }
+                }
+            }
         }
 
         private void NavigationPanel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

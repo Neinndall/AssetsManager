@@ -14,6 +14,20 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         private bool _hideUnchangedLines;
         private bool _isWordWrapEnabled;
 
+        // Metrics Properties
+        private int _insertionsCount;
+        private int _deletionsCount;
+        private int _modificationsCount;
+
+        // Metadata Properties
+        private string _oldSize;
+        private string _newSize;
+        private string _oldOrigin;
+        private string _newOrigin;
+        private string _currentPath;
+        private string _currentLineText;
+        private int _currentLine = 1;
+
         // Batch Mode Properties
         private bool _isBatchMode;
         private int _currentFileIndex = 1;
@@ -41,6 +55,66 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         {
             get => _isWordWrapEnabled;
             set { _isWordWrapEnabled = value; OnPropertyChanged(); }
+        }
+
+        public int InsertionsCount
+        {
+            get => _insertionsCount;
+            set { _insertionsCount = value; OnPropertyChanged(); }
+        }
+
+        public int DeletionsCount
+        {
+            get => _deletionsCount;
+            set { _deletionsCount = value; OnPropertyChanged(); }
+        }
+
+        public int ModificationsCount
+        {
+            get => _modificationsCount;
+            set { _modificationsCount = value; OnPropertyChanged(); }
+        }
+
+        public string OldSize
+        {
+            get => _oldSize;
+            set { _oldSize = value; OnPropertyChanged(); }
+        }
+
+        public string NewSize
+        {
+            get => _newSize;
+            set { _newSize = value; OnPropertyChanged(); }
+        }
+
+        public string OldOrigin
+        {
+            get => _oldOrigin;
+            set { _oldOrigin = value; OnPropertyChanged(); }
+        }
+
+        public string NewOrigin
+        {
+            get => _newOrigin;
+            set { _newOrigin = value; OnPropertyChanged(); }
+        }
+
+        public string CurrentPath
+        {
+            get => _currentPath;
+            set { _currentPath = value; OnPropertyChanged(); }
+        }
+
+        public int CurrentLine
+        {
+            get => _currentLine;
+            set { _currentLine = value; OnPropertyChanged(); }
+        }
+
+        public string CurrentLineText
+        {
+            get => _currentLineText;
+            set { _currentLineText = value; OnPropertyChanged(); }
         }
 
         public bool IsBatchMode
