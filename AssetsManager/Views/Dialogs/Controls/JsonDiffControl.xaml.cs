@@ -35,6 +35,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         private TextDocument _cachedOldDoc;
         private TextDocument _cachedNewDoc;
         private bool _isSyncing;
+        private int _lastAbsoluteLine = 1;
         #endregion
 
         #region Properties
@@ -595,12 +596,21 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async void HideUnchangedButton_Click(object sender, RoutedEventArgs e)
         {
-            _cachedOldDoc = null; // Force regeneration
-
             var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
-            double currentPercentage = GetCurrentScrollPercentage(editor);
             
-            await UpdateDiffView(currentPercentage, null);
+            // 1. Si vamos a OCULTAR (acaba de pasar a true), guardamos la línea real
+            if (ViewModel.HideUnchangedLines)
+            {
+                _lastAbsoluteLine = GetCurrentLineRobust(editor);
+                _cachedOldDoc = null;
+                await UpdateDiffView(GetCurrentScrollPercentage(editor), null);
+            }
+            else
+            {
+                // 2. Si vamos a MOSTRAR todo (acaba de pasar a false), restauramos la línea absoluta
+                _cachedOldDoc = null;
+                await UpdateDiffView(null, _lastAbsoluteLine);
+            }
         }
         #endregion
 
