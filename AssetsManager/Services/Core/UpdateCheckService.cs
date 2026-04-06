@@ -3,10 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Downloads;
+using AssetsManager.Info;
 
 namespace AssetsManager.Services.Core
 {
@@ -52,7 +55,6 @@ namespace AssetsManager.Services.Core
                 }
                 _updateTimer.Interval = _appSettings.UpdateCheckFrequency * 60 * 1000;
                 _updateTimer.Enabled = true;
-                _logService.LogDebug($"Background update timer started. Frequency: {_appSettings.UpdateCheckFrequency} minutes.");
             }
 
             // Start Asset Tracker timer
@@ -66,7 +68,6 @@ namespace AssetsManager.Services.Core
                 }
                 _assetTrackerTimer.Interval = _appSettings.AssetTrackerFrequency * 60 * 1000;
                 _assetTrackerTimer.Enabled = true;
-                _logService.LogDebug($"Asset Tracker timer started. Frequency: {_appSettings.AssetTrackerFrequency} minutes.");
             }
 
             // Start PBE Status timer
@@ -80,7 +81,6 @@ namespace AssetsManager.Services.Core
                 }
                 _pbeStatusTimer.Interval = _appSettings.PbeStatusFrequency * 60 * 1000;
                 _pbeStatusTimer.Enabled = true;
-                _logService.LogDebug($"PBE Status timer started. Frequency: {_appSettings.PbeStatusFrequency} minutes.");
             }
         }
 
@@ -201,7 +201,20 @@ namespace AssetsManager.Services.Core
                 if (appUpdateAvailable)
                 {
                     AvailableVersion = newVersion;
-                    UpdatesFound?.Invoke($"Version {newVersion} is available", newVersion);
+                    
+                    // Decide notification message
+                    string currentVerStr = ApplicationInfos.Version.Split('-')[0].Replace("v", "");
+                    string latestVerStr = newVersion.Replace("v", "");
+
+                    if (Version.TryParse(currentVerStr, out var currentVer) && 
+                        Version.TryParse(latestVerStr, out var latestVer))
+                    {
+                        string message = ApplicationInfos.IsQA && latestVer <= currentVer
+                            ? $"A stable version {newVersion} is available."
+                            : $"Version {newVersion} is available";
+
+                        UpdatesFound?.Invoke(message, newVersion);
+                    }
                 }
                 else
                 {

@@ -113,8 +113,8 @@ namespace AssetsManager
  
       // Explorer Services
       services.AddTransient<ExplorerPreviewService>();
-      services.AddSingleton<WadSavingService>();
-      services.AddSingleton<WadExtractionService>();
+      services.AddSingleton<WadExportService>();
+      services.AddSingleton<WadContentProvider>();
       services.AddSingleton<WadNodeLoaderService>();
       services.AddSingleton<WadSearchBoxService>();
       services.AddTransient<TreeBuilderService>();
@@ -147,7 +147,7 @@ namespace AssetsManager
 
       // Comparator Services
       services.AddSingleton<WadComparatorService>();
-      services.AddSingleton<WadDifferenceService>();
+      services.AddSingleton<WadDiffProvider>();
       services.AddSingleton<WadPackagingService>();
       services.AddSingleton<ReportGenerationService>();
 

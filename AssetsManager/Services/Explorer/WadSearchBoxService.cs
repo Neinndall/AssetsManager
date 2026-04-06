@@ -160,7 +160,18 @@ namespace AssetsManager.Services.Explorer
                     continue;
                 }
 
-                bool selfMatches = node.Name.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
+                bool selfMatches = false;
+                if (searchText.StartsWith(".") && searchText.Length > 1)
+                {
+                    // Search by extension
+                    selfMatches = node.Extension.Equals(searchText, StringComparison.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    // Search by name
+                    selfMatches = node.Name.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
+                }
+
                 bool childMatches = FilterNodes(node.Children, searchText);
 
                 node.IsVisible = selfMatches || childMatches;

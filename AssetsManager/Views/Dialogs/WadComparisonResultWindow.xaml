@@ -7,169 +7,186 @@
                 xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
                 xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
                 xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+                xmlns:viewModels="clr-namespace:AssetsManager.Views.Models.Dialogs"
                 mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
                 HeaderTitle="Comparison Results" 
                 HeaderIcon="Compare"
-                Height="800" Width="1400"
+                Height="850" Width="1450"
                 MinWidth="1100" MinHeight="700"
                 WindowStartupLocation="CenterScreen"
                 Background="{StaticResource SidebarBackground}"
                 Style="{StaticResource HudWindowStyle}">
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- 0: Toolbar (Stats) -->
-            <RowDefinition Height="Auto"/> <!-- 1: Dashboard -->
-            <RowDefinition Height="*"/>    <!-- 2: Main Content -->
-            <RowDefinition Height="Auto"/> <!-- 3: Footer -->
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/> <!-- Sidebar -->
+            <ColumnDefinition Width="*"/>    <!-- Content -->
+        </Grid.ColumnDefinitions>
 
-        <!-- 1. Stats Toolbar -->
-        <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="24,10">
-            <Grid>
-                <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                    <TextBlock Text="DIAGNOSTIC OVERVIEW" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
-                    <TextBlock Text="Asset Distribution &amp; Payload Analysis" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
-                </StackPanel>
-                
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}">
-                        <StackPanel Orientation="Horizontal">
-                            <icons:MaterialIcon Kind="PlusCircleOutline" Foreground="{StaticResource AccentGreen}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
-                            <TextBlock Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
+        <!-- 1. NAVIGATION SIDEBAR -->
+        <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0" Width="64">
+            <StackPanel Margin="0,20">
+                <!-- Advanced (Technical Tree) -->
+                <RadioButton Style="{StaticResource ModernSidebarNavigationStyle}" 
+                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}, Mode=TwoWay}"
+                             ToolTip="Hierarchy"
+                             GroupName="ExplorerNavigation">
+                    <Grid Width="64">
+                        <icons:MaterialIcon Kind="FileTreeOutline" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                </RadioButton>
 
-                    <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}">
-                        <StackPanel Orientation="Horizontal">
-                            <icons:MaterialIcon Kind="PencilCircleOutline" Foreground="{StaticResource AccentOrange}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="MODIFIED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
-                            <TextBlock Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
+                <!-- Discovery (Gallery) -->
+                <RadioButton Style="{StaticResource ModernSidebarNavigationStyle}" 
+                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Discovery}, Mode=TwoWay}"
+                             Margin="0,4,0,0" ToolTip="Gallery"
+                             GroupName="ExplorerNavigation">
+                    <Grid Width="64">
+                        <icons:MaterialIcon Kind="ImageMultipleOutline" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                </RadioButton>
 
-                    <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}">
-                        <StackPanel Orientation="Horizontal">
-                            <icons:MaterialIcon Kind="MinusCircleOutline" Foreground="{StaticResource AccentRed}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="REMOVED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
-                            <TextBlock Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Style="{StaticResource DiagnosticBadgeStyle}" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" Margin="0">
-                        <StackPanel Orientation="Horizontal">
-                            <icons:MaterialIcon Kind="SwapHorizontalCircleOutline" Foreground="{StaticResource AccentBlue}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="RENAMED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
-                            <TextBlock Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Grid>
+                <!-- Overview -->
+                <RadioButton Style="{StaticResource ModernSidebarNavigationStyle}" 
+                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Overview}, Mode=TwoWay}"
+                             Margin="0,4,0,0" ToolTip="Overview"
+                             GroupName="ExplorerNavigation">
+                    <Grid Width="64">
+                        <icons:MaterialIcon Kind="ViewDashboardOutline" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                </RadioButton>
+            </StackPanel>
         </Border>
 
-        <!-- 2. Dashboard -->
-        <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" 
-                Visibility="{Binding IsDashboardVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Grid Margin="24,15">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.5*"/>
-                    <ColumnDefinition Width="2*"/>
-                    <ColumnDefinition Width="1*"/>
-                </Grid.ColumnDefinitions>
+        <!-- 2. MAIN CONTENT AREA -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- A. Global Smart Toolbar (Stats + Search) -->
+                <RowDefinition Height="*"/>    <!-- B. View Container -->
+                <RowDefinition Height="Auto"/> <!-- C. Footer -->
+            </Grid.RowDefinitions>
 
-                <StackPanel Grid.Column="0" Margin="0,0,30,0">
-                    <TextBlock Text="CATEGORY DISTRIBUTION" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,12"/>
-                    <ItemsControl ItemsSource="{Binding TreeModel.CategoryDistribution}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="0,0,0,10">
-                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                    <Grid Margin="0,0,0,4">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                                            <TextBlock Text="{Binding Name}" FontSize="11" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding SizeChangeText}" FontSize="10" Foreground="{StaticResource AccentBrush}" Margin="8,0,0,0" VerticalAlignment="Bottom"/>
-                                        </StackPanel>
-                                        <TextBlock Text="{Binding Count, StringFormat='({0} files)'}" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
-                                    </Grid>
-                                    <ProgressBar Grid.Row="1" Height="4" Value="{Binding Percentage}" Foreground="{StaticResource AccentBrush}" Background="{StaticResource BorderColor}" BorderThickness="0"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+            <!-- A. GLOBAL SMART TOOLBAR -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="24,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="1" Margin="0,0,30,0">
-                    <TextBlock Text="TOP SIZE IMPACT" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,12"/>
-                    <ItemsControl ItemsSource="{Binding TreeModel.TopImpactFiles}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Style="{StaticResource DashboardCardStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding Path}" FontSize="9" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding SizeDiffText}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="15,0,0,0"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <TextBlock Text="DIAGNOSTIC OVERVIEW" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                        <TextBlock Text="Asset Distribution &amp; Payload Analysis" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="2">
-                    <TextBlock Text="AFFECTED AREAS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,12"/>
-                    <ItemsControl ItemsSource="{Binding TreeModel.AffectedAreas}">
-                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="8,4" Margin="0,0,6,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
-                                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="2" Margin="6,0,0,0" Padding="4,0">
-                                            <TextBlock Text="{Binding Count}" FontSize="9" Foreground="{StaticResource AccentBrush}" FontWeight="Bold"/>
-                                        </Border>
+                    <!-- Unified Diagnostic Control Hub (Search + Filters) -->
+                    <Border Grid.Column="1" Grid.ColumnSpan="2" 
+                            HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Background="{StaticResource SidebarBackground}"
+                            BorderBrush="{StaticResource BorderColor}" 
+                            BorderThickness="1"
+                            CornerRadius="10" 
+                            Padding="0">
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Global Search Zone -->
+                            <TextBox x:Name="globalSearchBox" 
+                                     Style="{StaticResource StandardSearchBoxStyle}" 
+                                     Width="280" 
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     TextChanged="GlobalSearchBox_TextChanged"
+                                     Tag="Search files..."/>
+
+                            <!-- Technical Separator -->
+                            <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="12,6" VerticalAlignment="Stretch"/>
+
+                            <!-- Global Interactive Filters -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                                <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                              IsChecked="{Binding TreeModel.ShowNew}"
+                                              ToolTip="Toggle: New Assets">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <icons:MaterialIcon Kind="PlusCircleOutline" Foreground="{StaticResource AccentGreen}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="NEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                        <TextBlock Text="{Binding CountNew}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
                                     </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                                </ToggleButton>
+
+                                <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                              IsChecked="{Binding TreeModel.ShowModified}"
+                                              ToolTip="Toggle: Modified Assets">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <icons:MaterialIcon Kind="PencilCircleOutline" Foreground="{StaticResource AccentBlue}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="MODIFIED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                        <TextBlock Text="{Binding CountModified}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </ToggleButton>
+
+                                <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                              IsChecked="{Binding TreeModel.ShowRemoved}"
+                                              ToolTip="Toggle: Removed Assets">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <icons:MaterialIcon Kind="MinusCircleOutline" Foreground="{StaticResource AccentRed}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="REMOVED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                        <TextBlock Text="{Binding CountRemoved}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </ToggleButton>
+
+                                <ToggleButton Style="{StaticResource DiagnosticBadgeToggleStyle}" 
+                                              IsChecked="{Binding TreeModel.ShowRenamed}"
+                                              ToolTip="Toggle: Renamed Assets"
+                                              Margin="0">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <icons:MaterialIcon Kind="SwapHorizontalCircleOutline" Foreground="{StaticResource AccentOrange}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="RENAMED" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,1,8,0" Opacity="0.8"/>
+                                        <TextBlock Text="{Binding CountRenamed}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- B. VIEW CONTAINER (Dynamic Content) -->
+            <Grid Grid.Row="1">
+                <!-- Overview View -->
+                <controls:WadComparisonOverviewControl Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Overview}}"/>
+                
+                <!-- Discovery View -->
+                <controls:WadComparisonGalleryControl Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Discovery}}"/>
+                
+                <!-- Advanced View (Hierarchy + Details) -->
+                <Grid Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}}">
+                    <Grid Margin="24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="300"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*" MinWidth="300"/>
+                        </Grid.ColumnDefinitions>
+
+                        <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0" DataContext="{Binding TreeModel}"/>
+                        <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ShowsPreview="False"/>
+                        <controls:WadDiffDetailsControl x:Name="DiffDetails" Grid.Column="2" DataContext="{Binding DetailsModel.SelectedDiff}"/>
+                    </Grid>
+                </Grid>
             </Grid>
-        </Border>
 
-        <!-- 3. Main Workspace -->
-        <Grid Grid.Row="2" Margin="24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="300"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            
-            <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0"
-                                            DataContext="{Binding TreeModel}"/>
-            
-            <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ShowsPreview="False"/>
+            <!-- C. FOOTER ACTIONS -->
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,12">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <icons:MaterialIcon Kind="InformationOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding SummaryText}" FontSize="11" Foreground="{StaticResource TextSecondary}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
 
-            <controls:WadDiffDetailsControl x:Name="DiffDetails" Grid.Column="2" 
-                                            DataContext="{Binding DetailsModel.SelectedDiff}"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Content="Reload Hashes" Click="ReloadHashesButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Margin="0,0,10,0" Padding="15,0"/>
+                        <Button Content="Save Results" Click="SaveButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Padding="20,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
         </Grid>
-
-        <!-- 4. Footer (Actions & Summary with bottom rounding) -->
-        <Border Grid.Row="3" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,12">
-            <Grid>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <icons:MaterialIcon Kind="InformationOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding SummaryText}" FontSize="11" Foreground="{StaticResource TextSecondary}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                </StackPanel>
-
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button Content="Reload Hashes" Click="ReloadHashesButton_Click" Style="{StaticResource SecondaryButton}" Height="32" Margin="0,0,10,0" Padding="15,0"/>
-                    <Button Content="Save Report" Click="SaveButton_Click" Style="{StaticResource PrimaryButton}" Height="32" Padding="20,0"/>
-                </StackPanel>
-            </Grid>
-        </Border>
     </Grid>
 </base:HudWindow>

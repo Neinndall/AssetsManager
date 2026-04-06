@@ -126,16 +126,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public int Count { get; set; }
         public double Percentage { get; set; }
         public long TotalSizeChange { get; set; }
-        public string SizeChangeText => (TotalSizeChange >= 0 ? "+" : "") + FormatSize((ulong)Math.Abs(TotalSizeChange));
-
-        private string FormatSize(ulong sizeInBytes)
-        {
-            if (sizeInBytes < 1024) return $"{sizeInBytes} B";
-            double sizeInKB = sizeInBytes / 1024.0;
-            if (sizeInKB < 1024) return $"{sizeInKB:F1} KB";
-            double sizeInMB = sizeInKB / 1024.0;
-            return $"{sizeInMB:F1} MB";
-        }
+        public string SizeChangeText => (TotalSizeChange >= 0 ? "+" : "") + FormatUtils.FormatSize((ulong)Math.Abs(TotalSizeChange));
     }
 
     public class TopImpactFile
@@ -146,16 +137,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public ulong OldSize { get; set; }
         public ulong NewSize { get; set; }
         public long SizeDiff { get; set; }
-        public string SizeDiffText => (SizeDiff >= 0 ? "+" : "") + FormatSize((ulong)Math.Abs(SizeDiff));
-
-        private string FormatSize(ulong sizeInBytes)
-        {
-            if (sizeInBytes < 1024) return $"{sizeInBytes} B";
-            double sizeInKB = sizeInBytes / 1024.0;
-            if (sizeInKB < 1024) return $"{sizeInKB:F1} KB";
-            double sizeInMB = sizeInKB / 1024.0;
-            return $"{sizeInMB:F1} MB";
-        }
+        public string SizeDiffText => (SizeDiff >= 0 ? "+" : "") + FormatUtils.FormatSize((ulong)Math.Abs(SizeDiff));
     }
 
     public class AffectedArea

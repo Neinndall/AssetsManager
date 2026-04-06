@@ -27,7 +27,7 @@ namespace AssetsManager.Views.Settings
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.Settings.LolPbeDirectory = folderBrowserDialog.FileName;
+                    ViewModel.LolPbeDirectory = folderBrowserDialog.FileName;
                 }
             }
         }
@@ -45,7 +45,7 @@ namespace AssetsManager.Views.Settings
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.Settings.LolLiveDirectory = folderBrowserDialog.FileName;
+                    ViewModel.LolLiveDirectory = folderBrowserDialog.FileName;
                 }
             }
         }
@@ -63,7 +63,7 @@ namespace AssetsManager.Views.Settings
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.Settings.DefaultExtractedSelectDirectory = folderBrowserDialog.FileName;
+                    ViewModel.DefaultExtractedSelectDirectory = folderBrowserDialog.FileName;
                 }
             }
         }
@@ -85,7 +85,7 @@ namespace AssetsManager.Views.Settings
             {
                 if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.Settings.CustomFloorTexturePath = openFileDialog.FileName;
+                    ViewModel.CustomFloorTexturePath = openFileDialog.FileName;
                 }
             }
         }

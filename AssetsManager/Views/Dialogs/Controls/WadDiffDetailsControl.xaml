@@ -66,7 +66,7 @@
 
                     <!-- Path Info (Standard) -->
                     <StackPanel Grid.Row="1" Margin="0,0,0,20" 
-                                Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='!Renamed'}">
+                                Visibility="{Binding Type, Converter={StaticResource EqualityConverter}, ConverterParameter='!Renamed'}">
                         <TextBlock Text="VIRTUAL LOCATION" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,8"/>
                         <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                             <TextBlock Text="{Binding Path}" FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
@@ -75,7 +75,7 @@
 
                     <!-- Path Info (Renamed) -->
                     <StackPanel Grid.Row="1" Margin="0,0,0,20"
-                                Visibility="{Binding Type, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter='Renamed'}">
+                                Visibility="{Binding Type, Converter={StaticResource EqualityConverter}, ConverterParameter='Renamed'}">
                         <TextBlock Text="RENAMED PATH LOG" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,8"/>
                         <Grid>
                             <Grid.RowDefinitions>

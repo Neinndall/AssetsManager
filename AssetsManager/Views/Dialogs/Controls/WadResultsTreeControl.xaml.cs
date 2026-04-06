@@ -50,7 +50,8 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
-        public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewDifferencesMenuItem");
+        public MenuItem ViewDifferencesMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "View Differences");
+        public MenuItem CopyMenuItem => (this.FindResource("WadDiffContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Copy");
 
         public WadResultsTreeControl()
         {
@@ -62,14 +63,8 @@ namespace AssetsManager.Views.Dialogs.Controls
             if (resultsTreeView != null)
                 resultsTreeView.SelectedItemChanged -= ResultsTreeView_SelectedItemChanged;
             
-            searchTextBox.TextChanged -= SearchTextBox_TextChanged;
             resultsTreeView.ItemsSource = null;
             ParentWindow = null;
-        }
-
-        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            ParentWindow?.HandleSearchTextChanged(searchTextBox.Text);
         }
 
         private void ResultsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -87,6 +82,22 @@ namespace AssetsManager.Views.Dialogs.Controls
             else
             {
                 ParentWindow?.HandleViewDifferencesRequest();
+            }
+        }
+
+        private void CopyName_Click(object sender, RoutedEventArgs e)
+        {
+            if (resultsTreeView.SelectedItem is SerializableChunkDiff diff)
+            {
+                Clipboard.SetText(diff.FileName);
+            }
+        }
+
+        private void CopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            if (resultsTreeView.SelectedItem is SerializableChunkDiff diff)
+            {
+                Clipboard.SetText(diff.Path);
             }
         }
 

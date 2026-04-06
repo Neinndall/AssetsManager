@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Wad;
@@ -18,6 +19,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Wad;
+using System.Threading;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -29,12 +31,13 @@ namespace AssetsManager.Views.Dialogs
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly AssetDownloader _assetDownloaderService;
         private readonly LogService _logService;
-        private readonly WadDifferenceService _wadDifferenceService;
+        private readonly WadDiffProvider _wadDiffProvider;
         private readonly WadPackagingService _wadPackagingService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private readonly DiffViewService _diffViewService;
         private readonly HashResolverService _hashResolverService;
         private readonly AppSettings _appSettings;
+        private readonly WadContentProvider _wadContentProvider;
 
         private string _oldPbePath;
         private string _newPbePath;
@@ -49,12 +52,13 @@ namespace AssetsManager.Views.Dialogs
             DirectoriesCreator directoriesCreator, 
             AssetDownloader assetDownloaderService, 
             LogService logService, 
-            WadDifferenceService wadDifferenceService, 
+            WadDiffProvider wadDiffProvider, 
             WadPackagingService wadPackagingService, 
             ComparisonHistoryService comparisonHistoryService,
             DiffViewService diffViewService, 
             HashResolverService hashResolverService, 
-            AppSettings appSettings)
+            AppSettings appSettings,
+            WadContentProvider wadContentProvider)
         {
             InitializeComponent();
             _viewModel = new WadComparisonResultModel();
@@ -65,20 +69,53 @@ namespace AssetsManager.Views.Dialogs
             _directoriesCreator = directoriesCreator;
             _assetDownloaderService = assetDownloaderService;
             _logService = logService;
-            _wadDifferenceService = wadDifferenceService;
+            _wadDiffProvider = wadDiffProvider;
             _wadPackagingService = wadPackagingService;
             _comparisonHistoryService = comparisonHistoryService;
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
             _appSettings = appSettings;
+            _wadContentProvider = wadContentProvider;
 
             // Peer Injection
             ResultsTree.ParentWindow = this;
 
             _viewModel.TreeModel.FilterChanged += OnTreeFilterChanged;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
             Loaded += WadComparisonResultWindow_Loaded;
             Closed += OnWindowClosed;
+        }
+
+        private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(WadComparisonResultModel.ActiveView))
+            {
+                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+                {
+                    _ = LoadGalleryThumbnailsAsync();
+                }
+            }
+        }
+
+        private async Task LoadGalleryThumbnailsAsync()
+        {
+            var itemsToLoad = _viewModel.DiscoveryItems.Where(i => i.ImagePreview == null).ToList();
+            if (!itemsToLoad.Any()) return;
+
+            foreach (var item in itemsToLoad)
+            {
+                try
+                {
+                    // Delegamos todo al servicio: extracción + procesado (TextureUtils)
+                    // Mantenemos el límite de 256px para optimizar memoria
+                    item.ImagePreview = await _wadContentProvider.GetDiffThumbnailAsync(item, _oldPbePath, _newPbePath, 256);
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to load gallery thumbnail for {item.Path}");
+                }
+            }
         }
 
         private void OnTreeFilterChanged(object sender, EventArgs e)
@@ -106,6 +143,12 @@ namespace AssetsManager.Views.Dialogs
 
             var wadGroups = PrepareGroupedResults(filtered);
             _viewModel.SetResults(filtered, wadGroups);
+
+            // If we are in Gallery mode, trigger thumbnail loading for newly visible filtered items
+            if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+            {
+                _ = LoadGalleryThumbnailsAsync();
+            }
         }
 
         public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string assignedFolderName = null)
@@ -162,6 +205,12 @@ namespace AssetsManager.Views.Dialogs
         }
 
         // --- Handle methods for direct peer communication ---
+
+        private void GlobalSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _viewModel.FilterText = globalSearchBox.Text;
+            ApplyFilters();
+        }
 
         public void HandleSearchTextChanged(string text)
         {

@@ -22,7 +22,7 @@ namespace AssetsManager.Services.Audio
 {
     public class AudioBankLinkerService
     {
-        private readonly WadExtractionService _wadExtractionService;
+        private readonly WadContentProvider _wadContentProvider;
         private readonly WadSearchBoxService _wadSearchBoxService;
         private readonly LogService _logService;
         private readonly TreeUIManager _treeUIManager;
@@ -30,14 +30,14 @@ namespace AssetsManager.Services.Audio
         private readonly WadNodeLoaderService _wadNodeLoaderService;
 
         public AudioBankLinkerService(
-            WadExtractionService wadExtractionService,
+            WadContentProvider wadContentProvider,
             WadSearchBoxService wadSearchBoxService,
             LogService logService,
             TreeUIManager treeUIManager,
             HashResolverService hashResolverService,
             WadNodeLoaderService wadNodeLoaderService)
         {
-            _wadExtractionService = wadExtractionService;
+            _wadContentProvider = wadContentProvider;
             _wadSearchBoxService = wadSearchBoxService;
             _logService = logService;
             _treeUIManager = treeUIManager;
@@ -101,7 +101,7 @@ namespace AssetsManager.Services.Audio
                         BackupChunkPath = binBackupChunkPath,
                         Type = NodeType.SoundBank
                     };
-                    binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
+                    binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
                     _logService.LogDebug($"[LinkAudioBankForDiffAsync] Loaded .bin data. Size: {binData?.Length ?? 0} bytes.");
 
                     if (clickedNode.FullPath.Contains("/characters/")) binType = BinType.Champion;
@@ -171,7 +171,7 @@ namespace AssetsManager.Services.Audio
 
                 if (binNode != null)
                 {
-                    binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
+                    binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
                     _logService.LogDebug($"[LinkAudioBankForDiffAsync] Live Mode: Loaded .bin data. Size: {binData?.Length ?? 0} bytes.");
                 }
                 else
@@ -207,7 +207,7 @@ namespace AssetsManager.Services.Audio
                 byte[] binData = null;
                 if (binNode != null)
                 {
-                    binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
+                    binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
                 }
                 else
                 {
@@ -233,7 +233,7 @@ namespace AssetsManager.Services.Audio
                 byte[] binData = null;
                 if (binNode != null)
                 {
-                    binData = await _wadExtractionService.GetVirtualFileBytesAsync(binNode);
+                    binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
                 }
                 else
                 {

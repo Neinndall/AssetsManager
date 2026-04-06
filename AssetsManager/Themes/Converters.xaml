@@ -15,11 +15,12 @@
     <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
     <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
     <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
-    <converters:EqualityToVisibilityConverter x:Key="EqualityToVisibilityConverter"/>
+    <converters:EqualityConverter x:Key="EqualityConverter"/>
     <converters:PathToIconConverter x:Key="PathToIconConverter"/>
     <converters:ChunkDiffTypeToBrushConverter x:Key="ChunkDiffTypeToBrushConverter"/>
     <converters:ValueMultiplierConverter x:Key="ValueMultiplierConverter"/>
     <converters:BooleanToMaterialIconConverter x:Key="BooleanToMaterialIconConverter"/>
+    <converters:StringCaseConverter x:Key="StringCaseConverter"/>
 
     <!-- 3. Specialized Parameterized Converters -->
     <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" 

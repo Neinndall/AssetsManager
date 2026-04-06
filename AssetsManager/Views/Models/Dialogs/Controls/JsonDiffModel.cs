@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Models.Dialogs.Controls
@@ -13,6 +14,18 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         private bool _isWordLevelDiff;
         private bool _hideUnchangedLines;
         private bool _isWordWrapEnabled;
+
+        // Metrics Properties
+        private int _insertionsCount;
+        private int _deletionsCount;
+        private int _modificationsCount;
+
+        // Metadata Properties
+        private string _oldSize;
+        private string _newSize;
+        private string _currentPath;
+        private string _currentLineText;
+        private int _currentLine = 1;
 
         // Batch Mode Properties
         private bool _isBatchMode;
@@ -43,6 +56,54 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             set { _isWordWrapEnabled = value; OnPropertyChanged(); }
         }
 
+        public int InsertionsCount
+        {
+            get => _insertionsCount;
+            set { _insertionsCount = value; OnPropertyChanged(); }
+        }
+
+        public int DeletionsCount
+        {
+            get => _deletionsCount;
+            set { _deletionsCount = value; OnPropertyChanged(); }
+        }
+
+        public int ModificationsCount
+        {
+            get => _modificationsCount;
+            set { _modificationsCount = value; OnPropertyChanged(); }
+        }
+
+        public string OldSize
+        {
+            get => _oldSize;
+            set { _oldSize = value; OnPropertyChanged(); }
+        }
+
+        public string NewSize
+        {
+            get => _newSize;
+            set { _newSize = value; OnPropertyChanged(); }
+        }
+
+        public string CurrentPath
+        {
+            get => _currentPath;
+            set { _currentPath = value; OnPropertyChanged(); }
+        }
+
+        public int CurrentLine
+        {
+            get => _currentLine;
+            set { _currentLine = value; OnPropertyChanged(); }
+        }
+
+        public string CurrentLineText
+        {
+            get => _currentLineText;
+            set { _currentLineText = value; OnPropertyChanged(); }
+        }
+
         public bool IsBatchMode
         {
             get => _isBatchMode;
@@ -52,20 +113,32 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public int CurrentFileIndex
         {
             get => _currentFileIndex;
-            set { _currentFileIndex = value; OnPropertyChanged(); }
+            set { _currentFileIndex = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
         }
 
         public int TotalFilesCount
         {
             get => _totalFilesCount;
-            set { _totalFilesCount = value; OnPropertyChanged(); }
+            set { _totalFilesCount = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
         }
+
+        public string TotalFilesCountString => $"{_currentFileIndex} / {_totalFilesCount}";
 
         // Playlist data
         public List<SerializableChunkDiff> BatchItems { get; set; }
         public string OldPbePath { get; set; }
         public string NewPbePath { get; set; }
         public Func<SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> LoadDataFunc { get; set; }
+
+        public void UpdateMetrics(string oldText, string newText)
+        {
+            // Note: Detailed metrics (ins/del/mod) are calculated in the Control 
+            // after the DiffPlex model is built.
+            
+            // Metadata Updates
+            OldSize = FormatUtils.FormatSize((ulong)(oldText?.Length ?? 0));
+            NewSize = FormatUtils.FormatSize((ulong)(newText?.Length ?? 0));
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

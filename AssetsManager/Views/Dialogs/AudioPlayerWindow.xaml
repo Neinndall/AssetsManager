@@ -7,7 +7,7 @@
         xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
         xmlns:audio="clr-namespace:AssetsManager.Services.Audio"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Title="Audio Player" Height="600" Width="440"
+        Height="600" Width="440"
         MinWidth="350" MinHeight="500"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource SidebarBackground}"

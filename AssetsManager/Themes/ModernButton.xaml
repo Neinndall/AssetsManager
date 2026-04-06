@@ -369,37 +369,6 @@
         </Setter>
     </Style>
 
-    <!-- [ViewerPanelControl.xaml] Botón toggle circular con fondo -->
-    <Style x:Key="IconToggleButton" TargetType="ToggleButton">
-        <Setter Property="Width" Value="21"/>
-        <Setter Property="Height" Value="21"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="border" 
-                            Background="{TemplateBinding Background}" 
-                            CornerRadius="12">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Opacity" Value="0.8"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="border" Property="Opacity" Value="0.6"/>
-                        </Trigger>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource TextSecondary}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <!-- [Toolbars] Botón de icono plano transparente -->
     <Style x:Key="TransparentIconButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
@@ -478,68 +447,6 @@
                     </Setter.Value>
                 </Setter>
                 <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-            </Trigger>
-        </Style.Triggers>
-    </Style>
-
-    <!-- [All Windows] Botones de control de ventana HUD (Refactorización definitiva) -->
-    <Style x:Key="HUDWindowButtonStyle" TargetType="Button">
-        <Setter Property="Width" Value="46"/>
-        <Setter Property="Height" Value="40"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="Focusable" Value="False"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="8" Margin="1,2">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <ContentPresenter.Resources>
-                                <Style TargetType="Path">
-                                    <Setter Property="Width" Value="10"/>
-                                    <Setter Property="Height" Value="10"/>
-                                    <Setter Property="Stretch" Value="Uniform"/>
-                                </Style>
-                            </ContentPresenter.Resources>
-                        </ContentPresenter>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <!-- Hover Estándar -->
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource HoverColor}"/>
-                        </Trigger>
-
-                        <!-- Especialización del Botón de CERRAR -->
-                        <!-- Detectamos por Command o por Nombre (cubriendo todas las versiones de MahApps) -->
-                        <Trigger Property="Name" Value="PART_Close">
-                            <Setter Property="Tag" Value="IsClose"/>
-                        </Trigger>
-                        
-                        <!-- Si el ratón está encima del botón de cerrar: Rojo + Redondeado de 11px -->
-                        <MultiTrigger>
-                            <MultiTrigger.Conditions>
-                                <Condition Property="IsMouseOver" Value="True"/>
-                                <Condition Property="Name" Value="PART_Close"/>
-                            </MultiTrigger.Conditions>
-                            <Setter TargetName="Bg" Property="Background" Value="#E81123"/>
-                            <Setter TargetName="Bg" Property="CornerRadius" Value="0,11,0,0"/>
-                            <Setter TargetName="Bg" Property="Margin" Value="0,0,0,1"/>
-                            <Setter Property="Foreground" Value="White"/>
-                        </MultiTrigger>
-
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bg" Property="Opacity" Value="0.7"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <Style x:Key="TitleBarButtonStyle" TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Foreground" Value="White"/>
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -999,6 +906,76 @@
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4"/>
                         </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- [WadComparisonResultWindow] Interactive Badge Style (Overlay Pattern) -->
+    <Style x:Key="DiagnosticBadgeToggleStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="Padding" Value="12,5"/>
+        <Setter Property="Margin" Value="0,0,8,0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid x:Name="RootGrid">
+                        <!-- 1. Background Layer (Constant SidebarBackground) -->
+                        <Border x:Name="BackgroundBorder" 
+                                Background="{TemplateBinding Background}" 
+                                CornerRadius="6"/>
+
+                        <!-- 2. Content Layer (Fixed Padding) -->
+                        <Border Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- 3. Overlay Border (Dynamic Stroke) -->
+                        <Border x:Name="InteractiveBorder"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                IsHitTestVisible="False"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- Hover State -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="BackgroundBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="InteractiveBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="InteractiveBorder" Property="BorderThickness" Value="1.5"/>
+                        </Trigger>
+                        
+                        <!-- Checked State (Active Filter) -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter Property="Opacity" Value="1.0"/>
+                            <Setter TargetName="InteractiveBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="InteractiveBorder" Property="BorderThickness" Value="1.5"/>
+                            <!-- Technical Glow -->
+                            <Setter Property="Effect">
+                                <Setter.Value>
+                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="{Binding Color, Source={StaticResource AccentBrush}}" Opacity="0.2"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+
+                        <!-- Unchecked State (Inactive Filter) -->
+                        <Trigger Property="IsChecked" Value="False">
+                            <Setter Property="Opacity" Value="0.6"/>
+                            <!-- Background stays SidebarBackground by default -->
+                        </Trigger>
+
+                        <!-- Recover Opacity on Hover even if unchecked -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsChecked" Value="False"/>
+                            </MultiTrigger.Conditions>
+                            <Setter Property="Opacity" Value="1.0"/>
+                        </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

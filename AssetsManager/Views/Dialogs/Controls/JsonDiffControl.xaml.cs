@@ -18,6 +18,7 @@ using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using ICSharpCode.AvalonEdit.Rendering;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
+using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs.Controls;
 
@@ -34,6 +35,8 @@ namespace AssetsManager.Views.Dialogs.Controls
         // Cache to prevent flickering
         private TextDocument _cachedOldDoc;
         private TextDocument _cachedNewDoc;
+        private bool _isSyncing;
+        private int _lastAbsoluteLine = 1;
         #endregion
 
         #region Properties
@@ -94,7 +97,116 @@ namespace AssetsManager.Views.Dialogs.Controls
                 // Ambos editores actualizan la guía (v3.2.1.0 style) para máxima robustez ante asincronismo
                 OldJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
                 NewJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
+
+                // Breadcrumb events
+                OldJsonContent.TextArea.Caret.PositionChanged += Caret_PositionChanged;
+                NewJsonContent.TextArea.Caret.PositionChanged += Caret_PositionChanged;
             };
+
+            UnifiedDiffEditor.Loaded += (s, e) =>
+            {
+                UnifiedDiffEditor.TextArea.Caret.PositionChanged += Caret_PositionChanged;
+            };
+        }
+
+        private void Caret_PositionChanged(object sender, EventArgs e)
+        {
+            if (sender is ICSharpCode.AvalonEdit.Editing.Caret caret)
+            {
+                UpdateJsonPath(caret.Line);
+            }
+        }
+
+        private void UpdateJsonPath(int line)
+        {
+            ViewModel.CurrentLine = line;
+            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            if (editor.Document == null) return;
+
+            try
+            {
+                var docLine = editor.Document.GetLineByNumber(line);
+                ViewModel.CurrentLineText = editor.Document.GetText(docLine).Trim();
+            }
+            catch { ViewModel.CurrentLineText = ""; }
+
+            ViewModel.CurrentPath = GetJsonPathAtLine(editor.Document, line);
+        }
+
+        private string GetJsonPathAtLine(TextDocument doc, int lineNumber)
+        {
+            try
+            {
+                if (doc == null || lineNumber <= 0) return "root";
+
+                var path = new List<string>();
+                int currentLineNum = lineNumber;
+                
+                // Heurística de escaneo ascendente
+                // 1. Empezamos buscando si la línea actual ya tiene una clave (ej: "key": "val")
+                var startLine = doc.GetLineByNumber(currentLineNum);
+                var startText = doc.GetText(startLine);
+                int lastIndent = GetIndentLevel(startText);
+
+                // Si la línea actual es una propiedad simple, la añadimos como primer segmento
+                string initialKey = ExtractKeyFromLine(startText);
+                if (!string.IsNullOrEmpty(initialKey)) path.Insert(0, initialKey);
+
+                while (currentLineNum > 1)
+                {
+                    currentLineNum--;
+                    var line = doc.GetLineByNumber(currentLineNum);
+                    var text = doc.GetText(line);
+                    int indent = GetIndentLevel(text);
+                    var trimmed = text.Trim();
+
+                    // Detectamos apertura de bloques con menor sangría
+                    if (indent < lastIndent && (trimmed.EndsWith("{") || trimmed.EndsWith("[")))
+                    {
+                        string key = ExtractKeyFromLine(trimmed);
+                        if (!string.IsNullOrEmpty(key))
+                        {
+                            path.Insert(0, key);
+                        }
+                        else if (trimmed.EndsWith("["))
+                        {
+                            path.Insert(0, "[]");
+                        }
+                        lastIndent = indent;
+                    }
+                    if (lastIndent <= 0) break;
+                }
+
+                return path.Count > 0 ? string.Join(" > ", path) : "root";
+            }
+            catch { return "root"; }
+        }
+
+        private string ExtractKeyFromLine(string text)
+        {
+            if (string.IsNullOrEmpty(text) || !text.Contains(":")) return null;
+            try
+            {
+                var parts = text.Split(':');
+                if (parts.Length > 0)
+                {
+                    return parts[0].Trim('"', ' ', '{', '[', ',');
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private int GetIndentLevel(string text)
+        {
+            int count = 0;
+            foreach (char c in text)
+            {
+                if (c == ' ') count++;
+                else if (c == '\t') count += 4;
+                else break;
+            }
+            return count;
         }
 
         private void Editor_GuideScrollChanged(object sender, EventArgs e)
@@ -168,6 +280,10 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                 _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
 
+                // Delegate to ViewModel
+                ViewModel.UpdateMetrics(oldText, newText);
+                UpdateChangeCounts();
+
                 await UpdateDiffView();
             }
             catch (Exception ex)
@@ -176,6 +292,48 @@ namespace AssetsManager.Views.Dialogs.Controls
                 ParentWindow?.Close();
             }
         }
+
+        private void UpdateChangeCounts()
+        {
+            // Calculate detailed metrics (One single pass over the built model)
+            int ins = 0, del = 0, mod = 0;
+            
+            if (_originalDiffModel?.NewText?.Lines != null)
+            {
+                foreach (var line in _originalDiffModel.NewText.Lines)
+                {
+                    switch (line.Type)
+                    {
+                        case ChangeType.Inserted: ins++; break;
+                        case ChangeType.Modified: mod++; break;
+                    }
+                }
+            }
+
+            if (_originalDiffModel?.OldText?.Lines != null)
+            {
+                foreach (var line in _originalDiffModel.OldText.Lines)
+                {
+                    if (line.Type == ChangeType.Deleted) del++;
+                }
+            }
+
+            ViewModel.InsertionsCount = ins;
+            ViewModel.DeletionsCount = del;
+            ViewModel.ModificationsCount = mod;
+        }
+
+        private void BtnCopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(ViewModel.CurrentPath))
+            {
+                Clipboard.SetText(ViewModel.CurrentPath);
+            }
+        }
+
+        private void JumpToInsertion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Inserted);
+        private void JumpToDeletion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Deleted);
+        private void JumpToModification_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Modified);
 
         public async Task LoadAndDisplayBatchDiffAsync(
             List<AssetsManager.Views.Models.Wad.SerializableChunkDiff> items,
@@ -413,12 +571,21 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async void HideUnchangedButton_Click(object sender, RoutedEventArgs e)
         {
-            _cachedOldDoc = null; // Force regeneration
-
             var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
-            double currentPercentage = GetCurrentScrollPercentage(editor);
             
-            await UpdateDiffView(currentPercentage, null);
+            // 1. Si vamos a OCULTAR (acaba de pasar a true), guardamos la línea real
+            if (ViewModel.HideUnchangedLines)
+            {
+                _lastAbsoluteLine = GetCurrentLineRobust(editor);
+                _cachedOldDoc = null;
+                await UpdateDiffView(GetCurrentScrollPercentage(editor), null);
+            }
+            else
+            {
+                // 2. Si vamos a MOSTRAR todo (acaba de pasar a false), restauramos la línea absoluta
+                _cachedOldDoc = null;
+                await UpdateDiffView(null, _lastAbsoluteLine);
+            }
         }
         #endregion
 
@@ -462,21 +629,36 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void SyncScroll(object sender, ICSharpCode.AvalonEdit.TextEditor target)
         {
-            if (target == null || target.TextArea?.TextView == null) return;
+            if (_isSyncing || target == null || target.TextArea?.TextView == null || !(sender is TextView sourceView)) return;
 
-            if (target == OldJsonContent) target.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
-            else target.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
+            // Identificar el editor de origen para obtener las métricas correctas
+            var sourceEditor = target == OldJsonContent ? NewJsonContent : OldJsonContent;
 
+            // FIX: Usar porcentajes para garantizar alineación visual perfecta (v3.2.1.0 style)
+            // ANOTACION: Fix "Crazy Jumps" at boundaries using Clamping (0.0-1.0) and Sync Flag.
+            double sourceMax = sourceEditor.ExtentHeight - sourceEditor.ViewportHeight;
+            double targetMax = target.ExtentHeight - target.ViewportHeight;
+
+            if (sourceMax <= 0) return;
+            
+            // Clamp percentage between 0 and 1 to prevent "crazy jumps" beyond boundaries
+            double percentage = Math.Max(0, Math.Min(sourceView.VerticalOffset / sourceMax, 1.0));
+            double targetOffset = targetMax * percentage;
+
+            // Only scroll if there's a meaningful change to avoid jitter
+            if (Math.Abs(target.VerticalOffset - targetOffset) < 0.5 && 
+                Math.Abs(target.HorizontalOffset - sourceView.HorizontalOffset) < 0.5) 
+                return;
+
+            _isSyncing = true;
             try
             {
-                var sourceView = (TextView)sender;
-                target.ScrollToVerticalOffset(sourceView.VerticalOffset);
+                target.ScrollToVerticalOffset(targetOffset);
                 target.ScrollToHorizontalOffset(sourceView.HorizontalOffset);
             }
             finally
             {
-                if (target == OldJsonContent) target.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
-                else target.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
+                _isSyncing = false;
             }
         }
 
@@ -501,6 +683,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 UnifiedDiffEditor.ScrollTo(lineNumber, 0);
                 UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
+                UpdateJsonPath(lineNumber);
                 return;
             }
 
@@ -509,6 +692,8 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             OldJsonContent.TextArea.Caret.Line = lineNumber;
             NewJsonContent.TextArea.Caret.Line = lineNumber;
+            
+            UpdateJsonPath(lineNumber);
             NewJsonContent.Focus();
         }
 

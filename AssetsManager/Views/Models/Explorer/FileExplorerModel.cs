@@ -25,6 +25,8 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isBusy;
         private bool _isTreeReady;
         private bool _isEmptyState;
+        private bool _isStandaloneMode = false;
+        private bool _isNoResultsFound;
         private bool _isWadMode = true; // Default WAD mode
         private bool _isBackupMode = false;
         private bool _isSortingEnabled = true;
@@ -38,6 +40,8 @@ namespace AssetsManager.Views.Models.Explorer
 
         private string _statusTitle;
         private string _statusDescription;
+        private string _searchNoResultsTitle;
+        private string _searchNoResultsDescription;
         private bool _isSelectDirectoryActionVisible;
 
         private FileSystemNodeModel _selectedItem;
@@ -50,6 +54,9 @@ namespace AssetsManager.Views.Models.Explorer
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true; // Start empty
+
+            SearchNoResultsTitle = "No Matching Results";
+            SearchNoResultsDescription = "Try adjusting your search or filters.";
         }
 
         public FileSystemNodeModel SelectedItem
@@ -100,18 +107,24 @@ namespace AssetsManager.Views.Models.Explorer
             set { _toolbar = value; OnPropertyChanged(); }
         }
 
+        public bool IsStandaloneMode
+        {
+            get => _isStandaloneMode;
+            set { _isStandaloneMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsToolbarVisible)); }
+        }
+
         public void UpdateEmptyState(bool isWadMode)
         {
             if (isWadMode)
             {
-                StatusTitle = "Select a LoL Directory";
-                StatusDescription = "Choose the root folder where you installed League of Legends to browse its WAD files.";
+                StatusTitle = "Asset explorer";
+                StatusDescription = "Select your LoL installation directory to start exploring game assets.";
                 IsSelectDirectoryActionVisible = true;
             }
             else
             {
-                StatusTitle = "Assets Directory Not Found";
-                StatusDescription = "The application could not find the directory for downloaded assets.";
+                StatusTitle = "Assets directory";
+                StatusDescription = "The local assets directory could not be found. Ensure you have extracted assets before exploring this mode.";
                 IsSelectDirectoryActionVisible = false;
             }
 
@@ -119,6 +132,7 @@ namespace AssetsManager.Views.Models.Explorer
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true;
+            IsStandaloneMode = false;
             OnPropertyChanged(nameof(IsToolbarVisible));
         }
 
@@ -132,6 +146,18 @@ namespace AssetsManager.Views.Models.Explorer
         {
             get => _statusDescription;
             set { if (_statusDescription != value) { _statusDescription = value; OnPropertyChanged(); } }
+        }
+
+        public string SearchNoResultsTitle
+        {
+            get => _searchNoResultsTitle;
+            set { if (_searchNoResultsTitle != value) { _searchNoResultsTitle = value; OnPropertyChanged(); } }
+        }
+
+        public string SearchNoResultsDescription
+        {
+            get => _searchNoResultsDescription;
+            set { if (_searchNoResultsDescription != value) { _searchNoResultsDescription = value; OnPropertyChanged(); } }
         }
 
         public bool IsSelectDirectoryActionVisible
@@ -260,6 +286,19 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
+        public bool IsNoResultsFound
+        {
+            get => _isNoResultsFound;
+            set 
+            { 
+                if (_isNoResultsFound != value) 
+                { 
+                    _isNoResultsFound = value; 
+                    OnPropertyChanged(); 
+                } 
+            }
+        }
+
         public bool IsWadMode
         {
             get => _isWadMode;
@@ -319,9 +358,9 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool IsFavoritesToggleVisible => IsWadMode && !IsBackupMode;
         
-        // Toolbar is visible if Tree is ready OR if we are NOT in WAD mode 
+        // Toolbar is visible if Tree is ready OR if we are NOT in WAD mode OR if we are in Standalone mode
         // (to allow switching back to WAD mode even if the directory is empty)
-        public bool IsToolbarVisible => IsTreeReady || !IsWadMode;
+        public bool IsToolbarVisible => IsTreeReady || !IsWadMode || IsStandaloneMode;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {

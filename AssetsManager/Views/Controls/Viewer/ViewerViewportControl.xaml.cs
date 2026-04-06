@@ -143,9 +143,27 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_activeSceneModel == null) return;
 
             _activeAnimationModel = animationModel;
-            _activeSceneModel.CurrentAnimation = animationModel.AnimationData.AnimationAsset;
-            _activeSceneModel.AnimationTime = 0;
-            _activeSceneModel.IsAnimationPaused = false;
+
+            if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
+            {
+                foreach (var model in _loadedModels)
+                {
+                    var animData = model.Animations.FirstOrDefault(a => a.Name == animationModel.Name);
+                    if (animData != null)
+                    {
+                        model.CurrentAnimation = animData.AnimationAsset;
+                        model.AnimationTime = 0;
+                        model.IsAnimationPaused = false;
+                    }
+                }
+            }
+            else
+            {
+                _activeSceneModel.CurrentAnimation = animationModel.AnimationData.AnimationAsset;
+                _activeSceneModel.AnimationTime = 0;
+                _activeSceneModel.IsAnimationPaused = false;
+            }
+
             _lastFrameTime = DateTime.Now;
 
             Panel?.SetAnimationPlayingState(animationModel, true);
@@ -155,14 +173,41 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_activeAnimationModel != animationToToggle) return;
 
-            _activeSceneModel.IsAnimationPaused = !_activeSceneModel.IsAnimationPaused;
+            bool newPausedState = !_activeSceneModel.IsAnimationPaused;
 
-            Panel?.SetAnimationPlayingState(_activeAnimationModel, !_activeSceneModel.IsAnimationPaused);
+            if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
+            {
+                foreach (var model in _loadedModels)
+                {
+                    if (model.CurrentAnimation != null)
+                    {
+                        model.IsAnimationPaused = newPausedState;
+                    }
+                }
+            }
+            else
+            {
+                _activeSceneModel.IsAnimationPaused = newPausedState;
+            }
+
+            Panel?.SetAnimationPlayingState(_activeAnimationModel, !newPausedState);
         }
 
         public void SeekAnimation(TimeSpan time)
         {
-            if (_activeSceneModel != null)
+            if (_activeSceneModel == null) return;
+
+            if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
+            {
+                foreach (var model in _loadedModels)
+                {
+                    if (model.CurrentAnimation != null)
+                    {
+                        model.AnimationTime = time.TotalSeconds;
+                    }
+                }
+            }
+            else
             {
                 _activeSceneModel.AnimationTime = time.TotalSeconds;
             }
@@ -177,10 +222,44 @@ namespace AssetsManager.Views.Controls.Viewer
                 Panel?.SetAnimationPlayingState(_activeAnimationModel, false);
             }
 
-            _activeSceneModel.CurrentAnimation = null;
+            if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
+            {
+                foreach (var model in _loadedModels)
+                {
+                    model.CurrentAnimation = null;
+                    model.AnimationTime = 0;
+                    model.IsAnimationPaused = true;
+                }
+            }
+            else
+            {
+                _activeSceneModel.CurrentAnimation = null;
+                _activeSceneModel.AnimationTime = 0;
+                _activeSceneModel.IsAnimationPaused = true;
+            }
+
             _activeAnimationModel = null;
-            _activeSceneModel.AnimationTime = 0;
-            _activeSceneModel.IsAnimationPaused = true;
+        }
+
+        public void RemoveAnimation(AnimationModel animationModel)
+        {
+            if (animationModel == null) return;
+
+            // 1. Stop if it's currently playing
+            if (_activeAnimationModel == animationModel)
+            {
+                StopAnimation();
+            }
+
+            // 2. Remove from all loaded models
+            foreach (var model in _loadedModels)
+            {
+                var animData = model.Animations.FirstOrDefault(a => a.Name == animationModel.Name);
+                if (animData != null)
+                {
+                    model.Animations.Remove(animData);
+                }
+            }
         }
 
         public void ResetScene()
@@ -282,31 +361,54 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
 
-            if (_animationPlayer != null && _activeSceneModel?.CurrentAnimation != null && _activeSceneModel.Skeleton != null && _activeSceneModel.SkinnedMesh != null)
+            if (_animationPlayer != null && _loadedModels.Count > 0)
             {
-                if (!_activeSceneModel.IsAnimationPaused)
+                // Synchronize playback timing across all models if enabled (v3.2.3.2)
+                // IMPORTANT: Only sync if the master model actually has an animation to sync from.
+                bool isPlaybackSync = Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true && 
+                                     _activeSceneModel != null && 
+                                     _activeSceneModel.CurrentAnimation != null;
+                
+                double masterTime = _activeSceneModel?.AnimationTime ?? 0;
+
+                foreach (var model in _loadedModels)
                 {
-                    var speed = _activeAnimationModel?.Speed ?? 1.0;
-                    _activeSceneModel.AnimationTime += deltaTime * speed;
-
-                    var duration = _activeSceneModel.CurrentAnimation.Duration;
-                    if (duration > 0 && _activeSceneModel.AnimationTime >= duration)
+                    if (model.CurrentAnimation != null && model.Skeleton != null && model.SkinnedMesh != null)
                     {
-                        _activeSceneModel.AnimationTime = 0;
-                    }
+                        if (isPlaybackSync && model != _activeSceneModel)
+                        {
+                            model.AnimationTime = masterTime;
+                            model.IsAnimationPaused = _activeSceneModel.IsAnimationPaused;
+                        }
+                        else if (!model.IsAnimationPaused)
+                        {
+                            var speed = _activeAnimationModel?.Speed ?? 1.0;
+                            model.AnimationTime += deltaTime * speed;
 
-                    Panel?.UpdateAnimationProgress(_activeSceneModel.AnimationTime);
+                            var duration = model.CurrentAnimation.Duration;
+                            if (duration > 0 && model.AnimationTime >= duration)
+                            {
+                                model.AnimationTime = 0;
+                            }
+                        }
+
+                        // Update skinning for all models that have an animation to ensure they are visible and moving
+                        _animationPlayer.Update(
+                            (float)model.AnimationTime,
+                            model.CurrentAnimation,
+                            model.Skeleton,
+                            model.SkinnedMesh,
+                            model.Parts.ToList(),
+                            model == _activeSceneModel ? _skeletonVisual : null,
+                            model == _activeSceneModel ? _jointsVisual : null
+                        );
+                    }
                 }
 
-                _animationPlayer.Update(
-                    (float)_activeSceneModel.AnimationTime,
-                    _activeSceneModel.CurrentAnimation,
-                    _activeSceneModel.Skeleton,
-                    _activeSceneModel.SkinnedMesh,
-                    _activeSceneModel.Parts.ToList(),
-                    _skeletonVisual,
-                    _jointsVisual
-                );
+                if (_activeSceneModel != null && _activeSceneModel.CurrentAnimation != null)
+                {
+                    Panel?.UpdateAnimationProgress(_activeSceneModel.AnimationTime);
+                }
             }
         }
 

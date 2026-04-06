@@ -4,20 +4,14 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Animation;
-using LeagueToolkit.Core.Mesh;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Core;
 using Material.Icons;
 using System.Threading.Tasks;
-using AssetsManager.Utils;
-using System.Windows.Media.Media3D;
 using AssetsManager.Views.Helpers;
-using System.Windows.Media;
-using System.Windows.Controls.Primitives;
 using System.Linq;
 
 namespace AssetsManager.Views.Controls.Viewer
@@ -73,9 +67,32 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     HandleSelectedModelChanged();
                 }
+                else if (e.PropertyName == nameof(ViewerPanelModel.IsAnimationSyncEnabled))
+                {
+                    if (_viewModel.IsAnimationSyncEnabled)
+                    {
+                        SyncLoadingForAllModels();
+                    }
+                }
             };
 
             Unloaded += (s, e) => Cleanup();
+        }
+
+        private void SyncLoadingForAllModels()
+        {
+            if (_viewModel.AnimationModels.Count == 0) return;
+
+            foreach (var model in _viewModel.LoadedModels)
+            {
+                foreach (var animModel in _viewModel.AnimationModels)
+                {
+                    if (!model.Animations.Any(a => a.Name == animModel.Name))
+                    {
+                        model.Animations.Add(animModel.AnimationData);
+                    }
+                }
+            }
         }
 
         private void HandleSelectedModelChanged()
@@ -161,6 +178,28 @@ namespace AssetsManager.Views.Controls.Viewer
                 else
                 {
                     ModelsListBox.SelectedIndex = 0;
+                }
+            }
+        }
+
+        private void DeleteAnimationButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is AnimationModel animationToDelete)
+            {
+                // 1. Remove from all model animation collections
+                Viewport?.RemoveAnimation(animationToDelete);
+
+                // 2. Remove from global UI collection
+                _viewModel.AnimationModels.Remove(animationToDelete);
+
+                if (_currentlyPlayingAnimation == animationToDelete)
+                {
+                    _currentlyPlayingAnimation = null;
+                }
+
+                if (_viewModel.SelectedAnimation == animationToDelete)
+                {
+                    _viewModel.SelectedAnimation = null;
                 }
             }
         }
@@ -325,9 +364,22 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 // Initialize Transform
                 newModel.PositionY = SceneElements.GroundLevel;
+                newModel.SourceType = string.IsNullOrEmpty(texturePath) ? "Model" : "Chroma";
 
                 Viewport?.AddModel(newModel);
                 _viewModel.SelectedModelParts = newModel.Parts;
+
+                // Sync current animations (v3.2.3.1)
+                if (_viewModel.IsAnimationSyncEnabled && _viewModel.AnimationModels.Count > 0)
+                {
+                    foreach (var animModel in _viewModel.AnimationModels)
+                    {
+                        if (!newModel.Animations.Any(a => a.Name == animModel.Name))
+                        {
+                            newModel.Animations.Add(animModel.AnimationData);
+                        }
+                    }
+                }
 
                 _viewModel.LoadedModels.Add(newModel);
                 _viewModel.SelectedModel = newModel;
@@ -390,8 +442,22 @@ namespace AssetsManager.Views.Controls.Viewer
                     var animationData = new AnimationData { AnimationAsset = animationAsset, Name = animationName };
                     var animationModel = new AnimationModel(animationData);
 
-                    _viewModel.SelectedModel.Animations.AddRange(new[] { animationData });
-                    _viewModel.AnimationModels.AddRange(new[] { animationModel });
+                    if (_viewModel.IsAnimationSyncEnabled)
+                    {
+                        foreach (var model in _viewModel.LoadedModels)
+                        {
+                            if (!model.Animations.Any(a => a.Name == animationName))
+                            {
+                                model.Animations.Add(animationData);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _viewModel.SelectedModel.Animations.Add(animationData);
+                    }
+
+                    _viewModel.AnimationModels.Add(animationModel);
                 }
             }
         }

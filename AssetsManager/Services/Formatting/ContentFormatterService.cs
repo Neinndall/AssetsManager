@@ -22,17 +22,17 @@ namespace AssetsManager.Services.Formatting
         private readonly CSSParserService _cssParserService;
         private readonly HashResolverService _hashResolverService;
         private readonly AudioBankService _audioBankService;
-        private readonly WadExtractionService _wadExtractionService;
+        private readonly WadContentProvider _wadContentProvider;
         private readonly JsonFormatterService _jsonFormatterService;
 
-        public ContentFormatterService(LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService, HashResolverService hashResolverService, AudioBankService audioBankService, WadExtractionService wadExtractionService, JsonFormatterService jsonFormatterService)
+        public ContentFormatterService(LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService, HashResolverService hashResolverService, AudioBankService audioBankService, WadContentProvider wadContentProvider, JsonFormatterService jsonFormatterService)
         {
             _logService = logService;
             _jsBeautifierService = jsBeautifierService;
             _cssParserService = cssParserService;
             _hashResolverService = hashResolverService;
             _audioBankService = audioBankService;
-            _wadExtractionService = wadExtractionService;
+            _wadContentProvider = wadContentProvider;
             _jsonFormatterService = jsonFormatterService;
         }
 
@@ -42,9 +42,9 @@ namespace AssetsManager.Services.Formatting
 
             try
             {
-                var wpkData = linkedBank.WpkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-                var audioBnkData = linkedBank.AudioBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
-                var eventsBnkData = linkedBank.EventsBnkNode != null ? await _wadExtractionService.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
+                var wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
+                var audioBnkData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
+                var eventsBnkData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
 
                 List<AudioEventNode> result;
                 if (linkedBank.BinData != null)
@@ -257,4 +257,3 @@ namespace AssetsManager.Services.Formatting
         }
     }
 }
-

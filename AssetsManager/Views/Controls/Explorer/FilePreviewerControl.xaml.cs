@@ -340,24 +340,33 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task LoadThumbnailsQueueAsync(ObservableRangeCollection<FileGridViewModel> items, CancellationToken ct)
         {
+            if (items == null || !items.Any()) return;
+
             foreach (var vm in items)
             {
                 if (ct.IsCancellationRequested) return;
 
-                if (SupportedFileTypes.Images.Contains(vm.Node.Extension) || 
-                    SupportedFileTypes.Textures.Contains(vm.Node.Extension) ||
-                    SupportedFileTypes.VectorImages.Contains(vm.Node.Extension))
+                try
                 {
-                    await LoadImagePreviewAsync(vm);
+                    if (SupportedFileTypes.Images.Contains(vm.Node.Extension) ||
+                        SupportedFileTypes.Textures.Contains(vm.Node.Extension) ||
+                        SupportedFileTypes.VectorImages.Contains(vm.Node.Extension))
+                    {
+                        await LoadImagePreviewAsync(vm);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogDebug($"Failed to load grid thumbnail for {vm.Node.Name}: {ex.Message}");
                 }
             }
         }
-
         private async Task LoadImagePreviewAsync(FileGridViewModel vm)
         {
             if (vm.ImagePreview != null) return;
 
-            var image = await ExplorerPreviewService.GetImagePreviewAsync(vm.Node);
+            // Aplicamos el estándar de 256px para optimizar la RAM en el GridView
+            var image = await ExplorerPreviewService.GetImagePreviewAsync(vm.Node, 256);
             if (image != null)
             {
                 vm.ImagePreview = image;

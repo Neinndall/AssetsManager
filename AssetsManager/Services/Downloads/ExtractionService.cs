@@ -17,8 +17,7 @@ namespace AssetsManager.Services.Downloads
         private readonly AppSettings _appSettings;
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly WadSavingService _wadSavingService;
-        private readonly WadExtractionService _wadExtractionService;
+        private readonly WadExportService _wadExportService;
 
         public event EventHandler<(string message, int totalFiles)> ExtractionStarted;
         public event EventHandler<(int extractedCount, int totalFiles, string message)> ExtractionProgressChanged;
@@ -28,14 +27,12 @@ namespace AssetsManager.Services.Downloads
             AppSettings appSettings,
             LogService logService,
             DirectoriesCreator directoriesCreator,
-            WadSavingService wadSavingService,
-            WadExtractionService wadExtractionService)
+            WadExportService wadExportService)
         {
             _appSettings = appSettings;
             _logService = logService;
             _directoriesCreator = directoriesCreator;
-            _wadSavingService = wadSavingService;
-            _wadExtractionService = wadExtractionService;
+            _wadExportService = wadExportService;
         }
 
         public async Task ExtractNewFilesFromComparisonAsync(
@@ -94,16 +91,10 @@ namespace AssetsManager.Services.Downloads
 
                     string extension = Path.GetExtension(node.Name).ToLower();
 
-                    if (extension == ".wpk" || extension == ".bnk")
-                    {
-                        // Raw copy for audio banks, ensuring it goes to the correct subdirectory
-                        await _wadExtractionService.ExtractNodeAsync(node, fileDestinationDirectory, cancellationToken);
-                    }
-                    else
-                    {
-                        // Smart saving for all other files, ensuring it goes to the correct subdirectory
-                        await _wadSavingService.ProcessAndSaveAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken);
-                    }
+                    // Decide mode based on type (Audio banks usually raw in this context)
+                    var mode = (extension == ".wpk" || extension == ".bnk") ? WadExportMode.Original : WadExportMode.Smart;
+
+                    await _wadExportService.ExportAsync(node, fileDestinationDirectory, mode, null, newLolPath, cancellationToken);
                 }
 
                 string relativePath = Path.Combine("AssetsDownloaded", Path.GetFileName(destinationRootPath));

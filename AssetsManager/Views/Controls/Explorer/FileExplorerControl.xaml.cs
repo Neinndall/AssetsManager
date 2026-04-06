@@ -32,19 +32,21 @@ namespace AssetsManager.Views.Controls.Explorer
     {
         public FilePreviewerControl FilePreviewer { get; set; }
 
-        public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "PinMenuItem");
-        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "AddToFavoritesMenuItem");
-        public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ViewChangesMenuItem");
-        public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ExtractMenuItem");
-        public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "SaveMenuItem");
-        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "AddToImageMergerMenuItem");
+        public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Pin to Tabs");
+        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "To Favorites");
+        public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString()?.Contains("Differences") == true || m.Header?.ToString()?.Contains("Changes") == true);
+        public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Extract");
+        public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Save");
+        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "To Image Merger");
+        public MenuItem CopyMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Copy");
 
         // Injected Services
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
-        public WadExtractionService WadExtractionService { get; set; }
-        public WadSavingService WadSavingService { get; set; }
+        public WadContentProvider WadContentProvider { get; set; }
+        public WadExportService WadExportService { get; set; }
         public WadSearchBoxService WadSearchBoxService { get; set; }
+        public WadNodeLoaderService WadNodeLoaderService { get; set; }
         public DiffViewService DiffViewService { get; set; }
         public DirectoriesCreator DirectoriesCreator { get; set; }
         public AppSettings AppSettings { get; set; }
@@ -286,7 +288,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        public async void HandleLoadComparison()
+        public async void HandleLoadBackup()
         {
             var openFileDialog = new CommonOpenFileDialog
             {
@@ -303,6 +305,49 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 await BuildTreeFromBackupAsync(openFileDialog.FileName);
             }
+        }
+
+        public async void HandleOpenStandaloneWad()
+        {
+            var openFileDialog = new CommonOpenFileDialog
+            {
+                Title = "Select a WAD file",
+                Filters = { 
+                    new CommonFileDialogFilter("WAD Files (*.wad.client, *.wad)", "*.wad.client;*.wad"), 
+                    new CommonFileDialogFilter("All files", "*.*") 
+                }
+            };
+
+            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                await LoadStandaloneWadAsync(openFileDialog.FileName);
+            }
+        }
+
+        public async Task LoadStandaloneWadAsync(string wadPath)
+        {
+            if (FilePreviewer != null)
+            {
+                await FilePreviewer.ResetToDefaultState();
+            }
+            await BuildStandaloneWadTreeAsync(wadPath);
+        }
+
+        private async Task BuildStandaloneWadTreeAsync(string wadPath)
+        {
+            _currentRootPath = wadPath;
+            NewLolPath = null;
+            OldLolPath = null;
+
+            await ExecuteTreeBuildInternalAsync(
+                async ct => await this.WadNodeLoaderService.LoadWadContentAsync(wadPath),
+                ExplorerLoadingState.LoadingWads,
+                "Failed to load standalone WAD file.",
+                false,
+                onSuccess: (nodes) => 
+                {
+                    _viewModel.IsStandaloneMode = true;
+                });
         }
 
         private async Task ExecuteTreeBuildInternalAsync(
@@ -401,13 +446,13 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async void TriggerExtractNodes(List<FileSystemNodeModel> nodes)
         {
-            if (WadExtractionService == null || nodes == null || nodes.Count == 0) return;
+            if (WadExportService == null || nodes == null || nodes.Count == 0) return;
             await ExecuteExtractionAsync(nodes);
         }
 
         public async void TriggerSaveNodes(List<FileSystemNodeModel> nodes)
         {
-            if (WadSavingService == null || nodes == null || nodes.Count == 0) return;
+            if (WadExportService == null || nodes == null || nodes.Count == 0) return;
             await ExecuteSaveAsync(nodes);
         }
 
@@ -419,9 +464,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (WadExtractionService == null)
+            if (WadExportService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "Extraction Service is not available.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "Wad Export Service is not available.", Window.GetWindow(this));
                 return;
             }
 
@@ -463,8 +508,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     // Show immediate activity
                     ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", 0));
 
-                    // Calculate total files for accurate progress
-                    int totalFiles = await WadExtractionService.CalculateTotalAsync(selectedNodes, cancellationToken);
+                    // Calculate total files for accurate progress (Original Mode)
+                    int totalFiles = await WadExportService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, WadExportMode.Original, cancellationToken);
                     
                     // Update with real total
                     ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", totalFiles));
@@ -474,10 +519,10 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         
-                        await WadExtractionService.ExtractNodeAsync(node, destinationPath, cancellationToken, (fileName) => 
+                        await WadExportService.ExportAsync(node, destinationPath, WadExportMode.Original, _viewModel.RootNodes, _currentRootPath, cancellationToken, (fileName) => 
                         {
                             processedCount++;
-                            ProgressUIManager?.OnExtractionProgressChanged(processedCount, totalFiles, fileName);
+                            ProgressUIManager?.OnExtractionProgressChanged(processedCount, totalFiles, Path.GetFileName(fileName));
                         });
                     }
 
@@ -493,7 +538,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
                     else
                     {
-                        string folderName = Path.GetFileName(destinationPath);
                         LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items", destinationPath, "Extracted Assets");
                     }
                     
@@ -511,7 +555,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 finally
                 {
                     ProgressUIManager?.OnExtractionCompleted();
-                    // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;
                 }
@@ -520,9 +563,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void SaveSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (WadSavingService == null)
+            if (WadExportService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "Wad Saving Service is not available.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "Wad Export Service is not available.", Window.GetWindow(this));
                 return;
             }
 
@@ -564,7 +607,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     // Show immediate activity
                     ProgressUIManager?.OnSavingStarted(0);
 
-                    int totalFiles = await WadSavingService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, cancellationToken);
+                    // Calculate total files for accurate progress (Smart Mode)
+                    int totalFiles = await WadExportService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, WadExportMode.Smart, cancellationToken);
                     
                     // Update with real total
                     ProgressUIManager?.OnSavingStarted(totalFiles);
@@ -578,7 +622,7 @@ namespace AssetsManager.Views.Controls.Explorer
                         cancellationToken.ThrowIfCancellationRequested();
 
                         var savedFiles = new List<string>();
-                        await WadSavingService.ProcessAndSaveAsync(node, destinationPath, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => 
+                        await WadExportService.ExportAsync(node, destinationPath, WadExportMode.Smart, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => 
                         {
                             processedCount++;
                             ProgressUIManager?.OnSavingProgressChanged(processedCount, totalFiles, Path.GetFileName(path));
@@ -616,7 +660,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
                     else
                     {
-                        string folderName = Path.GetFileName(destinationPath);
                         LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items", destinationPath, "Saved Assets");
                     }
 
@@ -634,7 +677,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 finally
                 {
                     ProgressUIManager?.OnSavingCompleted();
-                    // TaskCancellationManager is a singleton, its internal CancellationTokenSource is disposed by PrepareNewOperation()
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;
                 }
@@ -687,6 +729,22 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private void CopyName_Click(object sender, RoutedEventArgs e)
+        {
+            if (FileTreeView.SelectedItem is FileSystemNodeModel node)
+            {
+                Clipboard.SetText(node.Name);
+            }
+        }
+
+        private void CopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            if (FileTreeView.SelectedItem is FileSystemNodeModel node)
+            {
+                Clipboard.SetText(node.FullPath);
+            }
+        }
+
         private void AddToFavorites_Click(object sender, RoutedEventArgs e)
         {
             if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode)
@@ -728,7 +786,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     byte[] data = null;
                     if (node.Type == NodeType.VirtualFile)
-                        data = await WadExtractionService.GetVirtualFileBytesAsync(node);
+                        data = await WadContentProvider.GetVirtualFileBytesAsync(node);
                     else if (node.Type == NodeType.RealFile)
                         data = await File.ReadAllBytesAsync(node.FullPath);
 
@@ -813,35 +871,18 @@ namespace AssetsManager.Views.Controls.Explorer
             _viewModel.SelectedNodes = new ObservableCollection<FileSystemNodeModel>(
                 TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, selectedNode));
 
-            if (ExtractMenuItem is not null)
-            {
-                ExtractMenuItem.IsEnabled = _viewModel.IsWadMode;
-            }
+            if (ExtractMenuItem != null) ExtractMenuItem.IsEnabled = _viewModel.IsWadMode;
+            if (SaveMenuItem != null) SaveMenuItem.IsEnabled = _viewModel.IsWadMode;
+            if (PinMenuItem != null) PinMenuItem.IsEnabled = selectedNode.Type != NodeType.RealDirectory && selectedNode.Type != NodeType.VirtualDirectory && selectedNode.Type != NodeType.WadFile;
+            if (AddToFavoritesMenuItem != null) AddToFavoritesMenuItem.IsEnabled = _viewModel.IsWadMode && !_viewModel.IsBackupMode; 
 
-            if (SaveMenuItem is not null)
+            if (ViewChangesMenuItem != null)
             {
-                SaveMenuItem.IsEnabled = _viewModel.IsWadMode;
-            }
-
-            if (PinMenuItem is not null)
-            {
-                PinMenuItem.IsEnabled = selectedNode.Type != NodeType.RealDirectory && selectedNode.Type != NodeType.VirtualDirectory && selectedNode.Type != NodeType.WadFile;
-            }
-
-            if (AddToFavoritesMenuItem is not null)
-            {
-                // Favorites are only supported in pure WAD Mode (not Backup, not Directory)
-                 AddToFavoritesMenuItem.IsEnabled = _viewModel.IsWadMode && !_viewModel.IsBackupMode; 
-            }
-
-            if (ViewChangesMenuItem is not null)
-            {
-                // Leverage ViewModel logic but assign manually to the Header/IsEnabled
                 ViewChangesMenuItem.Header = _viewModel.ViewChangesHeader;
                 ViewChangesMenuItem.IsEnabled = _viewModel.CanViewChanges;
             }
 
-            if (AddToImageMergerMenuItem is not null)
+            if (AddToImageMergerMenuItem != null)
             {
                 AddToImageMergerMenuItem.IsEnabled = (SupportedFileTypes.Images.Contains(selectedNode.Extension) || SupportedFileTypes.Textures.Contains(selectedNode.Extension)) && 
                                                     (selectedNode.Type == NodeType.VirtualFile || selectedNode.Type == NodeType.RealFile);
@@ -932,10 +973,21 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
+        {
+            await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
+        }
+
         private async void SearchTimer_Tick(object sender, EventArgs e)
         {
             _searchTimer.Stop();
             string searchText = _viewModel.Toolbar.SearchText;
+
+            // CRITICAL: Immediate UI feedback when clearing search
+            if (string.IsNullOrEmpty(searchText))
+            {
+                _viewModel.IsNoResultsFound = false;
+            }
 
             if (FilePreviewer != null)
             {
@@ -943,6 +995,17 @@ namespace AssetsManager.Views.Controls.Explorer
             }
 
             var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, LoadAllChildrenForSearch);
+
+            // Update No Results found UI after search completes
+            if (!string.IsNullOrEmpty(searchText))
+            {
+                _viewModel.IsNoResultsFound = _viewModel.RootNodes.All(n => !n.IsVisible);
+            }
+            else
+            {
+                // Already set above, but ensuring consistency
+                _viewModel.IsNoResultsFound = false;
+            }
 
             if (nodeToSelect != null)
             {
@@ -962,11 +1025,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     }), DispatcherPriority.ContextIdle);
                 }
             }
-        }
-
-        private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
-        {
-            await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
         }
 
         public void SelectNode(FileSystemNodeModel node)

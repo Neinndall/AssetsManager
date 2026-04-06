@@ -22,5 +22,14 @@ namespace AssetsManager.Utils
             }
             return $"Expires in {remaining.Minutes}m";
         }
+
+        public static string FormatSize(ulong sizeInBytes)
+        {
+            if (sizeInBytes < 1024) return $"{sizeInBytes} B";
+            double sizeInKB = (double)sizeInBytes / 1024.0;
+            if (sizeInKB < 1024) return $"{sizeInKB:F1} KB";
+            double sizeInMB = sizeInKB / 1024.0;
+            return $"{sizeInMB:F1} MB";
+        }
     }
 }

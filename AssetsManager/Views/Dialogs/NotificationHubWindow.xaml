@@ -18,98 +18,132 @@
     <Window.Resources>
         <!-- DataTemplate for Notifications -->
         <DataTemplate DataType="{x:Type models:NotificationModel}">
-            <Border x:Name="NotificationBorder" 
-                    Background="{StaticResource CardBackground}" 
-                    CornerRadius="6" 
-                    Margin="0,0,0,8" 
-                    BorderBrush="{StaticResource BorderColor}" 
-                    BorderThickness="1"
-                    Padding="12"
-                    Cursor="Hand">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                        <ColumnDefinition Width="*"/>    <!-- Content -->
-                        <ColumnDefinition Width="Auto"/> <!-- Close -->
-                    </Grid.ColumnDefinitions>
+            <Grid Margin="0,0,0,10" Cursor="Hand">
+                <!-- 1. Background Layer -->
+                <Border x:Name="NotificationBackground" 
+                        Background="{StaticResource CardBackground}" 
+                        CornerRadius="8"/>
 
-                    <!-- 1. Semantic Icon -->
-                    <materialIcons:MaterialIcon Grid.Column="0" Width="16" Height="16" VerticalAlignment="Top" Margin="0,2,12,0">
-                        <materialIcons:MaterialIcon.Style>
-                            <Style TargetType="materialIcons:MaterialIcon">
-                                <Setter Property="Kind" Value="InformationOutline"/>
-                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Type}" Value="Success">
-                                        <Setter Property="Kind" Value="CheckCircle"/>
-                                        <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding Type}" Value="Warning">
-                                        <Setter Property="Kind" Value="AlertCircle"/>
-                                        <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding Type}" Value="Error">
-                                        <Setter Property="Kind" Value="CloseCircle"/>
-                                        <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </materialIcons:MaterialIcon.Style>
-                    </materialIcons:MaterialIcon>
+                <!-- 2. Content Layer (Fixed Padding, never shifts) -->
+                <Border Padding="16,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/> <!-- 0: Icon -->
+                            <ColumnDefinition Width="*"/>    <!-- 1: Body -->
+                            <ColumnDefinition Width="Auto"/> <!-- 2: Close -->
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Row 0: Header (Icon + Title + Time) -->
+                            <RowDefinition Height="*"/>    <!-- Row 1: Message -->
+                        </Grid.RowDefinitions>
 
-                    <!-- 2. Content Column -->
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,2">
-                        <TextBlock Text="{Binding Title}" 
-                                   FontWeight="SemiBold" 
-                                   FontSize="13" 
-                                   Foreground="{StaticResource TextPrimary}" 
-                                   TextTrimming="CharacterEllipsis"
-                                   Margin="0,0,0,2"/>
-                        
-                        <TextBlock Text="{Binding Message}" 
-                                   FontSize="12" 
-                                   Foreground="{StaticResource TextSecondary}" 
-                                   TextWrapping="Wrap"
-                                   LineHeight="18"/>
-                    </StackPanel>
-
-                    <!-- 3. Meta Column (Timestamp Centered) -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                        <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm'}" 
-                                   FontSize="11" 
-                                   Foreground="{StaticResource TextMuted}" 
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,12,0"/>
-
-                        <!-- 4. Remove Button -->
-                        <Button Style="{StaticResource TransparentIconButton}" 
-                                Width="24" Height="24" 
-                                VerticalAlignment="Center" 
-                                Click="RemoveNotification_Click"
-                                ToolTip="Dismiss">
-                            <Button.Resources>
+                        <!-- 1. Technical Icon (Aligned with Title line) -->
+                        <materialIcons:MaterialIcon Grid.Row="0" Grid.Column="0" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,12,0">
+                            <materialIcons:MaterialIcon.Style>
                                 <Style TargetType="materialIcons:MaterialIcon">
-                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                    <Setter Property="Kind" Value="InformationOutline"/>
+                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
-                                            <Setter Property="Foreground" Value="White"/>
-                                            <Setter Property="Opacity" Value="1"/>
+                                        <DataTrigger Binding="{Binding Type}" Value="Success">
+                                            <Setter Property="Kind" Value="CheckCircleOutline"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Type}" Value="Warning">
+                                            <Setter Property="Kind" Value="AlertOutline"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Type}" Value="Error">
+                                            <Setter Property="Kind" Value="CloseCircleOutline"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Button.Resources>
-                            <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14" Opacity="0.6"/>
-                        </Button>
-                    </StackPanel>
-                </Grid>
-            </Border>
+                            </materialIcons:MaterialIcon.Style>
+                        </materialIcons:MaterialIcon>
+
+                        <!-- 2. Header: Title - Time (Perfectly aligned with Icon) -->
+                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
+                            <TextBlock Text="{Binding Title, Converter={StaticResource StringCaseConverter}}" 
+                                       FontWeight="Black" 
+                                       FontSize="11" 
+                                       Foreground="{StaticResource TextMuted}" 
+                                       VerticalAlignment="Center"/>
+                            
+                            <TextBlock Text="-" 
+                                       FontSize="11" 
+                                       Foreground="{StaticResource TextMuted}" 
+                                       Margin="6,0" 
+                                       Opacity="0.5"
+                                       VerticalAlignment="Center"/>
+
+                            <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm'}" 
+                                       FontSize="11" 
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextMuted}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        
+                        <!-- 3. Main Message (Below Header) -->
+                        <TextBlock Grid.Row="1" Grid.Column="1" 
+                                   Text="{Binding Message}" 
+                                   FontSize="12" 
+                                   Foreground="{StaticResource TextPrimary}" 
+                                   TextWrapping="Wrap"
+                                   LineHeight="15"
+                                   LineStackingStrategy="BlockLineHeight"
+                                   Opacity="0.85"/>
+
+                        <!-- 4. Close Action (Centered vertically in the whole card) -->
+                        <Grid Grid.Column="2" Grid.RowSpan="2" VerticalAlignment="Center" Margin="16,0,0,0">
+                            <Button Style="{StaticResource TransparentIconButton}" 
+                                    Width="24" Height="24" 
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="RemoveNotification_Click"
+                                    ToolTip="Dismiss">
+                                <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14" Opacity="0.4"/>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- 3. Border Overlay (Changes thickness without shifting layout) -->
+                <Border x:Name="NotificationBorder" 
+                        BorderBrush="{StaticResource BorderColor}" 
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        IsHitTestVisible="False"/>
+            </Grid>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsRead}" Value="False">
                     <Setter TargetName="NotificationBorder" Property="BorderThickness" Value="1.5"/>
                     <Setter TargetName="NotificationBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                 </DataTrigger>
+                <!-- Type-specific accents for Unread status -->
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsRead}" Value="False"/>
+                        <Condition Binding="{Binding Type}" Value="Success"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="NotificationBorder" Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsRead}" Value="False"/>
+                        <Condition Binding="{Binding Type}" Value="Warning"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="NotificationBorder" Property="BorderBrush" Value="{StaticResource AccentOrange}"/>
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsRead}" Value="False"/>
+                        <Condition Binding="{Binding Type}" Value="Error"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="NotificationBorder" Property="BorderBrush" Value="{StaticResource AccentRed}"/>
+                </MultiDataTrigger>
+                
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="NotificationBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                    <Setter TargetName="NotificationBackground" Property="Background" Value="{StaticResource HoverColor}"/>
                 </Trigger>
             </DataTemplate.Triggers>
         </DataTemplate>

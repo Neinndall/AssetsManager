@@ -25,14 +25,14 @@ namespace AssetsManager.Services.Viewer
     {
         private readonly LogService _logService;
         private readonly HashResolverService _hashResolverService;
-        private readonly WadExtractionService _wadExtractionService;
+        private readonly WadContentProvider _wadContentProvider;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
 
-        public MapGeometryLoadingService(LogService logService, HashResolverService hashResolverService, WadExtractionService wadExtractionService, WadNodeLoaderService wadNodeLoaderService)
+        public MapGeometryLoadingService(LogService logService, HashResolverService hashResolverService, WadContentProvider wadContentProvider, WadNodeLoaderService wadNodeLoaderService)
         {
             _logService = logService;
             _hashResolverService = hashResolverService;
-            _wadExtractionService = wadExtractionService;
+            _wadContentProvider = wadContentProvider;
             _wadNodeLoaderService = wadNodeLoaderService;
         }
 

@@ -19,7 +19,7 @@ namespace AssetsManager.Views
         public ExplorerWindow(
             LogService logService,
             CustomMessageBoxService customMessageBoxService,
-            WadExtractionService wadExtractionService,
+            WadContentProvider wadContentProvider,
             WadSearchBoxService wadSearchBoxService,
             DirectoriesCreator directoriesCreator,
             ExplorerPreviewService explorerPreviewService,
@@ -29,19 +29,20 @@ namespace AssetsManager.Views
             TreeUIManager treeUIManager,
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
-            WadSavingService wadSavingService,
+            WadExportService wadExportService,
+            WadNodeLoaderService wadNodeLoaderService,
             HashResolverService hashResolverService,
             TaskCancellationManager taskCancellationManager,
             FavoritesManager favoritesManager,
             ImageMergerService imageMergerService,
-            ProgressUIManager progressUIManager
-        )
+            ProgressUIManager progressUIManager)
         {
             InitializeComponent();
             FileExplorer.LogService = logService;
             FileExplorer.CustomMessageBoxService = customMessageBoxService;
-            FileExplorer.WadExtractionService = wadExtractionService;
-            FileExplorer.WadSavingService = wadSavingService;
+            FileExplorer.WadContentProvider = wadContentProvider;
+            FileExplorer.WadExportService = wadExportService;
+            FileExplorer.WadNodeLoaderService = wadNodeLoaderService;
             FileExplorer.WadSearchBoxService = wadSearchBoxService;
             FileExplorer.DiffViewService = diffViewService;
             FileExplorer.DirectoriesCreator = directoriesCreator;

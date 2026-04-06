@@ -19,8 +19,9 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/> <!-- Toolbar -->
+            <RowDefinition Height="*"/>    <!-- Main Editors -->
+            <RowDefinition Height="Auto"/> <!-- JSON Path Breadcrumb -->
         </Grid.RowDefinitions>
 
         <!-- Professional Toolbar Area (Sub-header) -->
@@ -46,6 +47,34 @@
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
+                            <!-- INSIGHTS SECTION (Metrics) -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,12,0">
+                                <TextBlock Text="INSIGHTS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,12,0"/>
+                                
+                                <Border Background="#1A00E676" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Insertion" MouseLeftButtonDown="JumpToInsertion_Click" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal">
+                                        <icons:MaterialIcon Kind="Plus" Width="12" Height="12" Foreground="{StaticResource AccentGreen}" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding InsertionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="#1AFF5252" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Deletion" MouseLeftButtonDown="JumpToDeletion_Click" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal">
+                                        <icons:MaterialIcon Kind="Minus" Width="12" Height="12" Foreground="{StaticResource AccentRed}" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding DeletionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentRed}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="#1A5C85FF" CornerRadius="4" Padding="6,2" ToolTip="Jump to first Modification" MouseLeftButtonDown="JumpToModification_Click" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal">
+                                        <icons:MaterialIcon Kind="EditOutline" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding ModificationsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="0,0,12,0" VerticalAlignment="Center" Opacity="0.8"/>
+
                             <!-- FILES SECTION (Playlist) - Only visible in Batch Mode -->
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsBatchMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Text="FILES" Style="{StaticResource ToolSectionLabel}" Margin="4,0,8,0"/>
@@ -139,7 +168,7 @@
         </Border>
 
         <!-- Main Content -->
-        <Grid Grid.Row="1" Margin="24">
+        <Grid Grid.Row="1" Margin="24,14,24,0">
             <!-- Diff Grid -->
             <Grid x:Name="DiffGrid" Visibility="{Binding IsInlineMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
@@ -165,6 +194,7 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     
                                     <Border Background="#1AFF9100" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
@@ -172,7 +202,13 @@
                                     </Border>
                                     
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                                                    <TextBlock Text="OLD VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>                                        <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="OLD VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>
+                                        <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+
+                                    <!-- Technical Actions -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding OldSize, FallbackValue='0 KB'}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -201,6 +237,7 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     
                                     <Border Background="#1A00E676" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
@@ -208,7 +245,13 @@
                                     </Border>
                                     
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                                                    <TextBlock Text="NEW VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>                                        <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="NEW VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>
+                                        <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+
+                                    <!-- Technical Actions -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding NewSize, FallbackValue='0 KB'}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -283,5 +326,39 @@
                 </Grid>
             </Border>
         </Grid>
+
+        <!-- Bottom Info Bar (Breadcrumbs / JSON Path) -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,6">
+            <Grid>
+                <StackPanel Orientation="Horizontal">
+                    <!-- LINE INDICATOR -->
+                    <icons:MaterialIcon Kind="LineScan" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
+                    <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <Run Text="Line "/><Run Text="{Binding CurrentLine, FallbackValue='1'}"/>
+                    </TextBlock>
+
+                    <!-- SEPARATOR -->
+                    <Border Width="1" Height="12" Background="{StaticResource BorderColor}" Margin="0,0,12,0" VerticalAlignment="Center" Opacity="0.5"/>
+
+                    <!-- PATH INDICATOR (Now showing Full Line Content) -->
+                    <icons:MaterialIcon Kind="CodeBraces" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" Opacity="0.8"/>
+                    <TextBlock Text="{Binding CurrentLineText, FallbackValue='root'}" 
+                               FontSize="10" 
+                               FontWeight="SemiBold" 
+                               Foreground="{StaticResource TextPrimary}" 
+                               VerticalAlignment="Center" 
+                               Opacity="0.9"
+                               TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+
+                <Button HorizontalAlignment="Right"
+                        Click="BtnCopyPath_Click"
+                        Style="{StaticResource TransparentIconButton}"
+                        Width="26" Height="26"
+                        ToolTip="Copy JSON Path">
+                    <icons:MaterialIcon Kind="ContentCopy" Width="12" Height="12"/>
+                </Button>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

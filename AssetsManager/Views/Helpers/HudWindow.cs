@@ -10,7 +10,16 @@ namespace AssetsManager.Views.Helpers
     public class HudWindow : Window
     {
         public static readonly DependencyProperty HeaderTitleProperty =
-            DependencyProperty.Register("HeaderTitle", typeof(string), typeof(HudWindow), new PropertyMetadata(""));
+            DependencyProperty.Register("HeaderTitle", typeof(string), typeof(HudWindow), 
+                new PropertyMetadata("", OnHeaderTitleChanged));
+
+        private static void OnHeaderTitleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is HudWindow window && e.NewValue is string newTitle)
+            {
+                window.Title = newTitle;
+            }
+        }
 
         public static readonly DependencyProperty HeaderIconProperty =
             DependencyProperty.Register("HeaderIcon", typeof(MaterialIconKind), typeof(HudWindow), new PropertyMetadata(MaterialIconKind.WindowMaximize));

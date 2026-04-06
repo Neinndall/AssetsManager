@@ -42,16 +42,26 @@
                         <TextBlock Text="Filter by alias or URL." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                     </StackPanel>
 
-                    <!-- Input (Fixed Clipping) -->
-                    <TextBox x:Name="txtSearch" 
-                             Grid.Column="2"
-                             Style="{StaticResource StandardSearchBoxStyle}" 
-                             Width="180" 
-                             MinHeight="34"
-                             VerticalAlignment="Center"
-                             VerticalContentAlignment="Center"
-                             TextChanged="TxtSearch_TextChanged" 
-                             Tag="Filter..."/>
+                    <!-- Input (Search Hub Integration - Aligned with 44px Icon Box) -->
+                    <Border Grid.Column="2" 
+                            Background="{StaticResource SidebarBackground}" 
+                            BorderBrush="{StaticResource BorderColor}" 
+                            BorderThickness="1" 
+                            CornerRadius="10" 
+                            Padding="0"
+                            Width="200" Height="44"
+                            VerticalAlignment="Center">
+                        <Grid>
+                            <TextBox x:Name="txtSearch" 
+                                     Style="{StaticResource ResourceKey=StandardSearchBoxStyle}" 
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="12,0"
+                                     VerticalContentAlignment="Center"
+                                     TextChanged="TxtSearch_TextChanged" 
+                                     Tag="Search monitors..."/>
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
 

@@ -46,7 +46,7 @@
         <Setter Property="Visibility" Value="Collapsed"/>
     </Style>
 
-    <!-- Global MenuItem Style - Minimalist HUD -->
+    <!-- Global MenuItem Style - Minimalist HUD with Submenu Support -->
     <Style TargetType="MenuItem">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
@@ -59,57 +59,101 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="Border"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="4"
-                            Margin="3,0.5"
-                            SnapsToDevicePixels="True">
-                        <Grid MinHeight="{TemplateBinding MinHeight}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="28" SharedSizeGroup="MenuItemIcon"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto" SharedSizeGroup="MenuItemGesture"/>
-                                <ColumnDefinition Width="20" SharedSizeGroup="MenuItemArrow"/>
-                            </Grid.ColumnDefinitions>
+                    <Grid>
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Margin="3,0.5"
+                                SnapsToDevicePixels="True">
+                            <Grid MinHeight="{TemplateBinding MinHeight}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="28" SharedSizeGroup="MenuItemIcon"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MenuItemGesture"/>
+                                    <ColumnDefinition Width="20" SharedSizeGroup="MenuItemArrow"/>
+                                </Grid.ColumnDefinitions>
 
-                            <!-- Icon Layer -->
-                            <ContentPresenter x:Name="Icon" 
-                                            ContentSource="Icon"
-                                            Grid.Column="0" 
-                                            VerticalAlignment="Center" 
-                                            HorizontalAlignment="Center"
-                                            Width="14" 
-                                            Height="14"/>
-                            
-                            <!-- Main Text -->
-                            <ContentPresenter Grid.Column="1" 
-                                            ContentSource="Header" 
-                                            RecognizesAccessKey="True" 
-                                            VerticalAlignment="Center"
-                                            Margin="4,0,8,0"/>
-                            
-                            <!-- Shortcut Hint -->
-                            <TextBlock x:Name="GestureText" 
-                                     Grid.Column="2" 
-                                     Text="{TemplateBinding InputGestureText}"
-                                     VerticalAlignment="Center" 
-                                     Margin="12,0,8,0"
-                                     FontSize="10.5"
-                                     Foreground="{StaticResource TextSecondary}"
-                                     Opacity="0.5"/>
-                            
-                            <!-- Submenu Arrow -->
-                            <Path x:Name="ArrowPath"
-                                Grid.Column="3"
-                                Data="M0,0 L3,3 L0,6 z"
-                                Fill="{StaticResource TextSecondary}"
-                                VerticalAlignment="Center"
-                                HorizontalAlignment="Center"
-                                Visibility="Collapsed"/>
-                        </Grid>
-                    </Border>
+                                <!-- Icon Layer -->
+                                <ContentPresenter x:Name="Icon" 
+                                                ContentSource="Icon"
+                                                Grid.Column="0" 
+                                                VerticalAlignment="Center" 
+                                                HorizontalAlignment="Center"
+                                                Width="14" 
+                                                Height="14"/>
+                                
+                                <!-- Main Text -->
+                                <ContentPresenter Grid.Column="1" 
+                                                ContentSource="Header" 
+                                                RecognizesAccessKey="True" 
+                                                VerticalAlignment="Center"
+                                                Margin="4,0,8,0"/>
+                                
+                                <!-- Shortcut Hint -->
+                                <TextBlock x:Name="GestureText" 
+                                         Grid.Column="2" 
+                                         Text="{TemplateBinding InputGestureText}"
+                                         VerticalAlignment="Center" 
+                                         Margin="12,0,8,0"
+                                         FontSize="10.5"
+                                         Foreground="{StaticResource TextSecondary}"
+                                         Opacity="0.5"/>
+                                
+                                <!-- Submenu Arrow -->
+                                <Path x:Name="ArrowPath"
+                                    Grid.Column="3"
+                                    Data="M0,0 L3,3 L0,6 z"
+                                    Fill="{StaticResource TextSecondary}"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Submenu Popup -->
+                        <Popup x:Name="PART_Popup"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                               Placement="Right"
+                               PopupAnimation="Fade"
+                               VerticalOffset="-4"
+                               HorizontalOffset="-2">
+                            <Grid x:Name="SubmenuGrid">
+                                <!-- Shadow Layer -->
+                                <Border Background="Transparent" CornerRadius="6" Margin="4">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" Direction="270" ShadowDepth="2" Opacity="0.4" BlurRadius="12"/>
+                                    </Border.Effect>
+                                </Border>
+
+                                <Border Background="{StaticResource DarkBackground}"
+                                        BorderBrush="{StaticResource BorderColor}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Margin="4"
+                                        SnapsToDevicePixels="True">
+                                    <ScrollViewer x:Name="SubMenuScrollViewer" Style="{DynamicResource {ComponentResourceKey ResourceId=MenuScrollViewer, TypeInTargetAssembly={x:Type FrameworkElement}}}">
+                                        <Grid RenderOptions.ClearTypeHint="Enabled">
+                                            <Canvas Height="0" Width="0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                <Rectangle x:Name="OpaqueRect" 
+                                                         Fill="{Binding Background, ElementName=Border}" 
+                                                         Height="{Binding ActualHeight, ElementName=PART_Popup}" 
+                                                         Width="{Binding ActualWidth, ElementName=PART_Popup}"/>
+                                            </Canvas>
+                                            <ItemsPresenter x:Name="ItemsPresenter" 
+                                                          KeyboardNavigation.DirectionalNavigation="Cycle" 
+                                                          Grid.IsSharedSizeScope="True" 
+                                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" 
+                                                          KeyboardNavigation.TabNavigation="Cycle"/>
+                                        </Grid>
+                                    </ScrollViewer>
+                                </Border>
+                            </Grid>
+                        </Popup>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <!-- Hover: Clean Background Change -->
                         <Trigger Property="IsHighlighted" Value="True">

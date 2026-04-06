@@ -9,12 +9,22 @@ using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models.Viewer
 {
     public class SceneModel : INotifyPropertyChanged, IDisposable
     {
-        public string Name { get; set; }
+        private string _name = "New Model";
+        public string Name
+        {
+            get => _name;
+            set
+            {
+                SetField(ref _name, PathUtils.TruncateAtDot(value));
+            }
+        }
+        public string SourceType { get; set; } = "Model"; // "Model" or "Chroma"
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
 
@@ -71,7 +81,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public RigResource Skeleton { get; set; }
         public IAnimationAsset CurrentAnimation { get; set; }
-        public bool IsAnimationPaused { get; set; }
+        public bool IsAnimationPaused { get; set; } = true;
         public double AnimationTime { get; set; }
 
         private bool _areAllPartsVisible = true;
@@ -107,7 +117,6 @@ namespace AssetsManager.Views.Models.Viewer
 
         public SceneModel()
         {
-            Name = "New Model";
             RootVisual = new ModelVisual3D();
             UpdateTransform();
             Parts = new ObservableRangeCollection<ModelPart>();

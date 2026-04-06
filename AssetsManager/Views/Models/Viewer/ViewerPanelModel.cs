@@ -21,6 +21,8 @@ namespace AssetsManager.Views.Models.Viewer
         // --- UI State Properties (v3.2.2.0) ---
         private bool _isChromaGalleryVisible = false;
         private bool _isMainContentVisible = false;
+        private bool _isAnimationSyncEnabled = false;
+        private bool _isAnimationPlaybackSyncEnabled = false;
         private ViewerViewportModel _viewportViewModel;
 
         // --- Data Collections ---
@@ -32,6 +34,18 @@ namespace AssetsManager.Views.Models.Viewer
 
         public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
+
+        public bool IsAnimationSyncEnabled
+        {
+            get => _isAnimationSyncEnabled;
+            set { if (_isAnimationSyncEnabled != value) { _isAnimationSyncEnabled = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsAnimationPlaybackSyncEnabled
+        {
+            get => _isAnimationPlaybackSyncEnabled;
+            set { if (_isAnimationPlaybackSyncEnabled != value) { _isAnimationPlaybackSyncEnabled = value; OnPropertyChanged(); } }
+        }
 
         public ObservableRangeCollection<ModelPart> SelectedModelParts
         {

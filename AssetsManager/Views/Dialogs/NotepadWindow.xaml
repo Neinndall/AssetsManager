@@ -7,7 +7,7 @@
         xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
         xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Title="Notepad" Height="500" Width="400"
+        Height="500" Width="400"
         MinWidth="400" MinHeight="300"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource SidebarBackground}"

@@ -16,16 +16,24 @@ namespace AssetsManager.Services.Core
     public class GitHubApiService
     {
         private readonly HttpClient _httpClient;
+        private readonly LogService _logService;
         private const string RepoOwner = "Neinndall";
         private const string RepoName = "AssetsManager";
         private const string UserAgent = "AssetsManager-Update-Client";
 
-        public GitHubApiService()
+        // ETag Caching
+        private readonly Dictionary<string, string> _etags = new Dictionary<string, string>();
+        private readonly Dictionary<string, object> _cachedData = new Dictionary<string, object>();
+
+        public GitHubApiService(HttpClient httpClient, LogService logService)
         {
-            _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
-            // Optional: If you have a GitHub token for higher rate limits
-            // _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "YOUR_TOKEN");
+            _httpClient = httpClient;
+            _logService = logService;
+
+            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
+            {
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
+            }
         }
 
         /// <summary>
@@ -33,15 +41,46 @@ namespace AssetsManager.Services.Core
         /// </summary>
         public async Task<List<GitHubCommit>> GetCommitsAsync(string branch = "qa", int count = 20)
         {
+            string cacheKey = $"commits_{branch}_{count}";
+            string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/commits?sha={branch}&per_page={count}";
+
             try
             {
-                string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/commits?sha={branch}&per_page={count}";
-                var commits = await _httpClient.GetFromJsonAsync<List<GitHubCommit>>(url);
-                return commits ?? new List<GitHubCommit>();
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                if (_etags.TryGetValue(cacheKey, out var etag))
+                {
+                    request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+                }
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotModified && _cachedData.ContainsKey(cacheKey))
+                {
+                    return (List<GitHubCommit>)_cachedData[cacheKey];
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                if (response.Headers.ETag != null)
+                {
+                    _etags[cacheKey] = response.Headers.ETag.Tag;
+                }
+
+                var commits = await response.Content.ReadFromJsonAsync<List<GitHubCommit>>();
+                var result = commits ?? new List<GitHubCommit>();
+                
+                _cachedData[cacheKey] = result;
+                return result;
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to fetch GitHub commits for {RepoName} on branch {Branch}", RepoName, branch);
+                _logService.LogError(ex, $"Failed to fetch GitHub commits for {RepoName} on branch {branch}");
+                
+                if (_cachedData.TryGetValue(cacheKey, out var cached))
+                {
+                    return (List<GitHubCommit>)cached;
+                }
+                
                 return new List<GitHubCommit>();
             }
         }
@@ -51,14 +90,44 @@ namespace AssetsManager.Services.Core
         /// </summary>
         public async Task<GitHubRelease> GetReleaseAsync(string tag)
         {
+            string cacheKey = $"release_{tag}";
+            string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/tags/{tag}";
+
             try
             {
-                string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/tags/{tag}";
-                return await _httpClient.GetFromJsonAsync<GitHubRelease>(url);
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                if (_etags.TryGetValue(cacheKey, out var etag))
+                {
+                    request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+                }
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotModified && _cachedData.ContainsKey(cacheKey))
+                {
+                    return (GitHubRelease)_cachedData[cacheKey];
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                if (response.Headers.ETag != null)
+                {
+                    _etags[cacheKey] = response.Headers.ETag.Tag;
+                }
+
+                var release = await response.Content.ReadFromJsonAsync<GitHubRelease>();
+                _cachedData[cacheKey] = release;
+                return release;
             }
             catch (Exception ex)
             {
-                Log.Warning("Release with tag {Tag} not found: {Message}", tag, ex.Message);
+                _logService.LogWarning($"Release with tag {tag} not found or error: {ex.Message}");
+
+                if (_cachedData.TryGetValue(cacheKey, out var cached))
+                {
+                    return (GitHubRelease)cached;
+                }
+
                 return null;
             }
         }
@@ -68,18 +137,121 @@ namespace AssetsManager.Services.Core
         /// </summary>
         public async Task<List<GitHubAsset>> GetAllAssetsAsync()
         {
-            var allAssets = new List<GitHubAsset>();
+            string cacheKey = "all_assets";
+            string releasesUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases?per_page=30";
+
             try
             {
-                string releasesUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases?per_page=30";
-                var releases = await _httpClient.GetFromJsonAsync<List<GitHubRelease>>(releasesUrl);
-                if (releases != null) allAssets.AddRange(releases.SelectMany(r => r.Assets));
+                var request = new HttpRequestMessage(HttpMethod.Get, releasesUrl);
+                if (_etags.TryGetValue(cacheKey, out var etag))
+                {
+                    request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+                }
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotModified && _cachedData.ContainsKey(cacheKey))
+                {
+                    return (List<GitHubAsset>)_cachedData[cacheKey];
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                if (response.Headers.ETag != null)
+                {
+                    _etags[cacheKey] = response.Headers.ETag.Tag;
+                }
+
+                var releases = await response.Content.ReadFromJsonAsync<List<GitHubRelease>>();
+                var allAssets = releases?.SelectMany(r => r.Assets).ToList() ?? new List<GitHubAsset>();
+                
+                _cachedData[cacheKey] = allAssets;
                 return allAssets;
             }
             catch (Exception ex)
             {
-                Log.Warning("Failed to fetch all releases: {Message}", ex.Message);
-                return allAssets;
+                _logService.LogWarning($"Failed to fetch all releases: {ex.Message}");
+                
+                if (_cachedData.TryGetValue(cacheKey, out var cached))
+                {
+                    return (List<GitHubAsset>)cached;
+                }
+
+                return new List<GitHubAsset>();
+            }
+        }
+
+        /// <summary>
+        /// Fetches commits and automatically links them with their direct or inherited builds.
+        /// Centralizes revision domain logic in the service layer for a cleaner architecture.
+        /// </summary>
+        public async Task<List<GitHubCommit>> GetEnrichedCommitsAsync(string branch = "qa", string releaseTag = "qa-testing", int count = 20)
+        {
+            try
+            {
+                // 1. Fetch raw data
+                var commits = await GetCommitsAsync(branch, count);
+                var release = await GetReleaseAsync(releaseTag);
+                var assets = release?.Assets?.OrderByDescending(a => a.CreatedAt).ToList() ?? new List<GitHubAsset>();
+
+                // 2. Direct Linking
+                foreach (var commit in commits)
+                {
+                    commit.DownloadableAsset = assets.FirstOrDefault(a => 
+                        !string.IsNullOrEmpty(commit.Sha) && a.Name.Contains(commit.Sha, StringComparison.OrdinalIgnoreCase));
+                    
+                    commit.IsLatest = commits.IndexOf(commit) == 0;
+                }
+
+                // 3. Build Inheritance Logic
+                // Links commits without a direct ZIP to the nearest future build containing their changes.
+                GitHubAsset currentActiveAsset = null;
+                string currentActiveSha = null;
+
+                foreach (var commit in commits.OrderByDescending(c => c.Commit.Author.Date))
+                {
+                    if (commit.DownloadableAsset != null)
+                    {
+                        currentActiveAsset = commit.DownloadableAsset;
+                        currentActiveSha = commit.ShortSha;
+                    }
+                    else if (currentActiveAsset != null)
+                    {
+                        commit.ParentBuildAsset = currentActiveAsset;
+                        commit.ParentBuildSha = currentActiveSha;
+                    }
+                }
+
+                // 4. Virtual Commits for Orphaned Assets
+                // Ensures builds that don't have a corresponding commit in the recent list are still visible.
+                foreach (var asset in assets)
+                {
+                    bool isOrphan = !commits.Any(c => c.DownloadableAsset?.DownloadUrl == asset.DownloadUrl);
+                    if (isOrphan)
+                    {
+                        string sha = asset.Name.Replace(".zip", "");
+                        if (sha.Contains("qa_")) sha = sha.Split("qa_").Last();
+                        
+                        commits.Add(new GitHubCommit
+                        {
+                            Sha = sha,
+                            Commit = new CommitInfo 
+                            { 
+                                Message = $"Build found in QA release ({asset.Name})",
+                                Author = new CommitAuthor { Name = "GitHub Action", Date = asset.CreatedAt }
+                            },
+                            DownloadableAsset = asset,
+                            IsLatest = false
+                        });
+                    }
+                }
+
+                return commits.OrderByDescending(c => c.Commit.Author.Date).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to fetch enriched GitHub commits");
+                return new List<GitHubCommit>();
             }
         }
     }
@@ -102,6 +274,9 @@ namespace AssetsManager.Services.Core
 
         // Local helper for UI to link with a build asset
         public GitHubAsset DownloadableAsset { get; set; }
+        public GitHubAsset ParentBuildAsset { get; set; }
+        public string ParentBuildSha { get; set; }
+        public bool HasInheritedBuild => DownloadableAsset == null && ParentBuildAsset != null;
         public bool IsLatest { get; set; }
         public string ShortSha => Sha?.Substring(0, 7) ?? "";
     }

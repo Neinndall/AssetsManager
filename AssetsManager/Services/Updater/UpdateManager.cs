@@ -11,6 +11,7 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
+using AssetsManager.Info;
 
 namespace AssetsManager.Services.Updater
 {
@@ -66,17 +67,24 @@ namespace AssetsManager.Services.Updater
                 Version currentVer = new Version(parsedCurrentVersion);
                 Version latestVer = new Version(parsedLatestVersion);
 
-                if (latestVer.CompareTo(currentVer) > 0)
+                bool isNewer = latestVer.CompareTo(currentVer) > 0;
+                bool isExperimentalToStable = ApplicationInfos.IsQA;
+
+                if (isNewer || isExperimentalToStable)
                 {
+                    string message = isExperimentalToStable && !isNewer 
+                        ? $"A stable version {latestVersionRaw} is available. Do you want to return to the stable branch?" 
+                        : $"New version available {latestVersionRaw}. Do you want to download it?";
+
                     bool? result = _customMessageBoxService.ShowYesNo(
                         "Update available",
-                        $"New version available {latestVersionRaw}. Do you want to download it?",
+                        message,
                         owner
                     );
 
                     if (result == true)
                     {
-                        string fileName = $"PBE_AssetsDownloader_{latestVersionRaw}.zip";
+                        string fileName = $"AssetsManager_{latestVersionRaw}.zip";
                         string downloadPath = Path.Combine(_directoriesCreator.UpdateCachePath, fileName);
 
                         // Check if the file already exists and has the correct size
@@ -190,7 +198,7 @@ namespace AssetsManager.Services.Updater
 
                 progressWindow.Dispatcher.Invoke(() =>
                 {
-                    progressWindow.SetProgress(0, $"Downloading {shortSha} ({downloadSize})...");
+                    progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
                 });
 
                 using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
@@ -245,6 +253,9 @@ namespace AssetsManager.Services.Updater
             }
         }
 
+        private string _lastReleaseEtag;
+        private string _lastLatestVersionRaw;
+
         public async Task<(bool, string)> IsNewVersionAvailableAsync()
         {
             string currentVersionRaw = Assembly.GetExecutingAssembly().GetName().Version.ToString();
@@ -254,9 +265,34 @@ namespace AssetsManager.Services.Updater
 
             try
             {
-                var response = await _httpClient.GetStringAsync(apiUrl);
-                var releaseData = JsonConvert.DeserializeObject<dynamic>(response);
-                string latestVersionRaw = releaseData.tag_name;
+                var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+                if (!string.IsNullOrEmpty(_lastReleaseEtag))
+                {
+                    request.Headers.TryAddWithoutValidation("If-None-Match", _lastReleaseEtag);
+                }
+
+                var response = await _httpClient.SendAsync(request);
+
+                string latestVersionRaw;
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotModified && !string.IsNullOrEmpty(_lastLatestVersionRaw))
+                {
+                    latestVersionRaw = _lastLatestVersionRaw;
+                }
+                else
+                {
+                    response.EnsureSuccessStatusCode();
+                    
+                    if (response.Headers.ETag != null)
+                    {
+                        _lastReleaseEtag = response.Headers.ETag.Tag;
+                    }
+
+                    var content = await response.Content.ReadAsStringAsync();
+                    var releaseData = JsonConvert.DeserializeObject<dynamic>(content);
+                    latestVersionRaw = releaseData.tag_name;
+                    _lastLatestVersionRaw = latestVersionRaw;
+                }
 
                 string parsedCurrentVersion = Regex.Match(currentVersionRaw, @"\d+(\.\d+){1,3}").Value;
                 string parsedLatestVersion = Regex.Match(latestVersionRaw.ToString(), @"\d+(\.\d+){1,3}").Value;
@@ -269,7 +305,7 @@ namespace AssetsManager.Services.Updater
                 Version currentVer = new Version(parsedCurrentVersion);
                 Version latestVer = new Version(parsedLatestVersion);
 
-                if (latestVer.CompareTo(currentVer) > 0)
+                if (latestVer.CompareTo(currentVer) > 0 || ApplicationInfos.IsQA)
                 {
                     return (true, latestVersionRaw);
                 }

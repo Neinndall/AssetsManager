@@ -470,36 +470,38 @@ namespace AssetsManager.Services.Explorer
             return childrenToAdd;
         }
 
-        /// <summary>
-        /// Quick load of WAD file names without deep analysis.
-        /// </summary>
         public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadWadContentAsync(string wadPath)
         {
             var nodes = await Task.Run(() =>
             {
-                var fileNodes = new ObservableRangeCollection<FileSystemNodeModel>();
+                var resultNodes = new ObservableRangeCollection<FileSystemNodeModel>();
                 if (!File.Exists(wadPath))
                 {
-                    return fileNodes;
+                    return resultNodes;
                 }
 
                 try
                 {
                     using (var wadFile = new WadFile(wadPath))
                     {
+                        // Create a virtual root to build the tree structure
+                        var virtualRoot = new FileSystemNodeModel("Root", true, "", wadPath);
+
                         foreach (var chunk in wadFile.Chunks.Values)
                         {
                             string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
                             if (string.IsNullOrEmpty(virtualPath) || virtualPath == chunk.PathHash.ToString("x16"))
                             {
-                                virtualPath = chunk.PathHash.ToString("x16");
+                                virtualPath = chunk.PathHash.ToString("x16"); // Just the hash as the name
                             }
 
-                            var fileNode = new FileSystemNodeModel(Path.GetFileName(virtualPath), false, virtualPath, wadPath)
-                            {
-                                SourceChunkPathHash = chunk.PathHash
-                            };
-                            fileNodes.Add(fileNode);
+                            AddNodeToVirtualTree(virtualRoot, virtualPath, wadPath, chunk.PathHash);
+                        }
+
+                        // Return the top-level nodes (folders/files at root of virtual path)
+                        foreach (var child in virtualRoot.Children)
+                        {
+                            resultNodes.Add(child);
                         }
                     }
                 }
@@ -507,7 +509,7 @@ namespace AssetsManager.Services.Explorer
                 {
                     _logService.LogError($"Failed to load WAD content at '{wadPath}': {ex.Message}");
                 }
-                return fileNodes;
+                return resultNodes;
             });
 
             return nodes;
