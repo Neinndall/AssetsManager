@@ -1,3 +1,86 @@
+AssetsManager - League of Legends | v3.2.4.0
+
+MEDIUM UPDATE
+This update introduces standalone WAD support, a professional animation synchronization system, and advanced diagnostic tools for JSON analysis. It features a significant optimization of the viewer interface and a unified global diagnostic hub, providing a faster and more consistent experience for asset exploration and comparison.
+
+New Features
+  - Explorer / Standalone WAD Support
+    * Added the ability to open and explore individual .wad.client and .wad files directly from the toolbar.
+  - Viewer / Animation Management
+    * Added "Sync Anims": a new professional synchronization mode that replicates playback state (Play/Pause/Time) across all loaded models in the scene.
+    * Added the ability to remove animations from the viewer list.
+  - Explorer / Advanced Search
+    * Added the ability to search for files by their extension (e.g., .png, .bnk) for faster filtering.
+    * Added a new informative screen that automatically appears when a search finds no results.
+  - Explorer / Context Menu
+    * Improved the context menu with new quick-copy options for file names and paths.
+  - Update System
+    * Optimized the update system to reduce data consumption and improve response speed.
+    * Improved build discovery in the commit history: older changes are now reliably linked to the nearest installation package through a new professional inheritance logic.
+    * Added automatic detection between stable and experimental (QA) versions.
+    * New alerts to facilitate returning to the stable version from trial versions.
+    * Simplified the download progress interface by removing unnecessary technical information.
+  - GitHub Integration
+    * Added support for personal GitHub tokens in advanced settings for users requiring higher query limits.
+  - User Interface
+    * Improved the menu system with support for smoother and more elegant native submenus.
+  - JSON Diff Analysis Tools
+    * Added "Real-time Metrics": a new diagnostic capsule showing total Insertions, Deletions, and Modifications in the toolbar.
+    * Added "Smart Navigation": clicking on metrics now automatically jumps to the first occurrence of that change type.
+    * New technical headers: version cards now show file size for better traceability.
+    * Added "Contextual Breadcrumb": a new bottom bar that shows the current line number and full line content (key-value) in real-time, optimized for large files.
+
+Improvements
+  - Viewer / Studio Interface Optimization
+    * Re-engineered the Hierarchy list into a high-density single-line layout, significantly reducing vertical footprint.
+    * Implemented **Dynamic Source Labeling**: the hierarchy now automatically distinguishes between "Model" and "Chroma" assets.
+    * Improved Hierarchy readability: model names are now automatically shortened by removing redundant technical suffixes (truncation at the first dot) for a cleaner look.
+    * Redesigned the **Bottom Action Bar** into a compact horizontal toolstrip (36px height), reclaiming vertical space for inspector tools.
+    * Refined UI precision: achieved mathematically perfect horizontal and vertical centering for action buttons and eliminated redundant tooltips.
+  - User Interface / Consistency
+    * Unified the font sizes and layout of all informational screens and welcome messages for a more professional look.
+  - Notification Hub
+    * Improved the notification design for more comfortable reading and a cleaner visual layout.
+    * Added color indicators by alert type (Success, Warning, Error) for instant visual identification.
+  - Performance
+    * Improved overall history query performance using a persistent local cache system.
+    * Integrated unified sequential loading (1 by 1) for thumbnails in both GridView and Gallery, ensuring maximum stability and low resource impact.
+    * Optimized global memory footprint by applying a 256px limit to all file discovery thumbnails.
+  - Comparison Results / Global Diagnostic Hub
+    * Promoted the search box and status filters to the **Global Toolbar**: search and filter assets instantly across Hierarchy, Gallery, and Overview without switching views.
+    * Implemented **Interactive Diagnostic Badges**: converted static counters into smart ToggleButtons with high-fidelity HUD effects (1.5px dynamic borders and technical glow).
+    * Updated status filter icons to match the project's color standards: **Modified** is now Blue and **Renamed** is now Orange for better visual consistency with the file tree.
+    * Integrated "Search Hub" Design: unified the global searcher and status filters into a single professional tool capsule with a dedicated search icon and technical separators.
+    * Improved Gallery Experience: cleaned up the visual discovery grid by removing redundant selection states for a more fluid browsing experience.
+  - Comparison Results / User Experience
+    * Unified the loading experience: added a loading indicator when viewing differences for multiple files (Batch Mode), ensuring consistent feedback for both single and multiple assets (Images/Text/Audio).
+  - Explorer / Search Bar Precision
+    * Refined the search box layout by adjusting the caret margin (6px) and placeholder positioning (14px) for a more balanced and professional HUD aesthetic.
+  - Text Comparison Engine
+    * Upgraded scroll synchronization to use percentage-based offsets (v3.2.1.0 style), ensuring perfect alignment between documents of different scales.
+    * Improved position persistence: toggling the "Hide Unchanged Lines" tool now reliably maintains your current line position in the full document.
+    * Optimized UI layout: reduced vertical margins to maximize editor height and achieved better visual symmetry.
+    * Cleaned up the interface by removing redundant copy buttons, centralizing actions in the smart breadcrumb bar.
+    * Centralized file size formatting logic across the entire application for maximum technical consistency.
+
+Bug Fixes
+  - Viewer / Sync Anims Stability
+    * Fixed a bug where animations would auto-resume when switching models due to incorrect default pause states.
+    * Fixed a playback reset issue where animation time was forced to 0 when switching to a model without animations while "Sync Anims" was active.
+  - Notification Hub / Visual Stability
+    * Fixed a small visual jump that occurred in the notification content when marking it as read.
+  - Settings / Path Selection Reactivity
+    * Fixed a bug where selected client directory paths were not visible in the interface until the settings window was reopened.
+  - Explorer / Search Visibility Fluidity
+    * Optimized the "No results" overlay response time to ensure it disappears instantly when search filters are cleared, improving tree navigation transitions.
+  - Text Comparison / Stability
+    * Fixed "Crazy Jumps": resolved a historical bug where document views would jitter or jump when reaching the bottom boundaries using Clamping and Sync Flags.
+    * Fixed a feedback loop in scroll synchronization that occurred during high-speed manual scrolling.
+  - Model Management / Data Integrity
+    * Fixed a logic error in the comparison model where certain size properties were incorrectly handled after refactoring.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v3.2.3.1
 
 HOTFIX UPDATE
@@ -341,13 +424,142 @@ Bug Fixes
 AssetsManager - League of Legends | v3.2.0.0
 
 MAJOR UPDATE
-Landmark update redefining core infrastructure with parallel synchronization and a professional Universal Converter.
+This landmark update redefines the core infrastructure of AssetsManager, introducing a new era of performance and versatility. Version 3.1.1.0 delivers a high-speed parallel synchronization engine, a professional Universal Converter for image and audio assets, and a complete re-engineering of the hash loading system for near-instant startup. Combined with a redesigned Audio Player and deep architectural refinements, this release sets a new standard for stability, speed, and professional asset management.
 
 New Features
   - Explorer / MVVM State Management
-    * Fully migrated "Empty State" UI to the MVVM pattern.
-  - Home / Universal Converter
-    * High-performance engine supporting mixed image and audio queues.
+    * Fully migrated the "Empty State" UI (No Directory/Assets Found) to the MVVM pattern: all titles, descriptions, and action visibility are now managed by the **FileExplorerModel**.
+    * Implemented dynamic placeholder resolution: the UI now automatically updates its context-aware messaging based on the active mode (WAD vs. Directory) via clean data binding.
+  - Explorer / Unified Tree Orchestration
+    * Engineered a high-performance generic orchestrator (`ExecuteTreeBuildInternalAsync`) to handle all tree construction workflows (WAD, Directory, Backup).
+    * Centralized common "ceremony": unified loading states, cancellation management, and error handling across all exploration modes, reducing code duplication by 60%.
+  - System / Natural Progress Telemetry
+    * Standardized progress messaging: implemented a natural language format (`Action N of M: File`) across the entire application for superior legibility.
+    * Improved dynamic naming: progress titles now correctly reflect the active operation (e.g., "Verifying", "Saving") without redundant punctuation.
+  - System / Atomic Hash Protection
+    * Implemented a robust temporary file system (`.tmp`) for hash downloads. Local hash databases are now protected from corruption during network failures or unexpected application closures.
+  - Network / Parallel Hash Engine
+    * Engineered a high-speed download orchestrator using `Task.WhenAll`, enabling simultaneous acquisition of all pending hash files (Game, LCU, Bin, RST) to maximize bandwidth utilization.
+  - Utils / Texture Processing
+    * Extended **TextureUtils** with native JPEG encoding support, including quality-level optimization for asset extraction.
+  - Explorer / Image Merger Suite
+    * Implemented the brand new **Image Merger** tool: a dedicated workspace for creating image grids (Contact Sheets) from game assets.
+    * Integrated Real-Time Composition: users can adjust grid columns and margins with instant visual feedback in the preview area.
+    * High-Performance Rendering: engineered the merging engine using **DrawingVisual** and **RenderTargetBitmap** for ultra-fast, memory-efficient image processing.
+    * Professional Export: enabled high-quality PNG extraction with automatic default path resolution to the Desktop.
   - System / Optimized Performance Engine
-    * **Fast Mode Engine:** Advanced Reflection for near-instant WAD comparisons.
-    * **Blake3 Integration:** industry-leading hashing performance.
+    * **Fast Mode Engine:** Re-engineered the WAD comparison engine using advanced Reflection to access internal checksums, achieving near-instant results (seconds instead of minutes).
+    * **Resource Footprint Optimization:** Eliminated massive chunk decompression during the **WAD comparison phase**, reducing peak RAM usage from 4.8GB to ~200MB.
+    * **Intelligent Multi-Threading:** Implemented a balanced 3-layer threading strategy for the **ManifestDownloader** (2 for disk verification, 8 for network, 4 for CPU) and a high-efficiency sequential scan for the **WadComparator**.
+    * **Hash Startup Optimization:** Re-engineered the hash loading engine to use manual index seeking (`IndexOf`) and parallel loading for Bin/RST files, reducing RAM allocations and GC pressure by ~40%.
+  - System / High-Fidelity Progress Engine (Global)
+    * **Universal HUD Rework:** Redesigned the progress window with a professional technical aesthetic, featuring an 8px progress bar and a vertical data stack.
+    * **Intelligent Dual-Layer Tracking:** Implemented a sophisticated parser that separates global item progress (File X of Y) from granular technical metrics (Chunks/Assets).
+    * **Deep Asset Counting:** Engineered a recursive scan engine for the File Explorer that "looks inside" audio banks (.wpk, .bnk) to calculate exact sound counts before starting.
+  - Explorer / Deep Context Integration
+    * Added **"Add to Image Merger"** to the File Explorer context menu: allows users to "collect" images and textures directly from WAD archives or local directories without leaving the explorer.
+    * Integrated Toolbar Access: added a new "ViewGridPlus" action button to the main Explorer toolbar for instant access to the merger tray.
+  - Home / Notepad Integration
+    * Implemented a professional **Notepad** utility directly accessible from the Dashboard.
+    * Features a syntax-ready AvalonEdit engine with line numbers and a dark, distraction-free writing environment for quick note-taking during asset analysis.
+  - Home / Universal Converter (Unified Engine)
+    * **Major Evolution:** Transformed the old Texture Converter into a high-performance **Universal Converter**.
+    * **Audio Integration:** Added full support for individual audio assets (.wem, .ogg, .wav, .mp3) using the vgmstream engine.
+    * **Cross-Format Conversion:** Enabled the ability to convert between standard audio formats (e.g., OGG to MP3) and image formats.
+    * **Unified Workflow:** Engineered a single Drag & Drop interface that intelligently distinguishes between image and audio assets.
+    * **Dynamic HUD Interface:** Redesigned the UI with context-aware iconography and dual-output format selectors.
+    * **Async Multi-Engine:** Optimized the processing pipeline to orchestrate `TextureUtils` and `AudioConversionService` simultaneously for mixed file queues.
+  - Home / Audio Player Integration
+    * Implemented a brand new **Audio Player** mini-app for session-based audio management.
+    * **Drag & Drop Engine:** Engineered a high-performance listener that allows users to instantly add audio files (.mp3, .wav, .ogg) from Windows Explorer to the workspace.
+    * **Interactive HUD Controls:** Features a precision playback engine with real-time time tracking, a scrubbable progress slider, and 10-second skip navigation.
+    * **Dynamic Playlist Management:** Integrated a clean session list with individual item removal and global clearing capabilities.
+  - System / Keyboard Shortcut System
+    * **Centralized Command Engine:** Introduced `ShortKeys.cs` to manage application-wide shortcuts, starting with the Text Comparison suite.
+    * **Intuitive Diff Navigation:** Enabled `Alt + Up/Down` arrows to instantly jump between previous and next differences in the JSON/Data viewer, significantly improving the speed of technical reviews.
+  - Explorer / High-Performance Engine
+    * **Atomic UI Updates:** Implemented the brand new `ObservableRangeCollection<T>` across the entire Explorer ecosystem (WADs, Directories, Backups, Results).
+    * **Zero-Lag Despliegue:** Replaced iterative item insertion with bulk operations (`AddRange` / `ReplaceRange`), eliminating UI micro-stutters when expanding folders with thousands of assets (e.g., Champions, Icons).
+    * **Hardware-Accelerated Virtualization:** Enabled full UI Virtualization (`Recycling` mode) in the File Tree and Grid views, allowing the application to handle 5,000+ items with instant scrolling and minimal RAM footprint.
+    *   **Intelligent Deep Navigation:** Re-engineered the "Go To" search engine with a robust asynchronous algorithm that forces container generation and scrolls to specific indices in virtualized lists, ensuring the searcher never "loses" a file.
+  - System / High-Precision Size Analytics
+    * **Quurgical Variation Tracking:** Upgraded the size difference engine to show exact **Bytes** for small changes, eliminating the "0.00 KB" ambiguity for modified assets.
+    * **Dynamic Unit Formatting:** Implemented a smart formatter that automatically switches between Bytes, KB, and MB based on file scale, ensuring technical precision across all asset types.
+
+Improvements
+  - Architecture / Logic Centralization
+    * Migrated node selection logic: centralized the retrieval of single and multi-selected nodes into the **TreeUIManager** service, decoupling data queries from the view code-behind.
+    * Refined Service Hierarchy: moved the recursive "EnsureAllChildrenLoaded" logic to **WadNodeLoaderService** to resolve circular dependencies and improve data provider reliability.
+    * Advanced Audio Expansion: relocated the complex audio bank expansion logic (`ExpandAudioBankAsync`) to **TreeBuilderService**, centralizing the "Architect" role for dynamic tree building.
+  - System / Intelligent Sync Logic
+    * Enforced a strict "Server-Larger" synchronization policy. The application now protects local custom hashes by only updating if the server provides a strictly larger file (more hashes), preventing data loss from server-side regressions.
+  - Network / URL Centralization
+    * Migrated all remote hash endpoints to a single source of truth in the `Requests` service, improving maintainability and ensuring consistent communication with CommunityDragon.
+  - UI / High-Performance Window Engine
+    * **Hardware Acceleration Migration:** Switched all application windows (Main, Settings, Help, Comparators) to a `SingleBorderWindow` architecture with transparency disabled (`AllowsTransparency="False"`). This change forces GPU acceleration, completely eliminating lag when maximizing or moving windows on high-resolution displays.
+    * **Native Animations:** Restored the smooth, native Windows 11 minimize/maximize/open animations that were previously disabled by the chromeless style.
+    * **Artifact Elimination:** Resolved the "Black Corner" visual glitch by removing forced corner radii on root containers and setting `BorderThickness="0"`, allowing Windows 11 to apply its native rounding perfectly.
+  - Security / Cryptography Engine
+    * **Blake3 Integration:** Completely replaced the internal chunk checksum engine in the `WadComparatorService` with the Pure C# **Blake3** implementation.
+    * **Zero False Positives:** This migration resolves antivirus detection issues caused by native Rust DLLs while maintaining industry-leading hashing performance.
+  - UI Architecture / Custom Title Bar Suite
+    * Major visual overhaul: transitioned the entire application to a brand new **Chromeless Window Architecture** with custom high-end title bars.
+    * Integrated Professional Title Bars (40px): implemented a unified 40px header across all major tools (MainWindow, ImageDiff, JsonDiff, WadComparison, ImageMerger).
+    * **Premium Header Typography:** Unified all window title font sizes to **13px SemiBold** across the entire suite for superior readability and professional consistency.
+  - UI / Dialog & Window Polish
+    * **Unified Title Bars:** Standardized the `Settings` and `Help` windows to match the global 40px custom title bar design.
+    * **Standardized Control Suite:** Unified all chromeless window title bar buttons to a standardized **34x40px** footprint with **15x15px** icons and **18x18px** header icons.
+    * **Enhanced Responsiveness:** Integrated `WindowChrome.IsHitTestVisibleInChrome="True"` across all dialogs to ensure perfect click responsiveness in custom title bars.
+    * Symmetrical Corner Rounding: implemented a strict **12px/11px geometry rule** (12px outer window, 11px inner headers/footers) to eliminate background "bleeding" and ensure perfect curvature encasing.
+  - Comparator / Backup Performance
+    * **Sequential IO Engine:** Re-engineered the chunk saving process to use linear disk reading (ordered by Offset), reducing disk seek time and significantly improving backup speed.
+    * **Resource Efficiency:** Optimized file handle management to process entire WAD archives with a single stream, minimizing RAM and OS overhead.
+    * **History Persistence Fix:** Resolved a critical bug where comparison results were not being saved to the Monitor's History if Auto-Extraction or Report Generation was enabled. Refactored the completion flow to ensure independent and guaranteed background registration.
+  - Themes / Color Palette
+    * Introduced **AccentTeal** (#FF00BFA5) as a new dedicated color for utility tools, improving visual categorization on the Dashboard.
+  - Network / Error Handling
+    * **Smart Timeout Management:** Re-engineered the connection logic for CommunityDragon to treat timeout errors (HTTP 522) as "Warnings" instead of "Critical Errors".
+  - Monitor / Surgical Patching Engine
+    * **3-Phase Verification Architecture:** Implemented a high-performance, multi-layered verification system (Metadata -> Structural -> Hash Integrity) that rescues valid chunks from incomplete local files.
+    * **Advanced Chunk Deduplication:** Re-engineered the downloader to identify and download shared chunks only once across multiple files.
+  - UI / Advanced Toolbar Refinements
+    * **Distributed Tool Layout:** Redesigned the toolbars for both Image and Text comparison, moving functional capsules to the right side for better ergonomic flow.
+  - UI / MainWindow & Shell Polish
+    * Premium MainWindow Frame: transformed the main shell with integrated app iconography and a seamless flow between the sidebar and the new custom title bar.
+  - Explorer / Unified Progress Experience
+    * Integrated **"Extract Selected"** and **"Save Selected"** into the unified progress system: users can now track the real-time status of batch operations.
+  - UI / UX Polish
+    * Optimized Explorer code-behind: reduced the complexity of `FileExplorerControl.xaml.cs` by delegating data processing and state management to specialized services and ViewModels.
+    * Refined cancellation feedback: standardized tree building cancellation logs to a professional, unified message ("The tree build was cancelled.").
+  - Monitor / Reactive UI Infrastructure
+    * **Engineered a Unified Reactive Pattern:** Transitioned the Monitor suite (Backups, Tracker, Watcher, History) to an event-driven architecture.
+    * Implemented Real-Time Synchronization: all monitor modules now instantly react to "Reset to Default" or "Save" actions from the Settings window via the new `ConfigurationSaved` event.
+    * Robust Memory Management: integrated mandatory event unsubscription in `Unloaded` handlers across all monitor controls to eliminate potential memory leaks.
+  - Monitor / Asset Tracker Intelligence
+    * **Refined Start Sequence Logic:** Re-engineered the "Start Sequence ID" behavior to act as a precision visual cursor.
+    * Intelligent State Preservation: the tracker now respects already scanned "Not Found" IDs within the new sequence range, preventing redundant scans while correctly filling the remaining 10-item buffer with pending assets.
+
+Bug Fixes
+  - Monitor / Backup System
+    * **Fixed Path Detection Bug:** Resolved a critical issue where directory backups (e.g., _old) were not detected due to strict path validation. The engine now automatically handles trailing slashes and ensures robust scanning of PBE installations.
+  - Monitor / Asset Tracker
+    * **Refined Sequence Logic:** Fixed a bug where the "Start Sequence ID" would reset previously scanned states. The tracker now intelligently preserves "Not Found" statuses within the new range, preventing redundant scans while correctly filling the session buffer.
+  - Explorer / Intelligent Asset Saving
+    * **Resolved Audio Redundancy Bug:** Implemented a smart redundancy filter in the `WadSavingService` that reuses the decision logic from the Node Loader.
+    * Fixed duplicate sound extraction: the system now automatically identifies the primary source in an audio group (e.g., preferring .wpk over redundant .bnk files) during folder saves.
+    * Fixed metadata clutter: the "SAVE" operation now intelligently skips raw binary metadata files (like `_events.bnk`) that are not needed by the user.
+  - Explorer / Progress System
+    * Fixed a critical bug where saving or extracting audio banks (.wpk, .bnk) resulted in incorrect percentages. Implemented a high-performance asynchronous deep-scan engine.
+  - Monitor / Backup Workflow
+    * Fixed a bug where the "Cancel" button in the progress window did not stop directory backups.
+  - Monitor / Backup System
+    * Fixed a critical bug in the Backup Manager where directory backups (e.g., _old) were not detected due to strict path validation.
+    * Implemented robust path normalization: the engine now automatically handles trailing slashes and continues scanning even if one installation path (PBE/Live) is missing.
+  - UI / Unified Path Iconography
+    * Fixed a visual inconsistency where unresolved file hashes without extensions were displayed as folders.
+  - UI / Rendering & Stability
+    * **Fixed Binding Deadlock:** Resolved a critical `InvalidOperationException` in the Image Comparison window by correctly handling read-only PixelWidth/Height properties.
+  - Explorer / Multi-Selection Logic
+    * Fixed a bug in **Add to Image Merger** where only the last selected item was processed.
+  - Window Titles / Taskbar Visibility
+    * Fixed a bug where some windows (like Commit History) appeared without a name in the Windows taskbar and system previews. All windows now correctly display their titles in the shell.
