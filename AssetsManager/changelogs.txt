@@ -1,7 +1,13 @@
+AssetsManager - League of Legends | v3.2.4.1
+
+HOTFIX UPDATE
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v3.2.4.0
 
 MEDIUM UPDATE
-This update introduces standalone WAD support, a professional animation synchronization system, and advanced diagnostic tools for JSON analysis. It features a significant optimization of the viewer interface and a unified global diagnostic hub, providing a faster and more consistent experience for asset exploration and comparison.
+This update significantly enhances the asset exploration experience with standalone WAD support and advanced search filters. It introduces "Sync Anims" for professional animation management and a powerful suite of JSON diagnostic tools, including real-time metrics and contextual breadcrumbs. The user interface has been polished with high-density layouts and a unified global diagnostic hub, ensuring a more efficient and stable engineering workflow.
 
 New Features
   - Explorer / Standalone WAD Support
