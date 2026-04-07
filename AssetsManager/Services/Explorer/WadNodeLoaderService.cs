@@ -223,7 +223,7 @@ namespace AssetsManager.Services.Explorer
             ChunkDiffType.New => "New",
             ChunkDiffType.Modified => "Modified",
             ChunkDiffType.Renamed => "Renamed",
-            ChunkDiffType.Removed => "Deleted",
+            ChunkDiffType.Removed => "Removed",
             ChunkDiffType.Dependency => "Dependency",
             _ => "Unknown"
         };
