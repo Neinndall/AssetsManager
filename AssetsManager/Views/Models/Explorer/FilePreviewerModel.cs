@@ -30,7 +30,7 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public bool IsRenamedInfoVisible => RenamedDiffDetails != null && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
+        public bool IsRenamedInfoVisible => RenamedDiffDetails != null && RenamedDiffDetails.Type == ChunkDiffType.Renamed && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
 
         public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0;
 
