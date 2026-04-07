@@ -205,7 +205,7 @@ namespace AssetsManager.Views.Models.Dialogs
             
             // 2. Populate Discovery Grid (Visual Assets)
             var visualAssets = diffs
-                .Where(d => d.Type != ChunkDiffType.Removed && SupportedFileTypes.IsImage(d.Path))
+                .Where(d => SupportedFileTypes.IsImage(d.Path))
                 .ToList();
             DiscoveryItems.ReplaceRange(visualAssets);
 
