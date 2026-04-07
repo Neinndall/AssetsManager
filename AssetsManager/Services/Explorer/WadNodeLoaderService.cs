@@ -239,7 +239,7 @@ namespace AssetsManager.Services.Explorer
             return resolved;
         }
 
-        private string GetBackupChunkPath(string backupRoot, SerializableChunkDiff diff)
+        public static string GetBackupChunkPath(string backupRoot, SerializableChunkDiff diff)
         {
             if (diff.Type == ChunkDiffType.Removed)
             {
