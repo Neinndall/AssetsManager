@@ -57,7 +57,7 @@ namespace AssetsManager.Services.Audio
 
             byte[] binData = null;
             FileSystemNodeModel binNode = null;
-            string baseName = Path.GetFileNameWithoutExtension(clickedNode.Name).Replace("_events", "").Replace("_audio", "");
+            string baseName = GetBaseName(clickedNode.Name);
             BinType binType = BinType.Unknown;
 
             FileSystemNodeModel wpkNode = null;
@@ -256,7 +256,7 @@ namespace AssetsManager.Services.Audio
 
         private async Task<(FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode)> FindSiblingFilesFromWadsAsync(FileSystemNodeModel clickedNode, string basePath, bool preferOld = false)
         {
-            string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
+            string baseName = GetBaseName(clickedNode.Name);
 
             // Backup Mode
             if (basePath == null)
@@ -292,9 +292,9 @@ namespace AssetsManager.Services.Audio
 
                         if (siblings != null)
                         {
-                            var wpkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_audio.wpk"));
-                            var audioBnkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_audio.bnk"));
-                            var eventsBnkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_events.bnk"));
+                            var wpkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_audio.wpk", StringComparison.OrdinalIgnoreCase));
+                            var audioBnkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_audio.bnk", StringComparison.OrdinalIgnoreCase));
+                            var eventsBnkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_events.bnk", StringComparison.OrdinalIgnoreCase));
 
                             Func<SerializableChunkDiff, FileSystemNodeModel> createNode = (diff) =>
                             {
@@ -338,9 +338,9 @@ namespace AssetsManager.Services.Audio
 
             var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(wadPath);
 
-            FileSystemNodeModel wpkNode = wadContent.FirstOrDefault(c => c.Name == baseName + "_audio.wpk");
-            FileSystemNodeModel audioBnkNode = wadContent.FirstOrDefault(c => c.Name == baseName + "_audio.bnk");
-            FileSystemNodeModel eventsBnkNode = wadContent.FirstOrDefault(c => c.Name == baseName + "_events.bnk");
+            FileSystemNodeModel wpkNode = FindNodeByName(wadContent, baseName + "_audio.wpk");
+            FileSystemNodeModel audioBnkNode = FindNodeByName(wadContent, baseName + "_audio.bnk");
+            FileSystemNodeModel eventsBnkNode = FindNodeByName(wadContent, baseName + "_events.bnk");
 
             return (wpkNode, audioBnkNode, eventsBnkNode);
         }
@@ -391,7 +391,7 @@ namespace AssetsManager.Services.Audio
 
                     if (!string.IsNullOrEmpty(championName) && !string.IsNullOrEmpty(skinFolder))
                     {
-                        string skinName = (skinFolder == "base") ? "skin0" : $"skin{int.Parse(skinFolder.Replace("skin", ""))}";
+                        string skinName = (skinFolder == "base") ? "skin0" : $"skin{int.Parse(skinFolder.Replace("skin", ""))} ";
                         string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
                         string targetWadName = $"{championName.ToLower()}.wad.client";
                         var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
@@ -461,7 +461,7 @@ namespace AssetsManager.Services.Audio
 
         private async Task<(FileSystemNodeModel BinNode, string BaseName, BinType Type)> FindAssociatedBinFileFromWadsAsync(FileSystemNodeModel clickedNode, string basePath, bool preferOld = false)
         {
-            string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
+            string baseName = GetBaseName(clickedNode.Name);
             var strategy = GetBinFileSearchStrategy(clickedNode);
 
             if (strategy == null)
@@ -584,7 +584,7 @@ namespace AssetsManager.Services.Audio
             // A simple way to detect backup mode is to check if the node has ChunkDiff data.
             bool isBackupMode = clickedNode.ChunkDiff != null;
 
-            string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
+            string baseName = GetBaseName(clickedNode.Name);
             string expectedWpkName = baseName + "_audio.wpk";
             string expectedAudioBnkName = baseName + "_audio.bnk";
             string expectedEventsBnkName = baseName + "_events.bnk";
@@ -603,9 +603,9 @@ namespace AssetsManager.Services.Audio
                 }
                 var parentNode = parentPath[parentPath.Count - 2];
 
-                wpkNode = parentNode.Children.FirstOrDefault(c => c.Name == expectedWpkName);
-                audioBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == expectedAudioBnkName);
-                eventsBnkNode = parentNode.Children.FirstOrDefault(c => c.Name == expectedEventsBnkName);
+                wpkNode = parentNode.Children.FirstOrDefault(c => c.Name.Equals(expectedWpkName, StringComparison.OrdinalIgnoreCase));
+                audioBnkNode = parentNode.Children.FirstOrDefault(c => c.Name.Equals(expectedAudioBnkName, StringComparison.OrdinalIgnoreCase));
+                eventsBnkNode = parentNode.Children.FirstOrDefault(c => c.Name.Equals(expectedEventsBnkName, StringComparison.OrdinalIgnoreCase));
             }
             else // Backup Mode - search across the whole tree
             {
@@ -615,9 +615,9 @@ namespace AssetsManager.Services.Audio
                 
                 FindAllNodesByNameRecursive(rootNodes, namesToFind, allMatches);
 
-                wpkNode = allMatches.FirstOrDefault(n => n.Name == expectedWpkName);
-                audioBnkNode = allMatches.FirstOrDefault(n => n.Name == expectedAudioBnkName);
-                eventsBnkNode = allMatches.FirstOrDefault(n => n.Name == expectedEventsBnkName);
+                wpkNode = allMatches.FirstOrDefault(n => n.Name.Equals(expectedWpkName, StringComparison.OrdinalIgnoreCase));
+                audioBnkNode = allMatches.FirstOrDefault(n => n.Name.Equals(expectedAudioBnkName, StringComparison.OrdinalIgnoreCase));
+                eventsBnkNode = allMatches.FirstOrDefault(n => n.Name.Equals(expectedEventsBnkName, StringComparison.OrdinalIgnoreCase));
 
                 _logService.LogDebug($"[FindSiblingFilesByName] Sibling search results - WPK: {wpkNode != null}, AudioBNK: {audioBnkNode != null}, EventsBNK: {eventsBnkNode != null}");
             }
@@ -627,7 +627,7 @@ namespace AssetsManager.Services.Audio
 
         private async Task<(FileSystemNodeModel BinNode, string BaseName, BinType Type)> FindAssociatedBinFileAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
         {
-            string baseName = clickedNode.Name.Replace("_audio.wpk", "").Replace("_audio.bnk", "").Replace("_events.bnk", "");
+            string baseName = GetBaseName(clickedNode.Name);
             var strategy = GetBinFileSearchStrategy(clickedNode);
 
             if (strategy == null)
@@ -711,6 +711,13 @@ namespace AssetsManager.Services.Audio
             }
 
             return (null, baseName, strategy.Type);
+        }
+
+        private string GetBaseName(string name)
+        {
+            return name.Replace("_audio.wpk", "", StringComparison.OrdinalIgnoreCase)
+                       .Replace("_audio.bnk", "", StringComparison.OrdinalIgnoreCase)
+                       .Replace("_events.bnk", "", StringComparison.OrdinalIgnoreCase);
         }
 
 
