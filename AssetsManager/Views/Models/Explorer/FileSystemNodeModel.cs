@@ -10,7 +10,7 @@ using AssetsManager.Views.Models.Wad;
 namespace AssetsManager.Views.Models.Explorer
 {
     public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, WemFile, SoundBank }
-    public enum DiffStatus { Unchanged, New, Modified, Renamed, Deleted, Dependency }
+    public enum DiffStatus { Unchanged, New, Modified, Renamed, Removed, Dependency }
     public enum AudioSourceType { Wpk, Bnk }
 
     public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable

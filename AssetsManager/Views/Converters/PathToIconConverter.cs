@@ -81,7 +81,7 @@ namespace AssetsManager.Views.Converters
                 if (name == "New") return MaterialIconKind.PlusCircleOutline;
                 if (name == "Modified") return MaterialIconKind.PencilCircleOutline;
                 if (name == "Renamed") return MaterialIconKind.SwapHorizontalCircleOutline;
-                if (name == "Deleted") return MaterialIconKind.MinusCircleOutline;
+                if (name == "Removed") return MaterialIconKind.MinusCircleOutline;
                 if (name == "Dependency") return MaterialIconKind.LinkCircleOutline;
             }
 

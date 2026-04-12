@@ -260,7 +260,7 @@ namespace AssetsManager.Services.Explorer
             return type switch
             {
                 ChunkDiffType.New => DiffStatus.New,
-                ChunkDiffType.Removed => DiffStatus.Deleted,
+                ChunkDiffType.Removed => DiffStatus.Removed,
                 ChunkDiffType.Modified => DiffStatus.Modified,
                 ChunkDiffType.Renamed => DiffStatus.Renamed,
                 ChunkDiffType.Dependency => DiffStatus.Dependency,
