@@ -1,6 +1,39 @@
+AssetsManager - League of Legends | v3.2.4.2
+
+HOTFIX UPDATE
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v3.2.4.1
 
 HOTFIX UPDATE
+This hotfix is ​​primarily dedicated to fixing some bugs that have carried over from several previous versions, in various areas of the app.
+
+Changes
+  - Settings / Visual Refinement
+    * Refined the background of sub-option panels from "Hover" to "Card" style with a 1px border. This ensures a more professional, high-fidelity HUD look with reduced brightness and better contrast across General and Advanced settings.
+  - Explorer / Nomenclature Unification
+    * Updated the category labels in the Backup Explorer to use "Removed" instead of "Deleted", aligning with the internal comparison standards.
+
+Bug Fixes
+  - Explorer / Category Icon Alignment
+    * Fixed an inconsistency where the "Removed" category folder displayed a standard folder icon instead of the expected circular status icon. Also fully aligned the internal nomenclature to use "Removed" instead of "Deleted" across all services and UI triggers.
+  - Audio Engine / Historical Metadata Consistency
+    * Fixed a bug where viewing audio bank differences from the History module failed to resolve event names. The system now correctly anchors metadata resolution to the local backup files in AppData, ensuring accurate event identification regardless of current game updates.
+  - Explorer / Multi-Selection Context Menu
+    * Fixed a bug where the "View Selected Differences" header remained stuck in the context menu after selecting a single item following a multi-selection.
+  - Explorer / .WPK Audio Bank Expansion
+    * Fixed a bug that prevented voice-over (.wpk) files from correctly expanding to show their audio events when they were located within subdirectories of a WAD file.
+  - Settings / Interface Restoration
+    * Fixed a critical issue where the "Auto-extract new assets" and "Generate asset report" options were missing from the General Settings. These essential tools are now fully restored and reorganized under a new "Post-Comparison Actions" section.
+  - Explorer / Metadata Precision
+    * Fixed a bug where the "Renamed file metadata" panel appeared incorrectly for deleted files. The panel is now strictly reserved for renamed assets.
+  - Explorer / Dual View Stability
+    * Fixed an issue where the "Preview not available" message would disappear when selecting an image in the tree, ensuring consistent feedback across all preview slots.
+  - Comparison Results / Gallery Visibility
+    * Fixed a filtering issue in the Discovery Grid (Gallery) that excluded deleted assets. Removed images are now correctly displayed in the visual discovery view.
+  - Data Engine / Historical Consistency
+    * Fixed a critical bug where historical comparison results failed to load images or code after a PBE update. The system now intelligently prioritizes local backup data for history and uses direct folder paths for live comparisons, ensuring 100% reliable asset visualization in all scenarios.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
