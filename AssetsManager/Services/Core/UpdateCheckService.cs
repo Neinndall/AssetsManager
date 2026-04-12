@@ -210,8 +210,8 @@ namespace AssetsManager.Services.Core
                         Version.TryParse(latestVerStr, out var latestVer))
                     {
                         string message = ApplicationInfos.IsQA && latestVer <= currentVer
-                            ? $"A stable version {newVersion} is available."
-                            : $"Version {newVersion} is available";
+                            ? $"New stable version {newVersion} is available!"
+                            : $"New version {newVersion} is available!";
 
                         UpdatesFound?.Invoke(message, newVersion);
                     }
