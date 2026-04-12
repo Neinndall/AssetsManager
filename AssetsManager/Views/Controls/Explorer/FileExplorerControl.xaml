@@ -133,7 +133,7 @@
                                             </MultiDataTrigger>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding Status}" Value="Deleted"/>
+                                                    <Condition Binding="{Binding Status}" Value="Removed"/>
                                                     <Condition Binding="{Binding IsGroupingFolder}" Value="True"/>
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
@@ -183,7 +183,7 @@
                                             <DataTrigger Binding="{Binding Status}" Value="Modified">
                                                 <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
                                             </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Deleted">
+                                            <DataTrigger Binding="{Binding Status}" Value="Removed">
                                                 <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Status}" Value="Renamed">

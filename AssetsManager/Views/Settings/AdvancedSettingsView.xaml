@@ -39,7 +39,7 @@
                         <CheckBox x:Name="swAssetTracker" Grid.Column="1" IsChecked="{Binding Settings.AssetTrackerTimer, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                     </Grid>
                     
-                    <Border Margin="0,12,0,0" Background="{StaticResource HoverColor}" CornerRadius="4" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                    <Border Margin="0,12,0,0" Background="{StaticResource CardBackground}" CornerRadius="4" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                             Visibility="{Binding IsChecked, ElementName=swAssetTracker, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -71,7 +71,7 @@
                         <CheckBox x:Name="swPbeStatus" Grid.Column="1" IsChecked="{Binding Settings.CheckPbeStatus, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                     </Grid>
 
-                    <Border Margin="0,12,0,0" Background="{StaticResource HoverColor}" CornerRadius="4" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                    <Border Margin="0,12,0,0" Background="{StaticResource CardBackground}" CornerRadius="4" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                             Visibility="{Binding IsChecked, ElementName=swPbeStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>

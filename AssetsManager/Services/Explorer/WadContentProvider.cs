@@ -90,8 +90,9 @@ namespace AssetsManager.Services.Explorer
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // 1. MODO BACKUP (Si hay una ruta de backup o no hay ruta de League)
-                if (!string.IsNullOrEmpty(diff.BackupChunkPath) || string.IsNullOrEmpty(lolPath))
+                // 1. MODO BACKUP (Prioridad si hay BackupChunkPath)
+                // Usamos BackupChunkPath como ancla para saber que esta comparación tiene datos locales (History).
+                if (!string.IsNullOrEmpty(diff.BackupChunkPath))
                 {
                     string chunkPath = diff.BackupChunkPath;
 
@@ -116,17 +117,22 @@ namespace AssetsManager.Services.Explorer
                             return WadChunkUtils.DecompressChunk(compressedData, compressionType ?? WadChunkCompression.None);
                         }, cancellationToken);
                     }
-                    
-                    return null;
                 }
 
-                // 2. MODO LIVE (WADs instalados)
-                string wadPath = Path.Combine(lolPath, diff.SourceWadFile);
-                ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
+                // 2. MODO LIVE (WADs - Comparación directa o fallback del backup si no existe el chunk)
+                // Importante: lolPath es la ruta pasada por el método (pude ser la de Ajustes o una manual del Comparator).
+                if (!string.IsNullOrEmpty(lolPath))
+                {
+                    string wadPath = Path.Combine(lolPath, diff.SourceWadFile);
+                    ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
 
-                if (hash == 0) return null;
+                    if (hash != 0)
+                    {
+                        return await DecompressChunkByHashAsync(wadPath, hash, cancellationToken);
+                    }
+                }
 
-                return await DecompressChunkByHashAsync(wadPath, hash, cancellationToken);
+                return null;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

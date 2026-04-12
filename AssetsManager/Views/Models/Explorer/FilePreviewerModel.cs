@@ -30,7 +30,7 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public bool IsRenamedInfoVisible => RenamedDiffDetails != null && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
+        public bool IsRenamedInfoVisible => RenamedDiffDetails != null && RenamedDiffDetails.Type == ChunkDiffType.Renamed && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
 
         public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0;
 
@@ -220,12 +220,11 @@ namespace AssetsManager.Views.Models.Explorer
         {
             if (node == null) return;
 
-            // Step 1: Always hide status panels when a real file is about to be shown
+            // Step 1: Always hide Welcome panel when any file is about to be shown
             IsWelcomeVisible = false;
-            IsUnsupportedVisible = false;
             HasEverPreviewedAFile = true;
 
-            // Step 2: Determine category
+            // Step 2: Determine category and handle slot visibility
             bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
                            SupportedFileTypes.Textures.Contains(node.Extension) || 
                            SupportedFileTypes.VectorImages.Contains(node.Extension);
@@ -236,6 +235,8 @@ namespace AssetsManager.Views.Models.Explorer
             }
             else
             {
+                // Only hide Unsupported status if we are loading something into the Content slot
+                IsUnsupportedVisible = false;
                 IsContentVisible = true;
             }
         }

@@ -269,6 +269,7 @@ namespace AssetsManager.Services.Explorer
                     if (content is string extension)
                     {
                         _viewModel.IsUnsupportedVisible = true;
+                        _viewModel.IsContentVisible = true;
                         _viewModel.IsTextVisible = false;
                         _viewModel.IsWebVisible = false;
                         _viewModel.UnsupportedMessage = $"The {extension} format is not supported to preview it";

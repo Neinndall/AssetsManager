@@ -269,11 +269,17 @@ namespace AssetsManager.Views.Dialogs
 
         private void TryResolveHashes()
         {
+            string backupRoot = !string.IsNullOrEmpty(_sourceJsonPath) ? Path.GetDirectoryName(_sourceJsonPath) : null;
             var wadFileCache = new Dictionary<string, WadFile>();
             try
             {
                 foreach (var diff in _serializableDiffs)
                 {
+                    if (backupRoot != null)
+                    {
+                        diff.BackupChunkPath = WadNodeLoaderService.GetBackupChunkPath(backupRoot, diff);
+                    }
+
                     if (diff.OldPathHash != 0)
                     {
                         string resolvedPath = _hashResolverService.ResolveHash(diff.OldPathHash);

@@ -108,10 +108,11 @@ namespace AssetsManager.Views.Helpers
             // 2. Lógica de Acción Primaria / Navegación
             if (InteractionHelper.IsPrimaryActionIntent())
             {
-                var parentControl = ItemsControl.ItemsControlFromItemContainer(item);
-                if (parentControl?.ItemsSource != null)
+                // Limpiar selección múltiple en todo el árbol/lista
+                var rootControl = (ItemsControl)FindAncestor<TreeView>(item) ?? FindAncestor<ListBox>(item);
+                if (rootControl?.ItemsSource != null)
                 {
-                    ClearAllMultiSelected(parentControl.ItemsSource);
+                    ClearAllMultiSelected(rootControl.ItemsSource);
                 }
 
                 // Disparar el evento de acción primaria para que el control sepa que debe "ejecutar" el nodo

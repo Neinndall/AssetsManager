@@ -223,7 +223,7 @@ namespace AssetsManager.Services.Explorer
             ChunkDiffType.New => "New",
             ChunkDiffType.Modified => "Modified",
             ChunkDiffType.Renamed => "Renamed",
-            ChunkDiffType.Removed => "Deleted",
+            ChunkDiffType.Removed => "Removed",
             ChunkDiffType.Dependency => "Dependency",
             _ => "Unknown"
         };
@@ -239,7 +239,7 @@ namespace AssetsManager.Services.Explorer
             return resolved;
         }
 
-        private string GetBackupChunkPath(string backupRoot, SerializableChunkDiff diff)
+        public static string GetBackupChunkPath(string backupRoot, SerializableChunkDiff diff)
         {
             if (diff.Type == ChunkDiffType.Removed)
             {
@@ -260,7 +260,7 @@ namespace AssetsManager.Services.Explorer
             return type switch
             {
                 ChunkDiffType.New => DiffStatus.New,
-                ChunkDiffType.Removed => DiffStatus.Deleted,
+                ChunkDiffType.Removed => DiffStatus.Removed,
                 ChunkDiffType.Modified => DiffStatus.Modified,
                 ChunkDiffType.Renamed => DiffStatus.Renamed,
                 ChunkDiffType.Dependency => DiffStatus.Dependency,
