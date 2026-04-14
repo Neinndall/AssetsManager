@@ -80,13 +80,13 @@
                                             </Border>
                                         </StackPanel>
 
-                                        <ToggleButton Grid.Column="1" IsChecked="{Binding AreAllPartsVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Width="28" Height="28" Margin="0,0,3,0" ToolTip="Toggle Visibility">
-                                            <materialIcons:MaterialIcon Kind="{Binding AreAllPartsVisible, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Eye,EyeOff'}" 
+                                        <ToggleButton Grid.Column="1" IsChecked="{Binding IsVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Width="28" Height="28" Margin="0,0,3,0" ToolTip="Toggle Visibility">
+                                            <materialIcons:MaterialIcon Kind="{Binding IsVisible, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Eye,EyeOff'}" 
                                                                         Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                 <materialIcons:MaterialIcon.Style>
                                                     <Style TargetType="materialIcons:MaterialIcon">
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding AreAllPartsVisible}" Value="False">
+                                                            <DataTrigger Binding="{Binding IsVisible}" Value="False">
                                                                 <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
