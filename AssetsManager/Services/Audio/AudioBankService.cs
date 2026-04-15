@@ -58,10 +58,14 @@ namespace AssetsManager.Services.Audio
         public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData, string baseName, BinType binType)
         {
             var eventNameMap = BinParser.GetEventsFromBin(binData, baseName, binType, _logService);
-            var allWems = ExtractWems(wpkData, audioBnkData);
+            
+            // Now we include eventsData in WEM extraction in case Riot embedded audios there too
+            var allWems = ExtractWems(wpkData, audioBnkData, eventsData);
 
-            // Parse the events and link them to the sounds found above.
-            var eventNodes = ParseEventsBank(eventsData, eventNameMap, allWems);
+            // Parse the events and link them to the sounds found above. 
+            // We pass both eventsData and audioBnkData to ParseEventsBank to merge HIRC objects.
+            var eventNodes = ParseEventsBank(new[] { eventsData, audioBnkData }, eventNameMap, allWems);
+            
             // Find any sounds that were not linked to an event and group them under "Unknown".
             AddUnknownSoundsNode(eventNodes, allWems);
 
@@ -78,7 +82,7 @@ namespace AssetsManager.Services.Audio
             return ParseAudioBank(wpkData, audioBnkData, eventsData, null, null, BinType.Unknown);
         }
 
-        private Dictionary<uint, WemSoundInfo> ExtractWems(byte[] wpkData, byte[] audioBnkData)
+        private Dictionary<uint, WemSoundInfo> ExtractWems(byte[] wpkData, byte[] audioBnkData, byte[] eventsBnkData = null)
         {
             var allWems = new Dictionary<uint, WemSoundInfo>();
 
@@ -102,35 +106,41 @@ namespace AssetsManager.Services.Audio
                 }
             }
 
-            // Always process the BNK to find potentially missing audios (Common in VO containers)
-            if (audioBnkData != null)
-            {
-                using var audioStream = new MemoryStream(audioBnkData);
-                var audioBnk = BnkParser.Parse(audioStream, _logService);
-                if (audioBnk?.Didx?.Wems != null && audioBnk.Data != null)
-                {
-                    long dataOffset = audioBnk.Data.Offset;
-                    int bnkWemCount = 0;
-                    foreach (var wem in audioBnk.Didx.Wems)
-                    {
-                        // The offset in DIDX is relative to the start of the DATA section, so we calculate the absolute offset.
-                        if (!allWems.ContainsKey(wem.Id))
-                        {
-                            allWems[wem.Id] = new WemSoundInfo 
-                            { 
-                                Id = wem.Id, 
-                                Offset = (uint)(wem.Offset + dataOffset), 
-                                Size = wem.Size,
-                                Source = AudioSourceType.Bnk
-                            };
-                            bnkWemCount++;
-                        }
-                    }
-                    _logService.LogDebug($"[AUDIO] Found {bnkWemCount} ADDITIONAL WEM metadata entries in BNK.");
-                }
-            }
+            // Process the audio BNK
+            ProcessBnkWems(audioBnkData, allWems, AudioSourceType.Bnk, "AUDIO BNK");
+
+            // Process the events BNK (sometimes has embedded audios too)
+            ProcessBnkWems(eventsBnkData, allWems, AudioSourceType.Bnk, "EVENTS BNK");
 
             return allWems;
+        }
+
+        private void ProcessBnkWems(byte[] bnkData, Dictionary<uint, WemSoundInfo> allWems, AudioSourceType source, string logLabel)
+        {
+            if (bnkData == null) return;
+
+            using var audioStream = new MemoryStream(bnkData);
+            var bnk = BnkParser.Parse(audioStream, _logService);
+            if (bnk?.Didx?.Wems != null && bnk.Data != null)
+            {
+                long dataOffset = bnk.Data.Offset;
+                int bnkWemCount = 0;
+                foreach (var wem in bnk.Didx.Wems)
+                {
+                    if (!allWems.ContainsKey(wem.Id))
+                    {
+                        allWems[wem.Id] = new WemSoundInfo 
+                        { 
+                            Id = wem.Id, 
+                            Offset = (uint)(wem.Offset + dataOffset), 
+                            Size = wem.Size,
+                            Source = source
+                        };
+                        bnkWemCount++;
+                    }
+                }
+                _logService.LogDebug($"[AUDIO] Found {bnkWemCount} ADDITIONAL WEM metadata entries in {logLabel}.");
+            }
         }
 
         /// <summary>
@@ -163,20 +173,37 @@ namespace AssetsManager.Services.Audio
             }
         }
 
-        private List<AudioEventNode> ParseEventsBank(byte[] eventsData, Dictionary<uint, string> eventNameMap, Dictionary<uint, WemSoundInfo> wemMetadata)
+        private List<AudioEventNode> ParseEventsBank(byte[][] bnkDatas, Dictionary<uint, string> eventNameMap, Dictionary<uint, WemSoundInfo> wemMetadata)
         {
             var eventNodes = new List<AudioEventNode>();
-            if (eventsData == null) return eventNodes;
+            if (bnkDatas == null || bnkDatas.All(d => d == null)) return eventNodes;
 
-            using var stream = new MemoryStream(eventsData);
-            var bnkFile = BnkParser.Parse(stream, _logService);
+            var hircObjects = new Dictionary<uint, BnkObject>();
+            var eventObjects = new List<BnkObject>();
 
-            if (bnkFile?.Hirc?.Objects == null)
+            foreach (var bnkData in bnkDatas)
             {
-                return eventNodes;
+                if (bnkData == null) continue;
+                using var stream = new MemoryStream(bnkData);
+                var bnkFile = BnkParser.Parse(stream, _logService);
+
+                if (bnkFile?.Hirc?.Objects != null)
+                {
+                    foreach (var obj in bnkFile.Hirc.Objects)
+                    {
+                        // Add to global HIRC map for cross-bank resolution
+                        if (!hircObjects.ContainsKey(obj.Id)) hircObjects[obj.Id] = obj;
+                        
+                        // Collect event objects to start traversal from
+                        if (obj.Type == BnkObjectType.Event || obj.Type == BnkObjectType.DialogueEvent)
+                        {
+                            eventObjects.Add(obj);
+                        }
+                    }
+                }
             }
 
-            var hircObjects = bnkFile.Hirc.Objects.ToDictionary(o => o.Id);
+            if (!hircObjects.Any()) return eventNodes;
 
             void Traverse(uint objectId, AudioEventNode audioEventNode)
             {
@@ -253,8 +280,6 @@ namespace AssetsManager.Services.Audio
                         break;
                 }
             }
-
-            var eventObjects = bnkFile.Hirc.Objects.Where(o => o.Type == BnkObjectType.Event || o.Type == BnkObjectType.DialogueEvent);
 
             foreach (var eventObj in eventObjects)
             {
