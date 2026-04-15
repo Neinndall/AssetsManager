@@ -40,8 +40,14 @@ namespace AssetsManager.Services.Monitor
             if (assets == null || !assets.Any()) return (false, new List<string>());
 
             if (!silent) _logService.Log("Checking monitored assets for updates...");
+
             bool anyUpdated = false;
+            bool checkPerformed = false;
+            bool baseDirWarningLogged = false;
             var updatedAssetNames = new List<string>();
+
+            string baseDir = _appSettings.LolPbeDirectory;
+            bool hasBaseDir = !string.IsNullOrEmpty(baseDir) && Directory.Exists(baseDir);
 
             foreach (var asset in assets)
             {
@@ -55,14 +61,38 @@ namespace AssetsManager.Services.Monitor
                     }
 
                     string fullWadPath = GetFullWadPath(asset);
+                    
                     if (string.IsNullOrEmpty(fullWadPath) || !File.Exists(fullWadPath))
                     {
-                        _logService.LogWarning($"WAD file not found for asset '{asset.Alias}': {fullWadPath}");
-                        asset.Status = AssetStatus.Error;
-                        asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                        if (Path.IsPathRooted(asset.WadName))
+                        {
+                            // It's an absolute path that really doesn't exist
+                            _logService.LogWarning($"WAD file not found at path: {asset.WadName}");
+                            asset.Status = AssetStatus.Error;
+                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                        }
+                        else if (!hasBaseDir)
+                        {
+                            // It's a relative path but we don't have a base directory to resolve it
+                            if (!silent && !baseDirWarningLogged)
+                            {
+                                _logService.LogWarning("Some monitored assets have relative paths but PBE Client Directory is not configured in Settings.");
+                                baseDirWarningLogged = true;
+                            }
+                            asset.Status = AssetStatus.Pending;
+                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
+                        }
+                        else
+                        {
+                            // It's a relative path, we have a base dir, but still couldn't find the file
+                            _logService.LogWarning($"Asset WAD not found in game directory: {asset.WadName}");
+                            asset.Status = AssetStatus.Error;
+                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                        }
                         continue;
                     }
 
+                    checkPerformed = true;
                     using var wadFile = new WadFile(fullWadPath);
                     ulong pathHash = XxHash64Ext.Hash(asset.InternalPath.ToLower());
                     
@@ -120,15 +150,12 @@ namespace AssetsManager.Services.Monitor
                 _appSettings.Save();
                 if (!silent)
                 {
-                    string message = updatedAssetNames.Count > 0
-                        ? $"Monitored assets updated: {string.Join(", ", updatedAssetNames)}"
-                        : "Some monitored assets have been updated!";
-                    _logService.LogSuccess(message);
+                    _logService.LogSuccess("Assets Watcher files are updated.");
                 }
             }
-            else if (!silent)
+            else if (!silent && checkPerformed)
             {
-                _logService.Log("All monitored assets are up-to-date.");
+                _logService.LogSuccess("All monitored assets are up-to-date.");
             }
 
             return (anyUpdated, updatedAssetNames);
@@ -184,36 +211,45 @@ namespace AssetsManager.Services.Monitor
 
         private string GetFullWadPath(MonitoredAsset asset)
         {
+            if (string.IsNullOrEmpty(asset.WadName)) return null;
+
+            // 1. Absolute Path: Trust it.
+            if (Path.IsPathRooted(asset.WadName))
+            {
+                return File.Exists(asset.WadName) ? asset.WadName : null;
+            }
+
+            // 2. Relative Path: Resolve it using base directory.
             string baseDir = _appSettings.LolPbeDirectory;
             if (string.IsNullOrEmpty(baseDir)) return null;
 
-            // 1. Try direct combined path (Relative or Absolute)
-            string fullPath = Path.IsPathRooted(asset.WadName) 
-                ? asset.WadName 
-                : Path.Combine(baseDir, asset.WadName);
+            // Combined
+            string combined = Path.Combine(baseDir, asset.WadName);
+            if (File.Exists(combined)) return combined;
 
-            if (File.Exists(fullPath)) return fullPath;
-
-            // 2. Try common Riot locations
-            string gameDataPath = Path.Combine(baseDir, "Game", "DATA", "Final", Path.GetFileName(asset.WadName));
+            // Common locations
+            string fileName = Path.GetFileName(asset.WadName);
+            string gameDataPath = Path.Combine(baseDir, "Game", "DATA", "Final", fileName);
             if (File.Exists(gameDataPath)) return gameDataPath;
 
-            string pluginsPath = Path.Combine(baseDir, "Plugins", Path.GetFileName(asset.WadName));
+            string pluginsPath = Path.Combine(baseDir, "Plugins", fileName);
             if (File.Exists(pluginsPath)) return pluginsPath;
 
-            // 3. Last resort: Smart Recursive Search
+            // Search
             try
             {
-                string fileName = Path.GetFileName(asset.WadName);
-                var foundFiles = Directory.GetFiles(baseDir, fileName, SearchOption.AllDirectories);
-                if (foundFiles.Length > 0)
+                if (Directory.Exists(baseDir))
                 {
-                    // Update the asset WadName for future checks to avoid searching again
-                    asset.WadName = foundFiles[0].Substring(baseDir.Length).TrimStart('/', '\\');
-                    return foundFiles[0];
+                    var foundFiles = Directory.GetFiles(baseDir, fileName, SearchOption.AllDirectories);
+                    if (foundFiles.Length > 0)
+                    {
+                        // Update the asset WadName for future checks to avoid searching again
+                        asset.WadName = foundFiles[0].Substring(baseDir.Length).TrimStart('/', '\\');
+                        return foundFiles[0];
+                    }
                 }
             }
-            catch { /* Ignore search errors */ }
+            catch { }
 
             return null;
         }
