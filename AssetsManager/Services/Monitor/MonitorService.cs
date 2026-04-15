@@ -19,137 +19,71 @@ namespace AssetsManager.Services.Monitor
     public class MonitorService : IDisposable
     {
         private readonly AppSettings _appSettings;
-        private readonly JsonDataService _jsonDataService;
+        private readonly AssetWatcherService _assetWatcherService;
         private readonly LogService _logService;
         private readonly HttpClient _httpClient;
 
-        public ObservableRangeCollection<MonitoredUrl> MonitoredItems { get; } = new ObservableRangeCollection<MonitoredUrl>();
+        public ObservableRangeCollection<MonitoredAsset> MonitoredAssets { get; } = new ObservableRangeCollection<MonitoredAsset>();
 
         public event Action<AssetCategory> CategoryCheckStarted;
         public event Action<AssetCategory> CategoryCheckCompleted;
 
-        public MonitorService(AppSettings appSettings, JsonDataService jsonDataService, LogService logService, HttpClient httpClient)
+        public MonitorService(AppSettings appSettings, AssetWatcherService assetWatcherService, LogService logService, HttpClient httpClient)
         {
             _appSettings = appSettings;
-            _jsonDataService = jsonDataService;
+            _assetWatcherService = assetWatcherService;
             _logService = logService;
             _httpClient = httpClient;
 
-            LoadMonitoredUrls();
+            LoadMonitoredAssets();
 
-            _jsonDataService.FileUpdated += OnFileUpdated;
-            _jsonDataService.FileCheckStarted += OnFileCheckStarted;
-            _jsonDataService.FileCheckFailed += OnFileCheckFailed;
-            _jsonDataService.FileCheckUpToDate += OnFileCheckUpToDate;
+            _assetWatcherService.AssetUpdated += OnAssetUpdated;
         }
 
         public void Dispose()
         {
-            _jsonDataService.FileUpdated -= OnFileUpdated;
-            _jsonDataService.FileCheckStarted -= OnFileCheckStarted;
-            _jsonDataService.FileCheckFailed -= OnFileCheckFailed;
-            _jsonDataService.FileCheckUpToDate -= OnFileCheckUpToDate;
+            _assetWatcherService.AssetUpdated -= OnAssetUpdated;
         }
 
-        public void LoadMonitoredUrls()
+        public void LoadMonitoredAssets()
         {
-            MonitoredItems.Clear();
-            foreach (var url in _appSettings.MonitoredJsonFiles)
+            MonitoredAssets.Clear();
+            if (_appSettings.MonitoredAssets != null)
             {
-                _appSettings.JsonDataModificationDates.TryGetValue(url, out DateTime lastUpdated);
-
-                string statusText = "Pending check";
-                string lastChecked = "N/A";
-                Brush statusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
-
-                if (lastUpdated != DateTime.MinValue)
+                foreach (var asset in _appSettings.MonitoredAssets)
                 {
-                    statusText = "Up-to-date";
-                    lastChecked = $"Last Update: {lastUpdated:yyyy-MMM-dd HH:mm}";
-                    statusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                    // Update visual state based on current data
+                    if (asset.LastUpdated != DateTime.MinValue && !asset.HasChanges)
+                    {
+                        asset.Status = AssetStatus.UpToDate;
+                        asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                    }
+                    else if (asset.HasChanges)
+                    {
+                        asset.Status = AssetStatus.Updated;
+                        asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBlue");
+                    }
+                    else
+                    {
+                        asset.Status = AssetStatus.Pending;
+                        asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
+                    }
+
+                    MonitoredAssets.Add(asset);
                 }
-
-                MonitoredItems.Add(new MonitoredUrl
-                {
-                    Alias = GetAliasForUrl(url),
-                    Url = url,
-                    StatusText = statusText,
-                    StatusColor = statusColor,
-                    LastChecked = lastChecked,
-                    HasChanges = false
-                });
             }
         }
 
-        private void OnFileUpdated(FileUpdateInfo fileUpdateInfo)
+        private void OnAssetUpdated(MonitoredAsset asset)
         {
-            var item = MonitoredItems.FirstOrDefault(x => x.Url == fileUpdateInfo.FullUrl);
-            if (item != null)
-            {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    item.StatusText = "Updated";
-                    item.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBlue");
-                    item.LastChecked = $"Last Update: {fileUpdateInfo.Timestamp:yyyy-MMM-dd HH:mm}";
-                    item.HasChanges = true;
-                    item.OldFilePath = fileUpdateInfo.OldFilePath;
-                    item.NewFilePath = fileUpdateInfo.NewFilePath;
-                });
-                _appSettings.JsonDataModificationDates[fileUpdateInfo.FullUrl] = fileUpdateInfo.Timestamp;
-                AppSettings.SaveSettings(_appSettings);
-            }
+            // The AssetWatcherService already updates the asset object properties.
+            // Since MonitoredAssets contains the same references as _appSettings.MonitoredAssets,
+            // the UI will update automatically if the asset implements INotifyPropertyChanged.
         }
 
-        private void OnFileCheckStarted(string url)
+        public async Task<bool> CheckAssetsUpdatesAsync(bool silent = false)
         {
-            var item = MonitoredItems.FirstOrDefault(x => x.Url == url);
-            if (item != null)
-            {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    item.StatusText = "Checking";
-                    item.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBrush");
-                });
-            }
-        }
-
-        private void OnFileCheckFailed(string url)
-        {
-            var item = MonitoredItems.FirstOrDefault(x => x.Url == url);
-            if (item != null)
-            {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    item.StatusText = "Error";
-                    item.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
-                });
-            }
-        }
-
-        private void OnFileCheckUpToDate(string url)
-        {
-            var item = MonitoredItems.FirstOrDefault(x => x.Url == url);
-            if (item != null)
-            {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    item.StatusText = "Up-to-date";
-                    item.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
-                });
-            }
-        }
-
-        private string GetAliasForUrl(string url)
-        {
-            try
-            {
-                var uri = new Uri(url);
-                return uri.Segments.Last();
-            }
-            catch
-            {
-                return url;
-            }
+            return await _assetWatcherService.CheckAssetsAsync(MonitoredAssets, silent);
         }
 
         #region Asset Tracker

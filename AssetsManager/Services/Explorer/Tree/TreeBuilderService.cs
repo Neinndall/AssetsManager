@@ -145,17 +145,14 @@ namespace AssetsManager.Services.Explorer.Tree
                     var soundNodesToAdd = new List<FileSystemNodeModel>();
                     foreach (var soundNode in eventNode.Sounds)
                     {
-                        // Determine the correct source file (WPK or BNK) for the sound.
-                        AudioSourceType sourceType;
+                        // Determine the correct source file (WPK or BNK) for the sound based on its metadata.
                         ulong sourceHash;
-                        if (linkedBank.WpkNode != null)
+                        if (soundNode.Source == AudioSourceType.Wpk && linkedBank.WpkNode != null)
                         {
-                            sourceType = AudioSourceType.Wpk;
                             sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
                         }
                         else
                         {
-                            sourceType = AudioSourceType.Bnk;
                             sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
                         }
 
@@ -163,7 +160,7 @@ namespace AssetsManager.Services.Explorer.Tree
                         {
                             SourceWadPath = absoluteSourceWadPath,
                             SourceChunkPathHash = sourceHash,
-                            AudioSource = sourceType
+                            AudioSource = soundNode.Source
                         };
                         soundNodesToAdd.Add(newSoundNode);
                     }

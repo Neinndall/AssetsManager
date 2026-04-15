@@ -32,7 +32,7 @@ namespace AssetsManager.Views.Controls.Monitor
             // Solo creamos el modelo si no existe ya y si tenemos todos los servicios inyectados
             if (DataContext == null && MonitorService != null && PbeStatusService != null && AppSettings != null && VersionService != null && StatusService != null && UpdateCheckService != null)
             {
-                DataContext = new MonitorDashboardModel(MonitorService, PbeStatusService, AppSettings, VersionService, StatusService, UpdateCheckService);
+                DataContext = new MonitorDashboardModel(MonitorService, PbeStatusService, VersionService, AppSettings, StatusService, UpdateCheckService);
             }
         }
     }

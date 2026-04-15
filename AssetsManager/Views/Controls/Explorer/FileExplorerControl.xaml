@@ -44,6 +44,11 @@
                     <materialIcons:MaterialIcon Kind="StarOutline"/>
                 </MenuItem.Icon>
             </MenuItem>
+            <MenuItem Header="Watch Asset" x:Name="WatchAssetMenuItem" Click="WatchAsset_Click">
+                <MenuItem.Icon>
+                    <materialIcons:MaterialIcon Kind="EyeOutline"/>
+                </MenuItem.Icon>
+            </MenuItem>
             <MenuItem Header="To Image Merger" x:Name="AddToImageMergerMenuItem" Click="AddToImageMerger_Click">
                 <MenuItem.Icon>
                     <materialIcons:MaterialIcon Kind="ViewGridPlus"/>

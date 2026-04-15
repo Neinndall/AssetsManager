@@ -56,7 +56,7 @@
                                     <Setter Property="Text" Value="Operations dashboard and system integrity overview"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True">
-                                            <Setter Property="Text" Value="Remote manifests monitoring and real-time change detection"/>
+                                            <Setter Property="Text" Value="Local game assets monitoring and real-time change detection after patches"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True">
                                             <Setter Property="Text" Value="Audit log of historical changes and version differences"/>
@@ -117,8 +117,8 @@
                     </monitorControls:MonitorDashboardControl.Style>
                 </monitorControls:MonitorDashboardControl>
 
-                <monitorControls:FileWatcherControl x:Name="FileWatcherControl">
-                    <monitorControls:FileWatcherControl.Style>
+                <monitorControls:AssetWatcherControl x:Name="AssetWatcherControl">
+                    <monitorControls:AssetWatcherControl.Style>
                         <Style TargetType="UserControl">
                             <Setter Property="Visibility" Value="Collapsed"/>
                             <Style.Triggers>
@@ -127,8 +127,8 @@
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </monitorControls:FileWatcherControl.Style>
-                </monitorControls:FileWatcherControl>
+                    </monitorControls:AssetWatcherControl.Style>
+                </monitorControls:AssetWatcherControl>
 
                 <monitorControls:HistoryViewControl x:Name="HistoryViewControl">
                     <monitorControls:HistoryViewControl.Style>

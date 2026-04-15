@@ -17,7 +17,6 @@ namespace AssetsManager.Services.Core
     {
         private readonly AppSettings _appSettings;
         private readonly Status _status;
-        private readonly JsonDataService _jsonDataService;
         private readonly UpdateManager _updateManager;
         private readonly LogService _logService;
         private readonly MonitorService _monitorService;
@@ -31,11 +30,10 @@ namespace AssetsManager.Services.Core
 
         public string AvailableVersion { get; private set; }
 
-        public UpdateCheckService(AppSettings appSettings, Status status, JsonDataService jsonDataService, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService)
+        public UpdateCheckService(AppSettings appSettings, Status status, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService)
         {
             _appSettings = appSettings;
             _status = status;
-            _jsonDataService = jsonDataService;
             _updateManager = updateManager;
             _logService = logService;
             _monitorService = monitorService;
@@ -234,22 +232,14 @@ namespace AssetsManager.Services.Core
                 }));
             }
 
-            // 3. JSON Data Updates Check
-            if (_appSettings.CheckJsonDataUpdates)
+            // 3. Asset Updates Check (Local WADs)
+            if (_appSettings.AssetWatcherUpdates)
             {
-                tasks.Add(_jsonDataService.CheckJsonDataUpdatesAsync(silent, (updatedFiles) =>
+                tasks.Add(_monitorService.CheckAssetsUpdatesAsync(silent).ContinueWith(t =>
                 {
-                    if (updatedFiles != null && updatedFiles.Any())
+                    if (t.Result)
                     {
-                        if (updatedFiles.Count == 1)
-                        {
-                            UpdatesFound?.Invoke($"Monitored file updated: {updatedFiles[0]}", null);
-                        }
-                        else
-                        {
-                            string files = string.Join(", ", updatedFiles);
-                            UpdatesFound?.Invoke($"Monitored files updated: {files}", null);
-                        }
+                        UpdatesFound?.Invoke("Some monitored local assets have been updated!", null);
                     }
                 }));
             }

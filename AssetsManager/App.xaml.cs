@@ -134,7 +134,7 @@ namespace AssetsManager
       services.AddSingleton<PbeStatusService>();
       services.AddSingleton<RiotApiService>(); // LCU Service
       services.AddSingleton<VersionService>();
-      services.AddSingleton<JsonDataService>();
+      services.AddSingleton<AssetWatcherService>();
       services.AddSingleton<ComparisonHistoryService>();
       
       // Manifests Services

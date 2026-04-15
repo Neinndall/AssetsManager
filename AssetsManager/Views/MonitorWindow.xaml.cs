@@ -20,7 +20,7 @@ namespace AssetsManager.Views
             AppSettings appSettings,
             LogService logService,
             CustomMessageBoxService customMessageBoxService,
-            JsonDataService jsonDataService,
+            AssetWatcherService assetWatcherService,
             VersionService versionService,
             DirectoriesCreator directoriesCreator,
             RiotApiService riotApiService,
@@ -41,14 +41,14 @@ namespace AssetsManager.Views
             MonitorDashboardControl.StatusService = statusService;
             MonitorDashboardControl.UpdateCheckService = updateCheckService;
 
-            // Inject all necessary dependencies into the FileWatcherControl
-            FileWatcherControl.MonitorService = monitorService;
-            FileWatcherControl.ServiceProvider = serviceProvider;
-            FileWatcherControl.DiffViewService = diffViewService;
-            FileWatcherControl.JsonDataService = jsonDataService;
-            FileWatcherControl.AppSettings = appSettings;
-            FileWatcherControl.LogService = logService;
-            FileWatcherControl.CustomMessageBoxService = customMessageBoxService;
+            // Inject all necessary dependencies into the AssetWatcherControl
+            AssetWatcherControl.MonitorService = monitorService;
+            AssetWatcherControl.ServiceProvider = serviceProvider;
+            AssetWatcherControl.DiffViewService = diffViewService;
+            AssetWatcherControl.AssetWatcherService = assetWatcherService;
+            AssetWatcherControl.AppSettings = appSettings;
+            AssetWatcherControl.LogService = logService;
+            AssetWatcherControl.CustomMessageBoxService = customMessageBoxService;
 
             // Setup and inject dependencies for HistoryViewControl
             HistoryViewControl.AppSettings = appSettings;
