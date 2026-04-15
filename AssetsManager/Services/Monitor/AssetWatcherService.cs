@@ -230,7 +230,7 @@ namespace AssetsManager.Services.Monitor
 
                     var entry = new HistoryEntry
                     {
-                        FileName = $"{asset.Alias} (Watcher Update)",
+                        FileName = asset.Alias,
                         OldFilePath = archiveOld,
                         NewFilePath = archiveNew,
                         Timestamp = DateTime.Now,

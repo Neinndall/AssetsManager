@@ -227,7 +227,7 @@ namespace AssetsManager.Services.Core
                 {
                     if (silent)
                     {
-                        UpdatesFound?.Invoke("New hashes are available", null);
+                        UpdatesFound?.Invoke("New hashes are available!", null);
                     }
                 }));
             }

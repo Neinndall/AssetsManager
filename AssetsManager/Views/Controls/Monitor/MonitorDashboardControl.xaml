@@ -162,7 +162,7 @@
                 </Grid>
             </Border>
 
-            <!-- CARD 3: FILE WATCHER -->
+            <!-- CARD 3: ASSET WATCHER -->
             <Border Background="{StaticResource CardBackground}" CornerRadius="16" Margin="8,0,8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -177,7 +177,7 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
                             <TextBlock Text="Surveillance" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="FILE WATCHER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text="ASSET WATCHER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
 
