@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Media;
 using System.Collections.Specialized;
 using AssetsManager.Info;
@@ -186,7 +187,7 @@ namespace AssetsManager.Views.Models.Monitor
             AppVersionText = ApplicationInfos.Version;
 
             // Map ApplicationInfos color and icon dynamically
-            AppVersionColor = (Brush)System.Windows.Application.Current.FindResource(ApplicationInfos.BuildColorKey);
+            AppVersionColor = (Brush)Application.Current.FindResource(ApplicationInfos.BuildColorKey);
             AppVersionIconKind = ApplicationInfos.BuildIcon;
 
             // Check if an update was already found (Higher priority than Build Type)
@@ -203,7 +204,7 @@ namespace AssetsManager.Views.Models.Monitor
                 // Verify if it's an app update notification
                 if (!string.IsNullOrEmpty(latestVersion))
                 {
-                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    Application.Current.Dispatcher.Invoke(() =>
                     {
                         AppVersionText = $"v{latestVersion} ready!";
                         AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
@@ -256,7 +257,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             _monitorService.CategoryCheckCompleted += (category) =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     // Race condition fix: When this event fires, 'category.Status' might still be 'Checking'.
                     // We check if ANY OTHER category is checking. If not, we are effectively Idle.
@@ -274,7 +275,7 @@ namespace AssetsManager.Views.Models.Monitor
             };
             _monitorService.CategoryCheckStarted += (category) =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     AssetTrackerStatus = $"Category: {category.Name} - Checking...";
                 });
@@ -282,7 +283,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             _pbeStatusService.StatusChecked += () =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() => {
+                Application.Current.Dispatcher.Invoke(() => {
                     RefreshPbeData();
                     PbeLastCheck = DateTime.Now.ToString("HH:mm");
                 });
@@ -290,7 +291,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             _statusService.HashSyncStarted += () =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     HashesStatus = "Updating...";
                     UpdateSystemHealthFooter();
@@ -299,7 +300,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             _statusService.HashSyncCompleted += () =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     HashesStatus = "Synced";
                     UpdateSystemHealthFooter();
@@ -396,7 +397,7 @@ namespace AssetsManager.Views.Models.Monitor
         {
             if (e.PropertyName == nameof(MonitoredAsset.HasChanges) || e.PropertyName == nameof(MonitoredAsset.LastUpdated))
             {
-                RefreshFileWatcherData();
+                Application.Current.Dispatcher.Invoke(RefreshFileWatcherData);
             }
         }
 

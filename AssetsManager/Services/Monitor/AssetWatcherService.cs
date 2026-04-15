@@ -54,11 +54,14 @@ namespace AssetsManager.Services.Monitor
                 try
                 {
                     // Don't overwrite pending check or updated status if we are already in that state in UI
-                    if (asset.Status != AssetStatus.Updated)
+                    Application.Current.Dispatcher.Invoke(() =>
                     {
-                        asset.Status = AssetStatus.Pending;
-                        asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBrush");
-                    }
+                        if (asset.Status != AssetStatus.Updated)
+                        {
+                            asset.Status = AssetStatus.Pending;
+                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBrush");
+                        }
+                    });
 
                     string fullWadPath = GetFullWadPath(asset);
                     
@@ -68,8 +71,11 @@ namespace AssetsManager.Services.Monitor
                         {
                             // It's an absolute path that really doesn't exist
                             _logService.LogWarning($"WAD file not found at path: {asset.WadName}");
-                            asset.Status = AssetStatus.Error;
-                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                            Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                asset.Status = AssetStatus.Error;
+                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                            });
                         }
                         else if (!hasBaseDir)
                         {
@@ -79,15 +85,21 @@ namespace AssetsManager.Services.Monitor
                                 _logService.LogWarning("Some monitored assets have relative paths but PBE Client Directory is not configured in Settings.");
                                 baseDirWarningLogged = true;
                             }
-                            asset.Status = AssetStatus.Pending;
-                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
+                            Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                asset.Status = AssetStatus.Pending;
+                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
+                            });
                         }
                         else
                         {
                             // It's a relative path, we have a base dir, but still couldn't find the file
                             _logService.LogWarning($"Asset WAD not found in game directory: {asset.WadName}");
-                            asset.Status = AssetStatus.Error;
-                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                            Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                asset.Status = AssetStatus.Error;
+                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                            });
                         }
                         continue;
                     }
@@ -99,8 +111,11 @@ namespace AssetsManager.Services.Monitor
                     if (!wadFile.Chunks.TryGetValue(pathHash, out var chunk))
                     {
                         _logService.LogWarning($"Asset '{asset.InternalPath}' not found inside WAD '{asset.WadName}'");
-                        asset.Status = AssetStatus.Error;
-                        asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            asset.Status = AssetStatus.Error;
+                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                        });
                         continue;
                     }
 
@@ -124,24 +139,30 @@ namespace AssetsManager.Services.Monitor
                         // No changes found in this check. 
                         // CRITICAL: Only set to UpToDate if it wasn't already marked as Updated 
                         // (prevents auto-resetting before user sees it)
-                        if (!asset.HasChanges)
+                        Application.Current.Dispatcher.Invoke(() =>
                         {
-                            asset.Status = AssetStatus.UpToDate;
-                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
-                        }
-                        else
-                        {
-                            // Keep Updated status until user acknowledges
-                            asset.Status = AssetStatus.Updated;
-                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBlue");
-                        }
+                            if (!asset.HasChanges)
+                            {
+                                asset.Status = AssetStatus.UpToDate;
+                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                            }
+                            else
+                            {
+                                // Keep Updated status until user acknowledges
+                                asset.Status = AssetStatus.Updated;
+                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBlue");
+                            }
+                        });
                     }
                 }
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Error checking asset: {asset.AssetPath}");
-                    asset.Status = AssetStatus.Error;
-                    asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        asset.Status = AssetStatus.Error;
+                        asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                    });
                 }
             }
 
@@ -225,13 +246,16 @@ namespace AssetsManager.Services.Monitor
                 }
             }
 
-            asset.LastKnownHash = checksum;
-            asset.LastUpdated = DateTime.Now;
-            asset.Status = isInitial ? AssetStatus.UpToDate : AssetStatus.Updated;
-            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource(isInitial ? "AccentGreen" : "AccentBlue");
-            asset.HasChanges = !isInitial;
-            asset.OldFilePath = oldPath;
-            asset.NewFilePath = newPath;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                asset.LastKnownHash = checksum;
+                asset.LastUpdated = DateTime.Now;
+                asset.Status = isInitial ? AssetStatus.UpToDate : AssetStatus.Updated;
+                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource(isInitial ? "AccentGreen" : "AccentBlue");
+                asset.HasChanges = !isInitial;
+                asset.OldFilePath = oldPath;
+                asset.NewFilePath = newPath;
+            });
 
             if (!isInitial)
             {
