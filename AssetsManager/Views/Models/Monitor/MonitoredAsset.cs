@@ -77,8 +77,10 @@ namespace AssetsManager.Views.Models.Monitor
         public AssetStatus Status
         {
             get => _status;
-            set { if (_status != value) { _status = value; OnPropertyChanged(); UpdateStatusInfo(); } }
+            set { if (_status != value) { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); UpdateStatusInfo(); } }
         }
+
+        public string StatusText => GetStatusText();
 
         public Brush StatusColor
         {

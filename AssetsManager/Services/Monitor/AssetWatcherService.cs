@@ -195,6 +195,36 @@ namespace AssetsManager.Services.Monitor
             byte[] newData = decompressedDataOwner.Span.ToArray();
             await File.WriteAllBytesAsync(newPath, newData);
 
+            // Archive to history if enabled
+            if (!isInitial && _appSettings.SaveJsonHistory)
+            {
+                try
+                {
+                    string historyFolder = _directoriesCreator.GetNewJsonHistoryPath(asset.Alias);
+                    string archiveOld = Path.Combine(historyFolder, "old_" + cleanAlias);
+                    string archiveNew = Path.Combine(historyFolder, "new_" + cleanAlias);
+
+                    File.Copy(oldPath, archiveOld, true);
+                    File.Copy(newPath, archiveNew, true);
+
+                    var entry = new HistoryEntry
+                    {
+                        FileName = $"{asset.Alias} (Watcher Update)",
+                        OldFilePath = archiveOld,
+                        NewFilePath = archiveNew,
+                        Timestamp = DateTime.Now,
+                        Type = HistoryEntryType.FileDiff
+                    };
+
+                    _appSettings.DiffHistory.Insert(0, entry);
+                    // No need to save settings here as it's saved in the caller loop
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to archive watcher update for {asset.Alias}");
+                }
+            }
+
             asset.LastKnownHash = checksum;
             asset.LastUpdated = DateTime.Now;
             asset.Status = isInitial ? AssetStatus.UpToDate : AssetStatus.Updated;
