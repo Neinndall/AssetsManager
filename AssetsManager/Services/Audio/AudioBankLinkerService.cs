@@ -102,9 +102,9 @@ namespace AssetsManager.Services.Audio
                     _logService.LogDebug($"[LinkAudioBankForDiffAsync] Determined BinType: {binType}");
                 }
 
-                // Find the Sibling audio dependency (_audio.bnk or _audio.wpk)
-                var audioDep = clickedNode.ChunkDiff.Dependencies.FirstOrDefault(d => d.Path.Contains("_audio.bnk") || d.Path.Contains("_audio.wpk"));
-                if (audioDep != null)
+                // Find ALL Sibling audio dependencies (_audio.bnk and/or _audio.wpk)
+                var audioDeps = clickedNode.ChunkDiff.Dependencies.Where(d => d.Path.Contains("_audio.bnk") || d.Path.Contains("_audio.wpk")).ToList();
+                foreach (var audioDep in audioDeps)
                 {
                     _logService.LogDebug($"[LinkAudioBankForDiffAsync] Found sibling audio dependency: '{audioDep.Path}' from WAD '{audioDep.SourceWad}'");
                     ulong audioHash = preferOld ? audioDep.OldPathHash : audioDep.NewPathHash;
