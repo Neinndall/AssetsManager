@@ -237,9 +237,14 @@ namespace AssetsManager.Services.Core
             {
                 tasks.Add(_monitorService.CheckAssetsUpdatesAsync(silent).ContinueWith(t =>
                 {
-                    if (t.Result)
+                    var (anyUpdated, updatedNames) = t.Result;
+                    if (anyUpdated)
                     {
-                        UpdatesFound?.Invoke("Some monitored local assets have been updated!", null);
+                        string message = updatedNames.Count > 0
+                            ? $"Monitored assets updated: {string.Join(", ", updatedNames)}"
+                            : "Some monitored local assets have been updated!";
+
+                        UpdatesFound?.Invoke(message, null);
                     }
                 }));
             }

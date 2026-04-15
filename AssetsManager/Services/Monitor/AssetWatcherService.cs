@@ -35,12 +35,13 @@ namespace AssetsManager.Services.Monitor
             _wadContentProvider = wadContentProvider;
         }
 
-        public async Task<bool> CheckAssetsAsync(IEnumerable<MonitoredAsset> assets, bool silent = false)
+        public async Task<(bool anyUpdated, List<string> updatedAssetNames)> CheckAssetsAsync(IEnumerable<MonitoredAsset> assets, bool silent = false)
         {
-            if (assets == null || !assets.Any()) return false;
+            if (assets == null || !assets.Any()) return (false, new List<string>());
 
             if (!silent) _logService.Log("Checking monitored assets for updates...");
             bool anyUpdated = false;
+            var updatedAssetNames = new List<string>();
 
             foreach (var asset in assets)
             {
@@ -86,6 +87,7 @@ namespace AssetsManager.Services.Monitor
                         // Change detected!
                         await ProcessAssetUpdate(asset, wadFile, chunk, currentChecksum, false);
                         anyUpdated = true;
+                        updatedAssetNames.Add(asset.Alias);
                     }
                     else
                     {
@@ -116,14 +118,20 @@ namespace AssetsManager.Services.Monitor
             if (anyUpdated)
             {
                 _appSettings.Save();
-                if (!silent) _logService.LogSuccess("Some monitored assets have been updated!");
+                if (!silent)
+                {
+                    string message = updatedAssetNames.Count > 0
+                        ? $"Monitored assets updated: {string.Join(", ", updatedAssetNames)}"
+                        : "Some monitored assets have been updated!";
+                    _logService.LogSuccess(message);
+                }
             }
             else if (!silent)
             {
                 _logService.Log("All monitored assets are up-to-date.");
             }
 
-            return anyUpdated;
+            return (anyUpdated, updatedAssetNames);
         }
 
         private async Task ProcessAssetUpdate(MonitoredAsset asset, WadFile wadFile, WadChunk chunk, ulong checksum, bool isInitial)

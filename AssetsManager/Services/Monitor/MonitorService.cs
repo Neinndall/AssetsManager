@@ -81,7 +81,7 @@ namespace AssetsManager.Services.Monitor
             // the UI will update automatically if the asset implements INotifyPropertyChanged.
         }
 
-        public async Task<bool> CheckAssetsUpdatesAsync(bool silent = false)
+        public async Task<(bool anyUpdated, List<string> updatedAssetNames)> CheckAssetsUpdatesAsync(bool silent = false)
         {
             return await _assetWatcherService.CheckAssetsAsync(MonitoredAssets, silent);
         }
