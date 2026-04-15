@@ -47,7 +47,7 @@ namespace AssetsManager.Views.Models.Monitor
             set { _pbeLastCheck = value; OnPropertyChanged(); }
         }
 
-        // --- File Watcher ---
+        // --- Asset Watcher ---
         private int _monitoredFilesCount;
         public int MonitoredFilesCount
         {
