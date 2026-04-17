@@ -141,7 +141,11 @@ namespace AssetsManager.Services.Comparator
         public async Task<List<SerializableChunkDiff>> CreateLeanWadPackageAsync(IEnumerable<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string targetOldWadsPath, string targetNewWadsPath)
         {
             var finalDiffs = diffs.ToList();
-            var audioBankDiffs = finalDiffs.Where(d => (d.NewPath ?? d.OldPath).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase)).ToList();
+            var audioBankDiffs = finalDiffs.Where(d => 
+                (d.NewPath ?? d.OldPath).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase) ||
+                (d.NewPath ?? d.OldPath).EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase) ||
+                (d.NewPath ?? d.OldPath).EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase)
+            ).ToList();
             _logService.LogDebug($"[CreateLeanWadPackageAsync] Found {audioBankDiffs.Count} audio bank diffs to process.");
 
             foreach (var audioBankDiff in audioBankDiffs)
@@ -203,26 +207,28 @@ namespace AssetsManager.Services.Comparator
 
                 // --- 2. Handle sibling audio dependency ---
                 _logService.LogDebug($"[CreateLeanWadPackageAsync] Searching for sibling audio dependencies for '{pathForStrategy}'...");
-                string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(pathForStrategy);
+                string fileName = Path.GetFileName(pathForStrategy);
                 List<string> potentialSiblingsList = new List<string>();
 
-                if (fileNameWithoutExtension.EndsWith("_vo_events", StringComparison.OrdinalIgnoreCase))
+                if (fileName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
                 {
-                    string basePart = fileNameWithoutExtension.Replace("_vo_events", ""); // e.g., "yunara_base"
-                    potentialSiblingsList.Add(basePart + "_vo_audio.wpk");
-                }
-                else if (fileNameWithoutExtension.EndsWith("_sfx_events", StringComparison.OrdinalIgnoreCase))
-                {
-                    string basePart = fileNameWithoutExtension.Replace("_sfx_events", ""); // e.g., "yunara_base"
-                    potentialSiblingsList.Add(basePart + "_sfx_audio.bnk");
-                }
-                else if (fileNameWithoutExtension.EndsWith("_events", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Generic _events.bnk
-                    string basePart = fileNameWithoutExtension.Replace("_events", "");
+                    string basePart = fileName.Substring(0, fileName.Length - 11);
                     potentialSiblingsList.Add(basePart + "_audio.bnk");
                     potentialSiblingsList.Add(basePart + "_audio.wpk");
                 }
+                else if (fileName.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase))
+                {
+                    string basePart = fileName.Substring(0, fileName.Length - 10);
+                    potentialSiblingsList.Add(basePart + "_events.bnk");
+                    potentialSiblingsList.Add(basePart + "_audio.wpk");
+                }
+                else if (fileName.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase))
+                {
+                    string basePart = fileName.Substring(0, fileName.Length - 10);
+                    potentialSiblingsList.Add(basePart + "_events.bnk");
+                    potentialSiblingsList.Add(basePart + "_audio.bnk");
+                }
+                
                 _logService.LogDebug($"[CreateLeanWadPackageAsync] Potential siblings identified: {string.Join(", ", potentialSiblingsList)}");
 
                 foreach (var siblingFileName in potentialSiblingsList)
@@ -235,20 +241,10 @@ namespace AssetsManager.Services.Comparator
                     {
                         audioBankDiff.Dependencies.Add(siblingDependency);
                         _logService.LogDebug($"[CreateLeanWadPackageAsync] Successfully created and added sibling dependency for '{siblingFullPath}'.");
-
-                        // Always remove the top-level diff if it was explicitly a diff.
-                        // The dependency now carries its own Type and WasTopLevelDiff flag.
-                        if (diffForSiblingDependency != null)
-                        {
-                            finalDiffs.Remove(diffForSiblingDependency);
-                            _logService.LogDebug($"[CreateLeanWadPackageAsync] Removed top-level diff (now embedded as dependency): '{siblingFullPath}'.");
-                        }
-
-                        break;
                     }
                     else
                     {
-                        _logService.LogWarning($"[CreateLeanWadPackageAsync] Failed to create sibling dependency for '{siblingFullPath}'.");
+                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Sibling dependency not found for '{siblingFullPath}'. This is normal if the bank doesn't use this specific container type.");
                     }
                 }
             }
