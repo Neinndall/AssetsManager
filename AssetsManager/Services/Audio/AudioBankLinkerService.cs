@@ -133,24 +133,61 @@ namespace AssetsManager.Services.Audio
 
                 eventsBnkNode = clickedNode;
             }
-            // 2. MIXED MODE: If we have backupRootDir but NO Dependencies (Old Architecture or incomplete JSON), use the JSON searching sub-methods
+            // 2. MIXED/LIVE MODE
             else
             {
                 _logService.LogDebug($"[LinkAudioBankForDiffAsync] Resolving via sub-methods. BasePath: '{basePath}', BackupRootDir: '{backupRootDir}'");
-                var (binNodeFromWads, baseNameFromWads, binTypeFromWads) = await FindAssociatedBinFileFromWadsAsync(clickedNode, basePath, preferOld, backupRootDir);
-                binNode = binNodeFromWads;
-                baseName = baseNameFromWads;
-                binType = binTypeFromWads;
-
-                if (binNode != null)
+                
+                // BACKUP MODE without dependencies
+                if (backupRootDir != null || basePath == null)
                 {
-                    binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
-                }
+                    var (binNodeFromWads, baseNameFromWads, binTypeFromWads) = await FindAssociatedBinFileFromWadsAsync(clickedNode, basePath, preferOld, backupRootDir);
+                    binNode = binNodeFromWads;
+                    baseName = baseNameFromWads;
+                    binType = binTypeFromWads;
 
-                var siblingsResult = await FindSiblingFilesFromWadsAsync(clickedNode, basePath, preferOld, backupRootDir);
-                wpkNode = siblingsResult.WpkNode;
-                audioBnkNode = siblingsResult.AudioBnkNode;
-                eventsBnkNode = siblingsResult.EventsBnkNode;
+                    if (binNode != null) binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
+
+                    var siblingsResult = await FindSiblingFilesFromWadsAsync(clickedNode, basePath, preferOld, backupRootDir);
+                    wpkNode = siblingsResult.WpkNode;
+                    audioBnkNode = siblingsResult.AudioBnkNode;
+                    eventsBnkNode = siblingsResult.EventsBnkNode;
+                }
+                // LIVE MODE: Optimized to share WAD content loading
+                else
+                {
+                    var strategy = GetBinFileSearchStrategy(clickedNode);
+                    if (strategy != null)
+                    {
+                        binType = strategy.Type;
+                        string targetWadFullPath = ResolveTargetWadPath(clickedNode, basePath, strategy.TargetWadName);
+                        
+                        if (File.Exists(targetWadFullPath))
+                        {
+                            var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(targetWadFullPath);
+                            binNode = FindNodeByPath(wadContent, strategy.BinPath);
+                            if (binNode != null) binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
+
+                            // If the source WAD is the SAME as the target BIN WAD, reuse content for siblings
+                            string sourceWadFullPath = Path.Combine(basePath, clickedNode.ChunkDiff.SourceWadFile);
+                            if (string.Equals(targetWadFullPath, sourceWadFullPath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                wpkNode = FindNodeByName(wadContent, baseName + "_audio.wpk");
+                                audioBnkNode = FindNodeByName(wadContent, baseName + "_audio.bnk");
+                                eventsBnkNode = FindNodeByName(wadContent, baseName + "_events.bnk");
+                            }
+                        }
+                    }
+
+                    // Fallback for siblings if they weren't in the same WAD or no bin strategy was found
+                    if (eventsBnkNode == null)
+                    {
+                        var siblingsResult = await FindSiblingFilesFromWadsAsync(clickedNode, basePath, preferOld, backupRootDir);
+                        wpkNode = wpkNode ?? siblingsResult.WpkNode;
+                        audioBnkNode = audioBnkNode ?? siblingsResult.AudioBnkNode;
+                        eventsBnkNode = siblingsResult.EventsBnkNode;
+                    }
+                }
             }
 
             return new LinkedAudioBank
@@ -162,6 +199,26 @@ namespace AssetsManager.Services.Audio
                 BaseName = baseName,
                 BinType = binType
             };
+        }
+
+        private string ResolveTargetWadPath(FileSystemNodeModel clickedNode, string basePath, string targetWadName)
+        {
+            string sourceWadRelativePath = clickedNode.ChunkDiff.SourceWadFile;
+            string sourceWadFileName = Path.GetFileName(sourceWadRelativePath);
+
+            // Case 1: Same WAD
+            if (string.Equals(sourceWadFileName, targetWadName, StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.Combine(basePath, sourceWadRelativePath);
+            }
+            
+            // Case 2: Same directory
+            string sourceWadDirectory = Path.GetDirectoryName(sourceWadRelativePath);
+            string potentialPath = Path.Combine(basePath, sourceWadDirectory, targetWadName);
+            if (File.Exists(potentialPath)) return potentialPath;
+
+            // Case 3: Base path (champions/maps)
+            return Path.Combine(basePath, targetWadName);
         }
 
         public async Task<LinkedAudioBank> LinkAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
@@ -449,32 +506,12 @@ namespace AssetsManager.Services.Audio
             // LIVE MODE
             else
             {
-                string targetWadFullPath = null;
-                string sourceWadRelativePath = clickedNode.ChunkDiff.SourceWadFile;
-                string sourceWadFileName = Path.GetFileName(sourceWadRelativePath);
-
-                // Case 1: The BIN is in the same WAD as the audio file
-                if (string.Equals(sourceWadFileName, strategy.TargetWadName, StringComparison.OrdinalIgnoreCase))
-                {
-                    targetWadFullPath = Path.Combine(basePath, sourceWadRelativePath);
-                }
-                // Case 2: The BIN is in a different WAD. Try to find it in the same directory first.
-                else
-                {
-                    string sourceWadDirectory = Path.GetDirectoryName(sourceWadRelativePath);
-                    string potentialPath = Path.Combine(basePath, sourceWadDirectory, strategy.TargetWadName);
-                    if (File.Exists(potentialPath)) targetWadFullPath = potentialPath;
-                    else
-                    {
-                        string wadDirectory = (strategy.Type == BinType.Champion || strategy.Type == BinType.Map) ? basePath : Path.GetDirectoryName(Path.Combine(basePath, sourceWadRelativePath));
-                        targetWadFullPath = Path.Combine(wadDirectory, strategy.TargetWadName);
-                    }
-                }
+                string targetWadFullPath = ResolveTargetWadPath(clickedNode, basePath, strategy.TargetWadName);
 
                 if (File.Exists(targetWadFullPath))
                 {
                     var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(targetWadFullPath);
-                    var binNode = wadContent.FirstOrDefault(n => n.FullPath.Equals(strategy.BinPath, StringComparison.OrdinalIgnoreCase));
+                    var binNode = FindNodeByPath(wadContent, strategy.BinPath);
                     if (binNode != null) return (binNode, baseName, strategy.Type);
                 }
 
@@ -618,12 +655,13 @@ namespace AssetsManager.Services.Audio
 
         private string GetBaseName(string name)
         {
-            return name.Replace("_audio.wpk", "", StringComparison.OrdinalIgnoreCase)
-                       .Replace("_audio.bnk", "", StringComparison.OrdinalIgnoreCase)
-                       .Replace("_events.bnk", "", StringComparison.OrdinalIgnoreCase);
+            if (name.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 10);
+            if (name.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 10);
+            if (name.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 11);
+            if (name.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 4);
+            if (name.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 4);
+            return name;
         }
-
-
 
         private void FindAllNodesByNameRecursive(IEnumerable<FileSystemNodeModel> nodes, List<string> namesToFind, List<FileSystemNodeModel> foundNodes)
         {
