@@ -12,13 +12,19 @@ namespace AssetsManager.Services.Parsers
         public static Dictionary<uint, string> GetEventsFromBin(byte[] binData, string bankName, BinType binType, LogService logService)
         {
             var mapEventNames = new Dictionary<uint, string>();
-            if (binData == null || binData.Length == 0) return mapEventNames;
+            if (binData == null || binData.Length == 0) 
+            {
+                logService.Log($"[BinParser] binData is null or empty for bank: {bankName}");
+                return mapEventNames;
+            }
+
+            logService.Log($"[BinParser] Processing BIN for bank: {bankName} (Size: {binData.Length} bytes, Type: {binType})");
 
             try
             {
                 // Search for 'events' containers
                 var eventsMagicBytes = new byte[] { 0x84, 0xE3, 0xD8, 0x12, 0x80, 0x10 };
-                SearchAndExtract(binData, eventsMagicBytes, mapEventNames, logService);
+                SearchAndExtract(binData, eventsMagicBytes, mapEventNames, logService, "Standard Events");
 
                 // Search for 'music' embedded objects
                 var musicMagicBytes = new byte[] { 0xD4, 0x4F, 0x9C, 0x9F, 0x83 };
@@ -29,39 +35,44 @@ namespace AssetsManager.Services.Parsers
                 logService.LogError(ex, "[AUDIO] Crash during raw byte-based BIN processing in BinParser.");
             }
 
+            logService.Log($"[BinParser] Finished processing bank: {bankName}. Found {mapEventNames.Count} event names.");
             if (mapEventNames.Any())
             {
-                var eventsToShow = mapEventNames.Take(20).Select(kvp => string.Format("({0}: {1})", kvp.Key, kvp.Value));
+                var eventsToShow = mapEventNames.Take(5).Select(kvp => string.Format("({0}: {1})", kvp.Key, kvp.Value));
                 string eventList = string.Join(", ", eventsToShow);
+                logService.Log($"[BinParser] Sample names from {bankName}: {eventList}");
             }
             return mapEventNames;
         }
         
-        private static void SearchAndExtract(byte[] haystack, byte[] needle, Dictionary<uint, string> map, LogService logService)
+        private static void SearchAndExtract(byte[] haystack, byte[] needle, Dictionary<uint, string> map, LogService logService, string debugContext = "")
         {
             int currentPosition = 0;
+            int findCount = 0;
             while (currentPosition < haystack.Length)
             {
                 int foundIndex = FindBytes(haystack, needle, currentPosition);
                 if (foundIndex == -1) break;
 
+                findCount++;
                 currentPosition = foundIndex + needle.Length;
                 
                 // Read amount
                 if (currentPosition + 8 > haystack.Length)
                 {
-                    logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for amount after magic sequence (events).");
+                    logService.LogWarning($"[BinParser] [{debugContext}] Malformed/truncated BIN file: Not enough bytes for amount after magic sequence.");
                     break;
                 }
                 // Skipping 4 bytes of object size
                 uint amount = BitConverter.ToUInt32(haystack, currentPosition + 4);
+                logService.Log($"[BinParser] [{debugContext}] Found magic at index {foundIndex}. Strings to read: {amount}");
                 currentPosition += 8;
 
                 for (int i = 0; i < amount; i++)
                 {
                     if (currentPosition + 2 > haystack.Length)
                     {
-                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for string length (events).");
+                        logService.LogWarning($"[BinParser] [{debugContext}] Malformed/truncated BIN file: Not enough bytes for string length.");
                         break;
                     }
                     
@@ -71,7 +82,7 @@ namespace AssetsManager.Services.Parsers
 
                     if (currentPosition + stringLength > haystack.Length)
                     {
-                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for string data (events).");
+                        logService.LogWarning($"[BinParser] [{debugContext}] Malformed/truncated BIN file: Not enough bytes for string data.");
                         break;
                     }
                     
@@ -84,6 +95,10 @@ namespace AssetsManager.Services.Parsers
                         map[eventHash] = eventName;
                     }
                 }
+            }
+            if (findCount == 0)
+            {
+                logService.Log($"[BinParser] [{debugContext}] No magic bytes match found in this BIN.");
             }
         }
 
