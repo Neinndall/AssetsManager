@@ -83,25 +83,36 @@ namespace AssetsManager.Services.Comparator
             }
             _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 1 failed or was not applicable.");
 
-            // Strategy 2: Infer from WAD file name (for champions)
-            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 2: Infer from WAD file name (for champions).");
-            var wadNameParts = sourceWadName.Split('.');
-            if (wadNameParts.Length > 0)
+            // Strategy 2: Robust champion VO inference (CRITICAL: Move before generic inference)
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 2: Robust champion VO inference.");
+            if (fullPath.Contains("_vo_", StringComparison.OrdinalIgnoreCase))
             {
-                string championName = wadNameParts[0];
-                if (!championName.StartsWith("map", StringComparison.OrdinalIgnoreCase) && 
-                    !championName.Equals("common", StringComparison.OrdinalIgnoreCase) &&
-                    !championName.Equals("companions", StringComparison.OrdinalIgnoreCase))
+                string fileName = Path.GetFileName(fullPath);
+                string baseName = fileName;
+                if (fileName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase)) baseName = fileName.Substring(0, fileName.Length - 11);
+                else if (fileName.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase)) baseName = fileName.Substring(0, fileName.Length - 10);
+                else if (fileName.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase)) baseName = fileName.Substring(0, fileName.Length - 10);
+                else if (fileName.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase)) baseName = fileName.Substring(0, fileName.Length - 4);
+                else if (fileName.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase)) baseName = fileName.Substring(0, fileName.Length - 4);
+
+                string[] baseParts = baseName.Split('_');
+                if (baseParts.Length > 0)
                 {
-                    string skinName = "skin0";
-                    string binPath = $"data/characters/{championName.ToLower()}/skins/{skinName}.bin";
-                    string targetWadName = $"{championName.ToLower()}.wad.client";
-                    var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
-                    _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 2 successful. Found: {strategy}");
-                    return strategy;
+                    string championName = baseParts[0].ToLower();
+                    if (championName != "map" && championName != "common" && championName != "misc")
+                    {
+                        string skinName = "skin0";
+                        var skinPart = baseParts.FirstOrDefault(p => p.StartsWith("skin", StringComparison.OrdinalIgnoreCase));
+                        if (skinPart != null && int.TryParse(skinPart.Replace("skin", ""), out int skinId)) skinName = $"skin{skinId}";
+                        
+                        string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
+                        string targetWadName = $"{championName}.wad.client";
+                        var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
+                        _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 2 successful (VO Inference). Found: {strategy}");
+                        return strategy;
+                    }
                 }
             }
-            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 2 failed or was not applicable.");
 
             // Strategy 3: Infer for locale VO files
             _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 3: Infer for locale VO files.");
@@ -120,12 +131,13 @@ namespace AssetsManager.Services.Comparator
 
             // Strategy 4 (Unified Map/Common): Infer from WAD file name for maps.
             _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 4: Infer from WAD file name for Maps/Common.");
+            var wadNameParts = sourceWadName.Split('.');
             if (wadNameParts.Length > 0 && (sourceWadName.StartsWith("Map", StringComparison.OrdinalIgnoreCase) || sourceWadName.StartsWith("Common", StringComparison.OrdinalIgnoreCase)))
             {
                 string mapName = wadNameParts[0];
                 if (!string.IsNullOrEmpty(mapName))
                 {
-                    string binPath = $"data/maps/shipping/{mapName.ToLower()}/{mapName.ToLower()}.bin";
+                    string binPath = mapName.Equals("Common", StringComparison.OrdinalIgnoreCase) ? "data/maps/shipping/common/common.bin" : $"data/maps/shipping/{mapName.ToLower()}/{mapName.ToLower()}.bin";
                     string targetWadName = $"{mapName.ToLower()}.wad.client";
                     var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Map);
                     _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 4 successful. Found: {strategy}");
@@ -133,6 +145,25 @@ namespace AssetsManager.Services.Comparator
                 }
             }
             _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 4 failed or was not applicable.");
+
+            // Strategy 5: Generic Infer from WAD file name (Pattern: Champion.Locale.wad.client)
+            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 5: Generic infer from WAD file name.");
+            if (wadNameParts.Length > 0)
+            {
+                string championName = wadNameParts[0];
+                if (!championName.StartsWith("map", StringComparison.OrdinalIgnoreCase) && 
+                    !championName.Equals("common", StringComparison.OrdinalIgnoreCase) &&
+                    !championName.Equals("companions", StringComparison.OrdinalIgnoreCase))
+                {
+                    string skinName = "skin0";
+                    string binPath = $"data/characters/{championName.ToLower()}/skins/{skinName}.bin";
+                    string targetWadName = $"{championName.ToLower()}.wad.client";
+                    var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
+                    _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 5 successful. Found: {strategy}");
+                    return strategy;
+                }
+            }
+            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 5 failed or was not applicable.");
 
             _logService.LogWarning($"[GetBinFileSearchStrategy] No BIN file strategy found for '{fullPath}'.");
             return null;
