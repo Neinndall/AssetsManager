@@ -39,20 +39,25 @@
                     </MenuItem.Icon>
                 </MenuItem>
             </MenuItem>
-            <MenuItem Header="To Favorites" x:Name="AddToFavoritesMenuItem" Click="AddToFavorites_Click">
+            <MenuItem Header="Add to">
                 <MenuItem.Icon>
-                    <materialIcons:MaterialIcon Kind="StarOutline"/>
+                    <materialIcons:MaterialIcon Kind="Plus"/>
                 </MenuItem.Icon>
-            </MenuItem>
-            <MenuItem Header="Watch Asset" x:Name="WatchAssetMenuItem" Click="WatchAsset_Click">
-                <MenuItem.Icon>
-                    <materialIcons:MaterialIcon Kind="EyeOutline"/>
-                </MenuItem.Icon>
-            </MenuItem>
-            <MenuItem Header="To Image Merger" x:Name="AddToImageMergerMenuItem" Click="AddToImageMerger_Click">
-                <MenuItem.Icon>
-                    <materialIcons:MaterialIcon Kind="ViewGridPlus"/>
-                </MenuItem.Icon>
+                <MenuItem Header="Favorites" x:Name="AddToFavoritesMenuItem" Click="AddToFavorites_Click">
+                    <MenuItem.Icon>
+                        <materialIcons:MaterialIcon Kind="StarOutline" Width="14" Height="14"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Watch Asset" x:Name="WatchAssetMenuItem" Click="WatchAsset_Click">
+                    <MenuItem.Icon>
+                        <materialIcons:MaterialIcon Kind="EyeOutline" Width="14" Height="14"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Image Merger" x:Name="AddToImageMergerMenuItem" Click="AddToImageMerger_Click">
+                    <MenuItem.Icon>
+                        <materialIcons:MaterialIcon Kind="ViewGridPlus" Width="14" Height="14"/>
+                    </MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="Pin to Tabs" x:Name="PinMenuItem" Click="PinSelected_Click">
                 <MenuItem.Icon>
