@@ -32,21 +32,20 @@
                             <!-- Load Model Card -->
                             <Button Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenFile_Click"
-                                    ToolTip="Load a 3D model (.skn, .sco, .scb)"
                                     Width="180" Height="160">
                                 <StackPanel>
                                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
                                         <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="Load Model" 
-                                               FontWeight="SemiBold" 
-                                               FontSize="14" 
-                                               Foreground="{StaticResource TextPrimary}" 
+                                    <TextBlock Text="Load Model"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import skn, sco and scb" 
-                                               FontSize="12" 
-                                               Foreground="{StaticResource TextMuted}" 
-                                               HorizontalAlignment="Center" 
+                                    <TextBlock Text="Import skn, sco and scb"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextMuted}"
+                                               HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
                                                Margin="0,4,0,0"/>
@@ -56,21 +55,20 @@
                             <!-- Load Chroma Card -->
                             <Button Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenChromaFile_Click"
-                                    ToolTip="Load a model with custom textures"
                                     Width="180" Height="160">
                                 <StackPanel>
                                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
                                         <materialIcons:MaterialIcon Kind="Palette" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="Load Chroma" 
-                                               FontWeight="SemiBold" 
-                                               FontSize="14" 
-                                               Foreground="{StaticResource TextPrimary}" 
+                                    <TextBlock Text="Load Chroma"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import skn with textures" 
-                                               FontSize="12" 
-                                               Foreground="{StaticResource TextMuted}" 
-                                               HorizontalAlignment="Center" 
+                                    <TextBlock Text="Import skn with textures"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextMuted}"
+                                               HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
                                                Margin="0,4,0,0"/>
@@ -80,21 +78,20 @@
                             <!-- Load Map Card -->
                             <Button Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenGeometryFile_Click"
-                                    ToolTip="Load map geometry"
                                     Width="180" Height="160">
                                 <StackPanel>
                                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
                                         <materialIcons:MaterialIcon Kind="Map" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="Load Map" 
-                                               FontWeight="SemiBold" 
-                                               FontSize="14" 
-                                               Foreground="{StaticResource TextPrimary}" 
+                                    <TextBlock Text="Load Map"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import mapgeo" 
-                                               FontSize="12" 
-                                               Foreground="{StaticResource TextMuted}" 
-                                               HorizontalAlignment="Center" 
+                                    <TextBlock Text="Import mapgeo"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextMuted}"
+                                               HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
                                                Margin="0,4,0,0"/>
