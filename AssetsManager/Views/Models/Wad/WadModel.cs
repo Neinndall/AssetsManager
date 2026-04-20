@@ -71,7 +71,6 @@ namespace AssetsManager.Views.Models.Wad
         public ulong? NewUncompressedSize { get; set; }
         public ulong OldPathHash { get; set; }
         public ulong NewPathHash { get; set; }
-        public ulong NewHash { get; set; }
         [JsonIgnore]
         public string Path => NewPath ?? OldPath;
 
