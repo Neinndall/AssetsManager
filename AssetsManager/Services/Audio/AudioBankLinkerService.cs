@@ -64,8 +64,6 @@ namespace AssetsManager.Services.Audio
             FileSystemNodeModel audioBnkNode = null;
             FileSystemNodeModel eventsBnkNode = null;
 
-            bool binFoundInBackup = false;
-
             // 1. BACKUP MODE: STRICTLY use backup data (JSON and chunks)
             if (backupRootDir != null)
             {
@@ -141,7 +139,6 @@ namespace AssetsManager.Services.Audio
 
                             if (binDiff != null)
                             {
-                                binFoundInBackup = true;
                                 bool useOld = preferOld || binDiff.Type == ChunkDiffType.Removed;
                                 ulong hashForPath = useOld ? binDiff.OldPathHash : binDiff.NewPathHash;
                                 string chunkDir = useOld ? "old" : "new";
