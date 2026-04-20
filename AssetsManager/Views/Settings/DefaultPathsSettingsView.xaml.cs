@@ -16,7 +16,7 @@ namespace AssetsManager.Views.Settings
 
         private void btnBrowseLol_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel == null) return;
+            if (ViewModel?.Settings == null) return;
 
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
@@ -27,14 +27,15 @@ namespace AssetsManager.Views.Settings
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.LolPbeDirectory = folderBrowserDialog.FileName;
+                    ViewModel.Settings.LolPbeDirectory = folderBrowserDialog.FileName;
+                    ViewModel.NotifySettingsChanged();
                 }
             }
         }
 
         private void btnBrowseLolLive_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel == null) return;
+            if (ViewModel?.Settings == null) return;
 
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
@@ -45,14 +46,15 @@ namespace AssetsManager.Views.Settings
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.LolLiveDirectory = folderBrowserDialog.FileName;
+                    ViewModel.Settings.LolLiveDirectory = folderBrowserDialog.FileName;
+                    ViewModel.NotifySettingsChanged();
                 }
             }
         }
 
         private void btnBrowseDefaultExtracted_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel == null) return;
+            if (ViewModel?.Settings == null) return;
 
             using (var folderBrowserDialog = new CommonOpenFileDialog
             {
@@ -63,14 +65,15 @@ namespace AssetsManager.Views.Settings
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.DefaultExtractedSelectDirectory = folderBrowserDialog.FileName;
+                    ViewModel.Settings.DefaultExtractedSelectDirectory = folderBrowserDialog.FileName;
+                    ViewModel.NotifySettingsChanged();
                 }
             }
         }
 
         private void btnBrowseCustomFloorTexture_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel == null) return;
+            if (ViewModel?.Settings == null) return;
 
             using (var openFileDialog = new CommonOpenFileDialog
             {
@@ -85,7 +88,8 @@ namespace AssetsManager.Views.Settings
             {
                 if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.CustomFloorTexturePath = openFileDialog.FileName;
+                    ViewModel.Settings.CustomFloorTexturePath = openFileDialog.FileName;
+                    ViewModel.NotifySettingsChanged();
                 }
             }
         }

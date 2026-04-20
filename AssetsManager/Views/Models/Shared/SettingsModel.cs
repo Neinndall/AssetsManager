@@ -17,73 +17,11 @@ namespace AssetsManager.Views.Models.Shared
             get { return _settings; }
             set
             {
+                // NOTA TÉCNICA: Al resetear, la instancia de Settings sigue siendo la misma,
+                // pero sus valores internos han cambiado. Al disparar PropertyChanged para "Settings",
+                // WPF se ve obligado a re-evaluar todos los bindings que cuelgan de él (Settings.LolPbeDirectory, etc.)
                 _settings = value;
                 OnPropertyChanged(nameof(Settings));
-            }
-        }
-
-        public AudioExportFormat AudioExportFormat
-        {
-            get => _settings.AudioExportFormat;
-            set
-            {
-                if (_settings.AudioExportFormat != value)
-                {
-                    _settings.AudioExportFormat = value;
-                    OnPropertyChanged(nameof(AudioExportFormat));
-                }
-            }
-        }
-
-        public string LolPbeDirectory
-        {
-            get => _settings.LolPbeDirectory;
-            set
-            {
-                if (_settings.LolPbeDirectory != value)
-                {
-                    _settings.LolPbeDirectory = value;
-                    OnPropertyChanged(nameof(LolPbeDirectory));
-                }
-            }
-        }
-
-        public string LolLiveDirectory
-        {
-            get => _settings.LolLiveDirectory;
-            set
-            {
-                if (_settings.LolLiveDirectory != value)
-                {
-                    _settings.LolLiveDirectory = value;
-                    OnPropertyChanged(nameof(LolLiveDirectory));
-                }
-            }
-        }
-
-        public string DefaultExtractedSelectDirectory
-        {
-            get => _settings.DefaultExtractedSelectDirectory;
-            set
-            {
-                if (_settings.DefaultExtractedSelectDirectory != value)
-                {
-                    _settings.DefaultExtractedSelectDirectory = value;
-                    OnPropertyChanged(nameof(DefaultExtractedSelectDirectory));
-                }
-            }
-        }
-
-        public string CustomFloorTexturePath
-        {
-            get => _settings.CustomFloorTexturePath;
-            set
-            {
-                if (_settings.CustomFloorTexturePath != value)
-                {
-                    _settings.CustomFloorTexturePath = value;
-                    OnPropertyChanged(nameof(CustomFloorTexturePath));
-                }
             }
         }
 
@@ -94,25 +32,18 @@ namespace AssetsManager.Views.Models.Shared
             new AudioFormatOption { Name = "MP3", Value = AudioExportFormat.Mp3 }
         };
 
-        public ImageExportFormat ImageExportFormat
-        {
-            get => _settings.ImageExportFormat;
-            set
-            {
-                if (_settings.ImageExportFormat != value)
-                {
-                    _settings.ImageExportFormat = value;
-                    OnPropertyChanged(nameof(ImageExportFormat));
-                }
-            }
-        }
-
         public List<ImageFormatOption> ImageFormatOptions { get; } = new List<ImageFormatOption>
         {
             new ImageFormatOption { Name = "Original", Value = ImageExportFormat.Original },
             new ImageFormatOption { Name = "PNG", Value = ImageExportFormat.Png },
             new ImageFormatOption { Name = "JPEG", Value = ImageExportFormat.Jpeg }
         };
+
+        public void NotifySettingsChanged()
+        {
+            // Notificamos que el objeto Settings ha cambiado para refrescar todos sus sub-bindings
+            OnPropertyChanged(nameof(Settings));
+        }
 
         protected void OnPropertyChanged(string propertyName)
         {
