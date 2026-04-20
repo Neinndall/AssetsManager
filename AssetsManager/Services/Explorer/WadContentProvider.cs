@@ -41,41 +41,26 @@ namespace AssetsManager.Services.Explorer
 
                 try
                 {
-                    if (fileNode.Type != NodeType.VirtualFile && fileNode.Type != NodeType.SoundBank)
-                    {
-                        _logService.LogWarning($"Attempted to get bytes from a non-virtual file: {fileNode.Name}");
-                        return null;
-                    }
-
-                    byte[] decompressedData;
-
                     if (!string.IsNullOrEmpty(fileNode.BackupChunkPath))
                     {
+                        // MODO BACKUP: Carga directa y exclusiva de chunks guardados.
                         byte[] compressedData = File.ReadAllBytes(fileNode.BackupChunkPath);
                         bool useOld = fileNode.BackupChunkPath.Contains(Path.Combine("wad_chunks", "old"));
                         var compressionType = useOld ? fileNode.ChunkDiff.OldCompressionType : fileNode.ChunkDiff.NewCompressionType;
-                        decompressedData = WadChunkUtils.DecompressChunk(compressedData, compressionType);
-                    }
-                    else
-                    {
-                        using var wadFile = new WadFile(fileNode.SourceWadPath);
-                        if (!wadFile.Chunks.TryGetValue(fileNode.SourceChunkPathHash, out var chunk))
-                        {
-                            _logService.LogWarning($"Chunk with hash {fileNode.SourceChunkPathHash:x16} not found in {fileNode.SourceWadPath}");
-                            return null;
-                        }
-                        using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
-                        decompressedData = decompressedDataOwner.Span.ToArray();
+                        return WadChunkUtils.DecompressChunk(compressedData, compressionType);
                     }
 
-                    return decompressedData;
+                    // MODO LIVE: Solo si no hay backup (Comparator o Explorer local).
+                    using var wadFile = new WadFile(fileNode.SourceWadPath);
+                    if (wadFile.Chunks.TryGetValue(fileNode.SourceChunkPathHash, out var chunk))
+                    {
+                        using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
+                        return decompressedDataOwner.Span.ToArray();
+                    }
+
+                    return null;
                 }
-                catch (OperationCanceledException)
-                {
-                    _logService.LogWarning("Get virtual file bytes was cancelled.");
-                    throw;
-                }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.FullPath}");
                     return null;
@@ -90,53 +75,37 @@ namespace AssetsManager.Services.Explorer
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // 1. MODO BACKUP (Prioridad si hay BackupChunkPath)
-                // Usamos BackupChunkPath como ancla para saber que esta comparación tiene datos locales (History).
                 if (!string.IsNullOrEmpty(diff.BackupChunkPath))
                 {
-                    string chunkPath = diff.BackupChunkPath;
+                    // MODO BACKUP
+                    string root = GetBackupRoot(diff.BackupChunkPath);
+                    string chunkDir = isOld ? "old" : "new";
+                    ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
+                    string chunkPath = Path.Combine(root, "wad_chunks", chunkDir, diff.SourceWadFile, $"{hash:X16}.chunk");
 
-                    // Si necesitamos el lado contrario al que apunta BackupChunkPath, resolvemos la raíz
-                    if (isOld && (chunkPath == null || !chunkPath.Contains(Path.Combine("wad_chunks", "old"))))
-                    {
-                        string root = GetBackupRoot(chunkPath);
-                        chunkPath = Path.Combine(root, "wad_chunks", "old", diff.SourceWadFile, $"{diff.OldPathHash:X16}.chunk");
-                    }
-                    else if (!isOld && (chunkPath == null || !chunkPath.Contains(Path.Combine("wad_chunks", "new"))))
-                    {
-                        string root = GetBackupRoot(chunkPath);
-                        chunkPath = Path.Combine(root, "wad_chunks", "new", diff.SourceWadFile, $"{diff.NewPathHash:X16}.chunk");
-                    }
+                    if (!File.Exists(chunkPath)) return null;
 
-                    if (File.Exists(chunkPath))
+                    return await Task.Run(() =>
                     {
-                        return await Task.Run(() =>
-                        {
-                            byte[] compressedData = File.ReadAllBytes(chunkPath);
-                            var compressionType = isOld ? diff.OldCompressionType : diff.NewCompressionType;
-                            return WadChunkUtils.DecompressChunk(compressedData, compressionType ?? WadChunkCompression.None);
-                        }, cancellationToken);
-                    }
+                        byte[] compressedData = File.ReadAllBytes(chunkPath);
+                        var compressionType = isOld ? diff.OldCompressionType : diff.NewCompressionType;
+                        return WadChunkUtils.DecompressChunk(compressedData, compressionType ?? WadChunkCompression.None);
+                    }, cancellationToken);
                 }
 
-                // 2. MODO LIVE (WADs - Comparación directa o fallback del backup si no existe el chunk)
-                // Importante: lolPath es la ruta pasada por el método (pude ser la de Ajustes o una manual del Comparator).
+                // MODO LIVE
                 if (!string.IsNullOrEmpty(lolPath))
                 {
                     string wadPath = Path.Combine(lolPath, diff.SourceWadFile);
                     ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
-
-                    if (hash != 0)
-                    {
-                        return await DecompressChunkByHashAsync(wadPath, hash, cancellationToken);
-                    }
+                    if (hash != 0) return await DecompressChunkByHashAsync(wadPath, hash, cancellationToken);
                 }
 
                 return null;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logService.LogError(ex, $"Failed to get bytes for diff (isOld={isOld}): {diff.Path}");
+                _logService.LogError(ex, $"Failed to get bytes for diff: {diff.Path}");
                 return null;
             }
         }
@@ -168,73 +137,57 @@ namespace AssetsManager.Services.Explorer
                 {
                     string ext = Path.GetExtension(diff.Path).ToLowerInvariant();
                     using var ms = new MemoryStream(data);
-                    
-                    // Solo pasamos el tamaño si es mayor que 0 para evitar imágenes de 0x0
                     int? size = maxWidth > 0 ? maxWidth : null;
                     return TextureUtils.LoadTexture(ms, ext, size, size);
                 }
-                catch
-                {
-                    return null;
-                }
+                catch { return null; }
             }, cancellationToken);
         }
 
         // Orquesta la extracción de datos de audio .wem desde su contenedor (.bnk o .wpk).
         public async Task<byte[]> GetWemFileBytesAsync(FileSystemNodeModel node, CancellationToken cancellationToken = default)
         {
-            if (node.Type != NodeType.WemFile)
-            {
-                _logService.LogWarning($"Attempted to get WEM bytes from a non-WEM file: {node.Name}");
-                return null;
-            }
+            if (node.Type != NodeType.WemFile) return null;
 
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                byte[] containerData = await DecompressChunkByHashAsync(node.SourceWadPath, node.SourceChunkPathHash, cancellationToken);
-                if (containerData == null)
+                byte[] containerData;
+
+                if (!string.IsNullOrEmpty(node.BackupChunkPath))
                 {
-                    _logService.LogWarning($"Could not extract container for WEM file {node.Name}");
-                    return null;
+                    // MODO BACKUP: Carga del contenedor desde el chunk.
+                    byte[] compressedData = File.ReadAllBytes(node.BackupChunkPath);
+                    var compressionType = node.ChunkDiff?.NewCompressionType ?? WadChunkCompression.None;
+                    containerData = WadChunkUtils.DecompressChunk(compressedData, compressionType);
                 }
+                else
+                {
+                    // MODO LIVE
+                    containerData = await DecompressChunkByHashAsync(node.SourceWadPath, node.SourceChunkPathHash, cancellationToken);
+                }
+
+                if (containerData == null) return null;
 
                 if (node.AudioSource == AudioSourceType.Bnk)
                 {
                     if (node.WemSize == 0) return null;
-
                     byte[] wemData = new byte[node.WemSize];
-                    Array.Copy(containerData, node.WemOffset, wemData, 0, node.WemSize);
+                    Array.Copy(containerData, (int)node.WemOffset, wemData, 0, (int)node.WemSize);
                     return wemData;
                 }
                 else // Wpk
                 {
-                    if (node.WemId == 0) return null;
-
-                    return await Task.Run(() =>
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        using var wpkStream = new MemoryStream(containerData);
-                        var wpk = WpkParser.Parse(wpkStream, _logService);
-                        var wem = wpk.Wems.FirstOrDefault(w => w.Id == node.WemId);
-                        if (wem != null)
-                        {
-                            using var reader = new BinaryReader(wpkStream);
-                            wpkStream.Seek(wem.Offset, SeekOrigin.Begin);
-                            return reader.ReadBytes((int)wem.Size);
-                        }
-                        _logService.LogWarning($"WEM file with ID {node.WemId} not found inside its parent WPK.");
-                        return null;
-                    }, cancellationToken);
+                    using var wpkStream = new MemoryStream(containerData);
+                    var wpk = WpkParser.Parse(wpkStream, _logService);
+                    var wem = wpk.Wems.FirstOrDefault(w => w.Id == node.WemId);
+                    if (wem == null) return null;
+                    
+                    wpkStream.Seek(wem.Offset, SeekOrigin.Begin);
+                    return new BinaryReader(wpkStream).ReadBytes((int)wem.Size);
                 }
             }
-            catch (OperationCanceledException)
-            {
-                _logService.LogWarning($"WEM file extraction was cancelled: {node.FullPath}");
-                throw;
-            }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logService.LogError(ex, $"Failed to extract WEM file '{node.FullPath}'.");
                 return null;
