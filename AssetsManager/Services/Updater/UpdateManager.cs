@@ -73,7 +73,7 @@ namespace AssetsManager.Services.Updater
                 if (isNewer || isExperimentalToStable)
                 {
                     string message = isExperimentalToStable && !isNewer 
-                        ? $"A stable version {latestVersionRaw} is available. Do you want to return to the stable branch?" 
+                        ? $"A stable version {latestVersionRaw} is available. Do you want to return to the stable version?" 
                         : $"New version available {latestVersionRaw}. Do you want to download it?";
 
                     bool? result = _customMessageBoxService.ShowYesNo(

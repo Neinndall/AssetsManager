@@ -27,6 +27,11 @@ namespace AssetsManager.Views.Models.Audio
 
     public class BnkObjectData { }
 
+    public interface IHircContainer
+    {
+        List<uint> Children { get; }
+    }
+
     public class SoundBnkObjectData : BnkObjectData
     {
         public uint WemId { get; set; }
@@ -49,15 +54,32 @@ namespace AssetsManager.Views.Models.Audio
         public uint SwitchId { get; set; }
     }
 
-    public class RandomOrSequenceContainerBnkObjectData : BnkObjectData
+    public class RandomOrSequenceContainerBnkObjectData : BnkObjectData, IHircContainer
     {
         public uint ParentId { get; set; }
         public List<uint> Children { get; set; } = new List<uint>();
     }
 
-    public class SwitchContainerBnkObjectData : BnkObjectData
+    public class SwitchContainerBnkObjectData : BnkObjectData, IHircContainer
     {
         public uint ParentId { get; set; }
+        public List<uint> Children { get; set; } = new List<uint>();
+    }
+
+    public class ActorMixerBnkObjectData : BnkObjectData, IHircContainer
+    {
+        public uint ParentId { get; set; }
+        public List<uint> Children { get; set; } = new List<uint>();
+    }
+
+    public class BlendContainerBnkObjectData : BnkObjectData, IHircContainer
+    {
+        public uint ParentId { get; set; }
+        public List<uint> Children { get; set; } = new List<uint>();
+    }
+
+    public class DialogueEventBnkObjectData : BnkObjectData, IHircContainer
+    {
         public List<uint> Children { get; set; } = new List<uint>();
     }
 
@@ -66,18 +88,18 @@ namespace AssetsManager.Views.Models.Audio
         public List<uint> Children { get; set; } = new List<uint>();
     }
 
-    public class MusicSegmentBnkObjectData : BnkObjectData
+    public class MusicSegmentBnkObjectData : BnkObjectData, IHircContainer
     {
         public List<uint> Children { get; set; } = new List<uint>();
     }
 
-    public class MusicSwitchContainerBnkObjectData : BnkObjectData
+    public class MusicSwitchContainerBnkObjectData : BnkObjectData, IHircContainer
     {
         public uint ParentId { get; set; }
         public List<uint> Children { get; set; } = new List<uint>();
     }
 
-    public class MusicPlaylistContainerBnkObjectData : BnkObjectData
+    public class MusicPlaylistContainerBnkObjectData : BnkObjectData, IHircContainer
     {
         public List<uint> Children { get; set; } = new List<uint>();
     }

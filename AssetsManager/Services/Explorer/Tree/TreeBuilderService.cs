@@ -125,16 +125,11 @@ namespace AssetsManager.Services.Explorer.Tree
                 clickedNode.Children.Clear();
 
                 // Determine the absolute source WAD path for the child sound nodes.
-                string absoluteSourceWadPath;
-                if (clickedNode.ChunkDiff != null && (!string.IsNullOrEmpty(newLolPath) || !string.IsNullOrEmpty(oldLolPath)))
+                string absoluteSourceWadPath = null;
+                bool isBackup = clickedNode.ChunkDiff != null && (!string.IsNullOrEmpty(newLolPath) || !string.IsNullOrEmpty(oldLolPath));
+
+                if (!isBackup)
                 {
-                    // Backup mode: construct the absolute path from the base LoL directory and the relative WAD path.
-                    string basePath = clickedNode.ChunkDiff.Type == ChunkDiffType.Removed ? oldLolPath : newLolPath;
-                    absoluteSourceWadPath = Path.Combine(basePath, clickedNode.SourceWadPath);
-                }
-                else
-                {
-                    // Normal mode: the SourceWadPath should already be absolute.
                     absoluteSourceWadPath = clickedNode.SourceWadPath;
                 }
 
@@ -145,25 +140,37 @@ namespace AssetsManager.Services.Explorer.Tree
                     var soundNodesToAdd = new List<FileSystemNodeModel>();
                     foreach (var soundNode in eventNode.Sounds)
                     {
-                        // Determine the correct source file (WPK or BNK) for the sound.
-                        AudioSourceType sourceType;
+                        // Determine the correct source metadata.
                         ulong sourceHash;
-                        if (linkedBank.WpkNode != null)
+                        string backupChunkPath = null;
+                        SerializableChunkDiff soundDiff = null;
+
+                        if (soundNode.Source == AudioSourceType.Wpk && linkedBank.WpkNode != null)
                         {
-                            sourceType = AudioSourceType.Wpk;
                             sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
+                            backupChunkPath = linkedBank.WpkNode.BackupChunkPath;
+                            soundDiff = linkedBank.WpkNode.ChunkDiff;
+                        }
+                        else if (linkedBank.AudioBnkNode != null)
+                        {
+                            sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
+                            backupChunkPath = linkedBank.AudioBnkNode.BackupChunkPath;
+                            soundDiff = linkedBank.AudioBnkNode.ChunkDiff;
                         }
                         else
                         {
-                            sourceType = AudioSourceType.Bnk;
-                            sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
+                            sourceHash = clickedNode.SourceChunkPathHash;
+                            backupChunkPath = clickedNode.BackupChunkPath;
+                            soundDiff = clickedNode.ChunkDiff;
                         }
 
                         var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
                         {
                             SourceWadPath = absoluteSourceWadPath,
                             SourceChunkPathHash = sourceHash,
-                            AudioSource = sourceType
+                            BackupChunkPath = backupChunkPath,
+                            ChunkDiff = soundDiff,
+                            AudioSource = soundNode.Source
                         };
                         soundNodesToAdd.Add(newSoundNode);
                     }

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Collections.Generic;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Audio;
 
@@ -91,6 +92,62 @@ namespace AssetsManager.Services.Parsers
                                     bnkObject.Data = eventData;
                                     break;
 
+                                case BnkObjectType.ActorMixer:
+                                case BnkObjectType.BlendContainer:
+                                    var containerData = bnkObject.Type == BnkObjectType.ActorMixer 
+                                        ? (BnkObjectData)new ActorMixerBnkObjectData() 
+                                        : new BlendContainerBnkObjectData();
+                                    
+                                    logService.LogDebug($"[BNK PARSER] Parsing {bnkObject.Type} (Type {(byte)bnkObject.Type}), ID: {bnkObject.Id}");
+                                    
+                                    var parentIdField = containerData is ActorMixerBnkObjectData am ? am : (object)(containerData as BlendContainerBnkObjectData);
+                                    var childrenList = containerData is ActorMixerBnkObjectData am2 ? am2.Children : (containerData as BlendContainerBnkObjectData).Children;
+
+                                    uint pId;
+                                    (pId, _) = BnkParseHelper.SkipBaseParams(reader, bnk.Bkhd.Version);
+                                    
+                                    if (containerData is ActorMixerBnkObjectData am3) am3.ParentId = pId;
+                                    else (containerData as BlendContainerBnkObjectData).ParentId = pId;
+
+                                    uint childCount = reader.ReadUInt32();
+                                    for (int j = 0; j < childCount; j++) childrenList.Add(reader.ReadUInt32());
+                                    bnkObject.Data = containerData;
+                                    break;
+
+                                case BnkObjectType.DialogueEvent:
+                                    var dialogueEventData = new DialogueEventBnkObjectData();
+                                    logService.LogDebug($"[BNK PARSER] Parsing DialogueEvent (Type 15), ID: {bnkObject.Id}");
+                                    reader.ReadByte(); // Probability
+                                    uint treeDepth = reader.ReadUInt32();
+                                    reader.BaseStream.Seek(treeDepth * 4, SeekOrigin.Current); // Skip Arguments (uint32 * treeDepth)
+                                    uint treeDataSize = reader.ReadUInt32();
+                                    reader.ReadByte(); // Mode
+
+                                    // Recursive decision tree parsing
+                                    void ParseDecisionTreeRecursive(BinaryReader bReader, List<uint> children)
+                                    {
+                                        bReader.ReadUInt32(); // key
+                                        uint audioNodeId = bReader.ReadUInt32();
+                                        bReader.ReadUInt16(); // weight
+                                        ushort numChildren = bReader.ReadUInt16();
+
+                                        if (numChildren == 0)
+                                        {
+                                            if (audioNodeId != 0) children.Add(audioNodeId);
+                                        }
+                                        else
+                                        {
+                                            for (int j = 0; j < numChildren; j++) ParseDecisionTreeRecursive(bReader, children);
+                                        }
+                                    }
+
+                                    if (treeDataSize > 0)
+                                    {
+                                        ParseDecisionTreeRecursive(reader, dialogueEventData.Children);
+                                    }
+                                    bnkObject.Data = dialogueEventData;
+                                    break;
+
                                 case BnkObjectType.RandomOrSequenceContainer:
                                     var randContainerData = new RandomOrSequenceContainerBnkObjectData();
                                     (randContainerData.ParentId, _) = BnkParseHelper.SkipBaseParams(reader, bnk.Bkhd.Version);
@@ -113,21 +170,18 @@ namespace AssetsManager.Services.Parsers
                                     break;
 
                                 case BnkObjectType.MusicSegment:
-                                    var musicSegmentData = new MusicSegmentBnkObjectData();
-                                    reader.BaseStream.Seek(1, SeekOrigin.Current);
-                                    BnkParseHelper.SkipBaseParams(reader, bnk.Bkhd.Version);
-                                    uint segmentTrackIdAmount = reader.ReadUInt32();
-                                    for (int j = 0; j < segmentTrackIdAmount; j++) musicSegmentData.Children.Add(reader.ReadUInt32());
-                                    bnkObject.Data = musicSegmentData;
-                                    break;
-
                                 case BnkObjectType.MusicPlaylistContainer:
-                                    var musicPlaylistData = new MusicPlaylistContainerBnkObjectData();
+                                    var musicContainerData = bnkObject.Type == BnkObjectType.MusicSegment 
+                                        ? (BnkObjectData)new MusicSegmentBnkObjectData() 
+                                        : new MusicPlaylistContainerBnkObjectData();
+                                    
+                                    var mChildrenList = musicContainerData is MusicSegmentBnkObjectData ms ? ms.Children : (musicContainerData as MusicPlaylistContainerBnkObjectData).Children;
+
                                     reader.BaseStream.Seek(1, SeekOrigin.Current);
                                     BnkParseHelper.SkipBaseParams(reader, bnk.Bkhd.Version);
-                                    uint playlistTrackIdAmount = reader.ReadUInt32();
-                                    for (int j = 0; j < playlistTrackIdAmount; j++) musicPlaylistData.Children.Add(reader.ReadUInt32());
-                                    bnkObject.Data = musicPlaylistData;
+                                    uint musicChildCount = reader.ReadUInt32();
+                                    for (int j = 0; j < musicChildCount; j++) mChildrenList.Add(reader.ReadUInt32());
+                                    bnkObject.Data = musicContainerData;
                                     break;
 
                                 case BnkObjectType.MusicTrack:

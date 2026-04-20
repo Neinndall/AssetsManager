@@ -16,7 +16,7 @@ namespace AssetsManager.Utils
         public bool EnableExtraction { get; set; } 
         public bool OrganizeExtractedAssets { get; set; }
         public ReportGenerationSettings ReportGeneration { get; set; }
-        public bool CheckJsonDataUpdates { get; set; }
+        public bool AssetWatcherUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
         public bool SaveJsonHistory { get; set; }
         public bool SaveWadComparisonHistory { get; set; }
@@ -38,11 +38,8 @@ namespace AssetsManager.Utils
         public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
         public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Original;
 
-        // Dictionary for File Watcher
-        public Dictionary<string, DateTime> JsonDataModificationDates { get; set; }
-
-        // New structure for monitored files and directories
-        public List<string> MonitoredJsonFiles { get; set; }
+        // New structure for monitored assets (Local WADs/Plugins)
+        public List<MonitoredAsset> MonitoredAssets { get; set; }
         public List<HistoryEntry> DiffHistory { get; set; }
         public Dictionary<string, long> AssetTrackerProgress { get; set; }
         public Dictionary<string, List<long>> AssetTrackerFailedIds { get; set; }
@@ -79,48 +76,12 @@ namespace AssetsManager.Utils
             var jObject = JObject.Parse(json);
             bool needsResave = false;
 
-            if (jObject.TryGetValue("MonitoredJsonFiles", out var monitoredFilesToken) &&
-                monitoredFilesToken is JArray monitoredFilesArray)
-            {
-                var newUrls = new List<string>();
-                var newDates = settings.JsonDataModificationDates ?? new Dictionary<string, DateTime>();
-
-                foreach (var token in monitoredFilesArray)
-                {
-                    if (token is JObject itemObject &&
-                        itemObject.TryGetValue("Url", StringComparison.OrdinalIgnoreCase, out var urlToken))
-                    {
-                        string url = urlToken.ToString();
-                        if (!string.IsNullOrWhiteSpace(url))
-                        {
-                            newUrls.Add(url);
-
-                            if (itemObject.TryGetValue("LastUpdated", StringComparison.OrdinalIgnoreCase, out var dateToken) &&
-                                DateTime.TryParse(dateToken.ToString(), out var date))
-                            {
-                                newDates[url] = date;
-                            }
-
-                            needsResave = true;
-                        }
-                    }
-                    else if (token.Type == JTokenType.String)
-                    {
-                        newUrls.Add(token.ToString());
-                    }
-                }
-
-                settings.MonitoredJsonFiles = newUrls.Distinct().ToList();
-                settings.JsonDataModificationDates = newDates;
-            }
-
             if (needsResave)
             {
                 SaveSettings(settings);
             }
 
-            settings.MonitoredJsonFiles ??= new List<string>();
-            settings.JsonDataModificationDates ??= new Dictionary<string, DateTime>();
+            settings.MonitoredAssets ??= new List<MonitoredAsset>();
             settings.DiffHistory ??= new List<HistoryEntry>();
             settings.AssetTrackerProgress ??= new Dictionary<string, long>();
             settings.AssetTrackerFailedIds ??= new Dictionary<string, List<long>>();
@@ -164,7 +125,7 @@ namespace AssetsManager.Utils
                     FilterRenamed = false,
                     FilterRemoved = false
                 },
-                CheckJsonDataUpdates = false,
+                AssetWatcherUpdates = false,
                 AssetTrackerTimer = false,
                 SaveJsonHistory = false,
                 SaveWadComparisonHistory = false,
@@ -183,8 +144,7 @@ namespace AssetsManager.Utils
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
                 HashesSizes = new Dictionary<string, long>(),
-                JsonDataModificationDates = new Dictionary<string, DateTime>(),
-                MonitoredJsonFiles = new List<string>(),
+                MonitoredAssets = new List<MonitoredAsset>(),
                 DiffHistory = new List<HistoryEntry>(),
                 AssetTrackerProgress = new Dictionary<string, long>(),
                 AssetTrackerFailedIds = new Dictionary<string, List<long>>(),
@@ -211,7 +171,7 @@ namespace AssetsManager.Utils
         {
             var defaultSettings = GetDefaultSettings();
 
-            CheckJsonDataUpdates = defaultSettings.CheckJsonDataUpdates;
+            AssetWatcherUpdates = defaultSettings.AssetWatcherUpdates;
             EnableExtraction = defaultSettings.EnableExtraction;
             OrganizeExtractedAssets = defaultSettings.OrganizeExtractedAssets;
             ReportGeneration = defaultSettings.ReportGeneration;
@@ -229,8 +189,7 @@ namespace AssetsManager.Utils
             LastPbeStatusMessage = defaultSettings.LastPbeStatusMessage;
             UpdateCheckFrequency = defaultSettings.UpdateCheckFrequency;
             PbeStatusFrequency = defaultSettings.PbeStatusFrequency;
-            JsonDataModificationDates = defaultSettings.JsonDataModificationDates;
-            MonitoredJsonFiles = defaultSettings.MonitoredJsonFiles;
+            MonitoredAssets = defaultSettings.MonitoredAssets;
             DiffHistory = defaultSettings.DiffHistory;
             AssetTrackerTimer = defaultSettings.AssetTrackerTimer;
             AssetTrackerFrequency = defaultSettings.AssetTrackerFrequency;

@@ -24,6 +24,7 @@ namespace AssetsManager.Views.Models.Audio
         public uint Id { get; set; }
         public uint Offset { get; set; }
         public uint Size { get; set; }
+        public AudioSourceType Source { get; set; }
     }
 
     public enum BinType { Champion, Map, Companion, Unknown }

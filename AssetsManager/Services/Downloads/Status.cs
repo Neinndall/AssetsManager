@@ -87,7 +87,7 @@ namespace AssetsManager.Services.Downloads
                 HashSyncCompleted?.Invoke();
             }
 
-            if (!silent) _logService.Log("No server updates found. Local hashes are up-to-date.");
+            if (!silent) _logService.LogSuccess("No server updates found. Local hashes are up-to-date.");
             return false;
         }
 

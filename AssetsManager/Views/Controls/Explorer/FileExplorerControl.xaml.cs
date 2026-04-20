@@ -11,11 +11,13 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer.Tree;
@@ -25,6 +27,7 @@ using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Shared;
+using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -33,11 +36,12 @@ namespace AssetsManager.Views.Controls.Explorer
         public FilePreviewerControl FilePreviewer { get; set; }
 
         public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Pin to Tabs");
-        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "To Favorites");
+        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Add to")?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Favorites");
         public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString()?.Contains("Differences") == true || m.Header?.ToString()?.Contains("Changes") == true);
         public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Extract");
         public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Save");
-        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "To Image Merger");
+        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Add to")?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Image Merger");
+        public MenuItem WatchAssetMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Add to")?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Watch Asset");
         public MenuItem CopyMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Copy");
 
         // Injected Services
@@ -56,6 +60,8 @@ namespace AssetsManager.Views.Controls.Explorer
         public AudioBankService AudioBankService { get; set; }
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
         public HashResolverService HashResolverService { get; set; }
+        public AssetWatcherService AssetWatcherService { get; set; }
+        public MonitorService MonitorService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
         public ImageMergerService ImageMergerService { get; set; }
         public ProgressUIManager ProgressUIManager { get; set; }
@@ -762,6 +768,70 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private void WatchAsset_Click(object sender, RoutedEventArgs e)
+        {
+            if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode && selectedNode.Type == NodeType.VirtualFile)
+            {
+                var path = TreeUIManager.FindNodePath(_viewModel.RootNodes, selectedNode);
+                if (path == null) return;
+
+                // Build logical path: Source/WadName/InternalPath
+                // Assuming first node is the root/source
+                var validNodes = path.Where(n => n.Name != "Loading...").ToList();
+                
+                // Determine source type (Plugins or Game)
+                AssetSourceType sourceType = AssetSourceType.Game;
+                if (validNodes[0].Name.Contains("Plugins", StringComparison.OrdinalIgnoreCase))
+                    sourceType = AssetSourceType.Plugins;
+
+                // Find WAD node
+                var wadNode = validNodes.FirstOrDefault(n => n.Type == NodeType.WadFile);
+                if (wadNode == null) return;
+
+                int wadIdx = validNodes.IndexOf(wadNode);
+                string internalPath = string.Join("/", validNodes.Skip(wadIdx + 1).Select(n => n.Name));
+                
+                // The logical path for the monitor service parser
+                string logicalPath = $"{(sourceType == AssetSourceType.Plugins ? "Plugins" : "Game")}/{wadNode.Name}/{internalPath}";
+
+                if (AppSettings.MonitoredAssets.Any(a => a.AssetPath == logicalPath))
+                {
+                    CustomMessageBoxService.ShowWarning("Warning", "This asset is already being monitored.", Window.GetWindow(this));
+                    return;
+                }
+
+                // Use the physical source path provided by the node
+                string wadPhysicalPath = selectedNode.SourceWadPath;
+                string wadRelativePath = wadPhysicalPath;
+
+                if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && wadPhysicalPath.StartsWith(AppSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase))
+                {
+                    wadRelativePath = wadPhysicalPath.Substring(AppSettings.LolPbeDirectory.Length).TrimStart('/', '\\');
+                }
+
+                var newAsset = new MonitoredAsset
+                {
+                    Alias = selectedNode.Name,
+                    AssetPath = logicalPath,
+                    WadName = wadRelativePath, // Full relative path: Plugins/folder/file.wad
+                    InternalPath = internalPath,
+                    SourceType = sourceType,
+                    Status = AssetStatus.Pending,
+                    StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted"),
+                    LastKnownHash = selectedNode.SourceChunkPathHash != 0 ? selectedNode.SourceChunkPathHash : (selectedNode.ChunkDiff?.NewHash ?? 0)
+                };
+
+                // If we don't have the hash, we'll get it during the first check
+                AppSettings.MonitoredAssets.Add(newAsset);
+                AppSettings.Save();
+                
+                // Notify MonitorService to update the UI list in the other tab
+                MonitorService?.LoadMonitoredAssets();
+                
+                LogService.LogSuccess($"Asset added to watcher: {selectedNode.Name}");
+            }
+        }
+
         private async void AddToImageMerger_Click(object sender, RoutedEventArgs e)
         {
             var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
@@ -875,6 +945,7 @@ namespace AssetsManager.Views.Controls.Explorer
             if (SaveMenuItem != null) SaveMenuItem.IsEnabled = _viewModel.IsWadMode;
             if (PinMenuItem != null) PinMenuItem.IsEnabled = selectedNode.Type != NodeType.RealDirectory && selectedNode.Type != NodeType.VirtualDirectory && selectedNode.Type != NodeType.WadFile;
             if (AddToFavoritesMenuItem != null) AddToFavoritesMenuItem.IsEnabled = _viewModel.IsWadMode && !_viewModel.IsBackupMode; 
+            if (WatchAssetMenuItem != null) WatchAssetMenuItem.IsEnabled = _viewModel.IsWadMode && !_viewModel.IsBackupMode && (selectedNode.Type == NodeType.VirtualFile);
 
             if (ViewChangesMenuItem != null)
             {

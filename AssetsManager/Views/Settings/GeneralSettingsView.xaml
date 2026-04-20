@@ -40,8 +40,8 @@
                 <Grid Margin="0,0,0,24">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="File watcher history archive" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Store historical changes detected by file watcher service" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Asset Watcher history archive" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Store historical changes detected by Asset Watcher service" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <CheckBox Grid.Column="1" IsChecked="{Binding Settings.SaveJsonHistory, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>
@@ -90,10 +90,10 @@
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="JSON Remote surveillance" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Real-time monitoring of CommunityDragon remote data files" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Asset Watcher monitoring" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Real-time monitoring of local game assets and change detection after patches" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <CheckBox Grid.Column="1" IsChecked="{Binding Settings.CheckJsonDataUpdates, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
+                    <CheckBox Grid.Column="1" IsChecked="{Binding Settings.AssetWatcherUpdates, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>
             </StackPanel>
         </StackPanel>

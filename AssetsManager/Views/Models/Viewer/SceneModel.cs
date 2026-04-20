@@ -84,6 +84,13 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsAnimationPaused { get; set; } = true;
         public double AnimationTime { get; set; }
 
+        private bool _isVisible = true;
+        public bool IsVisible
+        {
+            get => _isVisible;
+            set => SetField(ref _isVisible, value);
+        }
+
         private bool _areAllPartsVisible = true;
         public bool AreAllPartsVisible
         {

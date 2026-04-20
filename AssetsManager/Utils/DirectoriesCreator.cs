@@ -12,6 +12,8 @@ namespace AssetsManager.Utils
         public string JsonCacheNewPath { get; }
         public string JsonCacheOldPath { get; }
         public string JsonCacheHistoryPath { get; }
+        public string WatcherCacheOldPath { get; }
+        public string WatcherCacheNewPath { get; }
         public string AssetsDownloadedPath { get; }
         public string WadComparisonSavePath { get; }
         public string VersionsPath { get; }
@@ -33,6 +35,9 @@ namespace AssetsManager.Utils
             JsonCacheNewPath = Path.Combine(appFolderPath, "json_cache", "new");
             JsonCacheOldPath = Path.Combine(appFolderPath, "json_cache", "old");
             JsonCacheHistoryPath = Path.Combine(appFolderPath, "json_cache", "history");
+
+            WatcherCacheOldPath = Path.Combine(appFolderPath, "watcher_cache", "old");
+            WatcherCacheNewPath = Path.Combine(appFolderPath, "watcher_cache", "new");
 
             UpdateCachePath = Path.Combine(appFolderPath, "update_cache");
 

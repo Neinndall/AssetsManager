@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.ComponentModel;
 using HelixToolkit.Wpf;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -290,7 +291,13 @@ namespace AssetsManager.Views.Controls.Viewer
         public void AddModel(SceneModel model)
         {
             _loadedModels.Add(model);
-            Viewport.Children.Add(model.RootVisual);
+            if (model.IsVisible)
+            {
+                if (!Viewport.Children.Contains(model.RootVisual))
+                    Viewport.Children.Add(model.RootVisual);
+            }
+            
+            model.PropertyChanged += Model_PropertyChanged;
             SetActiveModel(model);
         }
 
@@ -308,12 +315,31 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
                 _activeSceneModel = null;
             }
+
+            model.PropertyChanged -= Model_PropertyChanged;
             _loadedModels.Remove(model);
             if (Viewport.Children.Contains(model.RootVisual))
             {
                 Viewport.Children.Remove(model.RootVisual);
             }
             model.Dispose();
+        }
+
+        private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (sender is SceneModel model && e.PropertyName == nameof(SceneModel.IsVisible))
+            {
+                if (model.IsVisible)
+                {
+                    if (!Viewport.Children.Contains(model.RootVisual))
+                        Viewport.Children.Add(model.RootVisual);
+                }
+                else
+                {
+                    if (Viewport.Children.Contains(model.RootVisual))
+                        Viewport.Children.Remove(model.RootVisual);
+                }
+            }
         }
 
         public void SetActiveModel(SceneModel model)

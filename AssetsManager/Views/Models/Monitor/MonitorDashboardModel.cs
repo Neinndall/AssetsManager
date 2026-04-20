@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Media;
 using System.Collections.Specialized;
 using AssetsManager.Info;
@@ -10,6 +11,8 @@ using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
+using AssetsManager.Views.Models.Monitor;
+using Material.Icons;
 
 namespace AssetsManager.Views.Models.Monitor
 {
@@ -44,7 +47,7 @@ namespace AssetsManager.Views.Models.Monitor
             set { _pbeLastCheck = value; OnPropertyChanged(); }
         }
 
-        // --- File Watcher ---
+        // --- Asset Watcher ---
         private int _monitoredFilesCount;
         public int MonitoredFilesCount
         {
@@ -112,8 +115,8 @@ namespace AssetsManager.Views.Models.Monitor
             set { _appVersionColor = value; OnPropertyChanged(); }
         }
 
-        private Material.Icons.MaterialIconKind _appVersionIconKind;
-        public Material.Icons.MaterialIconKind AppVersionIconKind
+        private MaterialIconKind _appVersionIconKind;
+        public MaterialIconKind AppVersionIconKind
         {
             get => _appVersionIconKind;
             set { _appVersionIconKind = value; OnPropertyChanged(); }
@@ -134,8 +137,8 @@ namespace AssetsManager.Views.Models.Monitor
             set { _globalStatusColor = value; OnPropertyChanged(); }
         }
 
-        private Material.Icons.MaterialIconKind _globalStatusIconKind = Material.Icons.MaterialIconKind.ShieldCheckOutline;
-        public Material.Icons.MaterialIconKind GlobalStatusIconKind
+        private MaterialIconKind _globalStatusIconKind = MaterialIconKind.ShieldCheckOutline;
+        public MaterialIconKind GlobalStatusIconKind
         {
             get => _globalStatusIconKind;
             set { _globalStatusIconKind = value; OnPropertyChanged(); }
@@ -164,8 +167,8 @@ namespace AssetsManager.Views.Models.Monitor
             set { _systemHealthFooterColor = value; OnPropertyChanged(); }
         }
 
-        private Material.Icons.MaterialIconKind _systemHealthFooterIconKind = Material.Icons.MaterialIconKind.CheckAll;
-        public Material.Icons.MaterialIconKind SystemHealthFooterIconKind
+        private MaterialIconKind _systemHealthFooterIconKind = MaterialIconKind.CheckAll;
+        public MaterialIconKind SystemHealthFooterIconKind
         {
             get => _systemHealthFooterIconKind;
             set { _systemHealthFooterIconKind = value; OnPropertyChanged(); }
@@ -184,7 +187,7 @@ namespace AssetsManager.Views.Models.Monitor
             AppVersionText = ApplicationInfos.Version;
 
             // Map ApplicationInfos color and icon dynamically
-            AppVersionColor = (Brush)System.Windows.Application.Current.FindResource(ApplicationInfos.BuildColorKey);
+            AppVersionColor = (Brush)Application.Current.FindResource(ApplicationInfos.BuildColorKey);
             AppVersionIconKind = ApplicationInfos.BuildIcon;
 
             // Check if an update was already found (Higher priority than Build Type)
@@ -192,7 +195,7 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 AppVersionText = $"{_updateCheckService.AvailableVersion} ready!";
                 AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")); // Blue for available updates
-                AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
+                AppVersionIconKind = MaterialIconKind.CloudDownload;
             }
 
             // Subscribe to UpdateCheckService for future updates
@@ -201,11 +204,11 @@ namespace AssetsManager.Views.Models.Monitor
                 // Verify if it's an app update notification
                 if (!string.IsNullOrEmpty(latestVersion))
                 {
-                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    Application.Current.Dispatcher.Invoke(() =>
                     {
                         AppVersionText = $"v{latestVersion} ready!";
                         AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
-                        AppVersionIconKind = Material.Icons.MaterialIconKind.CloudDownload;
+                        AppVersionIconKind = MaterialIconKind.CloudDownload;
                         UpdateGlobalStatus();
                         UpdateSystemHealthFooter();
                     });
@@ -244,17 +247,17 @@ namespace AssetsManager.Views.Models.Monitor
             }
 
             // Subscriptions
-            _monitorService.MonitoredItems.CollectionChanged += MonitoredItems_CollectionChanged;
+            _monitorService.MonitoredAssets.CollectionChanged += MonitoredItems_CollectionChanged;
 
             // Subscribe to PropertyChanged for existing items
-            foreach (var item in _monitorService.MonitoredItems)
+            foreach (var item in _monitorService.MonitoredAssets)
             {
                 item.PropertyChanged += MonitoredItem_PropertyChanged;
             }
 
             _monitorService.CategoryCheckCompleted += (category) =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     // Race condition fix: When this event fires, 'category.Status' might still be 'Checking'.
                     // We check if ANY OTHER category is checking. If not, we are effectively Idle.
@@ -272,7 +275,7 @@ namespace AssetsManager.Views.Models.Monitor
             };
             _monitorService.CategoryCheckStarted += (category) =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     AssetTrackerStatus = $"Category: {category.Name} - Checking...";
                 });
@@ -280,7 +283,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             _pbeStatusService.StatusChecked += () =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() => {
+                Application.Current.Dispatcher.Invoke(() => {
                     RefreshPbeData();
                     PbeLastCheck = DateTime.Now.ToString("HH:mm");
                 });
@@ -288,7 +291,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             _statusService.HashSyncStarted += () =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     HashesStatus = "Updating...";
                     UpdateSystemHealthFooter();
@@ -297,7 +300,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             _statusService.HashSyncCompleted += () =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.Invoke(() =>
                 {
                     HashesStatus = "Synced";
                     UpdateSystemHealthFooter();
@@ -312,7 +315,7 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 GlobalStatusText = "System Alert";
                 GlobalStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
-                GlobalStatusIconKind = Material.Icons.MaterialIconKind.AlertCircleOutline;
+                GlobalStatusIconKind = MaterialIconKind.AlertCircleOutline;
                 return;
             }
 
@@ -321,14 +324,14 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 GlobalStatusText = "Action Required";
                 GlobalStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
-                GlobalStatusIconKind = Material.Icons.MaterialIconKind.AlertOctagonOutline;
+                GlobalStatusIconKind = MaterialIconKind.AlertOctagonOutline;
                 return;
             }
 
             // Priority 3: Normal
             GlobalStatusText = "System Nominal";
             GlobalStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
-            GlobalStatusIconKind = Material.Icons.MaterialIconKind.ShieldCheckOutline;
+            GlobalStatusIconKind = MaterialIconKind.ShieldCheckOutline;
         }
 
         private void UpdateDataStatus()
@@ -351,7 +354,7 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 SystemHealthFooterText = "Syncing Databases...";
                 SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")); // Blue
-                SystemHealthFooterIconKind = Material.Icons.MaterialIconKind.Sync;
+                SystemHealthFooterIconKind = MaterialIconKind.Sync;
                 return;
             }
 
@@ -360,21 +363,21 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 SystemHealthFooterText = "Update Recommended";
                 SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
-                SystemHealthFooterIconKind = Material.Icons.MaterialIconKind.CloudDownload;
+                SystemHealthFooterIconKind = MaterialIconKind.CloudDownload;
                 return;
             }
 
             // Case 3: All Good
             SystemHealthFooterText = "Self-Check Passed";
             SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
-            SystemHealthFooterIconKind = Material.Icons.MaterialIconKind.CheckAll;
+            SystemHealthFooterIconKind = MaterialIconKind.CheckAll;
         }
 
         private void MonitoredItems_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.NewItems != null)
             {
-                foreach (MonitoredUrl item in e.NewItems)
+                foreach (MonitoredAsset item in e.NewItems)
                 {
                     item.PropertyChanged += MonitoredItem_PropertyChanged;
                 }
@@ -382,7 +385,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             if (e.OldItems != null)
             {
-                foreach (MonitoredUrl item in e.OldItems)
+                foreach (MonitoredAsset item in e.OldItems)
                 {
                     item.PropertyChanged -= MonitoredItem_PropertyChanged;
                 }
@@ -392,9 +395,9 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void MonitoredItem_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(MonitoredUrl.HasChanges) || e.PropertyName == nameof(MonitoredUrl.LastChecked))
+            if (e.PropertyName == nameof(MonitoredAsset.HasChanges) || e.PropertyName == nameof(MonitoredAsset.LastUpdated))
             {
-                RefreshFileWatcherData();
+                Application.Current.Dispatcher.Invoke(RefreshFileWatcherData);
             }
         }
 
@@ -422,14 +425,14 @@ namespace AssetsManager.Views.Models.Monitor
 
         public void RefreshFileWatcherData()
         {
-            if (_monitorService.MonitoredItems == null) return;
+            if (_monitorService.MonitoredAssets == null) return;
 
-            MonitoredFilesCount = _monitorService.MonitoredItems.Count;
-            MonitoredFilesChangedCount = _monitorService.MonitoredItems.Count(x => x.HasChanges);
+            MonitoredFilesCount = _monitorService.MonitoredAssets.Count;
+            MonitoredFilesChangedCount = _monitorService.MonitoredAssets.Count(x => x.HasChanges);
 
-            var lastItem = _monitorService.MonitoredItems.OrderByDescending(x => x.LastChecked).FirstOrDefault();
-            WatcherLastUpdate = lastItem != null && lastItem.LastChecked != "N/A"
-                ? lastItem.LastChecked.Replace("Last Update: ", "")
+            var lastItem = _monitorService.MonitoredAssets.OrderByDescending(x => x.LastUpdated).FirstOrDefault();
+            WatcherLastUpdate = lastItem != null && lastItem.LastUpdated != DateTime.MinValue
+                ? (lastItem.LastUpdated.Date == DateTime.Today ? lastItem.LastUpdated.ToString("HH:mm") : lastItem.LastUpdated.ToString("dd/MM HH:mm"))
                 : "Never";
 
             UpdateGlobalStatus();
@@ -457,7 +460,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             if (DateTime.TryParseExact(timeStr, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime dt))
             {
-                return dt.Date == DateTime.Today ? dt.ToString("HH:mm") : dt.ToString("yyyy-MM-DD HH:mm");
+                return dt.Date == DateTime.Today ? dt.ToString("HH:mm") : dt.ToString("yyyy-MM-dd HH:mm");
             }
             return timeStr;
         }
