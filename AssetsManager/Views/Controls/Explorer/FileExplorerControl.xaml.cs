@@ -818,7 +818,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     SourceType = sourceType,
                     Status = AssetStatus.Pending,
                     StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted"),
-                    LastKnownHash = selectedNode.SourceChunkPathHash != 0 ? selectedNode.SourceChunkPathHash : (selectedNode.ChunkDiff?.NewHash ?? 0)
+                    LastKnownHash = selectedNode.SourceChunkPathHash != 0 ? selectedNode.SourceChunkPathHash : 0
                 };
 
                 // If we don't have the hash, we'll get it during the first check

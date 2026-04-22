@@ -364,12 +364,12 @@ namespace AssetsManager.Services.Comparator
                     }
                     else
                     {
-                        _logService.LogWarning($"[CreateDependencyAsync] Chunk NOT found for hash {fileHash:X16} in WAD '{wadFullPath}'.");
+                        _logService.LogDebug($"[CreateDependencyAsync] Chunk NOT found for file '{filePath}' (Hash: {fileHash:X16}) in WAD '{wadFullPath}'. This is normal for optional siblings.");
                     }
                 }
                 else
                 {
-                    _logService.LogWarning($"[CreateDependencyAsync] WAD file not found at either new or old paths: '{wadRelativePath}'.");
+                    _logService.LogDebug($"[CreateDependencyAsync] WAD file not found for dependency '{filePath}' at either new or old paths: '{wadRelativePath}'.");
                 }
                 return null;
             });

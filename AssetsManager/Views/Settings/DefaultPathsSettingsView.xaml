@@ -27,7 +27,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding LolPbeDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolPbeDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <Button Grid.Column="1" Click="btnBrowseLol_Click" Style="{StaticResource BrowseButtonStyle}" Width="44" Height="38">
                             <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                         </Button>
@@ -43,7 +43,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding LolLiveDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.LolLiveDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <Button Grid.Column="1" Click="btnBrowseLolLive_Click" Style="{StaticResource BrowseButtonStyle}" Width="44" Height="38">
                             <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                         </Button>
@@ -73,7 +73,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding CustomFloorTexturePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.CustomFloorTexturePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <Button Grid.Column="1" Click="btnBrowseCustomFloorTexture_Click" Style="{StaticResource BrowseButtonStyle}" Width="44" Height="38">
                             <materialIcons:MaterialIcon Kind="ImageOutline" Width="18" Height="18"/>
                         </Button>
@@ -89,7 +89,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding DefaultExtractedSelectDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.DefaultExtractedSelectDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <Button Grid.Column="1" Click="btnBrowseDefaultExtracted_Click" Style="{StaticResource BrowseButtonStyle}" Width="44" Height="38">
                             <materialIcons:MaterialIcon Kind="FolderDownloadOutline" Width="18" Height="18"/>
                         </Button>

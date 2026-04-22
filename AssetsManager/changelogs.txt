@@ -1,6 +1,44 @@
-AssetsManager - League of Legends | v3.2.4.2
+AssetsManager - League of Legends | v3.2.5.0
 
-HOTFIX UPDATE
+MEDIUM UPDATE
+This update introduces the brand new Automated Asset Watcher for background tracking of game files and features a major optimization for VO audio containers with unified hierarchy merging. It also refines the Notification Hub with a professional HUD aesthetic and enhances the 3D Viewer with persistent visibility states, ensuring a more stable and efficient engineering workflow.
+
+New Features
+  - Monitor / Automated Asset Watcher
+    * Replaced the old monitoring system with a brand new automated Asset Watcher. The system now automatically detects changes in your local game files and plugins after every patch, keeping your monitored assets permanently synchronized.
+    * Added support for automated background updates: the watcher can now check for changes periodically (even every minute) without interrupting your workflow.
+    * Integrated "Patch Intelligence" icons: assets now show clear status indicators (New, Updated, Up-to-Date) with professional HUD-style circular icons.
+    * Improved traceability: real updates now automatically save "Old" vs "New" versions in the background, allowing for instant difference viewing at any time.
+
+Improvements
+  - Audio Engine / VO Audio Container Optimization
+    * Optimized the logic for voice-over containers (_vo_audio.bnk and .wpk). The system now automatically merges the hierarchy of multiple banks, ensuring that all audio events and their internal structure are fully visible when viewing differences, even if the data is distributed across different files.
+    * Improved audio discovery: the scanner now also checks the events bank for embedded audios, preventing any "abandoned" audio from being lost during comparison or extraction.
+  - 3D Viewer / Visibility Persistence
+    * Implemented a new global visibility toggle for models in the SCENE hierarchy. Users can now hide and show entire models without losing their manual mesh visibility settings (Meshes & Textures).
+  - Audio Engine / Performance & Consistency
+    * Optimized the linker engine to load WAD contents only once during audio resolution, significantly reducing disk I/O and speeding up difference viewing.
+    * Unified the metadata resolution logic across Live Comparisons, History Results, and Archive Explorer for 100% consistent event naming.
+  - Comparator / UI Category Preservation
+    * Improved the dependency anchoring logic to keep modified or renamed assets in their primary UI folders. Files acting as dependencies for others are now internally linked rather than moved, ensuring a cleaner and more predictable results tree.
+  - Notification Hub / Visual Refinement
+    * Refined the notification layout with a more balanced and compact distribution, ensuring better alignment between the header and the message body.
+    * Redesigned the "New Notifications" badge with a modern technical HUD aesthetic, featuring semi-transparent backgrounds and a dedicated alert icon for improved visibility.
+    * Improved the vertical alignment of all elements (icons, text, and close button) for a perfectly centered and professional look.
+  - Explorer / Context Menu
+    * Reorganized the context menu by grouping "Favorites", "Watch Asset", and "Image Merger" into a new "Add to" submenu, significantly reducing visual clutter and improving navigation.
+
+Bug Fixes
+  - Regional Audio Resolution
+    * Fixed a bug where event names appeared as "Unknown" in regional WADs (e.g., .es_ES). The system now intelligently links to the base master bank to ensure 100% accurate metadata in all languages.
+  - Backup Dependency Integrity
+    * Improved the backup loading system to correctly resolve audio support files even when they are stored only as dependencies, ensuring full functionality in History mode.
+  - Historical Data Fidelity
+    * Reinforced data integrity by ensuring that backup views use exclusively saved data, preventing incorrect fallbacks to current live game files.
+  - Audio Engine / Event Metadata Resolution
+    * Fixed a bug where event names failed to resolve in audio bank files (_events.bnk) during live comparisons, ensuring metadata is consistently displayed across all operational modes including Archive Explorer.
+  - Comparator / Audio Dependency Integrity
+    * Fixed a critical issue where modified audio containers (.wpk or _audio.bnk) were saved without their necessary dependencies (_events.bnk and .bin). The system now implements a bi-directional linking logic that ensures all required metadata is packaged regardless of which part of the audio bank was updated.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

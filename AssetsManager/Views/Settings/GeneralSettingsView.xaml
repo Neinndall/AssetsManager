@@ -183,7 +183,7 @@
                     </StackPanel>
                     <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
                               ItemsSource="{Binding AudioFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"
-                              SelectedValue="{Binding AudioExportFormat, Mode=TwoWay}"/>
+                              SelectedValue="{Binding Settings.AudioExportFormat, Mode=TwoWay}"/>
                 </Grid>
 
                 <Grid>
@@ -194,7 +194,7 @@
                     </StackPanel>
                     <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
                               ItemsSource="{Binding ImageFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"
-                              SelectedValue="{Binding ImageExportFormat, Mode=TwoWay}"/>
+                              SelectedValue="{Binding Settings.ImageExportFormat, Mode=TwoWay}"/>
                 </Grid>
             </StackPanel>
         </StackPanel>
