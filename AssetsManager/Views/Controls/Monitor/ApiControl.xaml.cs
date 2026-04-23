@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -63,6 +64,39 @@ namespace AssetsManager.Views.Controls.Monitor
 
             await LoadSalesFromCacheAsync();
             await LoadMythicShopFromCacheAsync();
+            await LoadPassRewardsFromCacheAsync();
+        }
+
+        private async Task LoadPassRewardsFromCacheAsync()
+        {
+            if (DirectoriesCreator == null || !Directory.Exists(DirectoriesCreator.ApiCachePath))
+            {
+                return;
+            }
+
+            try
+            {
+                var progressionPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_progression.json");
+                var rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
+
+                if (File.Exists(progressionPath) && File.Exists(rewardsPath))
+                {
+                    var progContent = await File.ReadAllTextAsync(progressionPath);
+                    var rewardsContent = await File.ReadAllTextAsync(rewardsPath);
+
+                    var progression = JsonSerializer.Deserialize<ProgressionResponse>(progContent);
+                    var rewardsResponse = JsonSerializer.Deserialize<RewardsResponse>(rewardsContent);
+
+                    if (progression != null && rewardsResponse != null)
+                    {
+                        await ProcessPassRewardsDataAsync(progression, rewardsResponse);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Failed to load pass rewards data from cache.");
+            }
         }
 
         private async Task LoadMythicShopFromCacheAsync()
@@ -200,6 +234,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsSales_Click(object sender, RoutedEventArgs e)
         {
+            if (LogService != null) LogService.LogWarning("--- Starting Sales Fetch Process ---");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -325,6 +360,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsMythicShop_Click(object sender, RoutedEventArgs e)
         {
+            if (LogService != null) LogService.LogWarning("--- Starting Mythic Shop Fetch Process ---");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -522,6 +558,183 @@ namespace AssetsManager.Views.Controls.Monitor
         private void TabMythic_Click(object sender, RoutedEventArgs e)
         {
             MainTabControl.SelectedIndex = 1;
+        }
+
+        private void TabPass_Click(object sender, RoutedEventArgs e)
+        {
+            MainTabControl.SelectedIndex = 2;
+        }
+
+        private async void RequestsPassRewards_Click(object sender, RoutedEventArgs e)
+        {
+            if (LogService != null) LogService.LogWarning("--- Starting Pass Rewards Fetch Process ---");
+            if (RiotApiService == null)
+            {
+                CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
+                return;
+            }
+
+            ViewModel.IsBusy = true;
+            ViewModel.StatusText = "Status: Finding active pass...";
+
+            string eventId = await RiotApiService.GetActivePassGroupIdAsync();
+            if (string.IsNullOrEmpty(eventId))
+            {
+                ViewModel.IsBusy = false;
+                CustomMessageBoxService.ShowError("Error", "Could not find an active pass event ID.", Window.GetWindow(this));
+                return;
+            }
+
+            ViewModel.StatusText = "Status: Fetching pass data...";
+            string progressionJson = await RiotApiService.GetPassRewardsProgressionAsync(eventId);
+            string rewardsJson = await RiotApiService.GetPassRewardsRewardsAsync();
+
+            if (string.IsNullOrEmpty(progressionJson) || string.IsNullOrEmpty(rewardsJson))
+            {
+                ViewModel.IsBusy = false;
+                CustomMessageBoxService.ShowError("Error", "Could not retrieve pass progression or rewards data.", Window.GetWindow(this));
+                return;
+            }
+
+            try
+            {
+                var progression = JsonSerializer.Deserialize<ProgressionResponse>(progressionJson);
+                var rewardsResponse = JsonSerializer.Deserialize<RewardsResponse>(rewardsJson);
+
+                if (progression != null && rewardsResponse != null)
+                {
+                    await ProcessPassRewardsDataAsync(progression, rewardsResponse);
+                    LogService.LogSuccess("Pass rewards data retrieved and processed successfully!");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Failed to process Pass Rewards data.");
+                CustomMessageBoxService.ShowError("Error", $"An error occurred: {ex.Message}", Window.GetWindow(this));
+            }
+
+            ViewModel.IsBusy = false;
+            ViewModel.StatusText = "Status: LCU Connected";
+            UpdateAuthenticationStatus();
+        }
+
+        private async Task ProcessPassRewardsDataAsync(ProgressionResponse progression, RewardsResponse rewardsResponse)
+        {
+            var rewardGroupsMap = rewardsResponse.Data.ToDictionary(g => g.Id, g => g);
+            var passRewards = new List<PassRewardModel>();
+            var processedKeys = new HashSet<string>();
+
+            foreach (var milestone in progression.Milestones)
+            {
+                if (milestone.Properties == null || !milestone.Properties.TryGetValue("REWARD_GROUP_ID", out var rewardGroupIdObj))
+                    continue;
+
+                string rewardGroupId = rewardGroupIdObj.ToString();
+                string translatedLevel = TranslateMilestoneName(milestone.Name);
+                string key = $"{translatedLevel}-{rewardGroupId}";
+
+                if (processedKeys.Contains(key)) continue;
+
+                if (rewardGroupsMap.TryGetValue(rewardGroupId, out var rewardGroup))
+                {
+                    foreach (var reward in rewardGroup.Rewards)
+                    {
+                        if (reward.Media == null || string.IsNullOrEmpty(reward.Media.IconUrl))
+                            continue;
+
+                        string title = string.Empty;
+                        string details = string.Empty;
+
+                        if (reward.Localizations != null)
+                        {
+                            title = reward.Localizations.Title;
+                            details = reward.Localizations.Details;
+                        }
+
+                        passRewards.Add(new PassRewardModel
+                        {
+                            Level = translatedLevel,
+                            Title = TransformTitle(title, reward.Quantity),
+                            Details = details,
+                            IconUrl = reward.Media.IconUrl,
+                            Quantity = reward.Quantity,
+                            IsFree = milestone.Name.Contains("Free", StringComparison.OrdinalIgnoreCase)
+                        });
+
+                        processedKeys.Add(key);
+                        break; // Following GeneratorRewards logic: process only the first reward
+                    }
+                }
+            }
+
+            ViewModel.PassRewards.ReplaceRange(passRewards);
+
+            // Batch extract icons efficiently
+            var urlsToExtract = passRewards.Select(r => r.IconUrl).ToList();
+            
+            _ = Task.Run(async () => 
+            {
+                await RiotApiService.ExtractRewardIconsBatchAsync(urlsToExtract, (originalUrl, localPath) => 
+                {
+                    // Find all models using this URL (there might be duplicates across levels)
+                    var targets = passRewards.Where(r => r.IconUrl == originalUrl).ToList();
+                    
+                    Dispatcher.Invoke(() => 
+                    {
+                        foreach (var target in targets)
+                        {
+                            target.IconUrl = localPath;
+                        }
+                    });
+                });
+            });
+        }
+
+        private string TranslateMilestoneName(string name)
+        {
+            if (name.Contains("Milestone", StringComparison.OrdinalIgnoreCase))
+            {
+                int index = name.IndexOf("Milestone", StringComparison.OrdinalIgnoreCase);
+                if (index >= 0)
+                {
+                    // Get everything after "Milestone"
+                    string levelPart = name.Substring(index + "Milestone".Length);
+                    
+                    // Use Regex to extract only the leading numbers
+                    var match = Regex.Match(levelPart, @"^(\d+)");
+                    if (match.Success)
+                    {
+                        string levelNumber = match.Groups[1].Value.TrimStart('0');
+                        if (string.IsNullOrEmpty(levelNumber)) levelNumber = "0";
+                        return $"Level {levelNumber}";
+                    }
+                }
+            }
+            return name;
+        }
+
+        private string TransformTitle(string title, long quantity)
+        {
+            if (string.IsNullOrEmpty(title)) return title;
+
+            var match = Regex.Match(title, @"rewards_title_Reward_(\w+)_(\d+)");
+            if (match.Success)
+            {
+                var type = match.Groups[1].Value;
+                var amount = match.Groups[2].Value;
+
+                if (type.Equals("BE", StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"{amount} esencias azules";
+                }
+            }
+            return title;
+        }
+
+        private void SavePassRewardsButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Implementation for PNG export if needed, similar to SaveMythicShopAsPngAsync
+            CustomMessageBoxService.ShowInfo("Info", "Pass Rewards export to PNG is not yet implemented.", Window.GetWindow(this));
         }
     }
 }

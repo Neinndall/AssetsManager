@@ -73,22 +73,18 @@ namespace AssetsManager
 
       services.AddSingleton<HttpClient>(sp =>
       {
-          var handler = new SocketsHttpHandler
+          var handler = new HttpClientHandler
           {
-              PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-              MaxConnectionsPerServer = 16,
-              UseCookies = false,
-              
-              SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+              ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
               {
-                  RemoteCertificateValidationCallback = (message, cert, chain, errors) =>
+                  // Absolute trust for LCU/Local requests
+                  if (message != null && message.RequestUri != null)
                   {
-                      if (message is HttpRequestMessage req && req.RequestUri != null && req.RequestUri.IsLoopback)
+                      var host = message.RequestUri.Host;
+                      if (host == "127.0.0.1" || host == "localhost" || message.RequestUri.IsLoopback)
                           return true;
-                      
-                      // For all other requests, use the default system validation
-                      return errors == System.Net.Security.SslPolicyErrors.None;
                   }
+                  return errors == System.Net.Security.SslPolicyErrors.None;
               }
           };
           

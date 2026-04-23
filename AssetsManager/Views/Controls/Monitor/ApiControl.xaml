@@ -126,6 +126,24 @@
                         </StackPanel>
                     </Button>
                 </StackPanel>
+
+                <!-- Pass Rewards -->
+                <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabPass, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Button Click="RequestsPassRewards_Click" IsEnabled="{Binding IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                        <StackPanel VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="TicketOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                            <TextBlock Text="Fetch Pass" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Get rewards" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="SavePassRewardsButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0" Width="140" Height="90" Padding="0">
+                        <StackPanel VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="FileImageOutline" Width="24" Height="24" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                            <TextBlock Text="Export PNG" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Save image" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </StackPanel>
         </Grid>
 
@@ -139,6 +157,7 @@
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="TabSales" Content="Sales" Click="TabSales_Click" IsChecked="True" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
                     <RadioButton x:Name="TabMythic" Content="Mythic Shop" Click="TabMythic_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
+                    <RadioButton x:Name="TabPass" Content="Pass Rewards" Click="TabPass_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
                 </StackPanel>
             </Border>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -205,6 +224,15 @@
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </TabItem>
+            <TabItem>
+                <ItemsControl x:Name="PassRewardsItemsControl" ItemsSource="{Binding PassRewards}" ItemTemplate="{StaticResource PassRewardTemplate}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="5"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </TabItem>
         </TabControl>

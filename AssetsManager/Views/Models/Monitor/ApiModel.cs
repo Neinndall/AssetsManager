@@ -49,6 +49,8 @@ namespace AssetsManager.Views.Models.Monitor
 
         public ObservableRangeCollection<MythicShopCategory> MythicShopCategories { get; }
 
+        public ObservableRangeCollection<PassRewardModel> PassRewards { get; }
+
         // Computed properties for display
         public string RegionText => $"Region: {_apiSettings?.Token?.Region ?? "N/A"}";
         public string PlatformText => $"Platform: {_apiSettings?.Token?.Platform ?? "N/A"}";
@@ -74,6 +76,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             Paginator = new PaginationModel<CatalogItem> { PageSize = 12 };
             MythicShopCategories = new ObservableRangeCollection<MythicShopCategory>();
+            PassRewards = new ObservableRangeCollection<PassRewardModel>();
         }
 
         public void SetFullSalesCatalog(IEnumerable<CatalogItem> items)
