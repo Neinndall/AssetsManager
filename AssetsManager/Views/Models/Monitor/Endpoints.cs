@@ -17,8 +17,8 @@ namespace AssetsManager.Views.Models.Monitor
         {
             { "sales", "/storefront/v3/view/skins" },
             { "mythic_shop", "/catalog/v1/products/d1c2664a-5938-4c41-8d1b-61fd51052c22/stores" },
-            { "pass_rewards_progression", "/services/cap/progression/progression-api/v1/products/d1c2664a-5938-4c41-8d1b-61fd51052c22/groups/{events_id}" },
-            { "pass_rewards_rewards", "/services/rewards/public-api/v2/products/d1c2664a-5938-4c41-8d1b-61fd51052c22/groups?locale={locales}" }
+            { "progression", "/services/cap/progression/progression-api/v1/products/d1c2664a-5938-4c41-8d1b-61fd51052c22/groups/{events_id}" },
+            { "rewards", "/services/rewards/public-api/v2/products/d1c2664a-5938-4c41-8d1b-61fd51052c22/groups?locale={locales}" }
         };
     }
 }

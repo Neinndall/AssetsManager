@@ -234,7 +234,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsSales_Click(object sender, RoutedEventArgs e)
         {
-            if (LogService != null) LogService.LogWarning("--- Starting Sales Fetch Process ---");
+            if (LogService != null) LogService.Log("Starting Sales Fetch Process");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -360,7 +360,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsMythicShop_Click(object sender, RoutedEventArgs e)
         {
-            if (LogService != null) LogService.LogWarning("--- Starting Mythic Shop Fetch Process ---");
+            if (LogService != null) LogService.Log("Starting Mythic Shop Fetch Process");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -567,7 +567,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsPassRewards_Click(object sender, RoutedEventArgs e)
         {
-            if (LogService != null) LogService.LogWarning("--- Starting Pass Rewards Fetch Process ---");
+            if (LogService != null) LogService.Log("Starting Pass Rewards Fetch Process");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
