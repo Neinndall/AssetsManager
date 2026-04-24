@@ -21,10 +21,17 @@ namespace AssetsManager.Services.Monitor
         private readonly HttpClient _httpClient;
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly SemaphoreSlim _extractionSemaphore = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim _extractionSemaphore = new(1, 1);
+        private readonly string[] _passWadNames = { "default-assets2.wad", "default-assets.wad" };
 
         private readonly Dictionary<string, string> _localEndpoints;
         private readonly Dictionary<string, string> _remoteEndpoints;
+
+        private string GetIconWadPath(string iconUrl)
+        {
+            string basePath = Regex.Replace(iconUrl.ToLowerInvariant(), @"^.*assets/", "");
+            return $"plugins/rcp-be-lol-game-data/global/default/assets/{basePath}";
+        }
 
         public RiotApiService(AppSettings appSettings, HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator)
         {
@@ -267,10 +274,9 @@ namespace AssetsManager.Services.Monitor
             string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
             if (string.IsNullOrEmpty(lolDirectory)) return null;
 
-            string[] wadNames = { "default-assets2.wad", "default-assets.wad" };
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
 
-            foreach (var wadName in wadNames)
+            foreach (var wadName in _passWadNames)
             {
                 string wadPath = Path.Combine(pluginPath, wadName);
                 if (!File.Exists(wadPath)) continue;
@@ -388,8 +394,7 @@ namespace AssetsManager.Services.Monitor
             await _extractionSemaphore.WaitAsync();
             try
             {
-                string[] wadNames = { "default-assets.wad", "default-assets2.wad" };
-                foreach (var wadName in wadNames)
+                foreach (var wadName in _passWadNames)
                 {
                     string wadPath = Path.Combine(pluginPath, wadName);
                     if (!File.Exists(wadPath)) continue;
@@ -398,9 +403,7 @@ namespace AssetsManager.Services.Monitor
                     for (int i = remainingUrls.Count - 1; i >= 0; i--)
                     {
                         var iconUrl = remainingUrls[i];
-                        string basePath = Regex.Replace(iconUrl.ToLowerInvariant(), @"^.*assets/", "");
-                        string fullPath = $"plugins/rcp-be-lol-game-data/global/default/assets/{basePath}";
-                        ulong pathHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(fullPath);
+                        ulong pathHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(GetIconWadPath(iconUrl));
 
                         if (wadFile.Chunks.TryGetValue(pathHash, out var chunk))
                         {
@@ -432,12 +435,9 @@ namespace AssetsManager.Services.Monitor
                 string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
                 string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
                 
-                string basePath = Regex.Replace(iconUrl.ToLowerInvariant(), @"^.*assets/", "");
-                string fullPath = $"plugins/rcp-be-lol-game-data/global/default/assets/{basePath}";
-                ulong pathHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(fullPath);
+                ulong pathHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(GetIconWadPath(iconUrl));
 
-                string[] wadNames = { "default-assets.wad", "default-assets2.wad" };
-                foreach (var wadName in wadNames)
+                foreach (var wadName in _passWadNames)
                 {
                     string wadPath = Path.Combine(pluginPath, wadName);
                     if (!File.Exists(wadPath)) continue;
