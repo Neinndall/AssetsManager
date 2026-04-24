@@ -9,8 +9,6 @@ namespace AssetsManager.Utils
         // Fixed root paths
         public string AppDirectory { get; }
         public string HashesPath { get; }
-        public string JsonCacheNewPath { get; }
-        public string JsonCacheOldPath { get; }
         public string JsonCacheHistoryPath { get; }
         public string WatcherCacheOldPath { get; }
         public string WatcherCacheNewPath { get; }
@@ -32,8 +30,6 @@ namespace AssetsManager.Utils
 
             AssetsDownloadedPath = Path.Combine(AppDirectory, "AssetsDownloaded");
             
-            JsonCacheNewPath = Path.Combine(appFolderPath, "json_cache", "new");
-            JsonCacheOldPath = Path.Combine(appFolderPath, "json_cache", "old");
             JsonCacheHistoryPath = Path.Combine(appFolderPath, "json_cache", "history");
 
             WatcherCacheOldPath = Path.Combine(appFolderPath, "watcher_cache", "old");

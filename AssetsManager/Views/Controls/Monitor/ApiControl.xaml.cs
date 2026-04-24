@@ -275,7 +275,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            await HandleExportRequestAsync("sales", ViewModel.SalesCatalog, (DataTemplate)this.FindResource("StoreItemTemplate"), 4);
+            await HandleExportRequestAsync("sales", ViewModel.SalesCatalog, (DataTemplate)this.FindResource("StoreItemTemplate"), 8);
         }
 
         private async void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
@@ -286,7 +286,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            await HandleExportRequestAsync("mythic_shop", ViewModel.MythicShopCategories, (DataTemplate)this.FindResource("MythicItemTemplate"), 4);
+            await HandleExportRequestAsync("mythic_shop", ViewModel.MythicShopCategories, (DataTemplate)this.FindResource("MythicItemTemplate"), 8);
         }
 
         private async void SavePassRewardsButton_Click(object sender, RoutedEventArgs e)
@@ -297,7 +297,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            await HandleExportRequestAsync("pass_rewards", ViewModel.PassRewards, (DataTemplate)this.FindResource("PassRewardTemplate"), 5);
+            await HandleExportRequestAsync("pass_rewards", ViewModel.PassRewards, (DataTemplate)this.FindResource("PassRewardTemplate"), 8);
         }
 
         private async Task HandleExportRequestAsync(string defaultFileName, System.Collections.IEnumerable items, DataTemplate template, int columns)
