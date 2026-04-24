@@ -292,6 +292,12 @@ namespace AssetsManager.Services.Monitor
                             using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
                             using (var doc = JsonDocument.Parse(decompressedDataOwner.Span.ToArray()))
                             {
+                                string bestId = null;
+                                string bestName = "Unknown Event";
+                                DateTime latestStart = DateTime.MinValue;
+                                bool isBestActive = false;
+                                DateTime now = DateTime.UtcNow;
+
                                 foreach (var element in doc.RootElement.EnumerateArray())
                                 {
                                     if (element.TryGetProperty("event", out var eventObj))
@@ -302,11 +308,47 @@ namespace AssetsManager.Services.Monitor
                                                 rewardTrack.TryGetProperty("trackConfig", out var trackConfig) &&
                                                 trackConfig.TryGetProperty("id", out var id))
                                             {
-                                                _logService.LogSuccess($"Active Pass ID found in {wadName}: {id.GetString()}");
-                                                return id.GetString();
+                                                string currentId = id.GetString();
+                                                string currentName = eventObj.TryGetProperty("localizedName", out var nameProp) ? nameProp.GetString() : "Unknown Event";
+                                                DateTime startDate = DateTime.MinValue;
+                                                DateTime endDate = DateTime.MaxValue;
+
+                                                if (eventObj.TryGetProperty("startDate", out var startProp))
+                                                    DateTime.TryParse(startProp.GetString(), out startDate);
+
+                                                if (eventObj.TryGetProperty("endDate", out var endProp))
+                                                    DateTime.TryParse(endProp.GetString(), out endDate);
+
+                                                bool isActive = now >= startDate && now <= endDate;
+
+                                                if (isActive)
+                                                {
+                                                    if (!isBestActive || startDate > latestStart)
+                                                    {
+                                                        bestId = currentId;
+                                                        bestName = currentName;
+                                                        latestStart = startDate;
+                                                        isBestActive = true;
+                                                    }
+                                                }
+                                                else if (!isBestActive)
+                                                {
+                                                    if (bestId == null || startDate > latestStart)
+                                                    {
+                                                        bestId = currentId;
+                                                        bestName = currentName;
+                                                        latestStart = startDate;
+                                                    }
+                                                }
                                             }
                                         }
                                     }
+                                }
+
+                                if (bestId != null)
+                                {
+                                    _logService.LogSuccess($"Active Pass ID found called: {bestName}");
+                                    return bestId;
                                 }
                             }
                         }
