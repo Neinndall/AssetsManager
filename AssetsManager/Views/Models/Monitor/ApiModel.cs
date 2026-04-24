@@ -43,6 +43,9 @@ namespace AssetsManager.Views.Models.Monitor
         private string _authButtonContent;
         public string AuthButtonContent { get => _authButtonContent; set => SetProperty(ref _authButtonContent, value); }
 
+        private string _manualPassId;
+        public string ManualPassId { get => _manualPassId; set => SetProperty(ref _manualPassId, value); }
+
         public PaginationModel<CatalogItem> Paginator { get; }
 
         public ObservableRangeCollection<CatalogItem> SalesCatalog => Paginator.PagedItems;

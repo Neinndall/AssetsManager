@@ -301,7 +301,6 @@ namespace AssetsManager.Services.Monitor
                                 string bestId = null;
                                 string bestName = "Unknown Event";
                                 DateTime latestStart = DateTime.MinValue;
-                                bool isBestActive = false;
                                 DateTime now = DateTime.UtcNow;
 
                                 foreach (var element in doc.RootElement.EnumerateArray())
@@ -325,19 +324,9 @@ namespace AssetsManager.Services.Monitor
                                                 if (eventObj.TryGetProperty("endDate", out var endProp))
                                                     DateTime.TryParse(endProp.GetString(), out endDate);
 
-                                                bool isActive = now >= startDate && now <= endDate;
+                                                bool hasNotEnded = now <= endDate;
 
-                                                if (isActive)
-                                                {
-                                                    if (!isBestActive || startDate > latestStart)
-                                                    {
-                                                        bestId = currentId;
-                                                        bestName = currentName;
-                                                        latestStart = startDate;
-                                                        isBestActive = true;
-                                                    }
-                                                }
-                                                else if (!isBestActive)
+                                                if (hasNotEnded)
                                                 {
                                                     if (bestId == null || startDate > latestStart)
                                                     {
