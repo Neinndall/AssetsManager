@@ -271,81 +271,131 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (ViewModel?.SalesCatalog.Count == 0)
             {
-                CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowInfo("Information", "No sales data to save.", Window.GetWindow(this));
                 return;
             }
 
+            await HandleExportRequestAsync("sales", ViewModel.SalesCatalog, (DataTemplate)this.FindResource("StoreItemTemplate"), 4);
+        }
+
+        private async void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel?.MythicShopCategories.Count == 0)
+            {
+                CustomMessageBoxService.ShowInfo("Information", "No Mythic Shop data to save.", Window.GetWindow(this));
+                return;
+            }
+
+            await HandleExportRequestAsync("mythic_shop", ViewModel.MythicShopCategories, (DataTemplate)this.FindResource("MythicItemTemplate"), 4);
+        }
+
+        private async void SavePassRewardsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel?.PassRewards.Count == 0)
+            {
+                CustomMessageBoxService.ShowInfo("Information", "No pass rewards data to save.", Window.GetWindow(this));
+                return;
+            }
+
+            await HandleExportRequestAsync("pass_rewards", ViewModel.PassRewards, (DataTemplate)this.FindResource("PassRewardTemplate"), 5);
+        }
+
+        private async Task HandleExportRequestAsync(string defaultFileName, System.Collections.IEnumerable items, DataTemplate template, int columns)
+        {
             var dialog = new CommonSaveFileDialog
             {
-                Title = "Save sales data",
-                DefaultFileName = "sales",
+                Title = $"Save {defaultFileName.Replace("_", " ")} data",
+                DefaultFileName = defaultFileName,
                 InitialDirectory = DirectoriesCreator.AssetsDownloadedPath,
-                DefaultExtension = ".png" // Default to PNG
+                DefaultExtension = ".png"
             };
             dialog.Filters.Add(new CommonFileDialogFilter("PNG Image", "*.png"));
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                string filePath = dialog.FileName;
-                string extension = Path.GetExtension(filePath).ToLowerInvariant();
-
                 try
                 {
-                    if (extension == ".png")
-                    {
-                        await SaveSalesAsPngAsync(filePath);
-                    }
-                    else
-                    {
-                        CustomMessageBoxService.ShowError("Error", "Unsupported file format selected. Only PNG is supported.", Window.GetWindow(this));
-                    }
+                    await ExportGridToPngAsync(items, template, columns, dialog.FileName);
                 }
                 catch (Exception ex)
                 {
-                    LogService.LogError(ex, $"Failed to save sales data to {filePath}.");
+                    LogService.LogError(ex, $"Failed to export {defaultFileName} to PNG.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred while saving: {ex.Message}", Window.GetWindow(this));
                 }
             }
         }
 
-        private async Task SaveSalesAsPngAsync(string filePath)
+        private async Task ExportGridToPngAsync(System.Collections.IEnumerable items, DataTemplate template, int columns, string filePath)
         {
-            var items = ViewModel?.SalesCatalog; // Use the currently displayed page
-            if (items == null || !items.Any())
+            // 1. Container
+            var rootPanel = new StackPanel
             {
-                CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
-                return;
+                Background = (Brush)Application.Current.FindResource("SidebarBackground"), // Professional Dark Background
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true,
+                Orientation = Orientation.Vertical,
+                Width = 1200 // Fixed width for consistent high-quality output
+            };
+
+            // 2. Logic for both flat lists and categorized lists (Mythic)
+            bool isCategorized = items is IEnumerable<MythicShopCategory>;
+
+            if (isCategorized)
+            {
+                foreach (var category in (IEnumerable<MythicShopCategory>)items)
+                {
+                    var header = new Border
+                    {
+                        Background = (Brush)Application.Current.FindResource("CardBackground"),
+                        CornerRadius = new CornerRadius(8),
+                        Padding = new Thickness(16, 8, 16, 8),
+                        Margin = new Thickness(20, 20, 20, 12),
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        BorderBrush = (Brush)Application.Current.FindResource("BorderColor"),
+                        BorderThickness = new Thickness(1)
+                    };
+                    header.Child = new TextBlock
+                    {
+                        Text = category.CategoryName,
+                        FontSize = 14,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = (Brush)Application.Current.FindResource("TextPrimary")
+                    };
+                    rootPanel.Children.Add(header);
+
+                    rootPanel.Children.Add(CreateUniformGrid(category.Items, template, columns));
+                }
+            }
+            else
+            {
+                // Add a small padding at the top for flat lists
+                rootPanel.Children.Add(new Border { Height = 20 });
+                rootPanel.Children.Add(CreateUniformGrid(items, template, columns));
             }
 
-            // 1. Create the container
-            var grid = new Grid
-            {
-                Background = this.Background, // Use the control's own background
-                SnapsToDevicePixels = true,
-                UseLayoutRounding = true
-            };
+            // Add bottom padding
+            rootPanel.Children.Add(new Border { Height = 20 });
 
+            // 3. Measure & Arrange for off-screen rendering
+            rootPanel.Measure(new Size(rootPanel.Width, double.PositiveInfinity));
+            rootPanel.Arrange(new Rect(0, 0, rootPanel.DesiredSize.Width, rootPanel.DesiredSize.Height));
+
+            // 4. Save using utility
+            await ImageExportUtils.SaveAsPngAsync(rootPanel, filePath, LogService);
+        }
+
+        private ItemsControl CreateUniformGrid(System.Collections.IEnumerable items, DataTemplate template, int columns)
+        {
             var uniformGridFactory = new FrameworkElementFactory(typeof(UniformGrid));
-            uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, 3);
-            var itemsPanelTemplate = new ItemsPanelTemplate(uniformGridFactory);
-
-            // 2. Create the ItemsControl
-            var itemsControl = new ItemsControl
+            uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, columns);
+            
+            return new ItemsControl
             {
                 ItemsSource = items,
-                ItemTemplate = SalesItemsControl.ItemTemplate,
-                ItemsPanel = itemsPanelTemplate
+                ItemTemplate = template,
+                ItemsPanel = new ItemsPanelTemplate(uniformGridFactory),
+                Margin = new Thickness(10, 0, 10, 0)
             };
-
-            grid.Children.Add(itemsControl);
-
-            // 3. Set width and measure
-            grid.Width = SalesItemsControl.ActualWidth;
-            grid.Measure(new Size(grid.Width, double.PositiveInfinity));
-            grid.Arrange(new Rect(0, 0, grid.DesiredSize.Width, grid.DesiredSize.Height));
-
-            // 4. Call the utility to save the element
-            await ImageExportUtils.SaveAsPngAsync(grid, filePath, LogService);
         }
 
         private void PreviousPage_Click(object sender, RoutedEventArgs e)
@@ -367,9 +417,9 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            ViewModel?.IsBusy = true;
+            ViewModel.IsBusy = true;
             var mythicShopResponse = await RiotApiService.GetMythicShopResponseAsync();
-            ViewModel?.IsBusy = false;
+            ViewModel.IsBusy = false;
 
             if (mythicShopResponse == null)
             {
@@ -446,90 +496,6 @@ namespace AssetsManager.Views.Controls.Monitor
             }
         }
 
-        private async void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (ViewModel?.MythicShopCategories.Count == 0)
-            {
-                CustomMessageBoxService.ShowInfo("Info", "No Mythic Shop data to save.", Window.GetWindow(this));
-                return;
-            }
-
-            var dialog = new CommonSaveFileDialog
-            {
-                Title = "Save Mythic Shop data",
-                DefaultFileName = "mythic_shop",
-                InitialDirectory = DirectoriesCreator.AssetsDownloadedPath,
-                DefaultExtension = ".png"
-            };
-            dialog.Filters.Add(new CommonFileDialogFilter("PNG Image", "*.png"));
-
-            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                string filePath = dialog.FileName;
-                try
-                {
-                    await SaveMythicShopAsPngAsync(filePath);
-                }
-                catch (Exception ex)
-                {
-                    LogService.LogError(ex, $"Failed to save Mythic Shop data to {filePath}.");
-                    CustomMessageBoxService.ShowError("Error", $"An error occurred while saving: {ex.Message}", Window.GetWindow(this));
-                }
-            }
-        }
-
-        private async Task SaveMythicShopAsPngAsync(string filePath)
-        {
-            var categories = ViewModel?.MythicShopCategories;
-            if (categories == null || !categories.Any())
-            {
-                CustomMessageBoxService.ShowInfo("Info", "No Mythic Shop data to save.", Window.GetWindow(this));
-                return;
-            }
-
-            var rootPanel = new StackPanel
-            {
-                Background = this.Background,
-                SnapsToDevicePixels = true,
-                UseLayoutRounding = true,
-                Orientation = Orientation.Vertical
-            };
-
-            var itemTemplate = this.FindResource("MythicItemTemplate") as DataTemplate;
-
-            foreach (var category in categories)
-            {
-                var categoryTitle = new TextBlock
-                {
-                    Text = category.CategoryName,
-                    FontSize = 16,
-                    FontWeight = FontWeights.SemiBold,
-                    Margin = new Thickness(10, 10, 0, 10),
-                    Foreground = (SolidColorBrush)Application.Current.FindResource("TextPrimary")
-                };
-                rootPanel.Children.Add(categoryTitle);
-
-                var uniformGridFactory = new FrameworkElementFactory(typeof(UniformGrid));
-                uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, 4);
-                var itemsPanelTemplate = new ItemsPanelTemplate(uniformGridFactory);
-
-                var itemsControl = new ItemsControl
-                {
-                    ItemsSource = category.Items,
-                    ItemTemplate = itemTemplate,
-                    ItemsPanel = itemsPanelTemplate
-                };
-
-                rootPanel.Children.Add(itemsControl);
-            }
-
-            rootPanel.Width = MythicShopCategoriesItemsControl.ActualWidth;
-            rootPanel.Measure(new Size(rootPanel.Width, double.PositiveInfinity));
-            rootPanel.Arrange(new Rect(0, 0, rootPanel.DesiredSize.Width, rootPanel.DesiredSize.Height));
-
-            await ImageExportUtils.SaveAsPngAsync(rootPanel, filePath, LogService);
-        }
-
         private async void LcuConnectionTimer_Tick(object sender, EventArgs e)
         {
             if (RiotApiService == null) return;
@@ -574,17 +540,23 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            ViewModel.IsBusy = true;
-            ViewModel.StatusText = "Status: Finding active pass...";
+            string eventId = ViewModel.ManualPassId?.Trim();
 
-            string eventId = await RiotApiService.GetActivePassGroupIdAsync();
             if (string.IsNullOrEmpty(eventId))
             {
-                ViewModel.IsBusy = false;
-                CustomMessageBoxService.ShowError("Error", "Could not find an active pass event ID.", Window.GetWindow(this));
-                return;
+                ViewModel.IsBusy = true;
+                ViewModel.StatusText = "Status: Finding active pass...";
+
+                eventId = await RiotApiService.GetActivePassGroupIdAsync();
+                if (string.IsNullOrEmpty(eventId))
+                {
+                    ViewModel.IsBusy = false;
+                    CustomMessageBoxService.ShowError("Error", "Could not find an active pass event ID.", Window.GetWindow(this));
+                    return;
+                }
             }
 
+            ViewModel.IsBusy = true;
             ViewModel.StatusText = "Status: Fetching pass data...";
             string progressionJson = await RiotApiService.GetPassRewardsProgressionAsync(eventId);
             string rewardsJson = await RiotApiService.GetPassRewardsRewardsAsync();
@@ -729,12 +701,6 @@ namespace AssetsManager.Views.Controls.Monitor
                 }
             }
             return title;
-        }
-
-        private void SavePassRewardsButton_Click(object sender, RoutedEventArgs e)
-        {
-            // Implementation for PNG export if needed, similar to SaveMythicShopAsPngAsync
-            CustomMessageBoxService.ShowInfo("Info", "Pass Rewards export to PNG is not yet implemented.", Window.GetWindow(this));
         }
     }
 }
