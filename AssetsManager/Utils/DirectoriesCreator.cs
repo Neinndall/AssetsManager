@@ -23,10 +23,11 @@ namespace AssetsManager.Utils
         public DirectoriesCreator()
         {
             AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            HashesPath = Path.Combine(AppDirectory, "hashes");
 
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
+
+            HashesPath = Path.Combine(appFolderPath, "hashes");
 
             AssetsDownloadedPath = Path.Combine(AppDirectory, "AssetsDownloaded");
             
