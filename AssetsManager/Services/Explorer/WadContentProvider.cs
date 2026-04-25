@@ -61,7 +61,7 @@ namespace AssetsManager.Services.Explorer
                         byte[] buffer = ArrayPool<byte>.Shared.Rent((int)chunk.CompressedSize);
                         try
                         {
-                            fs.Read(buffer, 0, (int)chunk.CompressedSize);
+                            fs.ReadExactly(buffer, 0, (int)chunk.CompressedSize);
                             return WadChunkUtils.DecompressChunk(buffer.AsSpan(0, (int)chunk.CompressedSize), chunk.Compression);
                         }
                         finally
@@ -228,7 +228,7 @@ namespace AssetsManager.Services.Explorer
                     byte[] buffer = ArrayPool<byte>.Shared.Rent((int)chunk.CompressedSize);
                     try
                     {
-                        fs.Read(buffer, 0, (int)chunk.CompressedSize);
+                        fs.ReadExactly(buffer, 0, (int)chunk.CompressedSize);
                         return WadChunkUtils.DecompressChunk(buffer.AsSpan(0, (int)chunk.CompressedSize), chunk.Compression);
                     }
                     finally
