@@ -38,7 +38,6 @@ namespace AssetsManager.Utils
             {
                 if (!File.Exists(_binPath) || File.GetLastWriteTime(_binPath) < File.GetLastWriteTime(_txtPath))
                 {
-                    _logService.Log($"Generating binary hash cache for {Path.GetFileName(_txtPath)}...");
                     GenerateCache();
                 }
 
@@ -60,17 +59,23 @@ namespace AssetsManager.Utils
                 while ((line = reader.ReadLine()) != null)
                 {
                     int spaceIndex = line.IndexOf(' ');
-                    if (spaceIndex > 0)
+                    if (spaceIndex > 0 && spaceIndex < line.Length - 1)
                     {
                         var hashStr = line.Substring(0, spaceIndex);
                         var path = line.Substring(spaceIndex + 1);
-                        if (ulong.TryParse(hashStr, System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
+
+                        if (!string.IsNullOrWhiteSpace(path))
                         {
-                            entries.Add((hash, path));
+                            if (ulong.TryParse(hashStr, System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
+                            {
+                                entries.Add((hash, path));
+                            }
                         }
                     }
                 }
             }
+
+            if (entries.Count == 0) return;
 
             var sortedEntries = entries.OrderBy(e => e.Hash).ToList();
 
