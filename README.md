@@ -12,14 +12,16 @@ AssetsManager is a powerful tool designed for League of Legends enthusiasts who 
 
 ## 🏛️ Core Modules
 
-*   **Advanced WAD Comparator**: A high-speed comparison engine featuring **Fast Mode** (Reflection-based) to identify new, modified, or deleted assets in seconds.
-*   **Archive Explorer**: A professional navigation suite for the WAD game files with advanced toolbar tools:
-    *   **Adaptive Engineering Toolbar**: A dual-panel architecture featuring a clean header for core actions and an expanded technical suite for secondary tools (Collapse, Backup, Mode, Grid, Path, Favs, Merger) with seamless visual fusion.
+*   **Advanced WAD Comparator**: A high-speed comparison engine featuring **Fast Mode** (Reflection-based) to identify changes in seconds. Includes a **Diagnostic Studio** with multi-view navigation: **Hierarchy** (Tree), **Discovery** (Gallery), and **Analytics** (Overview).
+*   **Archive Explorer**: A professional navigation suite for the WAD game files with advanced tools:
+    *   **Open WAD (Standalone)**: Support for loading individual `.wad.client` files directly for fast inspection.
+    *   **Adaptive Engineering Toolbar**: A dual-panel architecture featuring a clean header for core actions and an expanded technical suite for secondary tools (Open WAD, Collapse, Backup, Mode, Grouping, Grid, Breadcrumb, Favs, Merger) with seamless visual fusion.
     *   **Premium Gallery (Grid View)**: High-performance visual explorer with asynchronous thumbnail generation and rich metadata badges.
     *   **Load Backups**: Ability to load your previous comparison backups from WAD Explorer.
     *   **Image Merger**: Specialized tray to "collect" and composite multiple textures into professional contact sheets.
     *   **Quick Access (Favorites)**: Persistent system to pin frequently used assets for instant cross-session navigation.
-    *   **Intelligent Search**: Deep-seek engine with real-time filtering and asynchronous "Go To" capabilities.
+    *   **Intelligent Search**: Deep-seek engine with real-time filtering, match highlighting, and asynchronous "Go To" capabilities.
+    *   **Contextual Trazability**: Professional right-click menu for extracting, saving, copying paths, pinning to tabs, and tracking assets.
 *   **3D Workspace**: Fully integrated HelixToolkit viewport for visualizing champion models (`.skn`), animations (`.anm`), and environment MapGeometry (`.mapgeo`).
 *   **Version Management**: Native integration with Riot APIs to manage manifests, plugins, and full game client downloads via a parallel RMAN engine.
 *   **Audio Bank Center**: Deep inspection of Wwise audio banks (`.wpk`, `.bnk`), supporting event hierarchy resolution and direct media access.
@@ -38,7 +40,7 @@ AssetsManager is a powerful tool designed for League of Legends enthusiasts who 
 *   **Parallel Sync Engine**: Simultaneous multi-file acquisition with atomic `.tmp` protection to guarantee local database integrity.
 *   **Optimized Hash Engine**: Re-engineered startup sequence with linear-seek parsing and proactive memory allocation for near-instant hash loading.
 *   **Blake3 Cryptography**: Implementation of Pure C# Blake3 for high-speed integrity verification across massive asset sets.
-*   **Chromeless HUD Design**: A hardware-accelerated UI with a 40px HUD title bar and professional technical aesthetics.
+*   **Chromeless HUD Design**: A hardware-accelerated UI with a 36px HUD title bar and professional technical aesthetics.
 
 ## 📡 Monitoring Engine (`MonitorWindow`)
 
@@ -49,7 +51,7 @@ AssetsManager is a powerful tool designed for League of Legends enthusiasts who 
 *   **Asset Tracker**: Persistent monitoring of specific assets with intelligent sequence management and extension fallback.
 *   **Comparison History**: Persistent registry of all past WAD comparisons, allowing instant access to cached results and differential data.
 *   **Backup Manager**: Specialized tool to create and manage local snapshots of the PBE file system, ensuring data safety across patches.
-*   **API Center**: Technical utility for querying official Riot APIs for sales, Mythic Shop rotation, and player metadata.
+*   **API Center**: Technical utility for querying official Riot APIs for sales, Mythic Shop rotation, and **Pass Rewards** (event tracking and asset extraction). Includes support for exporting data as **professional PNG images** for community sharing.
 
 ## 🚀 Getting Started
 
