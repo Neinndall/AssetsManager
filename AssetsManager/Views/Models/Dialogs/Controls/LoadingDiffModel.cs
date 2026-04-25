@@ -70,44 +70,44 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     break;
                 case DiffLoadingState.ParsingTextContent:
                     Description = "Parsing and formatting content...";
-                    ProgressValue = 50;
+                    ProgressValue = 60;
                     break;
                 case DiffLoadingState.CalculatingDifferences:
                     Description = "Calculating differences...";
-                    ProgressValue = 80;
+                    ProgressValue = 95;
                     break;
 
                 // IMAGE PROCESS
                 case DiffLoadingState.AcquiringTextureData:
                     Description = "Acquiring texture data...";
-                    ProgressValue = 30;
+                    ProgressValue = 40;
                     break;
                 case DiffLoadingState.DecodingTextures:
                     Description = "Decoding texture surfaces...";
-                    ProgressValue = 60;
+                    ProgressValue = 95;
                     break;
 
                 // AUDIO PROCESS
                 case DiffLoadingState.LinkingAudio:
                     Description = "Linking audio bank dependencies...";
-                    ProgressValue = 15;
+                    ProgressValue = 20;
                     break;
                 case DiffLoadingState.AcquiringAudioComponents:
                     Description = "Acquiring binary components...";
-                    ProgressValue = 40;
+                    ProgressValue = 50;
                     break;
                 case DiffLoadingState.ParsingAudioHierarchy:
                     Description = "Parsing audio hierarchy...";
-                    ProgressValue = 60;
+                    ProgressValue = 90;
                     break;
 
                 case DiffLoadingState.Finalizing:
                     Description = "Finalizing data structure...";
-                    ProgressValue = 85;
+                    ProgressValue = 98;
                     break;
 
                 case DiffLoadingState.Ready:
-                    Description = "Ready";
+                    Description = "Done! Displaying results...";
                     ProgressValue = 100;
                     break;
             }
