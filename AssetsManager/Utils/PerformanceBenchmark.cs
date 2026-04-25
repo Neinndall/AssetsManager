@@ -80,7 +80,7 @@ namespace AssetsManager.Utils
         {
             logService.Log("--- STARTING DECOMPRESSION COMPARISON BENCHMARK ---");
 
-            int iterations = 2000; // Aumentamos para mayor precisión
+            int iterations = 2000; 
             byte[] rawData = new byte[256 * 1024]; 
             new Random(42).NextBytes(rawData);
             
@@ -91,6 +91,24 @@ namespace AssetsManager.Utils
             }
 
             logService.Log($"Config: {iterations} iteraciones | Chunk: {rawData.Length / 1024}KB");
+
+            // --- TEST 0: FIDELIDAD BINARIA (Garantía de integridad) ---
+            byte[] baselineResult;
+            using (var ms = new MemoryStream(compressedData))
+            using (var ds = new ZstdSharp.DecompressionStream(ms))
+            using (var output = new MemoryStream())
+            {
+                ds.CopyTo(output);
+                baselineResult = output.ToArray();
+            }
+
+            byte[] optimizedResult = WadChunkUtils.DecompressChunk(compressedData, WadChunkCompression.Zstd);
+            
+            bool areIdentical = baselineResult.SequenceEqual(optimizedResult);
+            if (areIdentical)
+                logService.LogSuccess("[VALIDACIÓN] Fidelidad Binaria: OK (Los datos son 100% idénticos).");
+            else
+                logService.LogError(null, "[ERROR] ¡Los datos NO son idénticos! Revisar lógica.");
 
             // --- TEST 1: BASELINE ---
             GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
@@ -201,6 +219,73 @@ namespace AssetsManager.Utils
             logService.Log($">> VELOCIDAD: {(double)sw.ElapsedMilliseconds / assetCount:F4} ms de media por asset.");
 
             logService.Log("--- REAL-WORLD SIMULATION COMPLETED ---");
+        }
+
+        public static void RunRealFileValidation(LogService logService, string wadPath)
+        {
+            logService.Log($"--- STARTING REAL WAD VALIDATION ---");
+            if (!File.Exists(wadPath))
+            {
+                logService.LogWarning($"WAD not found: {wadPath}. Skipping real file test.");
+                return;
+            }
+
+            try
+            {
+                using var wadFile = new WadFile(wadPath);
+                
+                if (wadFile.Chunks.Count == 0)
+                {
+                    logService.LogWarning("WAD file is empty.");
+                    return;
+                }
+
+                // Buscamos el primer chunk con Zstd de forma segura
+                WadChunk? firstChunk = null;
+                foreach(var c in wadFile.Chunks.Values) 
+                {
+                    if (c.Compression == WadChunkCompression.Zstd) { firstChunk = c; break; }
+                }
+                
+                if (firstChunk is null)
+                {
+                    logService.LogWarning("No Zstd chunks found in this WAD to test.");
+                    return;
+                }
+
+                var chunk = firstChunk.Value;
+                logService.Log($"Testing Chunk: {chunk.PathHash:X16} | Size: {chunk.CompressedSize} bytes");
+
+                // 1. Descompresión vía Librería
+                using var libOwner = wadFile.LoadChunkDecompressed(chunk);
+                byte[] libResult = libOwner.Span.ToArray();
+
+                // 2. Descompresión vía Nuestro Sistema (Simulando WadContentProvider)
+                byte[] ourResult;
+                using (var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    fs.Position = chunk.DataOffset;
+                    byte[] buffer = ArrayPool<byte>.Shared.Rent((int)chunk.CompressedSize);
+                    try
+                    {
+                        fs.ReadExactly(buffer, 0, (int)chunk.CompressedSize);
+                        ourResult = WadChunkUtils.DecompressChunk(buffer.AsSpan(0, (int)chunk.CompressedSize), chunk.Compression);
+                    }
+                    finally { ArrayPool<byte>.Shared.Return(buffer); }
+                }
+
+                // 3. Comparación
+                bool match = libResult.SequenceEqual(ourResult);
+                if (match)
+                    logService.LogSuccess($"[REAL-FILE] Fidelidad Binaria: OK. Los datos del WAD real coinciden al 100%.");
+                else
+                    logService.LogError(null, "[REAL-FILE] ERROR: ¡Discrepancia detectada en datos reales!");
+
+            }
+            catch (Exception ex)
+            {
+                logService.LogError(ex, "Error during real file validation.");
+            }
         }
 
         public static void RunFullZeroCopyBenchmark(LogService logService)

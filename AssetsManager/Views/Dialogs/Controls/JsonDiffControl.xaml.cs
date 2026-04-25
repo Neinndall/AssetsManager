@@ -278,12 +278,14 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _cachedNewDoc = null;
                 _unifiedModel = null;
 
+                // Build model in background
                 _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
 
                 // Delegate to ViewModel
                 ViewModel.UpdateMetrics(oldText, newText);
                 UpdateChangeCounts();
 
+                // IMPORTANT: We do the UI update, but the Window is still Hidden
                 await UpdateDiffView();
             }
             catch (Exception ex)

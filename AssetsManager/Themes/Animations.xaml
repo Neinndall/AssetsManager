@@ -26,10 +26,10 @@
         </DoubleAnimation>
     </Storyboard>
     
-        <!-- Animación para el icono giratorio de progreso -->
+    <!-- Animación para el icono giratorio de progreso (Cadencia optimizada) -->
     <Storyboard x:Key="SpinningIconAnimation">
         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                         From="0" To="360" Duration="0:0:1" RepeatBehavior="Forever"/>
+                         From="0" To="360" Duration="0:0:0.85" RepeatBehavior="Forever"/>
     </Storyboard>
 
     <!-- Estilo para aplicar la animación de giro automáticamente -->
@@ -128,5 +128,16 @@
             </EventTrigger>
         </Style.Triggers>
     </Style>
+
+    <!-- Smooth Progress Animation: Interpolates the Value property for a professional feel -->
+    <Storyboard x:Key="SmoothProgressAnimation">
+        <DoubleAnimation Storyboard.TargetProperty="Value" 
+                         Duration="0:0:0.5" 
+                         DecelerationRatio="0.5">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut"/>
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
+    </Storyboard>
         
 </ResourceDictionary>

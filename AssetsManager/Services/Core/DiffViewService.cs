@@ -153,10 +153,7 @@ namespace AssetsManager.Services.Core
                         var (dataType, oldData, newData, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPath, newPath);
                         var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
                         return (oldText, newText);
-                    });
-
-                    loadingWindow.SetState(DiffLoadingState.Ready);
-                    loadingWindow.Close();
+                    }, loadingWindow);
 
                     // HudWindow standard: ShowDialog for text diffs if owner is provided (consistent with ShowWadDiffAsync)
                     diffWindow.ShowDialog();
@@ -253,11 +250,8 @@ namespace AssetsManager.Services.Core
             loadingWindow.SetState(DiffLoadingState.Finalizing);
             var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
             diffWindow.Owner = owner;
-            await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, diff.OldPath, diff.NewPath);
+            await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, diff.OldPath, diff.NewPath, loadingWindow);
 
-            loadingWindow.SetState(DiffLoadingState.Ready);
-            _logService.LogDebug("[HandleAudioBankDiffAsync] Displaying diff window.");
-            loadingWindow.Close();
             diffWindow.ShowDialog();
         }
 
@@ -301,10 +295,8 @@ namespace AssetsManager.Services.Core
             loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
             var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
             diffWindow.Owner = owner;
-            await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath);
+            await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath, loadingWindow);
 
-            loadingWindow.SetState(DiffLoadingState.Ready);
-            loadingWindow.Close();
             diffWindow.ShowDialog();
         }
 
@@ -359,10 +351,8 @@ namespace AssetsManager.Services.Core
                 loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
                 var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                 diffWindow.Owner = owner;
-                await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath));
+                await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath), loadingWindow);
 
-                loadingWindow.SetState(DiffLoadingState.Ready);
-                loadingWindow.Close();
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)
