@@ -49,7 +49,7 @@ namespace AssetsManager.Services.Hashes
                     LoadBinHashes();
                     LoadRstHashes();
                 });
-                _logService.LogSuccess("Hashes loaded (Binary Cache enabled).");
+                _logService.LogSuccess("Hashes loaded on startup.");
             }
             catch (Exception ex)
             {
