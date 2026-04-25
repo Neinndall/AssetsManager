@@ -55,7 +55,6 @@ namespace AssetsManager.Views.Dialogs
             // 4. Smooth Handover: Close loading window now that we are visible
             if (LoadingWindow != null)
             {
-                LoadingWindow.Topmost = false; 
                 LoadingWindow.Close();
                 LoadingWindow = null;
             }
