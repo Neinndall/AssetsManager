@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -50,12 +51,23 @@ namespace AssetsManager.Services.Explorer
                         return WadChunkUtils.DecompressChunk(compressedData, compressionType);
                     }
 
-                    // MODO LIVE: Solo si no hay backup (Comparator o Explorer local).
+                    // MODO LIVE: Optimizamos lectura mediante ArrayPool y lectura directa
                     using var wadFile = new WadFile(fileNode.SourceWadPath);
                     if (wadFile.Chunks.TryGetValue(fileNode.SourceChunkPathHash, out var chunk))
                     {
-                        using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
-                        return decompressedDataOwner.Span.ToArray();
+                        using var fs = new FileStream(fileNode.SourceWadPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        fs.Position = chunk.DataOffset;
+
+                        byte[] buffer = ArrayPool<byte>.Shared.Rent((int)chunk.CompressedSize);
+                        try
+                        {
+                            fs.Read(buffer, 0, (int)chunk.CompressedSize);
+                            return WadChunkUtils.DecompressChunk(buffer.AsSpan(0, (int)chunk.CompressedSize), chunk.Compression);
+                        }
+                        finally
+                        {
+                            ArrayPool<byte>.Shared.Return(buffer);
+                        }
                     }
 
                     return null;
@@ -209,8 +221,20 @@ namespace AssetsManager.Services.Explorer
                         _logService.LogWarning($"Chunk with hash {chunkHash:x16} not found in {wadPath}");
                         return null;
                     }
-                    using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
-                    return decompressedDataOwner.Span.ToArray();
+
+                    using var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                    fs.Position = chunk.DataOffset;
+
+                    byte[] buffer = ArrayPool<byte>.Shared.Rent((int)chunk.CompressedSize);
+                    try
+                    {
+                        fs.Read(buffer, 0, (int)chunk.CompressedSize);
+                        return WadChunkUtils.DecompressChunk(buffer.AsSpan(0, (int)chunk.CompressedSize), chunk.Compression);
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(buffer);
+                    }
                 }
                 catch (OperationCanceledException)
                 {
