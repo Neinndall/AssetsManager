@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using LeagueToolkit.Core.Wad;
+using ZstdSharp;
 
 namespace AssetsManager.Utils
 {
@@ -74,6 +76,133 @@ namespace AssetsManager.Utils
             logService.Log("--- BINARY HASH BENCHMARK COMPLETED ---");
         }
 
+        public static void RunDecompressionBenchmark(LogService logService)
+        {
+            logService.Log("--- STARTING DECOMPRESSION COMPARISON BENCHMARK ---");
+
+            int iterations = 2000; // Aumentamos para mayor precisión
+            byte[] rawData = new byte[256 * 1024]; 
+            new Random(42).NextBytes(rawData);
+            
+            byte[] compressedData;
+            using (var compressor = new Compressor())
+            {
+                compressedData = compressor.Wrap(rawData).ToArray();
+            }
+
+            logService.Log($"Config: {iterations} iteraciones | Chunk: {rawData.Length / 1024}KB");
+
+            // --- TEST 1: BASELINE ---
+            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            var proc = Process.GetCurrentProcess();
+            var cpuStart = proc.TotalProcessorTime;
+            Stopwatch sw = Stopwatch.StartNew();
+
+            for (int i = 0; i < iterations; i++)
+            {
+                using (var compressedStream = new MemoryStream(compressedData))
+                using (var decompressedStream = new MemoryStream())
+                using (var zstdStream = new ZstdSharp.DecompressionStream(compressedStream))
+                {
+                    zstdStream.CopyTo(decompressedStream);
+                    byte[] result = decompressedStream.ToArray();
+                }
+            }
+
+            sw.Stop();
+            var cpuTimeBaseline = proc.TotalProcessorTime - cpuStart;
+            logService.Log($"[BASELINE] Reloj: {sw.ElapsedMilliseconds}ms | Tiempo CPU (Core-Time): {cpuTimeBaseline.TotalMilliseconds:F0}ms");
+
+            // --- TEST 2: OPTIMIZADO ---
+            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            cpuStart = proc.TotalProcessorTime;
+            sw.Restart();
+
+            for (int i = 0; i < iterations; i++)
+            {
+                byte[] result = WadChunkUtils.DecompressChunk(compressedData, WadChunkCompression.Zstd);
+            }
+
+            sw.Stop();
+            var cpuTimeOpt = proc.TotalProcessorTime - cpuStart;
+            logService.Log($"[OPTIMIZADO] Reloj: {sw.ElapsedMilliseconds}ms | Tiempo CPU (Core-Time): {cpuTimeOpt.TotalMilliseconds:F0}ms");
+
+            // --- RESULTADOS CPU ---
+            double cpuSaving = (1.0 - (cpuTimeOpt.TotalMilliseconds / cpuTimeBaseline.TotalMilliseconds)) * 100;
+            logService.Log($">> REDUCCIÓN CARGA CPU: {cpuSaving:F1}% menos esfuerzo del procesador.");
+
+            logService.Log("--- DECOMPRESSION BENCHMARK COMPLETED ---");
+        }
+
+        public static void RunRealWorldWadBenchmark(LogService logService)
+        {
+            logService.Log("--- STARTING REAL-WORLD GALLERY SIMULATION ---");
+
+            int assetCount = 100; // 100 iconos/texturas
+            int assetSize = 128 * 1024; // 128KB de media
+            var random = new Random(42);
+
+            // Preparar datos comprimidos variados
+            var assets = new List<byte[]>();
+            using (var compressor = new Compressor())
+            {
+                for (int i = 0; i < assetCount; i++)
+                {
+                    byte[] data = new byte[assetSize + random.Next(-50000, 50000)];
+                    random.NextBytes(data);
+                    assets.Add(compressor.Wrap(data).ToArray());
+                }
+            }
+
+            logService.Log($"Escenario: Carga paralela de {assetCount} assets aleatorios.");
+
+            // --- TEST 1: BASELINE (Simulando WadFile.LoadChunkDecompressed) ---
+            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            long memStart = GC.GetTotalAllocatedBytes(true);
+            Stopwatch sw = Stopwatch.StartNew();
+
+            // Simulamos lo que hace la librería original (muchas asignaciones)
+            var tasksBaseline = assets.Select(data => Task.Run(() =>
+            {
+                // 1. Simular MemoryStream interno de la lib
+                using var ms = new MemoryStream(data);
+                // 2. Simular descompresión por stream
+                using var ds = new ZstdSharp.DecompressionStream(ms);
+                using var output = new MemoryStream();
+                ds.CopyTo(output);
+                // 3. Simular el ToArray final que espera la UI
+                return output.ToArray();
+            })).ToArray();
+
+            Task.WaitAll(tasksBaseline);
+            sw.Stop();
+            long allocatedBaseline = GC.GetTotalAllocatedBytes(true) - memStart;
+            logService.Log($"[BASELINE GALLERY] Tiempo: {sw.ElapsedMilliseconds}ms | RAM: {allocatedBaseline / 1024.0 / 1024.0:F2} MB");
+
+            // --- TEST 2: OPTIMIZADO (Nuestro sistema actual) ---
+            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            memStart = GC.GetTotalAllocatedBytes(true);
+            sw.Restart();
+
+            var tasksOpt = assets.Select(data => Task.Run(() =>
+            {
+                // Usamos nuestro WadChunkUtils que usa ArrayPool (indirectamente vía Unwrap) y reuso de descompresor
+                return WadChunkUtils.DecompressChunk(data, WadChunkCompression.Zstd);
+            })).ToArray();
+
+            Task.WaitAll(tasksOpt);
+            sw.Stop();
+            long allocatedOpt = GC.GetTotalAllocatedBytes(true) - memStart;
+            logService.Log($"[OPTIMIZED GALLERY] Tiempo: {sw.ElapsedMilliseconds}ms | RAM: {allocatedOpt / 1024.0 / 1024.0:F2} MB");
+
+            // --- RESULTADOS FINALES ---
+            double ramReduction = (double)(allocatedBaseline - allocatedOpt) / allocatedBaseline * 100;
+            logService.Log($">> REDUCCIÓN DE CARGA GC: {ramReduction:F1}% menos presión sobre el recolector de basura.");
+            logService.Log($">> VELOCIDAD: {(double)sw.ElapsedMilliseconds / assetCount:F4} ms de media por asset.");
+
+            logService.Log("--- REAL-WORLD SIMULATION COMPLETED ---");
+        }
+
         public static void RunFullZeroCopyBenchmark(LogService logService)
         {
             logService.Log("--- STARTING FULL ZERO-COPY BENCHMARK (SAFE VERSION) ---");
@@ -119,7 +248,7 @@ namespace AssetsManager.Utils
                         try
                         {
                             int read = stream.Read(buffer, 0, chunkSize);
-                            var result = WadChunkUtils.DecompressChunkSpan(buffer.AsSpan(0, read), WadChunkCompression.None);
+                            var result = WadChunkUtils.DecompressChunk(buffer.AsSpan(0, read), WadChunkCompression.None);
                         }
                         finally { ArrayPool<byte>.Shared.Return(buffer); }
                     }
