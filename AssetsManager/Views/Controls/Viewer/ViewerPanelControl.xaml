@@ -544,26 +544,46 @@
 
             <!-- BOTTOM ACTIONS (Compact Studio Toolbar v3.2.3.2) -->
             <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="12,8">
-                <UniformGrid Columns="3">
-                    <Button x:Name="LoadModelButton" Click="LoadModelButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,3,0" Padding="0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="LoadModelButton" Click="LoadModelButton_Click" Height="36" Padding="0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                <Setter Property="Grid.Column" Value="0"/>
+                                <Setter Property="Margin" Value="0,0,3,0"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMapMode}" Value="True">
+                                        <Setter Property="Grid.Column" Value="1"/>
+                                        <Setter Property="Margin" Value="0"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon x:Name="LoadModelIcon" Kind="{Binding LoadButtonIcon}" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock x:Name="LoadModelText" Text="{Binding LoadButtonText}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="LoadChromaModelButton" Click="LoadChromaModelButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,3,0" Padding="0" Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityConverter}, ConverterParameter=!Map}">
+                    
+                    <Button x:Name="LoadChromaModelButton" Grid.Column="1" Click="LoadChromaModelButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,3,0" Padding="0" Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon x:Name="LoadChromaModelIcon" Kind="Palette" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Chroma" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,0,0" Padding="0" Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityConverter}, ConverterParameter=!Map}">
+                    
+                    <Button x:Name="LoadAnimationButton" Grid.Column="2" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,0,0" Padding="0" Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="AnimationPlay" Width="16" Height="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Anims" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                </UniformGrid>
+                </Grid>
             </Border>
             
             <!-- Hidden controls needed for logic -->
