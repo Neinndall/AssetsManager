@@ -6,12 +6,12 @@ using System.Reflection;
 using AssetsManager.Services.Hashes;
 using System.Linq;
 using Serilog;
-using System.Threading; // Added for CancellationToken and OperationCanceledException
+using System.Threading;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Wad;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Core;
-using AssetsManager.Utils; // Added for TaskCancellationManager
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Comparator
 {
@@ -128,56 +128,55 @@ namespace AssetsManager.Services.Comparator
 
                 _logService.Log("Starting WADs comparison...");
                 
-                // Notify UI immediately to show activity (Indeterminate spinner)
                 NotifyComparisonStarted(0);
 
-                // Phase 1: Fast scanning to find valid pairs
                 var scanResult = await Task.Run(() =>
                 {
                     var searchPatterns = new[] { "*.wad.client", "*.wad" };
-                    var oldWadFiles = searchPatterns
+                    var files = searchPatterns
                         .SelectMany(pattern => Directory.GetFiles(oldDir, pattern, SearchOption.AllDirectories))
                         .ToList();
 
-                    var validPairs = new List<(string OldPath, string NewPath, string RelativePath)>();
+                    int total = 0;
+                    var valid = new List<(string OldPath, string NewPath, string RelativePath)>();
 
-                    foreach (var oldWadFile in oldWadFiles)
+                    foreach (var oldWadFile in files)
                     {
                         if (cancellationToken.IsCancellationRequested) break;
+
                         var relativePath = Path.GetRelativePath(oldDir, oldWadFile);
                         var newWadFileFullPath = Path.Combine(newDir, relativePath);
-                        
                         if (File.Exists(newWadFileFullPath))
                         {
-                            validPairs.Add((oldWadFile, newWadFileFullPath, relativePath));
+                            try
+                            {
+                                using var oldWad = new WadFile(oldWadFile);
+                                using var newWad = new WadFile(newWadFileFullPath);
+                                total += oldWad.Chunks.Count + newWad.Chunks.Count;
+                                valid.Add((oldWadFile, newWadFileFullPath, relativePath));
+                            }
+                            catch { /* Skip corrupt WADs */ }
                         }
                     }
 
-                    return validPairs;
+                    return (TotalChunks: total, ValidFiles: valid);
                 }, cancellationToken);
 
-                _totalChunksGlobal = 0;
+                _totalChunksGlobal = scanResult.TotalChunks;
                 _completedChunksGlobal = 0;
-
-                // Phase 2: Parallel Comparison
-                var concurrentDiffs = new ConcurrentBag<List<ChunkDiff>>();
                 
-                await Task.Run(() =>
-                {
-                    Parallel.ForEach(scanResult, new ParallelOptions 
-                    { 
-                        MaxDegreeOfParallelism = Environment.ProcessorCount, 
-                        CancellationToken = cancellationToken 
-                    }, pair =>
-                    {
-                        var diffs = CollectDiffsInternal(pair.OldPath, pair.NewPath, pair.RelativePath, cancellationToken);
-                        concurrentDiffs.Add(diffs);
-                    });
-                }, cancellationToken);
+                NotifyComparisonStarted(_totalChunksGlobal);
 
-                foreach (var diffList in concurrentDiffs)
+                int fileIndex = 0;
+                foreach (var file in scanResult.ValidFiles)
                 {
-                    allDiffs.AddRange(diffList);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    fileIndex++;
+
+                    string statusMsg = $"{fileIndex} of {scanResult.ValidFiles.Count} files: {file.RelativePath}";
+
+                    var diffs = await CollectDiffsAsync(file.OldPath, file.NewPath, file.RelativePath, cancellationToken, statusMsg);
+                    allDiffs.AddRange(diffs);
                 }
             }
             catch (OperationCanceledException)
@@ -210,89 +209,69 @@ namespace AssetsManager.Services.Comparator
             }
         }
 
-        private List<ChunkDiff> CollectDiffsInternal(string oldWadFile, string newWadFile, string sourceWadFile, CancellationToken cancellationToken)
+        private async Task<List<ChunkDiff>> CollectDiffsAsync(string oldWadFile, string newWadFile, string sourceWadFile, CancellationToken cancellationToken, string statusMsg = "")
         {
             var diffs = new List<ChunkDiff>();
 
-            try
+            Dictionary<ulong, WadChunk> oldChunks;
+            Dictionary<ulong, WadChunk> newChunks;
+
+            using (var oldWad = new WadFile(oldWadFile))
+            using (var newWad = new WadFile(newWadFile))
             {
-                using var oldWad = new WadFile(oldWadFile);
-                using var newWad = new WadFile(newWadFile);
+                oldChunks = oldWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
+                newChunks = newWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
+            }
 
-                // Actualizar total global de forma segura
-                Interlocked.Add(ref _totalChunksGlobal, oldWad.Chunks.Count + newWad.Chunks.Count);
-                NotifyComparisonStarted(_totalChunksGlobal);
+            var oldChunkChecksums = await GetChunkChecksumsAsync(oldChunks.Values, cancellationToken, statusMsg);
+            var newChunkChecksums = await GetChunkChecksumsAsync(newChunks.Values, cancellationToken, statusMsg);
 
-                // Obtenemos checksums usando la lógica rápida (Reflection)
-                var oldChunkChecksums = GetChunkChecksumsInternal(oldWad.Chunks.Values, cancellationToken, sourceWadFile);
-                var newChunkChecksums = GetChunkChecksumsInternal(newWad.Chunks.Values, cancellationToken, sourceWadFile);
-
-                // COMPARATIVA 1: Detectar Modificados y Eliminados (O(N))
-                foreach (var oldChunk in oldWad.Chunks.Values)
+            foreach (var oldChunk in oldChunks.Values)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var oldPath = _hashResolverService.ResolveHash(oldChunk.PathHash);
+                if (!newChunks.ContainsKey(oldChunk.PathHash))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    
-                    if (!newWad.Chunks.TryGetValue(oldChunk.PathHash, out var newChunk))
-                    {
-                        var oldPath = _hashResolverService.ResolveHash(oldChunk.PathHash);
-                        diffs.Add(new ChunkDiff { Type = ChunkDiffType.Removed, OldChunk = oldChunk, OldPath = oldPath, SourceWadFile = sourceWadFile });
-                    }
-                    else
-                    {
-                        if (oldChunkChecksums[oldChunk.PathHash] != newChunkChecksums[oldChunk.PathHash])
-                        {
-                            var oldPath = _hashResolverService.ResolveHash(oldChunk.PathHash);
-                            var newPath = _hashResolverService.ResolveHash(oldChunk.PathHash);
-                            diffs.Add(new ChunkDiff { Type = ChunkDiffType.Modified, OldChunk = oldChunk, NewChunk = newChunk, OldPath = oldPath, NewPath = newPath, SourceWadFile = sourceWadFile });
-                        }
-                    }
+                    diffs.Add(new ChunkDiff { Type = ChunkDiffType.Removed, OldChunk = oldChunk, OldPath = oldPath, SourceWadFile = sourceWadFile });
                 }
-
-                // OPTIMIZACIÓN CRÍTICA: Mapeo de Checksum -> Hash para detección de Renombrados en O(1)
-                // Solo incluimos archivos que NO están en el nuevo WAD para evitar falsos positivos de archivos idénticos
-                var oldChecksumMap = new Dictionary<ulong, ulong>();
-                foreach (var kvp in oldChunkChecksums)
+                else
                 {
-                    if (!newWad.Chunks.ContainsKey(kvp.Key))
+                    var newChunk = newChunks[oldChunk.PathHash];
+                    if (oldChunkChecksums[oldChunk.PathHash] != newChunkChecksums[newChunk.PathHash])
                     {
-                        // Si hay colisión de checksum (mismo contenido, distinta ruta), el primero gana.
-                        oldChecksumMap.TryAdd(kvp.Value, kvp.Key);
-                    }
-                }
-
-                // COMPARATIVA 2: Detectar Nuevos y Renombrados (O(M))
-                foreach (var newChunk in newWad.Chunks.Values)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    
-                    if (!oldWad.Chunks.ContainsKey(newChunk.PathHash))
-                    {
-                        var newPath = _hashResolverService.ResolveHash(newChunk.PathHash);
-                        ulong newChecksum = newChunkChecksums[newChunk.PathHash];
-
-                        // Búsqueda O(1) en el mapa de checksums
-                        if (newChecksum != 0 && oldChecksumMap.TryGetValue(newChecksum, out ulong oldHash))
-                        {
-                            var oldPath = _hashResolverService.ResolveHash(oldHash);
-                            diffs.Add(new ChunkDiff { 
-                                Type = ChunkDiffType.Renamed, 
-                                OldChunk = oldWad.Chunks[oldHash], 
-                                NewChunk = newChunk, 
-                                OldPath = oldPath, 
-                                NewPath = newPath, 
-                                SourceWadFile = sourceWadFile 
-                            });
-                        }
-                        else
-                        {
-                            diffs.Add(new ChunkDiff { Type = ChunkDiffType.New, NewChunk = newChunk, NewPath = newPath, SourceWadFile = sourceWadFile });
-                        }
+                        var newPath = _hashResolverService.ResolveHash(oldChunk.PathHash);
+                        diffs.Add(new ChunkDiff { Type = ChunkDiffType.Modified, OldChunk = oldChunk, NewChunk = newChunk, OldPath = oldPath, NewPath = newPath, SourceWadFile = sourceWadFile });
                     }
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+
+            var oldChecksumMap = new Dictionary<ulong, ulong>();
+            foreach (var kvp in oldChunkChecksums)
             {
-                _logService.LogError(ex, $"Error comparing WAD file: {sourceWadFile}");
+                if (!newChunks.ContainsKey(kvp.Key))
+                {
+                    oldChecksumMap.TryAdd(kvp.Value, kvp.Key);
+                }
+            }
+
+            foreach (var newChunk in newChunks.Values)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!oldChunks.ContainsKey(newChunk.PathHash))
+                {
+                    var newPath = _hashResolverService.ResolveHash(newChunk.PathHash);
+                    ulong newChecksum = newChunkChecksums[newChunk.PathHash];
+
+                    if (newChecksum != 0 && oldChecksumMap.TryGetValue(newChecksum, out ulong oldHash))
+                    {
+                        var oldPath = _hashResolverService.ResolveHash(oldHash);
+                        diffs.Add(new ChunkDiff { Type = ChunkDiffType.Renamed, OldChunk = oldChunks[oldHash], NewChunk = newChunk, OldPath = oldPath, NewPath = newPath, SourceWadFile = sourceWadFile });
+                    }
+                    else
+                    {
+                        diffs.Add(new ChunkDiff { Type = ChunkDiffType.New, NewChunk = newChunk, NewPath = newPath, SourceWadFile = sourceWadFile });
+                    }
+                }
             }
 
             return diffs;
@@ -300,36 +279,33 @@ namespace AssetsManager.Services.Comparator
 
         private static readonly FieldInfo _checksumField = typeof(WadChunk).GetField("_checksum", BindingFlags.NonPublic | BindingFlags.Instance);
 
-        private Dictionary<ulong, ulong> GetChunkChecksumsInternal(IEnumerable<WadChunk> chunks, CancellationToken cancellationToken, string statusMsg)
+        private async Task<Dictionary<ulong, ulong>> GetChunkChecksumsAsync(IEnumerable<WadChunk> chunks, CancellationToken cancellationToken, string statusMsg)
         {
             var checksums = new Dictionary<ulong, ulong>();
 
-            foreach (var chunk in chunks)
+            await Task.Run(() =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                ulong checksum = 0;
-                if (_checksumField != null)
+                foreach (var chunk in chunks)
                 {
-                    checksum = (ulong)_checksumField.GetValue(chunk);
-                }
-                
-                checksums[chunk.PathHash] = checksum;
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                int completed = Interlocked.Increment(ref _completedChunksGlobal);
-                // Reportamos progreso de forma equilibrada para no saturar la UI
-                if (completed % 1000 == 0 || completed == _totalChunksGlobal)
-                {
-                    NotifyComparisonProgressChanged(completed, statusMsg, true, null);
+                    ulong checksum = 0;
+                    if (_checksumField != null)
+                    {
+                        checksum = (ulong)_checksumField.GetValue(chunk);
+                    }
+                    
+                    checksums[chunk.PathHash] = checksum;
+
+                    int completed = Interlocked.Increment(ref _completedChunksGlobal);
+                    if (completed % 100 == 0 || completed == _totalChunksGlobal)
+                    {
+                        NotifyComparisonProgressChanged(completed, statusMsg, true, null);
+                    }
                 }
-            }
+            });
 
             return checksums;
-        }
-
-        private async Task<List<ChunkDiff>> CollectDiffsAsync(string oldWadFile, string newWadFile, string sourceWadFile, CancellationToken cancellationToken, string statusMsg = "")
-        {
-            return await Task.Run(() => CollectDiffsInternal(oldWadFile, newWadFile, sourceWadFile, cancellationToken), cancellationToken);
         }
     }
 }
