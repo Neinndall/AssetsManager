@@ -450,9 +450,9 @@ namespace AssetsManager.Services.Audio
                                     bool useOld = preferOld || diff.Type == ChunkDiffType.Removed;
                                     ulong hashForPath = useOld ? diff.OldPathHash : diff.NewPathHash;
                                     string chunkDir = useOld ? "old" : "new";
-                                    string fullPath = useOld ? diff.OldPath : diff.NewPath;
+                                    string fPath = useOld ? diff.OldPath : diff.NewPath;
 
-                                    return new FileSystemNodeModel(Path.GetFileName(fullPath), false, fullPath, diff.SourceWadFile)
+                                    return new FileSystemNodeModel(Path.GetFileName(fPath), false, fPath, diff.SourceWadFile)
                                     {
                                         ChunkDiff = diff,
                                         BackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", chunkDir, diff.SourceWadFile, $"{hashForPath:X16}.chunk"),
@@ -495,18 +495,17 @@ namespace AssetsManager.Services.Audio
             string sourceWadPath = clickedNode.SourceWadPath ?? clickedNode.ChunkDiff?.SourceWadFile;
             if (string.IsNullOrEmpty(sourceWadPath)) return null;
 
-            string sourceWadName = Path.GetFileName(sourceWadPath); // Ej: Map11.en_US.wad.client
+            string sourceWadName = Path.GetFileName(sourceWadPath); // Ej: Aatrox.en_US.wad.client
             var wadParts = sourceWadName.Split('.');
             if (wadParts.Length < 1) return null;
 
-            string wadPrefix = wadParts[0]; // Map11, Common, Ashe, etc.
+            string wadPrefix = wadParts[0]; // Map11, Common, Aatrox, etc.
             bool isMap = wadPrefix.StartsWith("Map", StringComparison.OrdinalIgnoreCase);
             bool isCommon = wadPrefix.Equals("Common", StringComparison.OrdinalIgnoreCase);
             
             _logService.Log($"[GetBinFileSearchStrategy] Container identified: '{sourceWadName}' (Prefix: {wadPrefix})");
 
-            // 2. DETECCIÓN POR CONTENEDOR (Prioridad Absoluta de Mapas)
-            // Si el WAD es MapXX o Common, todo el VO dentro debe ir al BIN del mapa
+            // 2. DETECCIÓN POR CONTENEDOR (Mapas)
             if (isMap || isCommon)
             {
                 string mapId = wadPrefix.ToLower();
@@ -517,16 +516,68 @@ namespace AssetsManager.Services.Audio
                 return new BinFileStrategy(binPath, targetWad, BinType.Map);
             }
 
-            // 3. DETECCIÓN POR CONTENEDOR (Campeones Regionales)
-            // Ej: Ashe.es_ES.wad.client (4 partes)
-            if (wadParts.Length >= 4)
+            // 3. DETECCIÓN POR CONTENEDOR (Campeones Regionales / Skins)
+            // Aquí aplicamos la lógica de prioridad: Nombre de archivo > Carpeta > Skin0
+            if (wadParts.Length >= 4 || clickedNode.FullPath.Contains("/characters/"))
             {
                 string champName = wadPrefix.ToLower();
-                _logService.Log($"[GetBinFileSearchStrategy] Container-Aware (CHAMP LOCALE): '{sourceWadName}' -> Linking to base '{champName}.wad.client'");
-                return new BinFileStrategy($"data/characters/{champName}/skins/skin0.bin", $"{champName}.wad.client", BinType.Champion);
+                
+                // Si la ruta no coincide con el prefijo, lo sacamos de la ruta (caso de archivos sueltos en WADs globales)
+                if (clickedNode.FullPath.Contains("/characters/"))
+                {
+                    var pathParts = clickedNode.FullPath.Split('/');
+                    int charIndex = Array.IndexOf(pathParts, "characters");
+                    if (pathParts.Length > charIndex + 1) champName = pathParts[charIndex + 1].ToLower();
+                }
+
+                string skinName = "skin0";
+                string fileName = clickedNode.Name.ToLower();
+
+                // PRIORIDAD 1: Buscar patrón _skinXX_ en el nombre del archivo
+                if (fileName.Contains("_skin"))
+                {
+                    int skinIdx = fileName.IndexOf("_skin");
+                    string sub = fileName.Substring(skinIdx + 5);
+                    string idStr = "";
+                    foreach (char c in sub)
+                    {
+                        if (char.IsDigit(c)) idStr += c;
+                        else break;
+                    }
+                    if (!string.IsNullOrEmpty(idStr) && int.TryParse(idStr, out int id))
+                    {
+                        skinName = $"skin{id}";
+                        _logService.Log($"[GetBinFileSearchStrategy] Skin ID extracted from FILENAME: '{skinName}'");
+                    }
+                }
+                // PRIORIDAD 2: Buscar en la ruta de carpetas
+                else if (clickedNode.FullPath.Contains("/skins/"))
+                {
+                    var pathParts = clickedNode.FullPath.Split('/');
+                    int skinsIndex = Array.IndexOf(pathParts, "skins");
+                    if (pathParts.Length > skinsIndex + 1)
+                    {
+                        string skinFolder = pathParts[skinsIndex + 1].ToLower();
+                        int id = (skinFolder == "base") ? 0 : -1;
+                        if (id == -1)
+                        {
+                            string idStr = new string(skinFolder.Where(char.IsDigit).ToArray());
+                            if (!string.IsNullOrEmpty(idStr)) int.TryParse(idStr, out id);
+                        }
+                        
+                        if (id != -1)
+                        {
+                            skinName = $"skin{id}";
+                            _logService.Log($"[GetBinFileSearchStrategy] Skin ID extracted from FOLDER: '{skinName}'");
+                        }
+                    }
+                }
+
+                _logService.Log($"[GetBinFileSearchStrategy] CHAMP Strategy: '{champName}' -> Linking to '{skinName}.bin' in '{champName}.wad.client'");
+                return new BinFileStrategy($"data/characters/{champName}/skins/{skinName}.bin", $"{champName}.wad.client", BinType.Champion);
             }
 
-            // 4. ESTRATEGIAS POR RUTA (Companions / Skins en WADs base o carpetas)
+            // 4. ESTRATEGIAS POR RUTA (Companions)
             if (clickedNode.FullPath.Contains("/companions/pets/"))
             {
                 var pathParts = clickedNode.FullPath.Split('/');
@@ -540,25 +591,7 @@ namespace AssetsManager.Services.Audio
                 }
             }
 
-            if (clickedNode.FullPath.Contains("/characters/"))
-            {
-                var pathParts = clickedNode.FullPath.Split('/');
-                int charIndex = Array.IndexOf(pathParts, "characters");
-                if (pathParts.Length > charIndex + 1)
-                {
-                    string championName = pathParts[charIndex + 1].ToLower();
-                    string skinName = "skin0";
-                    int skinsIndex = Array.IndexOf(pathParts, "skins");
-                    if (skinsIndex != -1 && pathParts.Length > skinsIndex + 1)
-                    {
-                        string skinFolder = pathParts[skinsIndex + 1];
-                        skinName = (skinFolder == "base") ? "skin0" : $"skin{skinFolder.Replace("skin", "")}";
-                    }
-                    return new BinFileStrategy($"data/characters/{championName}/skins/{skinName}.bin", $"{championName}.wad.client", BinType.Champion);
-                }
-            }
-
-            // 5. INFERENCIA FINAL (Fallback)
+            // 5. INFERENCIA FINAL (Fallback de emergencia)
             if (clickedNode.Name.Contains("_vo_", StringComparison.OrdinalIgnoreCase))
             {
                 string baseName = GetBaseName(clickedNode.Name);
