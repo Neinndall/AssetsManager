@@ -23,7 +23,7 @@ namespace AssetsManager.Utils
             {
                 case WadChunkCompression.ZstdChunked:
                 case WadChunkCompression.Zstd:
-                    // Mejora: Unwrap directo sobre el Span.
+                    // Fix: Unwrap may return a Span<byte>, so we convert it to ToArray() if needed to match the byte[] return type.
                     return _zstdDecompressor.Value.Unwrap(compressedData).ToArray();
 
                 case WadChunkCompression.GZip:

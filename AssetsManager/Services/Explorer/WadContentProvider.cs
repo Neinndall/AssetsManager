@@ -34,50 +34,32 @@ namespace AssetsManager.Services.Explorer
         }
 
         // Obtiene los bytes descomprimidos de un fichero virtual sin guardarlo, para usar en previsualizaciones.
-        public Task<byte[]> GetVirtualFileBytesAsync(FileSystemNodeModel fileNode, CancellationToken cancellationToken = default)
+        public async Task<byte[]> GetVirtualFileBytesAsync(FileSystemNodeModel fileNode, CancellationToken cancellationToken = default)
         {
-            return Task.Run(() =>
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                try
+                if (!string.IsNullOrEmpty(fileNode.BackupChunkPath))
                 {
-                    if (!string.IsNullOrEmpty(fileNode.BackupChunkPath))
+                    return await Task.Run(() =>
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+
                         // MODO BACKUP: Carga directa y exclusiva de chunks guardados.
                         byte[] compressedData = File.ReadAllBytes(fileNode.BackupChunkPath);
                         bool useOld = fileNode.BackupChunkPath.Contains(Path.Combine("wad_chunks", "old"));
                         var compressionType = useOld ? fileNode.ChunkDiff.OldCompressionType : fileNode.ChunkDiff.NewCompressionType;
                         return WadChunkUtils.DecompressChunk(compressedData, compressionType);
-                    }
-
-                    // MODO LIVE: Optimizamos lectura mediante ArrayPool y lectura directa
-                    using var wadFile = new WadFile(fileNode.SourceWadPath);
-                    if (wadFile.Chunks.TryGetValue(fileNode.SourceChunkPathHash, out var chunk))
-                    {
-                        using var fs = new FileStream(fileNode.SourceWadPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                        fs.Position = chunk.DataOffset;
-
-                        byte[] buffer = ArrayPool<byte>.Shared.Rent((int)chunk.CompressedSize);
-                        try
-                        {
-                            fs.ReadExactly(buffer, 0, (int)chunk.CompressedSize);
-                            return WadChunkUtils.DecompressChunk(buffer.AsSpan(0, (int)chunk.CompressedSize), chunk.Compression);
-                        }
-                        finally
-                        {
-                            ArrayPool<byte>.Shared.Return(buffer);
-                        }
-                    }
-
-                    return null;
+                    }, cancellationToken);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.FullPath}");
-                    return null;
-                }
-            }, cancellationToken);
+
+                // MODO LIVE: Delegamos en el método unificado
+                return await DecompressChunkByHashAsync(fileNode.SourceWadPath, fileNode.SourceChunkPathHash, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.FullPath}");
+                return null;
+            }
         }
 
         // Obtiene los bytes de un lado específico (Old o New) de un diff, gestionando tanto WADs como Backups.
@@ -125,8 +107,13 @@ namespace AssetsManager.Services.Explorer
         private string GetBackupRoot(string chunkPath)
         {
             if (string.IsNullOrEmpty(chunkPath)) return string.Empty;
+
             int index = chunkPath.IndexOf("wad_chunks", StringComparison.OrdinalIgnoreCase);
-            return index != -1 ? chunkPath.Substring(0, index) : Path.GetDirectoryName(Path.GetDirectoryName(chunkPath));
+            if (index != -1) return chunkPath.Substring(0, index);
+
+            string fallback = Path.GetDirectoryName(Path.GetDirectoryName(chunkPath));
+            _logService.LogWarning($"'wad_chunks' not found in path. Using fallback root: {fallback}");
+            return fallback;
         }
 
         // Obtiene los bytes descomprimidos de un diff (lado predominante para previsualización)
@@ -184,9 +171,8 @@ namespace AssetsManager.Services.Explorer
                 if (node.AudioSource == AudioSourceType.Bnk)
                 {
                     if (node.WemSize == 0) return null;
-                    byte[] wemData = new byte[node.WemSize];
-                    Array.Copy(containerData, (int)node.WemOffset, wemData, 0, (int)node.WemSize);
-                    return wemData;
+                    // Retornamos el segmento directamente usando Span para evitar copias intermedias (siendo ToArray la copia final necesaria)
+                    return containerData.AsSpan((int)node.WemOffset, (int)node.WemSize).ToArray();
                 }
                 else // Wpk
                 {
@@ -222,19 +208,9 @@ namespace AssetsManager.Services.Explorer
                         return null;
                     }
 
-                    using var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                    fs.Position = chunk.DataOffset;
-
-                    byte[] buffer = ArrayPool<byte>.Shared.Rent((int)chunk.CompressedSize);
-                    try
-                    {
-                        fs.ReadExactly(buffer, 0, (int)chunk.CompressedSize);
-                        return WadChunkUtils.DecompressChunk(buffer.AsSpan(0, (int)chunk.CompressedSize), chunk.Compression);
-                    }
-                    finally
-                    {
-                        ArrayPool<byte>.Shared.Return(buffer);
-                    }
+                    // Usamos LoadChunk del WadFile que ya gestiona el stream interno, evitando aperturas dobles.
+                    using var compressedDataOwner = wadFile.LoadChunk(chunk);
+                    return WadChunkUtils.DecompressChunk(compressedDataOwner.Span, chunk.Compression);
                 }
                 catch (OperationCanceledException)
                 {
