@@ -47,7 +47,7 @@ namespace AssetsManager.Services.Audio
 
         public async Task<LinkedAudioBank> LinkAudioBankForDiffAsync(FileSystemNodeModel clickedNode, string basePath, bool preferOld = false, string backupRootDir = null)
         {
-            _logService.Log($"[LinkAudioBankForDiffAsync] Linking audio bank for diff view. Node: '{clickedNode.Name}', Path: '{clickedNode.FullPath}', PreferOld: {preferOld}, BackupRootDir: '{backupRootDir}'");
+            _logService.LogDebug($"[LinkAudioBankForDiffAsync] Linking audio bank for diff view. Node: '{clickedNode.Name}', Path: '{clickedNode.FullPath}', PreferOld: {preferOld}, BackupRootDir: '{backupRootDir}'");
 
             if (string.IsNullOrEmpty(basePath) && clickedNode.ChunkDiff == null && string.IsNullOrEmpty(backupRootDir))
             {
@@ -67,7 +67,7 @@ namespace AssetsManager.Services.Audio
             // 1. BACKUP MODE: STRICTLY use backup data (JSON and chunks)
             if (backupRootDir != null)
             {
-                _logService.Log($"[LinkAudioBankForDiffAsync] [BACKUP MODE] STRICT resolution via JSON index.");
+                _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP MODE] STRICT resolution via JSON index.");
                 eventsBnkNode = clickedNode; // CRITICAL: Always assign events node first
                 
                 if (clickedNode.ChunkDiff != null)
@@ -84,7 +84,7 @@ namespace AssetsManager.Services.Audio
                         if (strategy != null)
                         {
                             binType = strategy.Type;
-                            _logService.Log($"[LinkAudioBankForDiffAsync] [BACKUP] Strategy identified: {strategy.Type}, Path: '{strategy.BinPath}'");
+                            _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Strategy identified: {strategy.Type}, Path: '{strategy.BinPath}'");
 
                             // DEEP SEARCH for the BIN in the whole JSON structure
                             SerializableChunkDiff binDiff = null;
@@ -108,7 +108,7 @@ namespace AssetsManager.Services.Audio
                                         OldPathHash = depMatch.OldPathHash, NewPathHash = depMatch.NewPathHash,
                                         OldCompressionType = depMatch.CompressionType, NewCompressionType = depMatch.CompressionType
                                     };
-                                    _logService.Log($"[LinkAudioBankForDiffAsync] [BACKUP] Found BIN in direct Dependencies.");
+                                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Found BIN in direct Dependencies.");
                                 }
                             }
 
@@ -130,7 +130,7 @@ namespace AssetsManager.Services.Audio
                                                 OldPathHash = depMatch.OldPathHash, NewPathHash = depMatch.NewPathHash,
                                                 OldCompressionType = depMatch.CompressionType, NewCompressionType = depMatch.CompressionType
                                             };
-                                            _logService.Log($"[LinkAudioBankForDiffAsync] [BACKUP] Found BIN in indirect dependencies.");
+                                            _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Found BIN in indirect dependencies.");
                                             break;
                                         }
                                     }
@@ -150,7 +150,7 @@ namespace AssetsManager.Services.Audio
                                     Type = NodeType.SoundBank
                                 };
                                 binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
-                                _logService.Log($"[LinkAudioBankForDiffAsync] [BACKUP] BinData loaded: {binData?.Length ?? 0} bytes.");
+                                _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] BinData loaded: {binData?.Length ?? 0} bytes.");
                             }
                         }
 
@@ -181,7 +181,7 @@ namespace AssetsManager.Services.Audio
                             }
                         }
 
-                        _logService.Log($"[LinkAudioBankForDiffAsync] [BACKUP] Found {siblings.Count} siblings. Searching containers...");
+                        _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Found {siblings.Count} siblings. Searching containers...");
                         
                         var wpkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_audio.wpk", StringComparison.OrdinalIgnoreCase))
                                    ?? siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + ".wpk", StringComparison.OrdinalIgnoreCase));
@@ -218,7 +218,7 @@ namespace AssetsManager.Services.Audio
 
                         if (isRegionalWad)
                         {
-                            _logService.Log($"[LinkAudioBankForDiffAsync] [BACKUP] Regional WAD detected: '{sourceWad}'. Searching for Master Events Bank in en_US counterpart using direct path...");
+                            _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Regional WAD detected: '{sourceWad}'. Searching for Master Events Bank in en_US counterpart using direct path...");
                             
                             // Use the EXACT same path (Riot usually shares en_us paths across all locales)
                             string targetPath = clickedNode.FullPath;
@@ -259,20 +259,20 @@ namespace AssetsManager.Services.Audio
                                 var masterNode = createNode(masterDiff);
                                 if (masterNode != null)
                                 {
-                                    _logService.Log($"[LinkAudioBankForDiffAsync] [BACKUP] Successfully linked Master Events Bank (Exact Path) from en_US WAD.");
+                                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Successfully linked Master Events Bank (Exact Path) from en_US WAD.");
                                     eventsBnkNode = masterNode; 
                                 }
                             }
                         }
 
-                        _logService.Log($"[LinkAudioBankForDiffAsync] [BACKUP] Siblings resolved: WPK={(wpkNode != null)}, AudioBNK={(audioBnkNode != null)}");
+                        _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Siblings resolved: WPK={(wpkNode != null)}, AudioBNK={(audioBnkNode != null)}");
                     }
                 }
             }
             // 2. LIVE MODE
             else
             {
-                _logService.Log($"[LinkAudioBankForDiffAsync] [LIVE MODE] Resolving via strategies and physical WADs.");
+                _logService.LogDebug($"[LinkAudioBankForDiffAsync] [LIVE MODE] Resolving via strategies and physical WADs.");
                 var strategy = GetBinFileSearchStrategy(clickedNode);
                 if (strategy != null)
                 {
@@ -286,7 +286,7 @@ namespace AssetsManager.Services.Audio
                         if (binNode != null)
                         {
                             binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
-                            _logService.Log($"[LinkAudioBankForDiffAsync] [LIVE] Loaded .bin data from live WAD. Size: {binData?.Length ?? 0} bytes.");
+                            _logService.LogDebug($"[LinkAudioBankForDiffAsync] [LIVE] Loaded .bin data from live WAD. Size: {binData?.Length ?? 0} bytes.");
                         }
 
                         // Siblings
@@ -309,7 +309,7 @@ namespace AssetsManager.Services.Audio
                 }
             }
 
-            _logService.Log($"[LinkAudioBankForDiffAsync] Final results - BinData: {binData != null}, WpkNode: {wpkNode != null}, AudioBnkNode: {audioBnkNode != null}, EventsBnkNode: {eventsBnkNode != null}");
+            _logService.LogDebug($"[LinkAudioBankForDiffAsync] Final results - BinData: {binData != null}, WpkNode: {wpkNode != null}, AudioBnkNode: {audioBnkNode != null}, EventsBnkNode: {eventsBnkNode != null}");
 
             return new LinkedAudioBank
             {

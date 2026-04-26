@@ -14,11 +14,11 @@ namespace AssetsManager.Services.Parsers
             var mapEventNames = new Dictionary<uint, string>();
             if (binData == null || binData.Length == 0) 
             {
-                logService.Log($"[BinParser] binData is null or empty for bank: {bankName}");
+                logService.LogDebug($"[BinParser] binData is null or empty for bank: {bankName}");
                 return mapEventNames;
             }
 
-            logService.Log($"[BinParser] Processing BIN for bank: {bankName} (Size: {binData.Length} bytes, Type: {binType})");
+            logService.LogDebug($"[BinParser] Processing BIN for bank: {bankName} (Size: {binData.Length} bytes, Type: {binType})");
 
             try
             {
@@ -35,12 +35,12 @@ namespace AssetsManager.Services.Parsers
                 logService.LogError(ex, "[AUDIO] Crash during raw byte-based BIN processing in BinParser.");
             }
 
-            logService.Log($"[BinParser] Finished processing bank: {bankName}. Found {mapEventNames.Count} event names.");
+            logService.LogDebug($"[BinParser] Finished processing bank: {bankName}. Found {mapEventNames.Count} event names.");
             if (mapEventNames.Any())
             {
                 var eventsToShow = mapEventNames.Take(5).Select(kvp => string.Format("({0}: {1})", kvp.Key, kvp.Value));
                 string eventList = string.Join(", ", eventsToShow);
-                logService.Log($"[BinParser] Sample names from {bankName}: {eventList}");
+                logService.LogDebug($"[BinParser] Sample names from {bankName}: {eventList}");
             }
             return mapEventNames;
         }
@@ -65,7 +65,7 @@ namespace AssetsManager.Services.Parsers
                 }
                 // Skipping 4 bytes of object size
                 uint amount = BitConverter.ToUInt32(haystack, currentPosition + 4);
-                logService.Log($"[BinParser] [{debugContext}] Found magic at index {foundIndex}. Strings to read: {amount}");
+                logService.LogDebug($"[BinParser] [{debugContext}] Found magic at index {foundIndex}. Strings to read: {amount}");
                 currentPosition += 8;
 
                 for (int i = 0; i < amount; i++)
@@ -98,7 +98,7 @@ namespace AssetsManager.Services.Parsers
             }
             if (findCount == 0)
             {
-                logService.Log($"[BinParser] [{debugContext}] No magic bytes match found in this BIN.");
+                logService.LogDebug($"[BinParser] [{debugContext}] No magic bytes match found in this BIN.");
             }
         }
 
