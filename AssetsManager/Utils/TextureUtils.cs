@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -207,16 +208,34 @@ namespace AssetsManager.Utils
                                 }));
                             }
 
-                            using (Image<Bgra32> bgra32Image = imageSharp.CloneAs<Bgra32>())
+                            // OPTIMIZACIÓN: Usamos ArrayPool para evitar picos de RAM y GC.
+                            // Restauramos la conversión a Bgra32 para compatibilidad total con WPF (Colores correctos).
+                            using (Image<Bgra32> bgraImage = imageSharp.CloneAs<Bgra32>())
                             {
-                                var pixelBuffer = new byte[bgra32Image.Width * bgra32Image.Height * 4];
-                                bgra32Image.CopyPixelDataTo(pixelBuffer);
+                                int bufferSize = bgraImage.Width * bgraImage.Height * 4;
+                                byte[] pixelBuffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+                                
+                                try
+                                {
+                                    bgraImage.CopyPixelDataTo(pixelBuffer);
 
-                                int stride = bgra32Image.Width * 4;
-                                var bitmapSource = BitmapSource.Create(bgra32Image.Width, bgra32Image.Height, 96, 96, PixelFormats.Bgra32, null, pixelBuffer, stride);
-                                bitmapSource.Freeze();
+                                    int stride = bgraImage.Width * 4;
+                                    var bitmapSource = BitmapSource.Create(
+                                        bgraImage.Width, 
+                                        bgraImage.Height, 
+                                        96, 96, 
+                                        PixelFormats.Bgra32, 
+                                        null, 
+                                        pixelBuffer, 
+                                        stride);
 
-                                return bitmapSource;
+                                    bitmapSource.Freeze();
+                                    return bitmapSource;
+                                }
+                                finally
+                                {
+                                    ArrayPool<byte>.Shared.Return(pixelBuffer);
+                                }
                             }
                         }
                     }
