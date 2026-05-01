@@ -538,16 +538,10 @@ namespace AssetsManager.Views.Controls.Explorer
                         string logName = PathUtils.GetLogName(node.Name);
                         string logPath = destinationPath;
                         
-                        // Use the real node.Name for the folder/file path to match what WadExportService created
+                        // Use node.Name (REAL name with suffixes) so the folder exists for LogService
                         if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                         {
                             logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
-                        }
-                        else
-                        {
-                            // For single files, try to point to the file itself if it doesn't enter the directory logic
-                            string filePath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
-                            if (File.Exists(filePath)) logPath = filePath;
                         }
 
                         LogService.LogInteractiveSuccess($"Successfully extracted {logName}", logPath, logName);
@@ -704,8 +698,8 @@ namespace AssetsManager.Views.Controls.Explorer
             // Use the TreeUIManager to get ALL multi-selected nodes, or the current one if none
             var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
             
-            // Filter only those that actually HAVE a difference to show
-            var nodesWithDiff = selectedNodes.Where(n => n.ChunkDiff != null).ToList();
+            // Filter only those that actually HAVE a real difference (exclude dependencies)
+            var nodesWithDiff = selectedNodes.Where(n => n.ChunkDiff != null && n.Status != DiffStatus.Dependency).ToList();
 
             if (nodesWithDiff.Count > 1 && FilePreviewer != null)
             {

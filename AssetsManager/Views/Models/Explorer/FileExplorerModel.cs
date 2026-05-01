@@ -86,18 +86,25 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public string ViewChangesHeader => SelectedNodes.Count > 1 
-            ? "View Selected Differences" 
-            : "View Differences";
+        public string ViewChangesHeader 
+        {
+            get
+            {
+                int diffableCount = SelectedNodes.Count(n => n.ChunkDiff != null && n.Status != DiffStatus.Dependency && !SupportedFileTypes.IsAudioDataContainer(n.Name));
+                return diffableCount > 1 ? "View Selected Differences" : "View Differences";
+            }
+        }
 
         public bool CanViewChanges
         {
             get
             {
                 if (SelectedNodes.Count > 1)
-                    return SelectedNodes.Any(n => n.ChunkDiff != null && !SupportedFileTypes.IsAudioDataContainer(n.Name));
+                {
+                    return SelectedNodes.Any(n => n.ChunkDiff != null && n.Status != DiffStatus.Dependency && !SupportedFileTypes.IsAudioDataContainer(n.Name));
+                }
 
-                return (SelectedItem?.Status == DiffStatus.Modified || SelectedItem?.ChunkDiff != null) && !SupportedFileTypes.IsAudioDataContainer(SelectedItem?.Name);
+                return (SelectedItem?.Status == DiffStatus.Modified || (SelectedItem?.ChunkDiff != null && SelectedItem?.Status != DiffStatus.Dependency)) && !SupportedFileTypes.IsAudioDataContainer(SelectedItem?.Name);
             }
         }
 

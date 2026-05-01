@@ -391,7 +391,8 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (nodes == null || nodes.Count == 0 || FileExplorer == null) return;
 
-            var diffs = nodes.Where(n => n.ChunkDiff != null).Select(n => n.ChunkDiff).ToList();
+            // Filter only those that actually HAVE a real difference (exclude dependencies)
+            var diffs = nodes.Where(n => n.ChunkDiff != null && n.Status != DiffStatus.Dependency).Select(n => n.ChunkDiff).ToList();
             if (diffs.Count == 0) return;
 
             // Get PBE paths from FileExplorer
