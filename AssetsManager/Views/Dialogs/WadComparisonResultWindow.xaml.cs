@@ -245,7 +245,7 @@ namespace AssetsManager.Views.Dialogs
             
             if (validDiffs.Count > 1)
             {
-                await _diffViewService.ShowBatchWadDiffAsync(validDiffs, 0, _oldPbePath, _newPbePath, this);
+                await _diffViewService.ShowBatchWadDiffAsync(validDiffs, 0, _oldPbePath, _newPbePath, this, _sourceJsonPath);
             }
             else if (validDiffs.Count == 1)
             {
