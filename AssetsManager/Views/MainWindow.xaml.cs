@@ -1,21 +1,14 @@
 using System;
-using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Interop;
 using Hardcodet.Wpf.TaskbarNotification;
 using Microsoft.Extensions.DependencyInjection;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models.Wad;
-using AssetsManager.Views.Models.Notifications;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
@@ -23,12 +16,15 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
+using AssetsManager.Utils;
+using AssetsManager.Utils.Win;
 using AssetsManager.Views.Controls;
-using AssetsManager.Views.Dialogs.Controls;
-using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Helpers;
-using AssetsManager.Utils.Win;
+using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Models.Wad;
+using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Views
 {
@@ -268,12 +264,12 @@ namespace AssetsManager.Views
                 OldPath = d.OldPath,
                 NewPath = d.NewPath,
                 SourceWadFile = d.SourceWadFile,
-                OldPathHash = d.OldChunk.PathHash,
-                NewPathHash = d.NewChunk.PathHash,
+                OldPathHash = (d.Type == ChunkDiffType.New) ? 0 : d.OldChunk.PathHash,
+                NewPathHash = (d.Type == ChunkDiffType.Removed) ? 0 : d.NewChunk.PathHash,
                 OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
                 NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
-                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
-                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
+                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : (WadChunkCompression?)d.OldChunk.Compression,
+                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : (WadChunkCompression?)d.NewChunk.Compression
             }).ToList();
 
             if (!serializableDiffs.Any()) return;

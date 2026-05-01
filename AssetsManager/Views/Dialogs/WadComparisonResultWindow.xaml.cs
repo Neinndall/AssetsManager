@@ -1,25 +1,25 @@
 using System;
-using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using AssetsManager.Views.Helpers;
 using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Explorer;
+using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Dialogs.Controls;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Wad;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Services.Core;
-using AssetsManager.Utils;
-using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Wad;
-using System.Threading;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -162,12 +162,12 @@ namespace AssetsManager.Views.Dialogs
                 OldPath = d.OldPath,
                 NewPath = d.NewPath,
                 SourceWadFile = d.SourceWadFile,
-                OldPathHash = d.OldChunk.PathHash,
-                NewPathHash = d.NewChunk.PathHash,
+                OldPathHash = (d.Type == ChunkDiffType.New) ? 0 : d.OldChunk.PathHash,
+                NewPathHash = (d.Type == ChunkDiffType.Removed) ? 0 : d.NewChunk.PathHash,
                 OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
                 NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
-                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
-                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
+                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : (WadChunkCompression?)d.OldChunk.Compression,
+                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : (WadChunkCompression?)d.NewChunk.Compression
             }).ToList();
         }
 

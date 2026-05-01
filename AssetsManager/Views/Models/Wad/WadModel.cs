@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Text.Json.Serialization;
-using LeagueToolkit.Core.Wad;
 using System.IO;
+using System.Text.Json.Serialization;
 using AssetsManager.Utils;
+using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Views.Models.Wad
 {
@@ -98,19 +98,24 @@ namespace AssetsManager.Views.Models.Wad
         {
             get
             {
-                if (Type == ChunkDiffType.Renamed || Type == ChunkDiffType.Dependency) return "N/A";
+                if (Type == ChunkDiffType.Dependency) return "N/A";
 
                 long diff = Type switch
                 {
                     ChunkDiffType.New => (long)(NewUncompressedSize ?? 0),
                     ChunkDiffType.Removed => -(long)(OldUncompressedSize ?? 0),
                     ChunkDiffType.Modified => (long)(NewUncompressedSize ?? 0) - (long)(OldUncompressedSize ?? 0),
+                    ChunkDiffType.Renamed => (long)(NewUncompressedSize ?? 0) - (long)(OldUncompressedSize ?? 0),
                     _ => 0
                 };
 
-                if (diff == 0 && Type == ChunkDiffType.Modified) return "N/A";
+                if (diff == 0)
+                {
+                    if (Type == ChunkDiffType.Modified || Type == ChunkDiffType.Renamed) return "±0 B";
+                    return "0 B";
+                }
                 
-                return (diff > 0 ? "+" : "") + FormatUtils.FormatSize((ulong)Math.Abs(diff));
+                return (diff > 0 ? "+" : "-") + FormatUtils.FormatSize((ulong)Math.Abs(diff));
             }
         }
 
