@@ -132,9 +132,12 @@ namespace AssetsManager.Services.Explorer
                     }
 
                     // Set grouping folder flag for top level folders in sorting mode
-                    foreach (var statusFolder in wadNode.Children)
+                    if (wadNode.Children != null)
                     {
-                        statusFolder.IsGroupingFolder = true;
+                        foreach (var statusFolder in wadNode.Children)
+                        {
+                            statusFolder.IsGroupingFolder = true;
+                        }
                     }
 
                     SortChildrenRecursively(wadNode);
@@ -602,6 +605,13 @@ namespace AssetsManager.Services.Explorer
                 Status = status,
                 Parent = parentNode
             };
+
+            // OPTIMIZATION: If the node has a real hierarchical parent, we can discard the stored string
+            // as the dynamic FullPath getter will reconstruct it on demand.
+            if (parentNode != null && !parentNode.IsGroupingFolder && parentNode.Type != NodeType.WadFile)
+            {
+                fileNode.FullPath = null;
+            }
 
             parentNode.Children.Add(fileNode);
             return fileNode;

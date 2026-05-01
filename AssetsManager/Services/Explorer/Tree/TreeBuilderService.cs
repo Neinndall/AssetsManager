@@ -199,6 +199,8 @@ namespace AssetsManager.Services.Explorer.Tree
                 return true; // Keep files
             }
 
+            if (node.Children == null) return false;
+
             for (int i = node.Children.Count - 1; i >= 0; i--)
             {
                 if (!PruneEmptyDirectories(node.Children[i]))

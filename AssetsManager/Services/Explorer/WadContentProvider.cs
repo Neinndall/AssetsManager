@@ -40,6 +40,7 @@ namespace AssetsManager.Services.Explorer
             {
                 if (!string.IsNullOrEmpty(fileNode.BackupChunkPath))
                 {
+                    _logService.LogDebug($"[DATA DIRECTION] Loading from BACKUP directory: 'wad_chunks/{ (fileNode.BackupChunkPath.Contains("old") ? "old" : "new") }'");
                     return await Task.Run(() =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -52,6 +53,7 @@ namespace AssetsManager.Services.Explorer
                     }, cancellationToken);
                 }
 
+                _logService.LogDebug($"[DATA DIRECTION] Loading from LOCAL installation: '{Path.GetDirectoryName(fileNode.SourceWadPath)}'");
                 // MODO LIVE: Delegamos en el método unificado
                 return await DecompressChunkByHashAsync(fileNode.SourceWadPath, fileNode.SourceChunkPathHash, cancellationToken);
             }
@@ -155,6 +157,7 @@ namespace AssetsManager.Services.Explorer
 
                 if (!string.IsNullOrEmpty(node.BackupChunkPath))
                 {
+                    _logService.LogDebug($"[DATA DIRECTION] Extracting WEM from BACKUP storage: 'wad_chunks/{ (node.BackupChunkPath.Contains("old") ? "old" : "new") }'");
                     // MODO BACKUP: Carga del contenedor desde el chunk.
                     byte[] compressedData = File.ReadAllBytes(node.BackupChunkPath);
                     var compressionType = node.ChunkDiff?.NewCompressionType ?? WadChunkCompression.None;
@@ -162,6 +165,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 else
                 {
+                    _logService.LogDebug($"[DATA DIRECTION] Extracting WEM from LOCAL installation: '{Path.GetDirectoryName(node.SourceWadPath)}'");
                     // MODO LIVE
                     containerData = await DecompressChunkByHashAsync(node.SourceWadPath, node.SourceChunkPathHash, cancellationToken);
                 }

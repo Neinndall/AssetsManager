@@ -92,9 +92,9 @@ namespace AssetsManager.Services.Explorer
                     if (mode == WadExportMode.Smart)
                     {
                         // Smart redundancy check for audio banks
-                        if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && node.Children.Count == 0) continue;
+                        if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && (node.Children == null || node.Children.Count == 0)) continue;
 
-                        if (node.Children.Count > 1 || (node.Children.Count == 1 && node.Children[0].Name != "Loading..."))
+                        if (node.Children != null && (node.Children.Count > 1 || (node.Children.Count == 1 && node.Children[0].Name != "Loading...")))
                         {
                             count += CountSoundsInAudioTree(node.Children);
                         }

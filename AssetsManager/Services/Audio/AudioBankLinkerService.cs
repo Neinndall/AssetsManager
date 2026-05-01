@@ -341,12 +341,15 @@ namespace AssetsManager.Services.Audio
 
         public async Task<LinkedAudioBank> LinkAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
         {
-            _logService.LogDebug($"[LinkAudioBankAsync] Linking audio bank for TreeView expansion. Node: '{clickedNode.Name}', Path: '{clickedNode.FullPath}', CurrentRootPath: '{currentRootPath}'");
+            bool isBackupMode = clickedNode.ChunkDiff != null;
+            string modeLabel = isBackupMode ? "BACKUP" : "LIVE";
+            
+            _logService.LogDebug($"[LinkAudioBankAsync] [{modeLabel} MODE] Linking audio bank. Node: '{clickedNode.Name}', Path: '{clickedNode.FullPath}'");
 
-            if (clickedNode.ChunkDiff != null)
+            if (isBackupMode)
             {
                 var (binNode, baseName, binType) = await FindAssociatedBinFileAsync(clickedNode, rootNodes, null);
-                _logService.LogDebug($"[LinkAudioBankAsync] [BACKUP] BinNode resolved: {binNode != null}, BaseName: {baseName}, Type: {binType}");
+                _logService.LogDebug($"[LinkAudioBankAsync] [BACKUP] BinNode resolution result: {(binNode != null ? "FOUND" : "NOT FOUND")}. Strategy: {binType}");
 
                 byte[] binData = null;
                 if (binNode != null) binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
