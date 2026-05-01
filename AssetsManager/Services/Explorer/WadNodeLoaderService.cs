@@ -75,7 +75,8 @@ namespace AssetsManager.Services.Explorer
                     }
                 }
 
-                var wadNode = new FileSystemNodeModel($"{wadGroup.Key} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
+                string wadNameOnly = Path.GetFileName(wadGroup.Key);
+                var wadNode = new FileSystemNodeModel($"{wadNameOnly} ({wadGroup.Count()})", true, wadGroup.Key, wadGroup.Key);
 
                 if (isSortingEnabled)
                 {

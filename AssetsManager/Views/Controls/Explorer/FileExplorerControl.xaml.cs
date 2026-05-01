@@ -535,12 +535,13 @@ namespace AssetsManager.Views.Controls.Explorer
                     if (selectedNodes.Count == 1)
                     {
                         var node = selectedNodes[0];
+                        string logName = PathUtils.GetLogName(node.Name);
                         string logPath = destinationPath;
                         if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                         {
-                            logPath = Path.Combine(destinationPath, node.Name);
+                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(logName));
                         }
-                        LogService.LogInteractiveSuccess($"Successfully extracted {node.Name}", logPath, node.Name);
+                        LogService.LogInteractiveSuccess($"Successfully extracted {logName}", logPath, logName);
                     }
                     else
                     {

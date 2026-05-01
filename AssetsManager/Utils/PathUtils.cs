@@ -21,6 +21,31 @@ namespace AssetsManager.Utils
             return sanitized;
         }
 
+        public static string GetLogName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return string.Empty;
+
+            string cleanName = name;
+            // Clean count suffix if present (e.g., "file.wad (11)" -> "file.wad")
+            int parenthesisIndex = cleanName.LastIndexOf(" (");
+            if (parenthesisIndex > 0)
+            {
+                string potentialNumber = cleanName.Substring(parenthesisIndex + 2);
+                if (potentialNumber.Length > 1 && potentialNumber.EndsWith(")") && int.TryParse(potentialNumber.Substring(0, potentialNumber.Length - 1), out _))
+                {
+                    cleanName = cleanName.Substring(0, parenthesisIndex).Trim();
+                }
+            }
+
+            // If it's a path (backup grouped mode), take only the filename
+            if (cleanName.Contains("\\") || cleanName.Contains("/"))
+            {
+                cleanName = Path.GetFileName(cleanName);
+            }
+
+            return cleanName;
+        }
+
         public static string GetUniqueFilePath(string destinationDirectory, string fileName)
         {
             string sanitizedFileName = SanitizeName(fileName); // This now calls the local static method
