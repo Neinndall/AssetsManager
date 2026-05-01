@@ -537,10 +537,19 @@ namespace AssetsManager.Views.Controls.Explorer
                         var node = selectedNodes[0];
                         string logName = PathUtils.GetLogName(node.Name);
                         string logPath = destinationPath;
+                        
+                        // Use the real node.Name for the folder/file path to match what WadExportService created
                         if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                         {
-                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(logName));
+                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
                         }
+                        else
+                        {
+                            // For single files, try to point to the file itself if it doesn't enter the directory logic
+                            string filePath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
+                            if (File.Exists(filePath)) logPath = filePath;
+                        }
+
                         LogService.LogInteractiveSuccess($"Successfully extracted {logName}", logPath, logName);
                     }
                     else
