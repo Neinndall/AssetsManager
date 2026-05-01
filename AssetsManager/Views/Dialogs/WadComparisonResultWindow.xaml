@@ -161,9 +161,9 @@
                 <Grid Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}}">
                     <Grid Margin="24">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" MinWidth="300"/>
+                            <ColumnDefinition Width="45*" MinWidth="300"/>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*" MinWidth="300"/>
+                            <ColumnDefinition Width="55*" MinWidth="300"/>
                         </Grid.ColumnDefinitions>
 
                         <controls:WadResultsTreeControl x:Name="ResultsTree" Grid.Column="0" DataContext="{Binding TreeModel}"/>
