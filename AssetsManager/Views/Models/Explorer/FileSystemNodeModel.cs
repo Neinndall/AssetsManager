@@ -28,6 +28,7 @@ namespace AssetsManager.Views.Models.Explorer
         public AudioSourceType AudioSource { get; set; } // Only for WemFile
 
         public ObservableRangeCollection<FileSystemNodeModel> Children { get; set; }
+        public FileSystemNodeModel Parent { get; set; }
 
         // --- Data for WADs and Chunks ---
         public string SourceWadPath { get; set; } // Only for VirtualFile/VirtualDirectory

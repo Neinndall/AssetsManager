@@ -136,7 +136,11 @@ namespace AssetsManager.Services.Explorer.Tree
                 var eventNodesToAdd = new List<FileSystemNodeModel>();
                 foreach (var eventNode in audioTree)
                 {
-                    var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
+                    var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent)
+                    {
+                        Parent = clickedNode
+                    };
+
                     var soundNodesToAdd = new List<FileSystemNodeModel>();
                     foreach (var soundNode in eventNode.Sounds)
                     {
@@ -170,7 +174,8 @@ namespace AssetsManager.Services.Explorer.Tree
                             SourceChunkPathHash = sourceHash,
                             BackupChunkPath = backupChunkPath,
                             ChunkDiff = soundDiff,
-                            AudioSource = soundNode.Source
+                            AudioSource = soundNode.Source,
+                            Parent = newEventNode
                         };
                         soundNodesToAdd.Add(newSoundNode);
                     }

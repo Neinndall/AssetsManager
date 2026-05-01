@@ -189,6 +189,7 @@ namespace AssetsManager.Services.Explorer
                             var statusNode = new FileSystemNodeModel(statusPrefix, true, statusPrefix, wadGroup.Key);
                             statusNode.Status = GetDiffStatus(statusType);
                             statusNode.IsGroupingFolder = true;
+                            statusNode.Parent = wadNode;
                             wadNode.Children.Add(statusNode);
 
                             foreach (var file in filesInStatus.OrderBy(f => f.Path))
@@ -205,7 +206,8 @@ namespace AssetsManager.Services.Explorer
                                     Status = status,
                                     ChunkDiff = file,
                                     BackupChunkPath = chunkPath,
-                                    OldPath = file.Type == ChunkDiffType.Renamed ? file.OldPath : null
+                                    OldPath = file.Type == ChunkDiffType.Renamed ? file.OldPath : null,
+                                    Parent = statusNode
                                 };
 
                                 statusNode.Children.Add(node);
@@ -367,7 +369,7 @@ namespace AssetsManager.Services.Explorer
                 try
                 {
                     var directories = Directory.GetDirectories(node.FullPath);
-                    var childDirs = directories.OrderBy(d => d).Select(dir => new FileSystemNodeModel(dir)).ToList();
+                    var childDirs = directories.OrderBy(d => d).Select(dir => new FileSystemNodeModel(dir) { Parent = node }).ToList();
                     node.Children.AddRange(childDirs);
                     
                     foreach(var childNode in childDirs)
@@ -396,7 +398,7 @@ namespace AssetsManager.Services.Explorer
 
                         if (keepFile)
                         {
-                            var childNode = new FileSystemNodeModel(file);
+                            var childNode = new FileSystemNodeModel(file) { Parent = node };
                             childFiles.Add(childNode);
                         }
                     }
@@ -470,6 +472,13 @@ namespace AssetsManager.Services.Explorer
 
                 SortChildrenRecursively(rootVirtualNode);
                 PostProcessAudioNodes(rootVirtualNode);
+
+                // IMPORTANT: Ensure first-level virtual nodes point to the real WAD node as parent
+                foreach (var child in rootVirtualNode.Children)
+                {
+                    child.Parent = wadNode;
+                }
+
                 return rootVirtualNode.Children;
             }, cancellationToken);
 
@@ -567,7 +576,8 @@ namespace AssetsManager.Services.Explorer
                         {
                             subDir = new FileSystemNodeModel(parts[i], true, currentAccPath, wadPath)
                             {
-                                Status = status
+                                Status = status,
+                                Parent = parentNode
                             };
                             parentNode.Children.Add(subDir);
                         }
@@ -589,7 +599,8 @@ namespace AssetsManager.Services.Explorer
             var fileNode = new FileSystemNodeModel(fileName, false, virtualPath, wadPath)
             {
                 SourceChunkPathHash = chunkHash,
-                Status = status
+                Status = status,
+                Parent = parentNode
             };
 
             parentNode.Children.Add(fileNode);
@@ -619,6 +630,7 @@ namespace AssetsManager.Services.Explorer
                 cancellationToken.ThrowIfCancellationRequested();
                 var dirNode = new FileSystemNodeModel(directory);
                 dirNode.Children.Clear();
+                dirNode.Parent = parentNode;
                 parentNode.Children.Add(dirNode);
                 AddNodeToRealTree(dirNode, directory, cancellationToken);
             }
@@ -628,6 +640,7 @@ namespace AssetsManager.Services.Explorer
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var fileNode = new FileSystemNodeModel(file);
+                fileNode.Parent = parentNode;
                 parentNode.Children.Add(fileNode);
             }
         }
