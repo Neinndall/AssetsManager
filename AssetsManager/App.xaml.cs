@@ -26,7 +26,6 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Manifests;
-using AssetsManager.Services.Champions;
 
 namespace AssetsManager
 {
@@ -148,7 +147,7 @@ namespace AssetsManager
       services.AddSingleton<WadPackagingService>();
       services.AddSingleton<ReportGenerationService>();
 
-      // Viewer Services
+      // Models Services
       services.AddSingleton<SknLoadingService>();
       services.AddSingleton<ScoLoadingService>();
       services.AddSingleton<MapGeometryLoadingService>();
@@ -159,12 +158,6 @@ namespace AssetsManager
       services.AddSingleton<AudioBankLinkerService>();
       services.AddSingleton<AudioPlayerService>();
 
-      // Champions Services
-      services.AddSingleton<ChampionCalculationService>();
-      services.AddSingleton<ChampionInfoService>();
-      services.AddSingleton<ChampionAbilitiesService>();
-      services.AddSingleton<ChampionDataService>();
-
       // Views
       services.AddTransient<MainWindow>();
       services.AddTransient<HomeWindow>();
@@ -172,7 +165,6 @@ namespace AssetsManager
       services.AddTransient<ComparatorWindow>();
       services.AddTransient<ViewerWindow>();
       services.AddTransient<MonitorWindow>();
-      services.AddTransient<StatsWindow>();
       services.AddTransient<HelpWindow>();
       services.AddTransient<SettingsWindow>();
             

@@ -14,14 +14,6 @@ namespace AssetsManager.Services.Core
             _serviceProvider = serviceProvider;
         }
 
-        private void SetOwnerSafely(Window dialog, Window owner)
-        {
-            if (owner != null && owner.IsVisible)
-            {
-                dialog.Owner = owner;
-            }
-        }
-
         public bool? ShowYesNo(
             string title,
             string message,
@@ -30,7 +22,7 @@ namespace AssetsManager.Services.Core
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();
             dialog.Initialize(title, message, CustomMessageBoxButtons.YesNo, icon);
-            SetOwnerSafely(dialog, owner);
+            dialog.Owner = owner;
             return dialog.ShowDialog();
         }
 
@@ -42,7 +34,7 @@ namespace AssetsManager.Services.Core
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();
             dialog.Initialize(title, message, CustomMessageBoxButtons.OK, icon);
-            SetOwnerSafely(dialog, owner);
+            dialog.Owner = owner;
             dialog.ShowDialog();
         }
 
@@ -54,7 +46,7 @@ namespace AssetsManager.Services.Core
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();
             dialog.Initialize(title, message, CustomMessageBoxButtons.OK, icon);
-            SetOwnerSafely(dialog, owner);
+            dialog.Owner = owner;
             dialog.ShowDialog();
         }
 
@@ -66,7 +58,7 @@ namespace AssetsManager.Services.Core
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();
             dialog.Initialize(title, message, CustomMessageBoxButtons.OK, icon);
-            SetOwnerSafely(dialog, owner);
+            dialog.Owner = owner;
             dialog.ShowDialog();
         }
 
@@ -78,7 +70,7 @@ namespace AssetsManager.Services.Core
         {
             var dialog = _serviceProvider.GetRequiredService<ConfirmationDialog>();
             dialog.Initialize(title, message, CustomMessageBoxButtons.OK, icon);
-            SetOwnerSafely(dialog, owner);
+            dialog.Owner = owner;
             dialog.ShowDialog();
         }
     }
