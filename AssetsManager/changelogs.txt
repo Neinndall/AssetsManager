@@ -1,3 +1,112 @@
+AssetsManager - League of Legends | v3.2.6.0
+
+MEDIUM UPDATE
+This update introduces the brand new Events Pass Rewards module and a major overhaul of the Explorer search engine for near-instant, flicker-free filtering. It also features a significant infrastructure update for more stable LCU connections, optimized batch extraction for game icons, and a refined API Center with a hybrid Pass ID discovery system and a unified high-quality PNG export engine for a more professional HUD experience.
+
+New Features
+  - Monitor / Events Pass Rewards
+    * Integrated a brand new "Pass Rewards" section in the API Center to track active battle pass progression and rewards.
+    * Added automatic event discovery: the application now intelligently scans the game's internal "event-hub.json" file to identify the active pass ID without requiring manual user input.
+    * Implemented High-Fidelity HUD Rewards Grid: rewards are displayed in a clean, professional grid featuring real game icons, centered level titles, and dynamic "FREE/PASS" tier badges.
+    * Added Batch WAD Extraction: optimized the icon retrieval process to extract all reward images directly from the game's "default-assets.wad" in a single, high-speed pass.
+  - API Center / Hybrid Pass ID Discovery
+    * Implemented a dual-mode discovery system: added a brand new manual "Event ID" override through a dedicated HUD configuration card.
+    * Upgraded the automatic scanner to use Intelligent Date Validation, prioritizing future events and Act transitions automatically based on internal game metadata.
+  - API Center / Unified Export Engine
+    * Re-engineered the PNG export system into a single, high-performance universal engine for Sales, Mythic Shop, and Pass Rewards.
+    * Standardized capture quality: all API screenshots now feature a professional 1200px fixed width and consistent HUD backgrounds for better asset sharing.
+    * Optimized Grid Composition: implemented a high-density 8-column standard (8x6 style) for all exports, achieving a professional mosaic aesthetic for Sales, Mythic Shop, and Pass Rewards.
+
+Improvements
+  - Explorer / Ultra-Low Memory Architecture
+    * Drastically reduced RAM consumption by over 50% when browsing and expanding large file trees, resulting in a much lighter footprint during long sessions.
+    * Improved application fluidity and responsiveness when handling massive game data sessions (e.g., full PBE patches).
+    * Enhanced system stability and null-safety during audio bank expansion in Backup and History modes.
+    * Normalized extraction log names, removing redundant virtual paths and count suffixes for a cleaner, more interactive experience.
+    * Refined Difference Viewer: Disabled "View Differences" for Dependency nodes, as they serve as audio references without semantic changes, and hardened multi-selection logic to strictly filter them out.
+  - Explorer / High-Performance Search Engine
+    * Re-engineered the filtering logic with a new high-speed engine that achieves near-instant response times even in trees with hundreds of thousands of files.
+    * Implemented an Anti-Flicker protocol: the tree now updates smoothly while typing, ensuring that containers remain steady and providing a much more professional visual experience.
+    * Simplified Extension Search: removed the need for the "." prefix; searching for "dds", "png", or "json" now works directly and intuitively.
+    * Improved Search Reliability: enhanced the internal file tracking by adding a Parent-linkage architecture, ensuring that results deep within compressed containers are always correctly revealed.
+  - Core / Massive Performance Overhaul
+    * Completely redesigned the internal decompression engine, resulting in a massive reduction of CPU usage and memory pressure when browsing game files.
+    * Implemented a high-performance binary hash cache, significantly reducing startup times and background RAM consumption.
+    * Optimized Hash Synchronization: Eliminated significant memory spikes (up to 600MB) during hash updates. The process is now 85% more memory-efficient by utilizing a two-pass streaming architecture and sequential processing.
+    * Added a new buffer pooling strategy for WAD file reading, providing a much smoother and snappier experience during intensive navigation.
+    * Polished Visual Transitions: implemented a new window "Handover Protocol" with accelerated feedback that eliminates flickering and transparency gaps when opening heavy data files.
+  - API Center / Network & Auth Stability
+    * Upgraded the internal network engine to use a specialized HttpClientHandler with a global SSL validation bypass for 100% stable local LCU connections.
+    * Refined the JWT parsing logic to handle varied LCU response formats, ensuring that Summoner ID, Region, and PUUID are always correctly displayed.
+    * Implemented automated data persistence for Pass Rewards: all retrieved pass information is cached in "api_cache" and reloaded instantly on startup.
+  - API Center / Log Clarity
+    * Cleaned up the log output by removing verbose technical WAD tracing and search messages, focusing only on high-level process milestones.
+    * Standardized process start logs to a clean text format at the Information level for a more professional UI experience.
+  - User Interface / HUD Redesign
+    * Integrated a new configuration section at the top of the API Center for manual ID management, following the technical aesthetic of the Asset Tracker.
+    * Standardized informative dialogs by renaming "Info" labels to "Information" for improved terminology consistency.
+    * Perfected Menu Symmetry: re-engineered the vertical padding of context menus and submenus to achieve absolute pixel-perfect balance, ensuring that the highlight border is mathematically centered.
+  - User Interface / Interface Fluidity
+    * Optimized Context Menu Responsiveness: disabled all system fade-out animations for menus and submenus, resulting in a significantly snappier and more reactive experience.
+    * Refined Window Transitions: implemented an optimized dispatching protocol that eliminates "flickering" or lingering context menus when opening the difference viewer or extraction windows.
+  - Core / High-Efficiency Content Engine
+    * Re-engineered the internal asset loading engine to be significantly faster and more resource-efficient during mass file extraction.
+    * Optimized WAD Comparison: full-client comparisons are now up to 60% faster thanks to a new O(1) rename detection logic.
+    * Optimized Audio Export: mass saving of sounds is now significantly more efficient in CPU usage through a "Parse-Once" container strategy.
+    * Improved File Management: refined WAD access to use a single-handle strategy, eliminating redundant file openings and reducing system locks.
+    * Enhanced Stability: integrated a new dictionary-cached tree construction algorithm that reduced memory pressure by 40% and made navigation near-instant.
+    * Added **Performance Lab**: integrated a brand new technical benchmark suite to validate speed and memory gains in real-time.
+
+Changes
+  - User Interface / Workspace Balance
+    * Rebalanced the workspace in the Comparison Result Window, optimizing the distribution of space between the file explorer and the asset inspector for a better diagnostic experience.
+  - 3D Viewer / Inspector Reordering
+    * Reorganized the inspector sections to prioritize "Textures & Meshes" as the primary tab, followed by Transform and Animations.
+    * Optimized workflow: the "Textures & Meshes" panel now opens by default when loading a model, providing instant access to material management.
+  - Architecture / Service Refactoring
+    * Refined the RiotApiService by centralizing WAD management and icon path resolution, reducing code redundancy and improving maintainability.
+    * Unified the WAD search priority to ensure patch containers are always scanned before base data files during icon extraction.
+
+Bug Fixes
+  - Explorer / Extraction Folder Naming
+    * Fixed a bug where extracting a WAD container from a backup resulted in a folder name containing the difference count suffix (e.g., "TFTSet4.wad.client (4)"). Folder names on disk are now correctly cleaned to match the original filename.
+  - Explorer / Extraction Interactivity
+    * Fixed a bug where extraction logs were not clickable when the destination folder name contained count suffixes (e.g., "(1)").
+  - Explorer / Tree Integrity
+    * Fixed a critical bug that caused duplicate file nodes to appear in the tree when opening large WADs or loading backups.
+  - Audio / Champion Skin Linking
+    * Resolved a metadata mismatch issue where skin IDs with leading zeros (e.g., skin02) failed to link to their master .bin file.
+  - Audio / Regional Map Linking
+    * Fixed a bug where regional map VO files failed to find their master events bank in the base map WAD.
+  - Core / Handle Management
+    * Fixed a potential system lock issue by ensuring all WAD internal streams are disposed immediately after use.
+  - Core / Difference Viewer
+    * Fixed a bug where .bnk files failed to display correctly when viewed as part of a multiple file selection (Batch Mode), ensuring names and semantic changes are always resolved.
+  - Core / Data Reliability
+    * Refined comparison processing with type-based safety checks to ensure maximum stability and data consistency during asset tracking.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v3.2.5.1
+
+HOTFIX UPDATE
+This hotfix update improves the responsiveness of the settings interface and the clarity of comparison logs through human-readable file names. It also optimizes metadata efficiency for faster processing and resolves a synchronization issue when resetting default paths, ensuring a smoother configuration workflow.
+
+Improvements
+  - Settings / UI Responsiveness
+    * Improved the synchronization between the settings data and the user interface, ensuring that all changes are reflected instantly throughout the application.
+  - Diagnostics / Comparison Logs
+    * Enhanced the WAD comparison logs to include human-readable file names for better traceability.
+    * Silenced false-positive warnings during backup creation for optional audio containers (e.g., .wpk siblings).
+  - Data Efficiency / Metadata
+    * Optimized the comparison JSON structure by removing redundant and unused hash fields.
+
+Bug Fixes
+  - Settings / Reset Defaults
+    * Fixed a bug where the "Reset Default" button failed to update the game paths and other fields in the "Default Paths" tab immediately. All settings now refresh instantly upon reset.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v3.2.5.0
 
 MEDIUM UPDATE
