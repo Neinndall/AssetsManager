@@ -152,7 +152,8 @@ namespace AssetsManager.Services.Explorer
             // 1. Directory Traversal
             if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
             {
-                string currentDestinationPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
+                string cleanName = PathUtils.GetLogName(node.Name);
+                string currentDestinationPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
                 _directoriesCreator.CreateDirectory(currentDestinationPath);
 
                 // Ensure children are loaded

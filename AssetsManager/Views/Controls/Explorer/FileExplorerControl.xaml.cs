@@ -538,10 +538,11 @@ namespace AssetsManager.Views.Controls.Explorer
                         string logName = PathUtils.GetLogName(node.Name);
                         string logPath = destinationPath;
                         
-                        // Use node.Name (REAL name with suffixes) so the folder exists for LogService
+                        // Use the cleaned name (without suffixes) so the log link matches the folder on disk
                         if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                         {
-                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
+                            string cleanName = PathUtils.GetLogName(node.Name);
+                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
                         }
 
                         LogService.LogInteractiveSuccess($"Successfully extracted {logName}", logPath, logName);
@@ -646,11 +647,13 @@ namespace AssetsManager.Views.Controls.Explorer
 
                             if (node.Type == NodeType.SoundBank)
                             {
-                                singleSavedPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(node.Name));
+                                string cleanName = PathUtils.GetLogName(node.Name);
+                                singleSavedPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(cleanName));
                             }
                             else if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                             {
-                                singleSavedPath = Path.Combine(destinationPath, node.Name);
+                                string cleanName = PathUtils.GetLogName(node.Name);
+                                singleSavedPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
                             }
 
                             if (savedFiles.Count == 1)
