@@ -77,7 +77,7 @@ namespace AssetsManager.Services.Champions
                     }
                 }
 
-                // Fallback to spellNames
+                // spellNames Fallback
                 if (info.Abilities.Count == 0)
                 {
                     var spells = ChampionBinService.GetPropValue<List<string>>(rootObj, "spellNames");
@@ -119,6 +119,7 @@ namespace AssetsManager.Services.Champions
                 
                 var info = new AbilityInfo { Key = key };
                 
+                // Icon extraction
                 var icons = ChampionBinService.GetPropValue<List<string>>(spell, "mImgIconName");
                 if (icons != null && icons.Count > 0)
                 {
@@ -145,10 +146,11 @@ namespace AssetsManager.Services.Champions
                         var values = ChampionBinService.GetPropValue<List<float>>(dv, "mValues");
                         if (!string.IsNullOrEmpty(dvName) && values != null)
                         {
-                            var filtered = values.Skip(1).Take(5).ToList();
+                            // Porting EXACT champs.py logic: filter indexes 1-5
+                            var filtered = values.Count > 1 ? values.Skip(1).Take(5).ToList() : values.ToList();
                             if (filtered.Count > 0)
                             {
-                                if (filtered.All(v => v == filtered[0])) info.DataValues[dvName] = filtered[0].ToString("0.##");
+                                if (filtered.All(v => Math.Abs(v - filtered[0]) < 0.001f)) info.DataValues[dvName] = filtered[0].ToString("0.##");
                                 else info.DataValues[dvName] = string.Join("/", filtered.Select(v => v.ToString("0.##")));
                             }
                         }
@@ -158,7 +160,7 @@ namespace AssetsManager.Services.Champions
                 // Calculations (mSpellCalculations)
                 var calculations = ChampionBinService.GetPropValue<BinTreeStruct>(spell, "mSpellCalculations");
 
-                // Localization logic (mClientData -> mLocKeys)
+                // Localization logic (mClientData -> mTooltipData -> mLocKeys)
                 var clientData = ChampionBinService.GetPropValue<BinTreeStruct>(spell, "mClientData");
                 if (clientData != null)
                 {
@@ -178,6 +180,11 @@ namespace AssetsManager.Services.Champions
                 
                 if (string.IsNullOrEmpty(info.Name)) info.Name = resolveString(ChampionBinService.GetPropValue<string>(spell, "mDisplayName"));
                 if (string.IsNullOrEmpty(info.Description)) info.Description = resolveString(ChampionBinService.GetPropValue<string>(spell, "mDescription"));
+                if (string.IsNullOrEmpty(info.Description))
+                {
+                    var buff = ChampionBinService.GetPropValue<BinTreeStruct>(obj, "mBuff");
+                    if (buff != null) info.Description = resolveString(ChampionBinService.GetPropValue<string>(buff, "mDescription"));
+                }
 
                 // Dynamic Replacement Engine
                 info.Description = _calcService.ReplaceTooltipValues(info.Description, info.DataValues, calculations, resolveString);

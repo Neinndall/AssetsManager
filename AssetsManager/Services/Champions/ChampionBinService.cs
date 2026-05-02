@@ -12,14 +12,20 @@ namespace AssetsManager.Services.Champions
         public static uint GetBinHash(string name)
         {
             if (uint.TryParse(name, System.Globalization.NumberStyles.HexNumber, null, out uint h)) return h;
-            // TRY MULTIPLE HASHES: Original and Lowercase (Riot is inconsistent)
             return Fnv1a.HashLower(name);
         }
 
-        public static uint GetBinHashSensitive(string name)
+        // Implementation of standard FNV1a for case-sensitive properties
+        public static uint Fnv1aHash(string input)
         {
-            // For case-sensitive properties like "BaseMR"
-            return Fnv1a.Hash(name);
+            if (string.IsNullOrEmpty(input)) return 0;
+            uint hash = 2166136261;
+            for (int i = 0; i < input.Length; i++)
+            {
+                hash ^= input[i];
+                hash *= 16777619;
+            }
+            return hash;
         }
 
         public static float GetStatValue(BinTreeObject root, string name, string fallback = null)
@@ -28,8 +34,7 @@ namespace AssetsManager.Services.Champions
             foreach (var v in variants)
             {
                 if (v == null) continue;
-                // Try original and lowercase
-                if (root.Properties.TryGetValue(Fnv1a.Hash(v), out var p)) return GetFloatFromProperty(p);
+                if (root.Properties.TryGetValue(Fnv1aHash(v), out var p)) return GetFloatFromProperty(p);
                 if (root.Properties.TryGetValue(Fnv1a.HashLower(v), out var p2)) return GetFloatFromProperty(p2);
                 if (uint.TryParse(v, System.Globalization.NumberStyles.HexNumber, null, out uint h) && root.Properties.TryGetValue(h, out var p3)) return GetFloatFromProperty(p3);
             }
@@ -42,7 +47,7 @@ namespace AssetsManager.Services.Champions
             foreach (var v in variants)
             {
                 if (v == null) continue;
-                if (root.Properties.TryGetValue(Fnv1a.Hash(v), out var p)) return GetFloatFromProperty(p);
+                if (root.Properties.TryGetValue(Fnv1aHash(v), out var p)) return GetFloatFromProperty(p);
                 if (root.Properties.TryGetValue(Fnv1a.HashLower(v), out var p2)) return GetFloatFromProperty(p2);
                 if (uint.TryParse(v, System.Globalization.NumberStyles.HexNumber, null, out uint h) && root.Properties.TryGetValue(h, out var p3)) return GetFloatFromProperty(p3);
             }
@@ -56,8 +61,7 @@ namespace AssetsManager.Services.Champions
             if (p is BinTreeU32 u) return (float)u.Value;
             if (p is BinTreeStruct s)
             {
-                // Recursive search for BaseValue
-                if (s.Properties.TryGetValue(Fnv1a.Hash("BaseValue"), out var bp)) return GetFloatFromProperty(bp);
+                if (s.Properties.TryGetValue(Fnv1aHash("BaseValue"), out var bp)) return GetFloatFromProperty(bp);
                 if (s.Properties.TryGetValue(Fnv1a.HashLower("BaseValue"), out var bp2)) return GetFloatFromProperty(bp2);
             }
             return 0;
@@ -65,14 +69,14 @@ namespace AssetsManager.Services.Champions
 
         public static T GetPropValue<T>(BinTreeObject obj, string propName, T @default = default)
         {
-            if (obj.Properties.TryGetValue(Fnv1a.Hash(propName), out var p)) return CastProperty<T>(p);
+            if (obj.Properties.TryGetValue(Fnv1aHash(propName), out var p)) return CastProperty<T>(p);
             if (obj.Properties.TryGetValue(Fnv1a.HashLower(propName), out var p2)) return CastProperty<T>(p2);
             return @default;
         }
 
         public static T GetPropValue<T>(BinTreeStruct str, string propName, T @default = default)
         {
-            if (str.Properties.TryGetValue(Fnv1a.Hash(propName), out var p)) return CastProperty<T>(p);
+            if (str.Properties.TryGetValue(Fnv1aHash(propName), out var p)) return CastProperty<T>(p);
             if (str.Properties.TryGetValue(Fnv1a.HashLower(propName), out var p2)) return CastProperty<T>(p2);
             return @default;
         }
