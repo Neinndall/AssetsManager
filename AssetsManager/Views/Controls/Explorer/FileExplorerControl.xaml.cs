@@ -313,49 +313,6 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        public async void HandleOpenStandaloneWad()
-        {
-            var openFileDialog = new CommonOpenFileDialog
-            {
-                Title = "Select a WAD file",
-                Filters = { 
-                    new CommonFileDialogFilter("WAD Files (*.wad.client, *.wad)", "*.wad.client;*.wad"), 
-                    new CommonFileDialogFilter("All files", "*.*") 
-                }
-            };
-
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                await LoadStandaloneWadAsync(openFileDialog.FileName);
-            }
-        }
-
-        public async Task LoadStandaloneWadAsync(string wadPath)
-        {
-            if (FilePreviewer != null)
-            {
-                await FilePreviewer.ResetToDefaultState();
-            }
-            await BuildStandaloneWadTreeAsync(wadPath);
-        }
-
-        private async Task BuildStandaloneWadTreeAsync(string wadPath)
-        {
-            _currentRootPath = wadPath;
-            NewLolPath = null;
-            OldLolPath = null;
-
-            await ExecuteTreeBuildInternalAsync(
-                async ct => await this.WadNodeLoaderService.LoadWadContentAsync(wadPath),
-                ExplorerLoadingState.LoadingWads,
-                "Failed to load standalone WAD file.",
-                false,
-                onSuccess: (nodes) => 
-                {
-                    _viewModel.IsStandaloneMode = true;
-                });
-        }
-
         private async Task ExecuteTreeBuildInternalAsync(
             Func<CancellationToken, Task<ObservableRangeCollection<FileSystemNodeModel>>> buildFunc, 
             ExplorerLoadingState loadingState, 

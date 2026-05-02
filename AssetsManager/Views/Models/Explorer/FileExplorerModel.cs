@@ -25,7 +25,6 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isBusy;
         private bool _isTreeReady;
         private bool _isEmptyState;
-        private bool _isStandaloneMode = false;
         private bool _isNoResultsFound;
         private bool _isWadMode = true; // Default WAD mode
         private bool _isBackupMode = false;
@@ -114,12 +113,6 @@ namespace AssetsManager.Views.Models.Explorer
             set { _toolbar = value; OnPropertyChanged(); }
         }
 
-        public bool IsStandaloneMode
-        {
-            get => _isStandaloneMode;
-            set { _isStandaloneMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsToolbarVisible)); }
-        }
-
         public void UpdateEmptyState(bool isWadMode)
         {
             if (isWadMode)
@@ -139,7 +132,6 @@ namespace AssetsManager.Views.Models.Explorer
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true;
-            IsStandaloneMode = false;
             OnPropertyChanged(nameof(IsToolbarVisible));
         }
 
@@ -365,9 +357,8 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool IsFavoritesToggleVisible => IsWadMode && !IsBackupMode;
         
-        // Toolbar is visible if Tree is ready OR if we are NOT in WAD mode OR if we are in Standalone mode
-        // (to allow switching back to WAD mode even if the directory is empty)
-        public bool IsToolbarVisible => IsTreeReady || !IsWadMode || IsStandaloneMode;
+        // Toolbar is visible if Tree is ready OR if we are NOT in WAD mode
+        public bool IsToolbarVisible => IsTreeReady || !IsWadMode;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
