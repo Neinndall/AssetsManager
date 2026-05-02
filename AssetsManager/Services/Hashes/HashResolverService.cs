@@ -43,12 +43,14 @@ namespace AssetsManager.Services.Hashes
             await _hashFileAccessLock.WaitAsync();
             try
             {
+                // Ejecutar en hilo de fondo para no congelar la UI
                 await Task.Run(() =>
                 {
                     LoadHashes();
                     LoadBinHashes();
                     LoadRstHashes();
                 });
+                
                 _logService.LogSuccess("Hashes loaded on startup.");
             }
             catch (Exception ex)
