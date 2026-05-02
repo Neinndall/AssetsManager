@@ -132,9 +132,9 @@ namespace AssetsManager.Services.Hashes
         {
             if (cache == null) return new Dictionary<ulong, string>();
             var dict = new Dictionary<ulong, string>();
-            for (int i = 0; i < cache.Hashes.Count; i++)
+            for (int i = 0; i < cache.Count; i++)
             {
-                dict[cache.Hashes[i]] = cache.ResolveByIndex(i);
+                dict[cache.GetHash(i)] = cache.ResolveByIndex(i);
             }
             return dict;
         }

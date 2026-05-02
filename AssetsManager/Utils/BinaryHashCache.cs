@@ -15,10 +15,10 @@ namespace AssetsManager.Utils
         private readonly LogService _logService;
 
         private MemoryMappedFile _mmf;
+        private MemoryMappedViewAccessor _hashAccessor;
+        private MemoryMappedViewAccessor _offsetAccessor;
         private MemoryMappedViewAccessor _dataAccessor;
-        private ulong[] _hashes;
-        private int[] _offsets;
-        private long _dataStartOffset;
+        private int _count;
         private bool _isLoaded;
 
         public BinaryHashCache(string txtPath, LogService logService)
@@ -29,6 +29,7 @@ namespace AssetsManager.Utils
         }
 
         public string BinPath => _binPath;
+        public int Count => _count;
 
         public void Load()
         {
@@ -216,53 +217,75 @@ namespace AssetsManager.Utils
         private void InitializeFromCache()
         {
             _mmf = MemoryMappedFile.CreateFromFile(_binPath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
+            
+            // Leemos el contador inicial
             using (var accessor = _mmf.CreateViewAccessor(0, 4, MemoryMappedFileAccess.Read))
             {
-                int count = accessor.ReadInt32(0);
-                _hashes = new ulong[count];
-                _offsets = new int[count];
-
-                using (var hashAccessor = _mmf.CreateViewAccessor(4, count * 8, MemoryMappedFileAccess.Read))
-                {
-                    hashAccessor.ReadArray(0, _hashes, 0, count);
-                }
-
-                using (var offsetAccessor = _mmf.CreateViewAccessor(4 + (count * 8), count * 4, MemoryMappedFileAccess.Read))
-                {
-                    offsetAccessor.ReadArray(0, _offsets, 0, count);
-                }
-
-                _dataStartOffset = 4 + (count * 8) + (count * 4);
-                // Abrir un accessor persistente para los datos de los strings
-                _dataAccessor = _mmf.CreateViewAccessor(_dataStartOffset, 0, MemoryMappedFileAccess.Read);
+                _count = accessor.ReadInt32(0);
             }
-        }
 
-        public IReadOnlyList<ulong> Hashes => _hashes;
+            // Creamos los accessors para las tres secciones del archivo
+            _hashAccessor = _mmf.CreateViewAccessor(4, _count * 8, MemoryMappedFileAccess.Read);
+            _offsetAccessor = _mmf.CreateViewAccessor(4 + (_count * 8), _count * 4, MemoryMappedFileAccess.Read);
+            
+            long dataStartOffset = 4 + (_count * 8) + (_count * 4);
+            _dataAccessor = _mmf.CreateViewAccessor(dataStartOffset, 0, MemoryMappedFileAccess.Read);
+        }
 
         public string Resolve(ulong hash)
         {
-            if (!_isLoaded || _hashes == null) return null;
+            if (!_isLoaded || _hashAccessor == null) return null;
 
-            int index = Array.BinarySearch(_hashes, hash);
-            if (index < 0) return null;
+            // Búsqueda binaria directamente sobre el MemoryMappedViewAccessor (Zero-RAM)
+            int low = 0;
+            int high = _count - 1;
 
-            return ResolveByIndex(index);
+            while (low <= high)
+            {
+                int mid = low + (high - low) / 2;
+                ulong midHash = _hashAccessor.ReadUInt64(mid * 8);
+
+                if (midHash == hash)
+                {
+                    return ResolveByIndex(mid);
+                }
+                
+                if (midHash < hash)
+                {
+                    low = mid + 1;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            return null;
         }
 
         public string ResolveByIndex(int index)
         {
-            if (index < 0 || index >= _hashes.Length) return null;
+            if (index < 0 || index >= _count) return null;
 
-            long offset = _offsets[index];
+            int offset = _offsetAccessor.ReadInt32(index * 4);
             int length = _dataAccessor.ReadInt32(offset);
+            
             byte[] bytes = new byte[length];
             _dataAccessor.ReadArray(offset + 4, bytes, 0, length);
+            
             return Encoding.UTF8.GetString(bytes);
+        }
+
+        public ulong GetHash(int index)
+        {
+            if (index < 0 || index >= _count) return 0;
+            return _hashAccessor.ReadUInt64(index * 8);
         }
 
         public void Dispose()
         {
+            _hashAccessor?.Dispose();
+            _offsetAccessor?.Dispose();
             _dataAccessor?.Dispose();
             _mmf?.Dispose();
         }
