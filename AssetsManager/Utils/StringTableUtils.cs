@@ -12,7 +12,7 @@ namespace AssetsManager.Utils
     public static class StringTableUtils
     {
         // Record para encapsular los datos parseados y resueltos
-        private record ParsedStringTableData(
+        internal record ParsedStringTableData(
             Dictionary<ulong, string> RstEntries,
             Dictionary<ulong, string> TruncatedLut,
             int HashBits,
@@ -20,7 +20,7 @@ namespace AssetsManager.Utils
         );
 
         // Método auxiliar para extraer la lógica común de parseo y resolución de hashes
-        private static ParsedStringTableData GetParsedStringTableData(Stream stream, HashResolverService hashResolverService, int gameVersion)
+        internal static ParsedStringTableData GetParsedStringTableData(Stream stream, HashResolverService hashResolverService, int gameVersion)
         {
             var (rstEntries, hashBits, fileVersion) = Parse(stream, gameVersion);
 
@@ -35,6 +35,25 @@ namespace AssetsManager.Utils
                 truncatedLut[pair.Key & hashMask] = pair.Value;
             }
             return new ParsedStringTableData(rstEntries, truncatedLut, hashBits, fileVersion);
+        }
+
+        public static Dictionary<string, string> ResolveStringTable(Stream inputStream, HashResolverService hashResolverService, int gameVersion = 1502)
+        {
+            var parsedData = GetParsedStringTableData(inputStream, hashResolverService, gameVersion);
+            var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in parsedData.RstEntries)
+            {
+                if (parsedData.TruncatedLut.TryGetValue(entry.Key, out var resolvedKey))
+                {
+                    resolved[resolvedKey] = entry.Value;
+                }
+                else
+                {
+                    resolved[$"{{{entry.Key:x10}}}"] = entry.Value;
+                }
+            }
+            return resolved;
         }
 
         public static Task WriteStringTableAsJsonAsync(Stream outputStream, Stream inputStream, HashResolverService hashResolverService, int gameVersion = 1502)

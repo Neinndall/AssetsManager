@@ -18,10 +18,25 @@ namespace AssetsManager.Views.Controls.Shared
             remove { RemoveHandler(SearchTextChangedEvent, value); }
         }
 
+        public static readonly DependencyProperty TextProperty =
+            DependencyProperty.Register("Text", typeof(string), typeof(SearchBoxControl), 
+                new FrameworkPropertyMetadata(string.Empty, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnTextChanged));
+
         public string Text
         {
-            get { return SearchTextBox.Text; }
-            set { SearchTextBox.Text = value; }
+            get { return (string)GetValue(TextProperty); }
+            set { SetValue(TextProperty, value); }
+        }
+
+        private static void OnTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is SearchBoxControl control)
+            {
+                if (control.SearchTextBox.Text != (string)e.NewValue)
+                {
+                    control.SearchTextBox.Text = (string)e.NewValue;
+                }
+            }
         }
 
         public SearchBoxControl()
@@ -37,6 +52,7 @@ namespace AssetsManager.Views.Controls.Shared
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
+            Text = SearchTextBox.Text;
             searchTimer.Stop();
             searchTimer.Start();
         }
@@ -44,7 +60,7 @@ namespace AssetsManager.Views.Controls.Shared
         private void SearchTimer_Tick(object sender, EventArgs e)
         {
             searchTimer.Stop();
-            RaiseEvent(new RoutedEventArgs(SearchTextChangedEvent, SearchTextBox.Text));
+            RaiseEvent(new RoutedEventArgs(SearchTextChangedEvent, Text));
         }
 
         private void SearchBoxControl_Unloaded(object sender, RoutedEventArgs e)

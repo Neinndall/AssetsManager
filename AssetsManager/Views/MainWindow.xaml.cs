@@ -458,6 +458,7 @@ namespace AssetsManager.Views
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Viewer": LoadViewerWindow(); break;
                 case "Monitor": LoadMonitorWindow(); break;
+                case "Stats": LoadStatsWindow(); break;
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
@@ -468,6 +469,13 @@ namespace AssetsManager.Views
             var homeWindow = _serviceProvider.GetRequiredService<HomeWindow>();
             homeWindow.ParentWindow = this;
             MainContentArea.Content = homeWindow;
+        }
+
+        private void LoadStatsWindow()
+        {
+            var statsWindow = _serviceProvider.GetRequiredService<StatsWindow>();
+            statsWindow.ParentWindow = this;
+            MainContentArea.Content = statsWindow;
         }
 
         private void LoadExplorerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ExplorerWindow>();
