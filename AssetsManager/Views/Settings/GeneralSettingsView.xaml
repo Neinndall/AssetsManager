@@ -10,10 +10,11 @@
 
     <UserControl.Resources>
         <x:Array x:Key="UpdateFrequencies" Type="{x:Type System:Int32}">
-            <System:Int32>1</System:Int32>
+            <System:Int32>3</System:Int32>
+            <System:Int32>5</System:Int32>
             <System:Int32>10</System:Int32>
+            <System:Int32>20</System:Int32>
             <System:Int32>30</System:Int32>
-            <System:Int32>60</System:Int32>
         </x:Array>
     </UserControl.Resources>
 
