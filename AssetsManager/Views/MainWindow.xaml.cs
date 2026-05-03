@@ -297,6 +297,8 @@ namespace AssetsManager.Views
                     if (string.IsNullOrEmpty(displayName)) displayName = "Root";
                 }
 
+                string version = await _versionService.GetGameVersionAsync(newLolPath);
+
                 try
                 {
                     // Unified Flow:
@@ -309,7 +311,7 @@ namespace AssetsManager.Views
                     {
                         await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.FullPath);
                         // 2. Metadata Registration (ComparisonHistoryService)
-                        _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, $"Comparison from {displayName}", oldLolPath, newLolPath);
+                        _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, displayName, oldLolPath, newLolPath, version);
                     });
                 }
                 catch (Exception ex)

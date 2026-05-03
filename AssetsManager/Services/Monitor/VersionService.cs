@@ -218,5 +218,46 @@ namespace AssetsManager.Services.Monitor
             }
             return successCount > 0;
         }
+
+        public async Task<string> GetGameVersionAsync(string lolDirectory)
+        {
+            if (string.IsNullOrEmpty(lolDirectory)) return null;
+
+            try
+            {
+                // League of Legends structure usually has content-metadata.json in the "Game" subfolder
+                // but we check both the root and the subfolder to be flexible (Live/PBE/Subfolders)
+                string metadataPath = Path.Combine(lolDirectory, "Game", "content-metadata.json");
+                if (!File.Exists(metadataPath))
+                {
+                    metadataPath = Path.Combine(lolDirectory, "content-metadata.json");
+                }
+
+                if (!File.Exists(metadataPath)) return null;
+
+                string json = await File.ReadAllTextAsync(metadataPath);
+                using var document = JsonDocument.Parse(json);
+                if (document.RootElement.TryGetProperty("version", out var versionElement))
+                {
+                    string fullVersion = versionElement.GetString();
+                    if (string.IsNullOrEmpty(fullVersion)) return null;
+
+                    // Extract the part before the '+' or ' ' if it exists
+                    // Example: "16.10.7727381+branch.main.content.beta" -> "16.10.7727381"
+                    int plusIndex = fullVersion.IndexOf('+');
+                    if (plusIndex > 0) return fullVersion.Substring(0, plusIndex);
+
+                    int spaceIndex = fullVersion.IndexOf(' ');
+                    if (spaceIndex > 0) return fullVersion.Substring(0, spaceIndex);
+
+                    return fullVersion;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Error reading content-metadata.json version");
+            }
+            return null;
+        }
     }
 }

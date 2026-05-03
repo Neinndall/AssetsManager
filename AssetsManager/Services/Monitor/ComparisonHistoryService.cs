@@ -33,7 +33,7 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
         }
 
-        public void RegisterComparisonInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath)
+        public void RegisterComparisonInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath, string version = null)
         {
             try
             {
@@ -43,7 +43,9 @@ namespace AssetsManager.Services.Monitor
                 {
                     var entry = new HistoryEntry
                     {
-                        FileName = comparisonDisplayName,
+                        FileName = comparisonDisplayName, // Preserved for legacy if needed
+                        DisplayName = comparisonDisplayName,
+                        Version = version,
                         OldFilePath = oldPbePath,
                         NewFilePath = newPbePath,
                         Timestamp = DateTime.Now,

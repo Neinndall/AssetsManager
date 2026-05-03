@@ -38,6 +38,7 @@ namespace AssetsManager.Views.Dialogs
         private readonly HashResolverService _hashResolverService;
         private readonly AppSettings _appSettings;
         private readonly WadContentProvider _wadContentProvider;
+        private readonly VersionService _versionService;
 
         private string _oldPbePath;
         private string _newPbePath;
@@ -58,7 +59,8 @@ namespace AssetsManager.Views.Dialogs
             DiffViewService diffViewService, 
             HashResolverService hashResolverService, 
             AppSettings appSettings,
-            WadContentProvider wadContentProvider)
+            WadContentProvider wadContentProvider,
+            VersionService versionService)
         {
             InitializeComponent();
             _viewModel = new WadComparisonResultModel();
@@ -76,6 +78,7 @@ namespace AssetsManager.Views.Dialogs
             _hashResolverService = hashResolverService;
             _appSettings = appSettings;
             _wadContentProvider = wadContentProvider;
+            _versionService = versionService;
 
             // Peer Injection
             ResultsTree.ParentWindow = this;
@@ -368,15 +371,20 @@ namespace AssetsManager.Views.Dialogs
                 }
 
                 _logService.Log("Starting comparison backup and asset packaging...");
-                string displayName = "Manual Backup";
+                string displayName = "Unknown";
                 var uniqueWads = _serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
 
                 if (uniqueWads.Count == 1) displayName = Path.GetFileName(uniqueWads[0]).Split('.')[0];
-                else if (!string.IsNullOrEmpty(_newPbePath)) displayName = Path.GetFileName(_newPbePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? "Root";
+                else if (!string.IsNullOrEmpty(_newPbePath)) 
+                {
+                    displayName = Path.GetFileName(_newPbePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? "Root";
+                }
+
+                string version = await _versionService.GetGameVersionAsync(_newPbePath);
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
                 await _wadPackagingService.SaveBackupAsync(_serializableDiffs, _oldPbePath, _newPbePath, folderInfo.FullPath);
-                _comparisonHistoryService.RegisterComparisonInHistory(folderInfo.FolderName, $"Comparison from {displayName}", _oldPbePath, _newPbePath);
+                _comparisonHistoryService.RegisterComparisonInHistory(folderInfo.FolderName, displayName, _oldPbePath, _newPbePath, version);
                 _assignedFolderName = folderInfo.FolderName;
                 _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);
             }
