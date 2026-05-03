@@ -215,7 +215,20 @@
                         </Border>
 
                         <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
-                            <avalonEdit:TextEditor x:Name="OldJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
+                            <Grid>
+                                <avalonEdit:TextEditor x:Name="OldJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
+
+                                <!-- Initial Comparison Overlay -->
+                                <Border Background="{StaticResource DarkBackground}" 
+                                        Visibility="{Binding IsInitialComparison, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        CornerRadius="0,0,12,12">
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.5">
+                                        <icons:MaterialIcon Kind="InformationOutline" Width="48" Height="48" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,16" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="NO PREVIOUS INFORMATION" FontSize="14" FontWeight="Black" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="This is the first time this asset is being tracked." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                         </Border>
                     </Grid>
                 </Border>

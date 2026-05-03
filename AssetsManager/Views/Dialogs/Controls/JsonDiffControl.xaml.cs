@@ -278,6 +278,9 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _cachedNewDoc = null;
                 _unifiedModel = null;
 
+                // Detection: Is this the first time the asset is being tracked?
+                ViewModel.IsInitialComparison = string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(newText);
+
                 // Build model in background
                 _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
 
@@ -297,6 +300,15 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void UpdateChangeCounts()
         {
+            // Initial comparison: Don't show technical "changes" as it's the first time
+            if (ViewModel.IsInitialComparison)
+            {
+                ViewModel.InsertionsCount = 0;
+                ViewModel.DeletionsCount = 0;
+                ViewModel.ModificationsCount = 0;
+                return;
+            }
+
             // Calculate detailed metrics (One single pass over the built model)
             int ins = 0, del = 0, mod = 0;
             
@@ -409,7 +421,11 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 UnifiedDiffEditor.Document = new TextDocument(combinedText);
                 UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Clear();
-                UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Add(new UnifiedDiffBackgroundRenderer(linesToShow));
+                
+                if (!ViewModel.IsInitialComparison)
+                {
+                    UnifiedDiffEditor.TextArea.TextView.BackgroundRenderers.Add(new UnifiedDiffBackgroundRenderer(linesToShow));
+                }
             }
 
             DiffNavigationPanel.Initialize(UnifiedDiffEditor, linesToShow);
@@ -721,8 +737,14 @@ namespace AssetsManager.Views.Dialogs.Controls
             OldJsonContent.TextArea.TextView.BackgroundRenderers.Clear();
             NewJsonContent.TextArea.TextView.BackgroundRenderers.Clear();
 
+            // Always add to Old (though it will be empty and covered by overlay if initial)
             OldJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, ViewModel.IsWordLevelDiff, true));
-            NewJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, ViewModel.IsWordLevelDiff, false));
+            
+            // Only add to New if NOT an initial comparison to avoid the "all green" effect
+            if (!ViewModel.IsInitialComparison)
+            {
+                NewJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, ViewModel.IsWordLevelDiff, false));
+            }
         }
         #endregion
     }

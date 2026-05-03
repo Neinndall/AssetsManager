@@ -219,43 +219,52 @@ namespace AssetsManager.Services.Monitor
             return successCount > 0;
         }
 
-        public async Task<string> GetGameVersionAsync(string lolDirectory)
+        public async Task<string> GetGameVersionAsync(string startDirectory)
         {
-            if (string.IsNullOrEmpty(lolDirectory)) return null;
+            if (string.IsNullOrEmpty(startDirectory) || !Directory.Exists(startDirectory)) return null;
 
             try
             {
-                // League of Legends structure usually has content-metadata.json in the "Game" subfolder
-                // but we check both the root and the subfolder to be flexible (Live/PBE/Subfolders)
-                string metadataPath = Path.Combine(lolDirectory, "Game", "content-metadata.json");
-                if (!File.Exists(metadataPath))
+                string currentDir = startDirectory;
+                
+                // Climb up the directory tree to find the game root (where content-metadata.json lives)
+                // Limit to 5 levels to avoid infinite loops or searching the whole drive
+                for (int i = 0; i < 5; i++)
                 {
-                    metadataPath = Path.Combine(lolDirectory, "content-metadata.json");
-                }
+                    string metadataPath = Path.Combine(currentDir, "Game", "content-metadata.json");
+                    if (!File.Exists(metadataPath))
+                    {
+                        metadataPath = Path.Combine(currentDir, "content-metadata.json");
+                    }
 
-                if (!File.Exists(metadataPath)) return null;
+                    if (File.Exists(metadataPath))
+                    {
+                        string json = await File.ReadAllTextAsync(metadataPath);
+                        using var document = JsonDocument.Parse(json);
+                        if (document.RootElement.TryGetProperty("version", out var versionElement))
+                        {
+                            string fullVersion = versionElement.GetString();
+                            if (string.IsNullOrEmpty(fullVersion)) return null;
 
-                string json = await File.ReadAllTextAsync(metadataPath);
-                using var document = JsonDocument.Parse(json);
-                if (document.RootElement.TryGetProperty("version", out var versionElement))
-                {
-                    string fullVersion = versionElement.GetString();
-                    if (string.IsNullOrEmpty(fullVersion)) return null;
+                            int plusIndex = fullVersion.IndexOf('+');
+                            if (plusIndex > 0) return fullVersion.Substring(0, plusIndex);
 
-                    // Extract the part before the '+' or ' ' if it exists
-                    // Example: "16.10.7727381+branch.main.content.beta" -> "16.10.7727381"
-                    int plusIndex = fullVersion.IndexOf('+');
-                    if (plusIndex > 0) return fullVersion.Substring(0, plusIndex);
+                            int spaceIndex = fullVersion.IndexOf(' ');
+                            if (spaceIndex > 0) return fullVersion.Substring(0, spaceIndex);
 
-                    int spaceIndex = fullVersion.IndexOf(' ');
-                    if (spaceIndex > 0) return fullVersion.Substring(0, spaceIndex);
+                            return fullVersion;
+                        }
+                    }
 
-                    return fullVersion;
+                    // Move to parent directory
+                    var parent = Directory.GetParent(currentDir);
+                    if (parent == null) break;
+                    currentDir = parent.FullName;
                 }
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Error reading content-metadata.json version");
+                _logService.LogError(ex, "Error searching for content-metadata.json version recursively");
             }
             return null;
         }

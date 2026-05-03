@@ -61,6 +61,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
         public HashResolverService HashResolverService { get; set; }
         public AssetWatcherService AssetWatcherService { get; set; }
+        public VersionService VersionService { get; set; }
         public MonitorService MonitorService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
         public ImageMergerService ImageMergerService { get; set; }
@@ -732,7 +733,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private void WatchAsset_Click(object sender, RoutedEventArgs e)
+        private async void WatchAsset_Click(object sender, RoutedEventArgs e)
         {
             if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode && selectedNode.Type == NodeType.VirtualFile)
             {
@@ -773,15 +774,29 @@ namespace AssetsManager.Views.Controls.Explorer
                     wadRelativePath = wadPhysicalPath.Substring(AppSettings.LolPbeDirectory.Length).TrimStart('/', '\\');
                 }
 
+                string currentVersion = null;
+                try
+                {
+                    // 1. Try primary path
+                    currentVersion = await VersionService.GetGameVersionAsync(NewPbePath);
+
+                    // 2. Fallback: Try the directory of the WAD itself if primary failed
+                    if (string.IsNullOrEmpty(currentVersion) && !string.IsNullOrEmpty(wadPhysicalPath))
+                    {
+                        string wadDir = Path.GetDirectoryName(wadPhysicalPath);
+                        currentVersion = await VersionService.GetGameVersionAsync(wadDir);
+                    }
+                }
+                catch { }
+
                 var newAsset = new MonitoredAsset
                 {
                     Alias = selectedNode.Name,
                     AssetPath = logicalPath,
-                    WadName = wadRelativePath, // Full relative path: Plugins/folder/file.wad
+                    WadName = wadRelativePath,
                     InternalPath = internalPath,
                     SourceType = sourceType,
-                    Status = AssetStatus.Pending,
-                    StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted"),
+                    Version = currentVersion,
                     LastKnownHash = selectedNode.SourceChunkPathHash != 0 ? selectedNode.SourceChunkPathHash : 0
                 };
 

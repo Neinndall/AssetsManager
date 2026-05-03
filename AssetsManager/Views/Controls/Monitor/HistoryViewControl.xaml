@@ -80,7 +80,21 @@
                         </Border>
                         
                         <!-- 2. Accent Strip -->
-                        <Border x:Name="AccentStrip" BorderThickness="4,0,0,0" BorderBrush="{StaticResource AccentBrush}" CornerRadius="10,0,0,10"/>
+                        <Border x:Name="AccentStrip" BorderThickness="4,0,0,0" CornerRadius="10,0,0,10">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentOrange}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                        </Border>
 
                         <!-- 3. Content -->
                         <Grid Margin="16,10">
@@ -98,13 +112,17 @@
                                             <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
                                             <Setter Property="Kind" Value="DatabaseOutline"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Type}" Value="FileDiff">
+                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
                                                     <Setter Property="Kind" Value="FileCompare"/>
                                                     <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding Type}" Value="WadComparison">
+                                                <DataTrigger Binding="{Binding Type}" Value="WadArchive">
                                                     <Setter Property="Kind" Value="PackageVariantClosed"/>
                                                     <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                                    <Setter Property="Kind" Value="Radar"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -114,12 +132,19 @@
 
                             <!-- Info Section -->
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <!-- Main Title: COMPARISON - [ClientName] -->
+                                <!-- Main Title with Type-based Prefix -->
                                 <TextBlock FontWeight="Black" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6" VerticalAlignment="Center">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Text" Value="{Binding DisplayName, StringFormat='{}Comparison | {0}'}"/>
                                             <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                                    <Setter Property="Text" Value="{Binding DisplayName, StringFormat='{}Watcher | {0}'}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                                    <Setter Property="Text" Value="{Binding DisplayName, StringFormat='{}Difference | {0}'}"/>
+                                                </DataTrigger>
+                                                <!-- Fallbacks -->
                                                 <DataTrigger Binding="{Binding DisplayName}" Value="{x:Null}">
                                                     <Setter Property="Text" Value="{Binding FileName}"/>
                                                 </DataTrigger>
@@ -132,13 +157,24 @@
                                 </TextBlock>
                                 
                                 <StackPanel Orientation="Horizontal">
-                                    <!-- Version Badge (Standardized with Timestamp style) -->
-                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0"
-                                            Visibility="{Binding Version, Converter={StaticResource NullToVisibilityConverter}}"
-                                            VerticalAlignment="Center">
+                                    <!-- Version/Type Badge -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <materialIcons:MaterialIcon Kind="Tag" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Version, StringFormat='{}v{0}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Version}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Version}" Value="{x:Null}">
+                                                                <Setter Property="Text" Value="v1.0"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Version}" Value="">
+                                                                <Setter Property="Text" Value="v1.0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                         </StackPanel>
                                     </Border>
 
@@ -150,7 +186,7 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- Storage ID Badge -->
+                                    <!-- Storage ID / Category Badge -->
                                     <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <materialIcons:MaterialIcon Kind="FolderOutline" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
@@ -162,21 +198,45 @@
 
                             <!-- Actions Section -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Click="btnEditName_Click" ToolTip="Rename Comparison"
-                                        Style="{StaticResource TransparentIconButton}"
+                                <Button Click="btnEditName_Click" 
                                         Width="30" Height="30" Margin="0,0,6,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                            <Setter Property="ToolTip" Value="Rename Comparison"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                                    <Setter Property="ToolTip" Value="Rename Watcher"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                                    <Setter Property="ToolTip" Value="Rename Difference"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
                                     <materialIcons:MaterialIcon Kind="Rename" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
                                 </Button>
 
-                                <Button Click="btnViewDiff_Click" ToolTip="Explore Historical Data" 
-                                        Style="{StaticResource TransparentIconButton}" 
+                                <Button Click="btnViewDiff_Click" 
                                         Width="34" Height="34" Margin="0,0,6,0" Background="{StaticResource SidebarBackground}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                            <Setter Property="ToolTip" Value="View Comparison Diffs"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                                    <Setter Property="ToolTip" Value="View Watcher Diffs"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                                    <Setter Property="ToolTip" Value="View Difference"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
                                     <materialIcons:MaterialIcon Kind="ChevronRight" Width="22" Height="22" Foreground="{StaticResource AccentBrush}"/>
                                 </Button>
-                                
+
                                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0,10,0" Background="{StaticResource BorderColor}"/>
 
-                                <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="30" Height="30" ToolTip="Purge from History">
+                                <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="30" Height="30" ToolTip="Remove from History">
                                     <materialIcons:MaterialIcon Kind="DeleteSweepOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
                                 </Button>
                             </StackPanel>

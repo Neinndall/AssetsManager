@@ -152,6 +152,9 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (host == null || host.ActualWidth <= 0 || host.ActualHeight <= 0) return;
             host.ClearVisuals();
+
+            // Initial comparison: Don't draw markers as there are no semantic changes
+            if (ParentControl?.ViewModel?.IsInitialComparison == true) return;
             
             var backgroundVisual = new DrawingVisual();
             using (var dc = backgroundVisual.RenderOpen())
@@ -216,6 +219,10 @@ namespace AssetsManager.Views.Dialogs.Controls
         private void FindDiffLines()
         {
             _diffLines.Clear();
+
+            // Initial comparison: No real differences to navigate to
+            if (ParentControl?.ViewModel?.IsInitialComparison == true) return;
+
             var lines = _diffModel?.NewText.Lines ?? _unifiedLines;
             if (lines == null) return;
 

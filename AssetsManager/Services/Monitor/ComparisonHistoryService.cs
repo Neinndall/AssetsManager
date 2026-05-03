@@ -49,7 +49,7 @@ namespace AssetsManager.Services.Monitor
                         OldFilePath = oldPbePath,
                         NewFilePath = newPbePath,
                         Timestamp = DateTime.Now,
-                        Type = HistoryEntryType.WadComparison,
+                        Type = HistoryEntryType.WadArchive,
                         ReferenceId = folderName
                     };
 
@@ -98,7 +98,7 @@ namespace AssetsManager.Services.Monitor
         {
             try
             {
-                if (entry.Type == HistoryEntryType.WadComparison && !string.IsNullOrEmpty(entry.ReferenceId))
+                if (entry.Type == HistoryEntryType.WadArchive && !string.IsNullOrEmpty(entry.ReferenceId))
                 {
                     // 1. Delete physical directory
                     string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, entry.ReferenceId);

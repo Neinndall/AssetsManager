@@ -120,24 +120,29 @@
                                 <ColumnDefinition Width="Auto"/> <!-- Actions -->
                             </Grid.ColumnDefinitions>
 
-                            <!-- Status Box -->
-                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{StaticResource HoverColor}" Margin="0,0,16,0">
-                                <materialIcons:MaterialIcon Width="20" Height="20" Foreground="{Binding StatusColor}">
+                            <!-- Professional Icon Box -->
+                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{StaticResource SidebarBackground}" Margin="0,0,16,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                <materialIcons:MaterialIcon Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center">
                                     <materialIcons:MaterialIcon.Style>
                                         <Style TargetType="materialIcons:MaterialIcon">
-                                            <Setter Property="Kind" Value="HelpCircleOutline" />
+                                            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                            <Setter Property="Kind" Value="HelpCircleOutline"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding Status}" Value="UpToDate">
-                                                    <Setter Property="Kind" Value="CheckCircleOutline" />
+                                                    <Setter Property="Kind" Value="CheckCircleOutline"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding Status}" Value="Updated">
-                                                    <Setter Property="Kind" Value="BellRingOutline" />
+                                                    <Setter Property="Kind" Value="Radar"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding Status}" Value="Pending">
-                                                    <Setter Property="Kind" Value="Sync" />
+                                                    <Setter Property="Kind" Value="Sync"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding Status}" Value="Error">
-                                                    <Setter Property="Kind" Value="AlertCircleOutline" />
+                                                    <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -147,18 +152,41 @@
 
                             <!-- Information -->
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Alias}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="8,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="Bold" Foreground="{Binding StatusColor}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding Alias}" FontWeight="Black" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
+                                
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- 1. STATUS BADGE -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="Circle" Width="8" Height="8" Foreground="{Binding StatusColor}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </Border>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="PackageVariant" Width="12" Height="12" Foreground="{StaticResource TextMuted}" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding WadName}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,1,0,0"/>
-                                        <Border Width="1" Height="8" Background="{StaticResource BorderColor}" Margin="8,0"/>
-                                        <materialIcons:MaterialIcon Kind="ClockOutline" Width="12" Height="12" Foreground="{StaticResource TextMuted}" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding LastUpdated, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,1,0,0"/>
-                                    </StackPanel>
+
+                                    <!-- 2. VERSION BADGE -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center"
+                                            Visibility="{Binding Version, Converter={StaticResource NullToVisibilityConverter}}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="Tag" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Version}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 3. TIMESTAMP BADGE (HORA) -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="CalendarClock" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding LastUpdated, StringFormat='{}{0:dd MMM yyyy · HH:mm}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 4. WAD SOURCE BADGE (DIRECCION) -->
+                                    <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="PackageVariant" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding WadName}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </StackPanel>
 
@@ -166,13 +194,17 @@
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button Click="ViewChanges_Click" 
                                         Tag="{Binding}"
-                                        ToolTip="Show Differences" Style="{StaticResource TransparentIconButton}" Width="32" Height="32" Margin="0,0,8,0" Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Foreground="{StaticResource AccentBlue}"/>
+                                        ToolTip="View Differences" 
+                                        Style="{StaticResource TransparentIconButton}" 
+                                        Width="34" Height="34" Margin="0,0,8,0" 
+                                        Background="{StaticResource SidebarBackground}"
+                                        Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <materialIcons:MaterialIcon Kind="ChevronRight" Width="22" Height="22" Foreground="{StaticResource AccentBrush}"/>
                                 </Button>                                    
                                 <Button Click="Remove_Click" 
                                         Tag="{Binding}"
                                         Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Remove Monitor">
-                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
+                                    <materialIcons:MaterialIcon Kind="DeleteSweepOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
                                 </Button>
                             </StackPanel>
                         </Grid>

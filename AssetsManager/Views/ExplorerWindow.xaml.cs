@@ -32,6 +32,7 @@ namespace AssetsManager.Views
             WadExportService wadExportService,
             WadNodeLoaderService wadNodeLoaderService,
             HashResolverService hashResolverService,
+            VersionService versionService,
             TaskCancellationManager taskCancellationManager,
             FavoritesManager favoritesManager,
             ImageMergerService imageMergerService,
@@ -54,6 +55,7 @@ namespace AssetsManager.Views
             FileExplorer.AudioBankService = audioBankService;
             FileExplorer.AudioBankLinkerService = audioBankLinkerService;
             FileExplorer.HashResolverService = hashResolverService;
+            FileExplorer.VersionService = versionService;
             FileExplorer.TaskCancellationManager = taskCancellationManager;
             FileExplorer.FavoritesManager = favoritesManager;
             FileExplorer.ImageMergerService = imageMergerService;

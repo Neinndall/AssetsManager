@@ -38,7 +38,7 @@ namespace AssetsManager.Services.Formatting
 
         public async Task<string> FormatAudioBankAsync(LinkedAudioBank linkedBank)
         {
-            if (linkedBank == null) return "{}";
+            if (linkedBank == null) return string.Empty;
 
             try
             {
@@ -55,6 +55,8 @@ namespace AssetsManager.Services.Formatting
                 {
                     result = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsBnkData);
                 }
+
+                if (result == null || result.Count == 0) return string.Empty;
 
                 var options = new System.Text.Json.JsonSerializerOptions
                 {
@@ -122,7 +124,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
@@ -142,7 +144,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
@@ -166,7 +168,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
@@ -189,7 +191,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
@@ -214,7 +216,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
@@ -238,7 +240,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try

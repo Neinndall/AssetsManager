@@ -29,8 +29,15 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
         // Batch Mode Properties
         private bool _isBatchMode;
+        private bool _isInitialComparison;
         private int _currentFileIndex = 1;
         private int _totalFilesCount = 1;
+
+        public bool IsInitialComparison
+        {
+            get => _isInitialComparison;
+            set { _isInitialComparison = value; OnPropertyChanged(); }
+        }
 
         public bool IsInlineMode
         {

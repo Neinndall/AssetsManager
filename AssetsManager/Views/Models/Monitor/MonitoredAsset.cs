@@ -25,8 +25,21 @@ namespace AssetsManager.Views.Models.Monitor
         private string _assetPath;
         private string _wadName;
         private string _internalPath;
+        private string _version;
         private AssetSourceType _sourceType;
         private ulong _lastKnownHash;
+
+        public MonitoredAsset()
+        {
+            Status = AssetStatus.Pending;
+            StatusColor = (SolidColorBrush)System.Windows.Application.Current.FindResource("TextMuted");
+        }
+
+        public string Version
+        {
+            get => _version;
+            set { if (_version != value) { _version = value; OnPropertyChanged(); } }
+        }
         private DateTime _lastUpdated;
         private AssetStatus _status;
         private Brush _statusColor;
