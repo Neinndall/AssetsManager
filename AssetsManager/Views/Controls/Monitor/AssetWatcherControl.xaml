@@ -199,7 +199,7 @@
                                         Width="34" Height="34" Margin="0,0,8,0" 
                                         Background="{StaticResource SidebarBackground}"
                                         Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <materialIcons:MaterialIcon Kind="ChevronRight" Width="22" Height="22" Foreground="{StaticResource AccentBrush}"/>
+                                    <materialIcons:MaterialIcon Kind="EyeOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
                                 </Button>                                    
                                 <Button Click="Remove_Click" 
                                         Tag="{Binding}"

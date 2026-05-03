@@ -220,18 +220,15 @@
                                         Width="34" Height="34" Margin="0,0,6,0" Background="{StaticResource SidebarBackground}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-                                            <Setter Property="ToolTip" Value="View Comparison Diffs"/>
+                                            <Setter Property="ToolTip" Value="View Historical Data"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
-                                                    <Setter Property="ToolTip" Value="View Watcher Diffs"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
-                                                    <Setter Property="ToolTip" Value="View Difference"/>
+                                                    <Setter Property="ToolTip" Value="View Differences"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="ChevronRight" Width="22" Height="22" Foreground="{StaticResource AccentBrush}"/>
+                                    <materialIcons:MaterialIcon Kind="EyeOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
                                 </Button>
 
                                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0,10,0" Background="{StaticResource BorderColor}"/>
