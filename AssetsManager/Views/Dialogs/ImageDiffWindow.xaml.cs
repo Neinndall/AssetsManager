@@ -9,11 +9,14 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Models.Dialogs.Controls;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class ImageDiffWindow : HudWindow
     {
+        public LoadingDiffWindow LoadingWindow { get; set; }
+
         // Batch Mode Properties
         public static readonly DependencyProperty IsBatchModeProperty =
             DependencyProperty.Register("IsBatchMode", typeof(bool), typeof(ImageDiffWindow), new PropertyMetadata(false));
@@ -61,6 +64,9 @@ namespace AssetsManager.Views.Dialogs
         {
             InitializeComponent();
             
+            // Smooth Handover: Handled via Loaded event if LoadingWindow is set
+            Loaded += ImageDiffWindow_Loaded;
+
             SetImageData(oldImage, newImage, oldFileName, newFileName);
 
             this.Closed += OnWindowClosed;
@@ -80,6 +86,31 @@ namespace AssetsManager.Views.Dialogs
             // Force Side-by-Side as default
             SideBySideBtn.IsChecked = true;
             UpdateUIMode();
+        }
+
+        private async void ImageDiffWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= ImageDiffWindow_Loaded;
+
+            // 0. Visual Satisfaction: Show the bar as 100% ready while we do the final internal rendering
+            if (LoadingWindow != null)
+            {
+                LoadingWindow.SetState(DiffLoadingState.Ready);
+            }
+
+            // 1. IMPORTANT: Wait for the UI to process the initial rendering (especially for high-res textures)
+            // Using Render priority for images as they are faster to draw than heavy text
+            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+
+            // 2. Now make the window visible and bring to front
+            this.Visibility = Visibility.Visible;
+
+            // 3. Smooth Handover: Close loading window now that we are visible
+            if (LoadingWindow != null)
+            {
+                LoadingWindow.Close();
+                LoadingWindow = null;
+            }
         }
 
         private void ImageDiffWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -124,8 +155,10 @@ namespace AssetsManager.Views.Dialogs
             int startIndex,
             string oldPbePath,
             string newPbePath,
-            Func<SerializableChunkDiff, string, string, Task<(BitmapSource oldImage, BitmapSource newImage)>> loadDataFunc)
+            Func<SerializableChunkDiff, string, string, Task<(BitmapSource oldImage, BitmapSource newImage)>> loadDataFunc,
+            LoadingDiffWindow loadingWindow = null)
         {
+            LoadingWindow = loadingWindow; // Take custody of the loading window
             _batchItems = items;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;

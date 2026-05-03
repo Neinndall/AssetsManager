@@ -126,11 +126,9 @@ namespace AssetsManager.Services.Core
                         var oldImg = ToBitmapSource((byte[])oldData, ext);
                         var newImg = ToBitmapSource((byte[])newData, ext);
                         return (oldImg, newImg);
-                    });
+                    }, loadingWindow);
 
-                    loadingWindow.SetState(DiffLoadingState.Ready);
-                    loadingWindow.Close();
-                    imageDiffWindow.Show();
+                    imageDiffWindow.ShowDialog();
                 }
                 else // Default to Text/Data Diff if it's not an image and it's supported
                 {
@@ -323,10 +321,8 @@ namespace AssetsManager.Services.Core
             var oldImage = ToBitmapSource((byte[])oldData, extension);
             var newImage = ToBitmapSource((byte[])newData, extension);
 
-            loadingWindow.SetState(DiffLoadingState.Ready);
-            loadingWindow.Close();
-            var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath) { Owner = owner };
-            imageDiffWindow.Show();
+            var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath) { Owner = owner, LoadingWindow = loadingWindow };
+            imageDiffWindow.ShowDialog();
         }
 
         public async Task ShowFileDiffAsync(string oldFilePath, string newFilePath, Window owner)
