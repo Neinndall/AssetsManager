@@ -213,7 +213,7 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="Rename" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                                    <materialIcons:MaterialIcon Kind="Rename" Width="18" Height="18" Foreground="{StaticResource TextSecondary}"/>
                                 </Button>
 
                                 <Button Click="btnViewDiff_Click" 
@@ -228,13 +228,13 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="EyeOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
                                 </Button>
 
                                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0,10,0" Background="{StaticResource BorderColor}"/>
 
                                 <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="30" Height="30" ToolTip="Remove from History">
-                                    <materialIcons:MaterialIcon Kind="DeleteSweepOutline" Width="18" Foreground="{StaticResource AccentRed}"/>
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="{StaticResource AccentRed}"/>
                                 </Button>
                             </StackPanel>
                         </Grid>
