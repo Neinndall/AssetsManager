@@ -88,6 +88,10 @@
                                             <Setter TargetName="borderOverlay" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                                             <Setter TargetName="borderOverlay" Property="BorderThickness" Value="1.5"/>
                                         </DataTrigger>
+                                        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=ComboBox}}" Value="Icon">
+                                            <Setter TargetName="Arrow" Property="HorizontalAlignment" Value="Center"/>
+                                            <Setter TargetName="Arrow" Property="Margin" Value="0"/>
+                                        </DataTrigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
                             </ToggleButton.Template>

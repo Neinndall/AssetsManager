@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Comparator"
+             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
 
@@ -78,7 +79,7 @@
 
                         <!-- Discreet Quick Select (Arrow) -->
                         <ComboBox Grid.Column="1" x:Name="TargetQuickSelect" 
-                                  Style="{StaticResource ModernComboBox}" 
+                                  Style="{StaticResource ModernComboBox}" Tag="Icon" 
                                   Width="38" Height="38"
                                   ItemsSource="{Binding AvailableBackups}"
                                   SelectedItem="{Binding SelectedTargetBackup}"
@@ -235,7 +236,7 @@
 
                         <!-- Discreet Quick Select (Arrow) -->
                         <ComboBox Grid.Column="1" x:Name="BaseQuickSelect" 
-                                  Style="{StaticResource ModernComboBox}" 
+                                  Style="{StaticResource ModernComboBox}" Tag="Icon" 
                                   Width="38" Height="38"
                                   ItemsSource="{Binding AvailableBackups}"
                                   SelectedItem="{Binding SelectedBaseBackup}"
