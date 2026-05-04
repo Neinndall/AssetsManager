@@ -123,22 +123,43 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void createLolBackupButton_Click(object sender, RoutedEventArgs e)
         {
-            // 1. Determine Source (Selection or Default)
+            // 1. Determine Source and Destination
             string sourceLolPath;
+            string destinationBackupPath;
             var selectedBackup = ViewModel.AllBackups.FirstOrDefault(b => b.IsSelected);
             string clientName;
 
             if (selectedBackup != null)
             {
-                sourceLolPath = selectedBackup.Path;
-                clientName = selectedBackup.DisplayName.Contains("PBE") ? "PBE" : "LIVE";
+                // REFRESH MODE: Use active client as source, selected backup as destination
+                bool isPbe = selectedBackup.DisplayName.Contains("PBE");
+                sourceLolPath = isPbe ? AppSettings.LolPbeDirectory : AppSettings.LolLiveDirectory;
+                destinationBackupPath = selectedBackup.Path;
+                clientName = isPbe ? "PBE" : "LIVE";
+
+                // Confirm overwrite
+                var confirm = CustomMessageBoxService.ShowYesNo("Overwrite Backup", 
+                    $"This will overwrite the selected backup with the current {clientName} data. Are you sure?", 
+                    Window.GetWindow(this));
+                if (confirm != true) return;
             }
             else
             {
+                // NEW BACKUP MODE: Use preferred client as source, create timestamped destination
                 sourceLolPath = AppSettings.PreferredBackupClient == PreferredClient.LIVE 
                     ? AppSettings.LolLiveDirectory 
                     : AppSettings.LolPbeDirectory;
                 clientName = AppSettings.PreferredBackupClient == PreferredClient.LIVE ? "LIVE" : "PBE";
+
+                string cleanSource = sourceLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+                string baseName = cleanSource;
+                if (baseName.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
+                {
+                    baseName = baseName.Substring(0, baseName.Length - 4);
+                }
+                
+                string dateSuffix = DateTime.Now.ToString("yyyyMMdd_HHmm");
+                destinationBackupPath = $"{baseName}_old_{dateSuffix}";
             }
 
             // 2. Validate Source
@@ -153,19 +174,6 @@ namespace AssetsManager.Views.Controls.Monitor
                 CustomMessageBoxService.ShowError("Error", $"The source directory does not exist: {sourceLolPath}", Window.GetWindow(this));
                 return;
             }
-
-            // 3. Determine Destination (Format: _old_DATE)
-            string cleanSource = sourceLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
-            string baseName = cleanSource;
-
-            // Remove existing _old suffix if present to avoid double tagging (e.g., _old_old)
-            if (baseName.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
-            {
-                baseName = baseName.Substring(0, baseName.Length - 4);
-            }
-            
-            string dateSuffix = DateTime.Now.ToString("yyyyMMdd_HHmm");
-            string destinationBackupPath = $"{baseName}_old_{dateSuffix}";
 
             ViewModel.IsBusy = true;
             try
