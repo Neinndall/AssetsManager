@@ -57,10 +57,10 @@
             </Grid.ColumnDefinitions>
 
             <!-- LEFT CARD: TARGET VERSION (NEW) -->
-            <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="28">
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24,20" VerticalAlignment="Top" Margin="0,24">
                 <StackPanel>
                     <!-- Header with integrated Quick Select -->
-                    <Grid Margin="0,0,0,24">
+                    <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -84,35 +84,6 @@
                                   SelectedItem="{Binding SelectedTargetBackup}"
                                   SelectionChanged="TargetQuickSelect_SelectionChanged"
                                   VerticalAlignment="Center">
-                            <ComboBox.Template>
-                                <ControlTemplate TargetType="ComboBox">
-                                    <Grid>
-                                        <ToggleButton IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
-                                                      Cursor="Hand">
-                                            <ToggleButton.Template>
-                                                <ControlTemplate TargetType="ToggleButton">
-                                                    <Border x:Name="border" Background="{StaticResource SidebarBackground}" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource BorderColor}">
-                                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="18" Foreground="{StaticResource TextSecondary}"/>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="border" Property="Background" Value="{StaticResource HoverColor}"/>
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </ToggleButton.Template>
-                                        </ToggleButton>
-                                        <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom" PopupAnimation="Slide">
-                                            <Grid MinWidth="320" MaxHeight="400" Margin="0,4">
-                                                <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8"/>
-                                                <ScrollViewer Margin="1" SnapsToDevicePixels="True">
-                                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" Margin="0,4"/>
-                                                </ScrollViewer>
-                                            </Grid>
-                                        </Popup>
-                                    </Grid>
-                                </ControlTemplate>
-                            </ComboBox.Template>
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="4,2">
@@ -136,9 +107,20 @@
                         </ComboBox>
                     </Grid>
 
-                    <!-- Manual Path Row (Primary Input) -->
-                    <TextBlock Text="MANUAL PATH" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,8"/>
-                    <Grid Margin="0,0,0,24">
+                    <!-- Path Row (Primary Input) -->
+                    <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="DIRECTORY PATH"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFileMode}" Value="True">
+                                        <Setter Property="Text" Value="WAD FILE PATH"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -167,8 +149,11 @@
                         </Button>
                     </Grid>
 
+                    <!-- Metadata Section Header -->
+                    <TextBlock Text="METADATA INFORMATION" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                    
                     <!-- Metadata HUD -->
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="16">
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="16,12">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -233,10 +218,10 @@
             </Grid>
 
             <!-- RIGHT CARD: BASE VERSION (OLD) -->
-            <Border Grid.Column="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="28">
+            <Border Grid.Column="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24,20" VerticalAlignment="Top" Margin="0,24">
                 <StackPanel>
                     <!-- Header with integrated Quick Select -->
-                    <Grid Margin="0,0,0,24">
+                    <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -247,7 +232,7 @@
                                 <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentOrange}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="BASE VERSION" FontSize="12" FontWeight="Black" Foreground="{StaticResource AccentOrange}"/>
+                                <TextBlock Text="BASE VERSION" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentOrange}"/>
                                 <TextBlock Text="Old source to compare against" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
                             </StackPanel>
                         </StackPanel>
@@ -260,35 +245,6 @@
                                   SelectedItem="{Binding SelectedBaseBackup}"
                                   SelectionChanged="BaseQuickSelect_SelectionChanged"
                                   VerticalAlignment="Center">
-                            <ComboBox.Template>
-                                <ControlTemplate TargetType="ComboBox">
-                                    <Grid>
-                                        <ToggleButton IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
-                                                      Cursor="Hand">
-                                            <ToggleButton.Template>
-                                                <ControlTemplate TargetType="ToggleButton">
-                                                    <Border x:Name="border" Background="{StaticResource SidebarBackground}" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource BorderColor}">
-                                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="18" Foreground="{StaticResource TextSecondary}"/>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="border" Property="Background" Value="{StaticResource HoverColor}"/>
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </ToggleButton.Template>
-                                        </ToggleButton>
-                                        <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom" PopupAnimation="Slide">
-                                            <Grid MinWidth="320" MaxHeight="400" Margin="0,4">
-                                                <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8"/>
-                                                <ScrollViewer Margin="1" SnapsToDevicePixels="True">
-                                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" Margin="0,4"/>
-                                                </ScrollViewer>
-                                            </Grid>
-                                        </Popup>
-                                    </Grid>
-                                </ControlTemplate>
-                            </ComboBox.Template>
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="4,2">
@@ -312,9 +268,20 @@
                         </ComboBox>
                     </Grid>
 
-                    <!-- Manual Path Row (Primary Input) -->
-                    <TextBlock Text="MANUAL PATH" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,8"/>
-                    <Grid Margin="0,0,0,24">
+                    <!-- Path Row (Primary Input) -->
+                    <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="DIRECTORY PATH"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFileMode}" Value="True">
+                                        <Setter Property="Text" Value="WAD FILE PATH"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -343,8 +310,11 @@
                         </Button>
                     </Grid>
 
+                    <!-- Metadata Section Header -->
+                    <TextBlock Text="METADATA INFORMATION" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                    
                     <!-- Metadata HUD -->
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="16">
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="16,12">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>

@@ -62,11 +62,12 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_selectedTargetBackup != value)
                 {
                     _selectedTargetBackup = value;
-                    if (value != null) _newManualPath = value.Path; // Sync manual path with backup selection
+                    if (value != null) _newManualPath = value.Path; 
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(TargetSourcePath));
                     OnPropertyChanged(nameof(NewDirectoryPath));
                     OnPropertyChanged(nameof(NewWadFilePath));
+                    if (value == null && string.IsNullOrEmpty(_newManualPath)) ClearMetadata(false);
                 }
             }
         }
@@ -79,11 +80,12 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_selectedBaseBackup != value)
                 {
                     _selectedBaseBackup = value;
-                    if (value != null) _oldManualPath = value.Path; // Sync manual path with backup selection
+                    if (value != null) _oldManualPath = value.Path;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(BaseSourcePath));
                     OnPropertyChanged(nameof(OldDirectoryPath));
                     OnPropertyChanged(nameof(OldWadFilePath));
+                    if (value == null && string.IsNullOrEmpty(_oldManualPath)) ClearMetadata(true);
                 }
             }
         }
@@ -96,11 +98,18 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_newManualPath != value) 
                 { 
                     _newManualPath = value;
-                    if (!string.IsNullOrEmpty(value)) _selectedTargetBackup = null; // Clear backup if manual entered
+                    if (string.IsNullOrEmpty(value)) 
+                    {
+                        _selectedTargetBackup = null;
+                        ClearMetadata(false);
+                    }
+                    else
+                    {
+                        _selectedTargetBackup = null;
+                    }
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(TargetSourcePath));
                     OnPropertyChanged(nameof(SelectedTargetBackup));
-                    if (string.IsNullOrEmpty(value) && _selectedTargetBackup == null) ClearMetadata(false);
                 } 
             }
         }
@@ -113,11 +122,18 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_oldManualPath != value) 
                 { 
                     _oldManualPath = value; 
-                    if (!string.IsNullOrEmpty(value)) _selectedBaseBackup = null; // Clear backup if manual entered
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        _selectedBaseBackup = null;
+                        ClearMetadata(true);
+                    }
+                    else
+                    {
+                        _selectedBaseBackup = null;
+                    }
                     OnPropertyChanged(); 
                     OnPropertyChanged(nameof(BaseSourcePath));
                     OnPropertyChanged(nameof(SelectedBaseBackup));
-                    if (string.IsNullOrEmpty(value) && _selectedBaseBackup == null) ClearMetadata(true);
                 } 
             }
         }
@@ -130,11 +146,18 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_newManualPath != value) 
                 { 
                     _newManualPath = value; 
-                    if (!string.IsNullOrEmpty(value)) _selectedTargetBackup = null;
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        _selectedTargetBackup = null;
+                        ClearMetadata(false);
+                    }
+                    else
+                    {
+                        _selectedTargetBackup = null;
+                    }
                     OnPropertyChanged(); 
                     OnPropertyChanged(nameof(TargetSourcePath));
                     OnPropertyChanged(nameof(SelectedTargetBackup));
-                    if (string.IsNullOrEmpty(value) && _selectedTargetBackup == null) ClearMetadata(false);
                 } 
             }
         }
@@ -147,11 +170,18 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_oldManualPath != value) 
                 { 
                     _oldManualPath = value; 
-                    if (!string.IsNullOrEmpty(value)) _selectedBaseBackup = null;
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        _selectedBaseBackup = null;
+                        ClearMetadata(true);
+                    }
+                    else
+                    {
+                        _selectedBaseBackup = null;
+                    }
                     OnPropertyChanged(); 
                     OnPropertyChanged(nameof(BaseSourcePath));
                     OnPropertyChanged(nameof(SelectedBaseBackup));
-                    if (string.IsNullOrEmpty(value) && _selectedBaseBackup == null) ClearMetadata(true);
                 } 
             }
         }

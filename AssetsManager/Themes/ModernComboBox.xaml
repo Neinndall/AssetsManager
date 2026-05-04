@@ -16,6 +16,8 @@
                     <Border x:Name="Border"
                             Background="{TemplateBinding Background}"
                             Padding="{TemplateBinding Padding}"
+                            CornerRadius="8"
+                            Margin="1"
                             SnapsToDevicePixels="true">
                         <ContentPresenter />
                     </Border>
@@ -51,25 +53,41 @@
                                       ClickMode="Press">
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
-                                    <Border x:Name="templateRoot" 
-                                            Background="{StaticResource SidebarBackground}"
-                                            BorderBrush="{StaticResource BorderColor}" 
-                                            BorderThickness="1" 
-                                            CornerRadius="8">
+                                    <Grid>
+                                        <!-- Layer 1: Background -->
+                                        <Border x:Name="backgroundRoot" 
+                                                Background="{StaticResource SidebarBackground}"
+                                                CornerRadius="8"/>
+                                        
+                                        <!-- Layer 2: Content (Stationary) -->
                                         <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
                                             <Path x:Name="Arrow"
-                                                  Grid.Column="1"
                                                   Data="M0,0 L4,4 L8,0 Z"
                                                   Fill="{StaticResource TextSecondary}"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
-                                                  Margin="0,0,12,0"/>
+                                                  Width="8" Height="4"
+                                                  Stretch="Fill"/>
                                         </Grid>
-                                    </Border>
+
+                                        <!-- Layer 3: Overlay Border (Dynamic) -->
+                                        <Border x:Name="borderOverlay" 
+                                                BorderBrush="{StaticResource BorderColor}" 
+                                                BorderThickness="1" 
+                                                CornerRadius="8"
+                                                IsHitTestVisible="False"/>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="borderOverlay" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                            <Setter TargetName="borderOverlay" Property="BorderThickness" Value="1.5"/>
+                                            <Setter TargetName="backgroundRoot" Property="Background" Value="{StaticResource HoverColor}"/>
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" Value="True">
+                                            <Setter TargetName="borderOverlay" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                            <Setter TargetName="borderOverlay" Property="BorderThickness" Value="1.5"/>
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
                                 </ControlTemplate>
                             </ToggleButton.Template>
                         </ToggleButton>
@@ -96,9 +114,13 @@
                                         Background="{StaticResource SidebarBackground}"
                                         BorderThickness="1"
                                         BorderBrush="{StaticResource BorderColor}"
-                                        CornerRadius="8"/>
+                                        CornerRadius="12">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="10" ShadowDepth="3" Opacity="0.2" Color="Black"/>
+                                    </Border.Effect>
+                                </Border>
                                 <ScrollViewer Margin="1" SnapsToDevicePixels="True">
-                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" Margin="0,4"/>
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" Margin="0"/>
                                 </ScrollViewer>
                             </Grid>
                         </Popup>
