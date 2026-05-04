@@ -160,23 +160,7 @@ namespace AssetsManager.Views.Models.Comparator
             }
         }
 
-        public void SetMetadata(bool isBase, BackupModel backup)
-        {
-            if (isBase)
-            {
-                BaseVersion = backup.Version;
-                IsBasePbe = backup.DisplayName.Contains("PBE");
-                IsBaseActive = backup.IsActiveClient;
-            }
-            else
-            {
-                TargetVersion = backup.Version;
-                IsTargetPbe = backup.DisplayName.Contains("PBE");
-                IsTargetActive = backup.IsActiveClient;
-            }
-        }
-
-        public async Task UpdateMetadataFromPathAsync(bool isBase, string path, VersionService versionService, AppSettings appSettings)
+        public async Task UpdateMetadataFromPathAsync(bool isBase, string path, VersionService versionService, BackupManager backupManager)
         {
             if (string.IsNullOrEmpty(path))
             {
@@ -185,12 +169,7 @@ namespace AssetsManager.Views.Models.Comparator
             }
 
             var version = await versionService.GetGameVersionAsync(path);
-            
-            bool isPbe = (!string.IsNullOrEmpty(appSettings.LolPbeDirectory) && path.StartsWith(appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase)) || 
-                         path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase);
-
-            bool isActive = (!string.IsNullOrEmpty(appSettings.LolPbeDirectory) && path.Equals(appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase)) || 
-                            (!string.IsNullOrEmpty(appSettings.LolLiveDirectory) && path.Equals(appSettings.LolLiveDirectory, StringComparison.OrdinalIgnoreCase));
+            var (isPbe, isActive) = backupManager.GetPathIdentification(path);
 
             if (isBase)
             {

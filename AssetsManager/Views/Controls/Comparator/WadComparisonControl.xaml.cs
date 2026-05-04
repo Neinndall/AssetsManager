@@ -62,7 +62,7 @@ namespace AssetsManager.Views.Controls.Comparator
             if (!string.IsNullOrEmpty(defaultPath))
             {
                 ViewModel.NewDirectoryPath = defaultPath;
-                await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.NewDirectoryPath, VersionService, AppSettings);
+                await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.NewDirectoryPath, VersionService, BackupManager);
             }
         }
 
@@ -85,26 +85,26 @@ namespace AssetsManager.Views.Controls.Comparator
             }
         }
 
-        private void BaseQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void BaseQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
                 if (ViewModel.IsDirectoryMode) ViewModel.OldDirectoryPath = backup.Path;
                 else if (backup.Path.EndsWith(".wad") || backup.Path.EndsWith(".wad.client")) ViewModel.OldWadFilePath = backup.Path;
 
-                ViewModel.SetMetadata(true, backup);
+                await ViewModel.UpdateMetadataFromPathAsync(true, backup.Path, VersionService, BackupManager);
                 comboBox.SelectedItem = null; 
             }
         }
 
-        private void TargetQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void TargetQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
                 if (ViewModel.IsDirectoryMode) ViewModel.NewDirectoryPath = backup.Path;
                 else if (backup.Path.EndsWith(".wad") || backup.Path.EndsWith(".wad.client")) ViewModel.NewWadFilePath = backup.Path;
 
-                ViewModel.SetMetadata(false, backup);
+                await ViewModel.UpdateMetadataFromPathAsync(false, backup.Path, VersionService, BackupManager);
                 comboBox.SelectedItem = null;
             }
         }
@@ -123,7 +123,7 @@ namespace AssetsManager.Views.Controls.Comparator
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     ViewModel.OldDirectoryPath = folderBrowserDialog.FileName;
-                    await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldDirectoryPath, VersionService, AppSettings);
+                    await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldDirectoryPath, VersionService, BackupManager);
                 }
             }
         }
@@ -142,7 +142,7 @@ namespace AssetsManager.Views.Controls.Comparator
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     ViewModel.NewDirectoryPath = folderBrowserDialog.FileName;
-                    await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.NewDirectoryPath, VersionService, AppSettings);
+                    await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.NewDirectoryPath, VersionService, BackupManager);
                 }
             }
         }
@@ -161,7 +161,7 @@ namespace AssetsManager.Views.Controls.Comparator
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 ViewModel.OldWadFilePath = openFileDialog.FileName;
-                await ViewModel.UpdateMetadataFromPathAsync(true, System.IO.Path.GetDirectoryName(ViewModel.OldWadFilePath), VersionService, AppSettings);
+                await ViewModel.UpdateMetadataFromPathAsync(true, System.IO.Path.GetDirectoryName(ViewModel.OldWadFilePath), VersionService, BackupManager);
             }
         }
 
@@ -179,7 +179,7 @@ namespace AssetsManager.Views.Controls.Comparator
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 ViewModel.NewWadFilePath = openFileDialog.FileName;
-                await ViewModel.UpdateMetadataFromPathAsync(false, System.IO.Path.GetDirectoryName(ViewModel.NewWadFilePath), VersionService, AppSettings);
+                await ViewModel.UpdateMetadataFromPathAsync(false, System.IO.Path.GetDirectoryName(ViewModel.NewWadFilePath), VersionService, BackupManager);
             }
         }
 

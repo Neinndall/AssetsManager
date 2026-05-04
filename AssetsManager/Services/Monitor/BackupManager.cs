@@ -171,6 +171,19 @@ namespace AssetsManager.Services.Monitor
             return backups.OrderByDescending(b => b.CreationDate).ToList();
         }
 
+        public (bool IsPbe, bool IsActive) GetPathIdentification(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return (false, false);
+
+            bool isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || 
+                         (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory) && path.StartsWith(_appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase));
+
+            bool isActive = (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory) && path.Equals(_appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase)) || 
+                            (!string.IsNullOrEmpty(_appSettings.LolLiveDirectory) && path.Equals(_appSettings.LolLiveDirectory, StringComparison.OrdinalIgnoreCase));
+
+            return (isPbe, isActive);
+        }
+
         private string GetBackupDisplayName(string folderName, string fullPath)
         {
             if (fullPath.Contains("(PBE)", StringComparison.OrdinalIgnoreCase)) return "League of Legends PBE";

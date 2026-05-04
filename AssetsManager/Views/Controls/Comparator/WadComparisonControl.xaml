@@ -152,10 +152,10 @@
                                         <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="---"/>
+                                                    <Setter Property="Text" Value="LIVE"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding TargetVersion, Converter={StaticResource EqualityConverter}, ConverterParameter='!---'}" Value="Visible">
-                                                            <Setter Property="Text" Value="LIVE"/>
+                                                        <DataTrigger Binding="{Binding TargetVersion}" Value="---">
+                                                            <Setter Property="Text" Value="---"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsTargetPbe}" Value="True">
                                                             <Setter Property="Text" Value="PBE"/>
@@ -167,6 +167,23 @@
                                     </Border>
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsTargetActive, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <TextBlock Text="ACTIVE" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                    </Border>
+                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsTargetActive}" Value="False"/>
+                                                            <Condition Binding="{Binding TargetVersion, Converter={StaticResource EqualityConverter}, ConverterParameter='!---'}" Value="True"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="BACKUP" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
                                     </Border>
                                 </StackPanel>
                             </StackPanel>
@@ -278,10 +295,10 @@
                                         <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="---"/>
+                                                    <Setter Property="Text" Value="LIVE"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding BaseVersion, Converter={StaticResource EqualityConverter}, ConverterParameter='!---'}" Value="Visible">
-                                                            <Setter Property="Text" Value="LIVE"/>
+                                                        <DataTrigger Binding="{Binding BaseVersion}" Value="---">
+                                                            <Setter Property="Text" Value="---"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsBasePbe}" Value="True">
                                                             <Setter Property="Text" Value="PBE"/>
@@ -293,6 +310,23 @@
                                     </Border>
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsBaseActive, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <TextBlock Text="ACTIVE" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                    </Border>
+                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsBaseActive}" Value="False"/>
+                                                            <Condition Binding="{Binding BaseVersion, Converter={StaticResource EqualityConverter}, ConverterParameter='!---'}" Value="True"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="BACKUP" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
                                     </Border>
                                 </StackPanel>
                             </StackPanel>
