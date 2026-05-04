@@ -20,13 +20,15 @@ namespace AssetsManager.Services.Monitor
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
+        private readonly VersionService _versionService;
         private readonly HashSet<string> _currentSessionBackups;
 
-        public BackupManager(DirectoriesCreator directoriesCreator, LogService logService, AppSettings appSettings)
+        public BackupManager(DirectoriesCreator directoriesCreator, LogService logService, AppSettings appSettings, VersionService versionService)
         {
             _directoriesCreator = directoriesCreator;
             _logService = logService;
             _appSettings = appSettings;
+            _versionService = versionService;
             _currentSessionBackups = new HashSet<string>();
         }
 
@@ -114,61 +116,61 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<List<BackupModel>> GetBackupsAsync()
         {
-            return await Task.Run(() =>
+            var backups = new List<BackupModel>();
+            var pathsToScan = new List<string>();
+
+            if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory)) 
+                pathsToScan.Add(_appSettings.LolPbeDirectory);
+
+            foreach (var baseDir in pathsToScan)
             {
-                var backups = new List<BackupModel>();
-                var pathsToScan = new List<string>();
+                // Clean trailing slashes to avoid "Path\_old"
+                string cleanBaseDir = baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var specificBackupPath = cleanBaseDir + "_old";
 
-                if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory)) 
-                    pathsToScan.Add(_appSettings.LolPbeDirectory);
-
-                foreach (var baseDir in pathsToScan)
+                if (Directory.Exists(specificBackupPath))
                 {
-                    // Clean trailing slashes to avoid "Path\_old"
-                    string cleanBaseDir = baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                    var specificBackupPath = cleanBaseDir + "_old";
+                    await AddBackupToList(backups, specificBackupPath);
+                }
 
-                    if (Directory.Exists(specificBackupPath))
+                // Scan parent directory for other "_old" folders
+                try
+                {
+                    var parentDirectory = Directory.GetParent(cleanBaseDir)?.FullName;
+                    if (!string.IsNullOrEmpty(parentDirectory) && Directory.Exists(parentDirectory))
                     {
-                        AddBackupToList(backups, specificBackupPath);
-                    }
-
-                    // Scan parent directory for other "_old" folders
-                    try
-                    {
-                        var parentDirectory = Directory.GetParent(cleanBaseDir)?.FullName;
-                        if (!string.IsNullOrEmpty(parentDirectory) && Directory.Exists(parentDirectory))
+                        foreach (var dir in Directory.EnumerateDirectories(parentDirectory))
                         {
-                            foreach (var dir in Directory.EnumerateDirectories(parentDirectory))
+                            if (dir.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
                             {
-                                if (dir.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    AddBackupToList(backups, dir);
-                                }
+                                await AddBackupToList(backups, dir);
                             }
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        _logService.LogWarning($"Error scanning parent directory for backups: {ex.Message}");
-                    }
                 }
+                catch (Exception ex)
+                {
+                    _logService.LogWarning($"Error scanning parent directory for backups: {ex.Message}");
+                }
+            }
 
-                return backups.OrderByDescending(b => b.CreationDate).ToList();
-            });
+            return backups.OrderByDescending(b => b.CreationDate).ToList();
         }
 
-        private void AddBackupToList(List<BackupModel> backups, string path)
+        private async Task AddBackupToList(List<BackupModel> backups, string path)
         {
             if (backups.Any(b => b.Path.Equals(path, StringComparison.OrdinalIgnoreCase)))
                 return;
 
             var directoryInfo = new DirectoryInfo(path);
             long totalBytes = GetDirectorySize(directoryInfo.FullName);
+            string version = await _versionService.GetGameVersionAsync(directoryInfo.FullName);
+
             backups.Add(new BackupModel
             {
                 Name = directoryInfo.Name,
                 DisplayName = GetBackupDisplayName(directoryInfo.Name),
+                Version = version ?? "Unknown Version",
                 Path = directoryInfo.FullName,
                 CreationDate = directoryInfo.CreationTime,
                 Size = totalBytes,

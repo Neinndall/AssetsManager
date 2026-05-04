@@ -40,6 +40,7 @@ namespace AssetsManager.Views.Models.Monitor
         public string Path { get; set; }
         public string Name { get; set; }
         public string DisplayName { get; set; }
+        public string Version { get; set; }
         public DateTime CreationDate { get; set; }
         public long Size { get; set; }
         public string SizeDisplay { get; set; }

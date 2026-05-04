@@ -95,9 +95,15 @@
                                                 </StackPanel>
 
                                                 <!-- Size -->
-                                                <StackPanel Orientation="Horizontal">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
                                                     <materialIcons:MaterialIcon Kind="DatabaseOutline" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{Binding SizeDisplay}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+
+                                                <!-- Version -->
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialIcons:MaterialIcon Kind="TagOutline" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Version}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </StackPanel>

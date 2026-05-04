@@ -80,7 +80,7 @@
                         </Border>
                         
                         <!-- 2. Accent Strip -->
-                        <Border x:Name="AccentStrip" BorderThickness="4,0,0,0" CornerRadius="10,0,0,10">
+                        <Border x:Name="AccentStrip" BorderThickness="2,0,0,0" CornerRadius="10,0,0,10">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
