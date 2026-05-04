@@ -166,12 +166,12 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- SECTION: EXPORT PROTOCOLS -->
+        <!-- SECTION: PREFERRED PROTOCOLS -->
         <StackPanel Margin="0,0,0,40">
             <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
                 <StackPanel Orientation="Horizontal">
                     <materialIcons:MaterialIcon Kind="FileExportOutline" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="EXPORT PROTOCOLS" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,1,0,0"/>
+                    <TextBlock Text="PREFERRED PROTOCOLS" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,1,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -187,7 +187,7 @@
                               SelectedValue="{Binding Settings.AudioExportFormat, Mode=TwoWay}"/>
                 </Grid>
 
-                <Grid>
+                <Grid Margin="0,0,0,24">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="Image rendering target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
@@ -196,6 +196,23 @@
                     <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
                               ItemsSource="{Binding ImageFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"
                               SelectedValue="{Binding Settings.ImageExportFormat, Mode=TwoWay}"/>
+                </Grid>
+
+                <!-- Preferred Backup Client -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Preferred backup client" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Select the default game client for scanning and creating backups" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" Width="120" Height="28" 
+                              Style="{StaticResource ModernComboBox}"
+                              ItemsSource="{Binding PreferredClientOptions}"
+                              DisplayMemberPath="Name" SelectedValuePath="Value"
+                              SelectedValue="{Binding Settings.PreferredBackupClient, Mode=TwoWay}"/>
                 </Grid>
             </StackPanel>
         </StackPanel>

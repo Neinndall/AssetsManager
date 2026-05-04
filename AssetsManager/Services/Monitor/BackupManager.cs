@@ -8,6 +8,7 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Services.Monitor
 {
@@ -117,72 +118,63 @@ namespace AssetsManager.Services.Monitor
         public async Task<List<BackupModel>> GetBackupsAsync()
         {
             var backups = new List<BackupModel>();
-            var pathsToScan = new List<string>();
+            var scannedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory)) 
-                pathsToScan.Add(_appSettings.LolPbeDirectory);
+            var basePaths = new List<string>();
+            if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory)) basePaths.Add(_appSettings.LolPbeDirectory);
+            if (!string.IsNullOrEmpty(_appSettings.LolLiveDirectory)) basePaths.Add(_appSettings.LolLiveDirectory);
 
-            foreach (var baseDir in pathsToScan)
+            foreach (var basePath in basePaths)
             {
-                // Clean trailing slashes to avoid "Path\_old"
-                string cleanBaseDir = baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                var specificBackupPath = cleanBaseDir + "_old";
+                var parentDir = Directory.GetParent(basePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))?.FullName;
+                if (string.IsNullOrEmpty(parentDir) || !Directory.Exists(parentDir)) continue;
 
-                if (Directory.Exists(specificBackupPath))
-                {
-                    await AddBackupToList(backups, specificBackupPath);
-                }
-
-                // Scan parent directory for other "_old" folders
                 try
                 {
-                    var parentDirectory = Directory.GetParent(cleanBaseDir)?.FullName;
-                    if (!string.IsNullOrEmpty(parentDirectory) && Directory.Exists(parentDirectory))
+                    foreach (var dir in Directory.EnumerateDirectories(parentDir))
                     {
-                        foreach (var dir in Directory.EnumerateDirectories(parentDirectory))
+                        if (scannedPaths.Contains(dir)) continue;
+                        
+                        string version = await _versionService.GetGameVersionAsync(dir);
+                        if (version != null)
                         {
-                            if (dir.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
+                            bool isPbe = dir.Contains("(PBE)", StringComparison.OrdinalIgnoreCase);
+
+                            // Filter by preference
+                            if (_appSettings.PreferredBackupClient == PreferredClient.PBE && !isPbe) continue;
+                            if (_appSettings.PreferredBackupClient == PreferredClient.LIVE && isPbe) continue;
+
+                            backups.Add(new BackupModel
                             {
-                                await AddBackupToList(backups, dir);
-                            }
+                                Name = Path.GetFileName(dir),
+                                DisplayName = isPbe ? "League of Legends PBE" : "League of Legends LIVE",
+                                Version = version,
+                                Path = dir,
+                                IsActiveClient = dir.Equals(_appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase) || 
+                                                 dir.Equals(_appSettings.LolLiveDirectory, StringComparison.OrdinalIgnoreCase),
+                                CreationDate = Directory.GetCreationTime(dir),
+                                Size = GetDirectorySize(dir),
+                                SizeDisplay = FormatBytes(GetDirectorySize(dir)),
+                                IsSelected = false,
+                                IsCurrentSessionBackup = _currentSessionBackups.Contains(dir)
+                            });
+                            scannedPaths.Add(dir);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogWarning($"Error scanning parent directory for backups: {ex.Message}");
+                    _logService.LogWarning($"Error scanning directory {parentDir}: {ex.Message}");
                 }
             }
 
             return backups.OrderByDescending(b => b.CreationDate).ToList();
         }
 
-        private async Task AddBackupToList(List<BackupModel> backups, string path)
+        private string GetBackupDisplayName(string folderName, string fullPath)
         {
-            if (backups.Any(b => b.Path.Equals(path, StringComparison.OrdinalIgnoreCase)))
-                return;
-
-            var directoryInfo = new DirectoryInfo(path);
-            long totalBytes = GetDirectorySize(directoryInfo.FullName);
-            string version = await _versionService.GetGameVersionAsync(directoryInfo.FullName);
-
-            backups.Add(new BackupModel
-            {
-                Name = directoryInfo.Name,
-                DisplayName = GetBackupDisplayName(directoryInfo.Name),
-                Version = version ?? "Unknown Version",
-                Path = directoryInfo.FullName,
-                CreationDate = directoryInfo.CreationTime,
-                Size = totalBytes,
-                SizeDisplay = FormatBytes(totalBytes),
-                IsSelected = false,
-                IsCurrentSessionBackup = _currentSessionBackups.Contains(directoryInfo.FullName)
-            });
-        }
-
-        private string GetBackupDisplayName(string folderName)
-        {
-            return "League of Legends PBE";
+            if (fullPath.Contains("(PBE)", StringComparison.OrdinalIgnoreCase)) return "League of Legends PBE";
+            return "League of Legends LIVE";
         }
         
         private long GetDirectorySize(string path)

@@ -10,6 +10,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
@@ -17,6 +18,7 @@ namespace AssetsManager.Views.Controls.Monitor
     {
         // Public properties for dependency injection from the container
         public BackupManager BackupManager { get; set; }
+        public VersionService VersionService { get; set; }
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
@@ -121,21 +123,56 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void createLolBackupButton_Click(object sender, RoutedEventArgs e)
         {
-            string sourceLolPath = AppSettings.LolPbeDirectory;
+            // 1. Determine Source (Selection or Default)
+            string sourceLolPath;
+            var selectedBackup = ViewModel.AllBackups.FirstOrDefault(b => b.IsSelected);
+            string clientName;
 
+            if (selectedBackup != null)
+            {
+                sourceLolPath = selectedBackup.Path;
+                clientName = selectedBackup.DisplayName.Contains("PBE") ? "PBE" : "LIVE";
+            }
+            else
+            {
+                sourceLolPath = AppSettings.PreferredBackupClient == PreferredClient.LIVE 
+                    ? AppSettings.LolLiveDirectory 
+                    : AppSettings.LolPbeDirectory;
+                clientName = AppSettings.PreferredBackupClient == PreferredClient.LIVE ? "LIVE" : "PBE";
+            }
+
+            // 2. Validate Source
             if (string.IsNullOrEmpty(sourceLolPath))
             {
-                CustomMessageBoxService.ShowWarning("Warning", "LoL directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowWarning("Warning", $"LoL {clientName} directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
                 return;
             }
 
             if (!System.IO.Directory.Exists(sourceLolPath))
             {
-                CustomMessageBoxService.ShowError("Error", $"The configured LoL directory does not exist: {sourceLolPath}", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", $"The source directory does not exist: {sourceLolPath}", Window.GetWindow(this));
                 return;
             }
 
-            string destinationBackupPath = sourceLolPath + "_old";
+            // 3. Determine Destination (Format: _VERSION_DATE)
+            string cleanSource = sourceLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+            
+            // Get version of source
+            string sourceVersion = await VersionService.GetGameVersionAsync(sourceLolPath);
+            string versionSuffix = !string.IsNullOrEmpty(sourceVersion) ? "_" + sourceVersion : "";
+            string dateSuffix = "_" + DateTime.Now.ToString("yyyyMMdd_HHmm");
+            
+            // We want to avoid nested suffixes (if folder already has _version_date)
+            // But for safety and to keep it simple, we just append to the base name if it's an active client,
+            // or to the current name if it's a backup selection
+            string baseName = cleanSource;
+            if (selectedBackup != null && !selectedBackup.IsActiveClient)
+            {
+                // If it's a backup, maybe it already has a version/date. 
+                // We'll just append to keep it unique.
+            }
+            
+            string destinationBackupPath = baseName + versionSuffix + dateSuffix;
 
             ViewModel.IsBusy = true;
             try
@@ -145,8 +182,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 
                 if (!cancellationToken.IsCancellationRequested)
                 {
-                    LogService.LogSuccess($"LoL backup completed successfully.");
-                    CustomMessageBoxService.ShowInfo("Backup", "LoL backup completed successfully.", Window.GetWindow(this));
+                    LogService.LogSuccess($"Backup of {System.IO.Path.GetFileName(sourceLolPath)} completed successfully.");
+                    CustomMessageBoxService.ShowInfo("Backup", $"Backup completed successfully as:\n{System.IO.Path.GetFileName(destinationBackupPath)}", Window.GetWindow(this));
                 }
                 await LoadBackupsAsync();
             }
