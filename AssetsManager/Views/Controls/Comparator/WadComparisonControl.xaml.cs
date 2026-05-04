@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.WindowsAPICodePack.Dialogs;
@@ -6,6 +8,9 @@ using AssetsManager.Views.Models.Comparator;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
+using AssetsManager.Services.Monitor;
+using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Views.Controls.Comparator
 {
@@ -16,15 +21,95 @@ namespace AssetsManager.Views.Controls.Comparator
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public AppSettings AppSettings { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
+        public BackupManager BackupManager { get; set; }
+        public VersionService VersionService { get; set; }
 
         public WadComparisonModel ViewModel => DataContext as WadComparisonModel;
 
         public WadComparisonControl()
         {
             InitializeComponent();
+            this.Loaded += WadComparisonControl_Loaded;
         }
 
-        private void btnSelectOldLolPbeDirectory_Click(object sender, RoutedEventArgs e)
+        private async void WadComparisonControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            await LoadBackupsAsync();
+            await InitializeDefaultPathsAsync();
+        }
+
+        private async Task InitializeDefaultPathsAsync()
+        {
+            if (ViewModel == null || AppSettings == null || VersionService == null) return;
+
+            string defaultPath = null;
+
+            // Respect user preference for default active client
+            if (AppSettings.PreferredBackupClient == PreferredClient.PBE && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
+            {
+                defaultPath = AppSettings.LolPbeDirectory;
+            }
+            else if (AppSettings.PreferredBackupClient == PreferredClient.LIVE && !string.IsNullOrEmpty(AppSettings.LolLiveDirectory))
+            {
+                defaultPath = AppSettings.LolLiveDirectory;
+            }
+            else
+            {
+                // Fallback if preferred is not set or not available
+                defaultPath = !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) ? AppSettings.LolPbeDirectory : AppSettings.LolLiveDirectory;
+            }
+
+            if (!string.IsNullOrEmpty(defaultPath))
+            {
+                ViewModel.NewDirectoryPath = defaultPath;
+                await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.NewDirectoryPath, VersionService, AppSettings);
+            }
+        }
+
+        private async Task LoadBackupsAsync()
+        {
+            if (BackupManager == null || ViewModel == null) return;
+
+            try
+            {
+                var backups = await BackupManager.GetBackupsAsync();
+                ViewModel.AvailableBackups.Clear();
+                foreach (var backup in backups)
+                {
+                    ViewModel.AvailableBackups.Add(backup);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Error loading backups for comparator.");
+            }
+        }
+
+        private void BaseQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
+            {
+                if (ViewModel.IsDirectoryMode) ViewModel.OldDirectoryPath = backup.Path;
+                else if (backup.Path.EndsWith(".wad") || backup.Path.EndsWith(".wad.client")) ViewModel.OldWadFilePath = backup.Path;
+
+                ViewModel.SetMetadata(true, backup);
+                comboBox.SelectedItem = null; 
+            }
+        }
+
+        private void TargetQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
+            {
+                if (ViewModel.IsDirectoryMode) ViewModel.NewDirectoryPath = backup.Path;
+                else if (backup.Path.EndsWith(".wad") || backup.Path.EndsWith(".wad.client")) ViewModel.NewWadFilePath = backup.Path;
+
+                ViewModel.SetMetadata(false, backup);
+                comboBox.SelectedItem = null;
+            }
+        }
+
+        private async void btnSelectOldLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
 
@@ -37,15 +122,13 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    var oldPath = folderBrowserDialog.FileName;
-                    ViewModel.OldDirectoryPath = oldPath;
-                    ViewModel.NewDirectoryPath = oldPath.Replace("(PBE)_old", "(PBE)");
-                    LogService.LogDebug($"Old Directory selected: {oldPath}");
+                    ViewModel.OldDirectoryPath = folderBrowserDialog.FileName;
+                    await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldDirectoryPath, VersionService, AppSettings);
                 }
             }
         }
 
-        private void btnSelectNewLolPbeDirectory_Click(object sender, RoutedEventArgs e)
+        private async void btnSelectNewLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
 
@@ -58,15 +141,13 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    var newPath = folderBrowserDialog.FileName;
-                    ViewModel.NewDirectoryPath = newPath;
-                    ViewModel.OldDirectoryPath = newPath.Replace("(PBE)", "(PBE)_old");
-                    LogService.LogDebug($"New Directory selected: {newPath}");
+                    ViewModel.NewDirectoryPath = folderBrowserDialog.FileName;
+                    await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.NewDirectoryPath, VersionService, AppSettings);
                 }
             }
         }
 
-        private void btnSelectOldWadFile_Click(object sender, RoutedEventArgs e)
+        private async void btnSelectOldWadFile_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
 
@@ -79,13 +160,12 @@ namespace AssetsManager.Views.Controls.Comparator
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                var oldPath = openFileDialog.FileName;
-                ViewModel.OldWadFilePath = oldPath;
-                ViewModel.NewWadFilePath = oldPath.Replace("(PBE)_old", "(PBE)");
+                ViewModel.OldWadFilePath = openFileDialog.FileName;
+                await ViewModel.UpdateMetadataFromPathAsync(true, System.IO.Path.GetDirectoryName(ViewModel.OldWadFilePath), VersionService, AppSettings);
             }
         }
 
-        private void btnSelectNewWadFile_Click(object sender, RoutedEventArgs e)
+        private async void btnSelectNewWadFile_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
 
@@ -98,9 +178,8 @@ namespace AssetsManager.Views.Controls.Comparator
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                var newPath = openFileDialog.FileName;
-                ViewModel.NewWadFilePath = newPath;
-                ViewModel.OldWadFilePath = newPath.Replace("(PBE)", "(PBE)_old");
+                ViewModel.NewWadFilePath = openFileDialog.FileName;
+                await ViewModel.UpdateMetadataFromPathAsync(false, System.IO.Path.GetDirectoryName(ViewModel.NewWadFilePath), VersionService, AppSettings);
             }
         }
 
