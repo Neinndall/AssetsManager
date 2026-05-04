@@ -89,11 +89,7 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
-                if (ViewModel.IsDirectoryMode) ViewModel.OldDirectoryPath = backup.Path;
-                else if (backup.Path.EndsWith(".wad") || backup.Path.EndsWith(".wad.client")) ViewModel.OldWadFilePath = backup.Path;
-
                 await ViewModel.UpdateMetadataFromPathAsync(true, backup.Path, VersionService, BackupManager);
-                comboBox.SelectedItem = null; 
             }
         }
 
@@ -101,11 +97,7 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
-                if (ViewModel.IsDirectoryMode) ViewModel.NewDirectoryPath = backup.Path;
-                else if (backup.Path.EndsWith(".wad") || backup.Path.EndsWith(".wad.client")) ViewModel.NewWadFilePath = backup.Path;
-
                 await ViewModel.UpdateMetadataFromPathAsync(false, backup.Path, VersionService, BackupManager);
-                comboBox.SelectedItem = null;
             }
         }
 
@@ -192,23 +184,21 @@ namespace AssetsManager.Views.Controls.Comparator
             try
             {
                 var cancellationToken = TaskCancellationManager.PrepareNewOperation();
+                
+                if (string.IsNullOrEmpty(ViewModel.BaseSourcePath) || string.IsNullOrEmpty(ViewModel.TargetSourcePath))
+                {
+                    string msg = ViewModel.IsDirectoryMode ? "Please select both directories." : "Please select both WAD files.";
+                    CustomMessageBoxService.ShowWarning("Warning", msg, Window.GetWindow(this));
+                    return;
+                }
+
                 if (ViewModel.IsDirectoryMode) // By Directory
                 {
-                    if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath) || string.IsNullOrEmpty(ViewModel.NewDirectoryPath))
-                    {
-                        CustomMessageBoxService.ShowWarning("Warning", "Please select both directories.", Window.GetWindow(this));
-                        return;
-                    }
-                    await WadComparatorService.CompareWadsAsync(ViewModel.OldDirectoryPath, ViewModel.NewDirectoryPath, cancellationToken);
+                    await WadComparatorService.CompareWadsAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, cancellationToken);
                 }
                 else // By File
                 {
-                    if (string.IsNullOrEmpty(ViewModel.OldWadFilePath) || string.IsNullOrEmpty(ViewModel.NewWadFilePath))
-                    {
-                        CustomMessageBoxService.ShowWarning("Warning", "Please select both WAD files.", Window.GetWindow(this));
-                        return;
-                    }
-                    await WadComparatorService.CompareSingleWadAsync(ViewModel.OldWadFilePath, ViewModel.NewWadFilePath, cancellationToken);
+                    await WadComparatorService.CompareSingleWadAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, cancellationToken);
                 }
             }
             catch (OperationCanceledException)

@@ -138,7 +138,7 @@ namespace AssetsManager.Services.Monitor
                         string version = await _versionService.GetGameVersionAsync(dir);
                         if (version != null)
                         {
-                            bool isPbe = dir.Contains("(PBE)", StringComparison.OrdinalIgnoreCase);
+                            var (isPbe, isActive) = GetPathIdentification(dir);
 
                             // Filter by preference
                             if (_appSettings.PreferredBackupClient == PreferredClient.PBE && !isPbe) continue;
@@ -147,11 +147,10 @@ namespace AssetsManager.Services.Monitor
                             backups.Add(new BackupModel
                             {
                                 Name = Path.GetFileName(dir),
-                                DisplayName = isPbe ? "League of Legends PBE" : "League of Legends LIVE",
+                                DisplayName = GetBackupDisplayName(null, dir),
                                 Version = version,
                                 Path = dir,
-                                IsActiveClient = dir.Equals(_appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase) || 
-                                                 dir.Equals(_appSettings.LolLiveDirectory, StringComparison.OrdinalIgnoreCase),
+                                IsActiveClient = isActive,
                                 CreationDate = Directory.GetCreationTime(dir),
                                 Size = GetDirectorySize(dir),
                                 SizeDisplay = FormatBytes(GetDirectorySize(dir)),
@@ -186,8 +185,8 @@ namespace AssetsManager.Services.Monitor
 
         private string GetBackupDisplayName(string folderName, string fullPath)
         {
-            if (fullPath.Contains("(PBE)", StringComparison.OrdinalIgnoreCase)) return "League of Legends PBE";
-            return "League of Legends LIVE";
+            var (isPbe, _) = GetPathIdentification(fullPath);
+            return isPbe ? "League of Legends PBE" : "League of Legends LIVE";
         }
         
         private long GetDirectorySize(string path)

@@ -90,14 +90,15 @@
                             <Grid x:Name="DropDown"
                                   SnapsToDevicePixels="True"
                                   MinWidth="{TemplateBinding ActualWidth}"
-                                  MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                  MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                  Margin="0,4">
                                 <Border x:Name="DropDownBorder"
                                         Background="{StaticResource SidebarBackground}"
                                         BorderThickness="1"
                                         BorderBrush="{StaticResource BorderColor}"
                                         CornerRadius="8"/>
-                                <ScrollViewer Margin="0" SnapsToDevicePixels="True">
-                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                <ScrollViewer Margin="1" SnapsToDevicePixels="True">
+                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" Margin="0,4"/>
                                 </ScrollViewer>
                             </Grid>
                         </Popup>

@@ -15,10 +15,6 @@ namespace AssetsManager.Views.Models.Comparator
         public event PropertyChangedEventHandler PropertyChanged;
 
         private bool _isDirectoryMode = true;
-        private string _newDirectoryPath;
-        private string _oldDirectoryPath;
-        private string _newWadFilePath;
-        private string _oldWadFilePath;
         private bool _isComparing;
 
         private string _baseVersion = "---";
@@ -46,58 +42,112 @@ namespace AssetsManager.Views.Models.Comparator
 
         public bool IsFileMode => !IsDirectoryMode;
 
+        private string _newManualPath;
+        private string _oldManualPath;
+        private BackupModel _selectedTargetBackup;
+        private BackupModel _selectedBaseBackup;
+
+        public string TargetSourcePath => _selectedTargetBackup != null ? _selectedTargetBackup.Path : _newManualPath;
+        public string BaseSourcePath => _selectedBaseBackup != null ? _selectedBaseBackup.Path : _oldManualPath;
+
+        public BackupModel SelectedTargetBackup
+        {
+            get => _selectedTargetBackup;
+            set
+            {
+                if (_selectedTargetBackup != value)
+                {
+                    _selectedTargetBackup = value;
+                    if (value != null) _newManualPath = value.Path; // Sync manual path with backup selection
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(TargetSourcePath));
+                    OnPropertyChanged(nameof(NewDirectoryPath));
+                    OnPropertyChanged(nameof(NewWadFilePath));
+                }
+            }
+        }
+
+        public BackupModel SelectedBaseBackup
+        {
+            get => _selectedBaseBackup;
+            set
+            {
+                if (_selectedBaseBackup != value)
+                {
+                    _selectedBaseBackup = value;
+                    if (value != null) _oldManualPath = value.Path; // Sync manual path with backup selection
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(BaseSourcePath));
+                    OnPropertyChanged(nameof(OldDirectoryPath));
+                    OnPropertyChanged(nameof(OldWadFilePath));
+                }
+            }
+        }
+
         public string NewDirectoryPath
         {
-            get => _newDirectoryPath;
+            get => IsDirectoryMode ? _newManualPath : null;
             set 
             { 
-                if (_newDirectoryPath != value) 
+                if (_newManualPath != value) 
                 { 
-                    _newDirectoryPath = value; 
+                    _newManualPath = value;
+                    if (!string.IsNullOrEmpty(value)) _selectedTargetBackup = null; // Clear backup if manual entered
                     OnPropertyChanged();
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(false);
+                    OnPropertyChanged(nameof(TargetSourcePath));
+                    OnPropertyChanged(nameof(SelectedTargetBackup));
+                    if (string.IsNullOrEmpty(value) && _selectedTargetBackup == null) ClearMetadata(false);
                 } 
             }
         }
 
         public string OldDirectoryPath
         {
-            get => _oldDirectoryPath;
+            get => IsDirectoryMode ? _oldManualPath : null;
             set 
             { 
-                if (_oldDirectoryPath != value) 
+                if (_oldManualPath != value) 
                 { 
-                    _oldDirectoryPath = value; 
+                    _oldManualPath = value; 
+                    if (!string.IsNullOrEmpty(value)) _selectedBaseBackup = null; // Clear backup if manual entered
                     OnPropertyChanged(); 
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(true);
+                    OnPropertyChanged(nameof(BaseSourcePath));
+                    OnPropertyChanged(nameof(SelectedBaseBackup));
+                    if (string.IsNullOrEmpty(value) && _selectedBaseBackup == null) ClearMetadata(true);
                 } 
             }
         }
 
         public string NewWadFilePath
         {
-            get => _newWadFilePath;
+            get => IsFileMode ? _newManualPath : null;
             set 
             { 
-                if (_newWadFilePath != value) 
+                if (_newManualPath != value) 
                 { 
-                    _newWadFilePath = value; 
+                    _newManualPath = value; 
+                    if (!string.IsNullOrEmpty(value)) _selectedTargetBackup = null;
                     OnPropertyChanged(); 
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(false);
+                    OnPropertyChanged(nameof(TargetSourcePath));
+                    OnPropertyChanged(nameof(SelectedTargetBackup));
+                    if (string.IsNullOrEmpty(value) && _selectedTargetBackup == null) ClearMetadata(false);
                 } 
             }
         }
 
         public string OldWadFilePath
         {
-            get => _oldWadFilePath;
+            get => IsFileMode ? _oldManualPath : null;
             set 
             { 
-                if (_oldWadFilePath != value) 
+                if (_oldManualPath != value) 
                 { 
-                    _oldWadFilePath = value; 
+                    _oldManualPath = value; 
+                    if (!string.IsNullOrEmpty(value)) _selectedBaseBackup = null;
                     OnPropertyChanged(); 
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(true);
+                    OnPropertyChanged(nameof(BaseSourcePath));
+                    OnPropertyChanged(nameof(SelectedBaseBackup));
+                    if (string.IsNullOrEmpty(value) && _selectedBaseBackup == null) ClearMetadata(true);
                 } 
             }
         }
