@@ -41,8 +41,8 @@
                 <!-- Mode Selector -->
                 <Border Grid.Column="1" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="ModeDirectory" Content="DIRECTORY" GroupName="ComparisonMode" IsChecked="{Binding IsDirectoryMode}" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                        <RadioButton x:Name="ModeFile" Content="WAD FILE" GroupName="ComparisonMode" IsChecked="{Binding IsFileMode, Mode=OneWay}" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="ModeDirectory" Content="DIRECTORY" IsChecked="{Binding IsDirectoryMode, Mode=TwoWay}" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="ModeFile" Content="WAD FILE" IsChecked="{Binding IsFileMode, Mode=TwoWay}" Style="{StaticResource SegmentedRadioButtonStyle}"/>
                     </StackPanel>
                 </Border>
             </Grid>

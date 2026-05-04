@@ -40,7 +40,11 @@ namespace AssetsManager.Views.Models.Comparator
             }
         }
 
-        public bool IsFileMode => !IsDirectoryMode;
+        public bool IsFileMode
+        {
+            get => !IsDirectoryMode;
+            set => IsDirectoryMode = !value;
+        }
 
         private string _newManualPath;
         private string _oldManualPath;
