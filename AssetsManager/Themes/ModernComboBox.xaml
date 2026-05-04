@@ -64,8 +64,9 @@
                                             <Path x:Name="Arrow"
                                                   Data="M0,0 L4,4 L8,0 Z"
                                                   Fill="{StaticResource TextSecondary}"
-                                                  HorizontalAlignment="Center"
+                                                  HorizontalAlignment="Right"
                                                   VerticalAlignment="Center"
+                                                  Margin="0,0,12,0"
                                                   Width="8" Height="4"
                                                   Stretch="Fill"/>
                                         </Grid>

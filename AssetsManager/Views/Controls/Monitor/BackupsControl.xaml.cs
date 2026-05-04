@@ -154,25 +154,18 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            // 3. Determine Destination (Format: _VERSION_DATE)
+            // 3. Determine Destination (Format: _old_DATE)
             string cleanSource = sourceLolPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
-            
-            // Get version of source
-            string sourceVersion = await VersionService.GetGameVersionAsync(sourceLolPath);
-            string versionSuffix = !string.IsNullOrEmpty(sourceVersion) ? "_" + sourceVersion : "";
-            string dateSuffix = "_" + DateTime.Now.ToString("yyyyMMdd_HHmm");
-            
-            // We want to avoid nested suffixes (if folder already has _version_date)
-            // But for safety and to keep it simple, we just append to the base name if it's an active client,
-            // or to the current name if it's a backup selection
             string baseName = cleanSource;
-            if (selectedBackup != null && !selectedBackup.IsActiveClient)
+
+            // Remove existing _old suffix if present to avoid double tagging (e.g., _old_old)
+            if (baseName.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
             {
-                // If it's a backup, maybe it already has a version/date. 
-                // We'll just append to keep it unique.
+                baseName = baseName.Substring(0, baseName.Length - 4);
             }
             
-            string destinationBackupPath = baseName + versionSuffix + dateSuffix;
+            string dateSuffix = DateTime.Now.ToString("yyyyMMdd_HHmm");
+            string destinationBackupPath = $"{baseName}_old_{dateSuffix}";
 
             ViewModel.IsBusy = true;
             try

@@ -10,17 +10,17 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 1. Header & Mode -->
-            <RowDefinition Height="*"/>    <!-- 2. Dual Comparison Cards -->
+            <RowDefinition Height="Auto"/> <!-- 2. Dual Comparison Cards -->
             <RowDefinition Height="Auto"/> <!-- 3. Action Footer -->
         </Grid.RowDefinitions>
 
         <!-- 1. HEADER: Mode Switcher -->
-        <Border Grid.Row="0" Margin="0,0,0,24"
+        <Border Grid.Row="0" Margin="0,0,0,28"
                 Background="{StaticResource CardBackground}" 
                 BorderBrush="{StaticResource BorderColor}" 
                 BorderThickness="1" 
                 CornerRadius="12" 
-                Padding="16,12">
+                Padding="24,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -33,7 +33,7 @@
                         <materialIcons:MaterialIcon Kind="Wrench" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Configuration" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Configuration" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="Select a mode and set up your comparison by selecting base and target sources." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
                     </StackPanel>
                 </StackPanel>
@@ -49,30 +49,30 @@
         </Border>
 
         <!-- 2. DUAL CARDS -->
-        <Grid Grid.Row="1" Margin="0,0,0,24">
+        <Grid Grid.Row="1" Margin="0,0,0,28">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="64"/> <!-- Divider Gap -->
+                <ColumnDefinition Width="32"/> <!-- Divider Gap reduced for wider cards -->
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- LEFT CARD: TARGET VERSION (NEW) -->
-            <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24,20" VerticalAlignment="Top" Margin="0,24">
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24,26,24,26" VerticalAlignment="Top">
                 <StackPanel>
                     <!-- Header with integrated Quick Select -->
-                    <Grid Margin="0,0,0,16">
+                    <Grid Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         
                         <StackPanel Orientation="Horizontal" Grid.Column="0">
-                            <Border Background="#1A00E676" CornerRadius="8" Width="36" Height="36" Margin="0,0,14,0">
+                            <Border Background="#1A00E676" CornerRadius="8" Width="38" Height="38" Margin="0,0,12,0">
                                 <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="TARGET VERSION" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
-                                <TextBlock Text="New source to compare with" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                                <TextBlock Text="TARGET VERSION" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentGreen}"/>
+                                <TextBlock Text="New source to compare with" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -210,30 +210,26 @@
                 </StackPanel>
             </Border>
 
-            <!-- CENTER ICON -->
-            <Grid Grid.Column="1" VerticalAlignment="Center">
-                <Border Width="48" Height="48" CornerRadius="24" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                    <materialIcons:MaterialIcon Kind="SwapHorizontal" Foreground="{StaticResource TextMuted}" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-            </Grid>
+            <!-- CENTER GAP (Icon removed as requested) -->
+            <Grid Grid.Column="1" VerticalAlignment="Top" Margin="0,15,0,0"/>
 
             <!-- RIGHT CARD: BASE VERSION (OLD) -->
-            <Border Grid.Column="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24,20" VerticalAlignment="Top" Margin="0,24">
+            <Border Grid.Column="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24,26,24,26" VerticalAlignment="Top">
                 <StackPanel>
                     <!-- Header with integrated Quick Select -->
-                    <Grid Margin="0,0,0,16">
+                    <Grid Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         
                         <StackPanel Orientation="Horizontal" Grid.Column="0">
-                            <Border Background="#1AFF9100" CornerRadius="8" Width="36" Height="36" Margin="0,0,14,0">
+                            <Border Background="#1AFF9100" CornerRadius="8" Width="38" Height="38" Margin="0,0,12,0">
                                 <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentOrange}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="BASE VERSION" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentOrange}"/>
-                                <TextBlock Text="Old source to compare against" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                                <TextBlock Text="BASE VERSION" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentOrange}"/>
+                                <TextBlock Text="Old source to compare against" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -373,7 +369,7 @@
         </Grid>
 
         <!-- 3. FOOTER: Start Comparison -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="12" Padding="12">
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="12" Padding="24,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
