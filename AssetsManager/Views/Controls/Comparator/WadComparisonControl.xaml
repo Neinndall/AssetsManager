@@ -184,8 +184,8 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </Border>
-                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsTargetActive, Converter={StaticResource BoolToVisibilityConverter}}">
-                                        <TextBlock Text="ACTIVE" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsTargetMain, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White"/>
                                     </Border>
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                         <Border.Style>
@@ -194,7 +194,7 @@
                                                 <Style.Triggers>
                                                     <MultiDataTrigger>
                                                         <MultiDataTrigger.Conditions>
-                                                            <Condition Binding="{Binding IsTargetActive}" Value="False"/>
+                                                            <Condition Binding="{Binding IsTargetMain}" Value="False"/>
                                                             <Condition Binding="{Binding TargetVersion, Converter={StaticResource EqualityConverter}, ConverterParameter='!---'}" Value="True"/>
                                                         </MultiDataTrigger.Conditions>
                                                         <Setter Property="Visibility" Value="Visible"/>
@@ -341,8 +341,8 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </Border>
-                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsBaseActive, Converter={StaticResource BoolToVisibilityConverter}}">
-                                        <TextBlock Text="ACTIVE" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsBaseMain, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White"/>
                                     </Border>
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                         <Border.Style>
@@ -351,7 +351,7 @@
                                                 <Style.Triggers>
                                                     <MultiDataTrigger>
                                                         <MultiDataTrigger.Conditions>
-                                                            <Condition Binding="{Binding IsBaseActive}" Value="False"/>
+                                                            <Condition Binding="{Binding IsBaseMain}" Value="False"/>
                                                             <Condition Binding="{Binding BaseVersion, Converter={StaticResource EqualityConverter}, ConverterParameter='!---'}" Value="True"/>
                                                         </MultiDataTrigger.Conditions>
                                                         <Setter Property="Visibility" Value="Visible"/>

@@ -191,7 +191,7 @@ namespace AssetsManager.Services.Monitor
                         string version = await _versionService.GetGameVersionAsync(dir);
                         if (version != null)
                         {
-                            var (isPbe, isActive) = GetPathIdentification(dir);
+                            var (isPbe, isMain) = GetPathIdentification(dir);
 
                             // Filter by preference
                             if (_appSettings.PreferredBackupClient == PreferredClient.PBE && !isPbe) continue;
@@ -203,7 +203,7 @@ namespace AssetsManager.Services.Monitor
                                 DisplayName = GetBackupDisplayName(null, dir),
                                 Version = version,
                                 Path = dir,
-                                IsActiveClient = isActive,
+                                IsMainClient = isMain,
                                 CreationDate = Directory.GetCreationTime(dir),
                                 Size = GetDirectorySize(dir),
                                 SizeDisplay = FormatBytes(GetDirectorySize(dir)),
@@ -223,17 +223,17 @@ namespace AssetsManager.Services.Monitor
             return backups.OrderByDescending(b => b.CreationDate).ToList();
         }
 
-        public (bool IsPbe, bool IsActive) GetPathIdentification(string path)
+        public (bool IsPbe, bool IsMain) GetPathIdentification(string path)
         {
             if (string.IsNullOrEmpty(path)) return (false, false);
 
             bool isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || 
                          (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory) && path.StartsWith(_appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase));
 
-            bool isActive = (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory) && path.Equals(_appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase)) || 
+            bool isMain = (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory) && path.Equals(_appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase)) || 
                             (!string.IsNullOrEmpty(_appSettings.LolLiveDirectory) && path.Equals(_appSettings.LolLiveDirectory, StringComparison.OrdinalIgnoreCase));
 
-            return (isPbe, isActive);
+            return (isPbe, isMain);
         }
 
         private string GetBackupDisplayName(string folderName, string fullPath)

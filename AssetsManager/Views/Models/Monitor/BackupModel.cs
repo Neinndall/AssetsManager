@@ -42,7 +42,7 @@ namespace AssetsManager.Views.Models.Monitor
         public string DisplayName { get; set; }
         public string Version { get; set; }
         public DateTime CreationDate { get; set; }
-        public bool IsActiveClient { get; set; }
+        public bool IsMainClient { get; set; }
         public long Size { get; set; }
         public string SizeDisplay { get; set; }
         public bool IsCurrentSessionBackup { get; set; }

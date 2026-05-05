@@ -21,8 +21,8 @@ namespace AssetsManager.Views.Models.Comparator
         private string _targetVersion = "---";
         private bool _isBasePbe;
         private bool _isTargetPbe;
-        private bool _isBaseActive;
-        private bool _isTargetActive;
+        private bool _isBaseMain;
+        private bool _isTargetMain;
 
         public ObservableCollection<BackupModel> AvailableBackups { get; } = new ObservableCollection<BackupModel>();
 
@@ -216,16 +216,16 @@ namespace AssetsManager.Views.Models.Comparator
             set { if (_isTargetPbe != value) { _isTargetPbe = value; OnPropertyChanged(); } }
         }
 
-        public bool IsBaseActive
+        public bool IsBaseMain
         {
-            get => _isBaseActive;
-            set { if (_isBaseActive != value) { _isBaseActive = value; OnPropertyChanged(); } }
+            get => _isBaseMain;
+            set { if (_isBaseMain != value) { _isBaseMain = value; OnPropertyChanged(); } }
         }
 
-        public bool IsTargetActive
+        public bool IsTargetMain
         {
-            get => _isTargetActive;
-            set { if (_isTargetActive != value) { _isTargetActive = value; OnPropertyChanged(); } }
+            get => _isTargetMain;
+            set { if (_isTargetMain != value) { _isTargetMain = value; OnPropertyChanged(); } }
         }
 
         public void ClearMetadata(bool isBase)
@@ -234,13 +234,13 @@ namespace AssetsManager.Views.Models.Comparator
             {
                 BaseVersion = "---";
                 IsBasePbe = false;
-                IsBaseActive = false;
+                IsBaseMain = false;
             }
             else
             {
                 TargetVersion = "---";
                 IsTargetPbe = false;
-                IsTargetActive = false;
+                IsTargetMain = false;
             }
         }
 
@@ -253,19 +253,19 @@ namespace AssetsManager.Views.Models.Comparator
             }
 
             var version = await versionService.GetGameVersionAsync(path);
-            var (isPbe, isActive) = backupManager.GetPathIdentification(path);
+            var (isPbe, isMain) = backupManager.GetPathIdentification(path);
 
             if (isBase)
             {
                 BaseVersion = version ?? "Unknown";
                 IsBasePbe = isPbe;
-                IsBaseActive = isActive;
+                IsBaseMain = isMain;
             }
             else
             {
                 TargetVersion = version ?? "Unknown";
                 IsTargetPbe = isPbe;
-                IsTargetActive = isActive;
+                IsTargetMain = isMain;
             }
         }
 

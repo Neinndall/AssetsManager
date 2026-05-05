@@ -85,14 +85,14 @@
                                                     <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                                 </Border>
 
-                                                <!-- Source Tag (ACTIVE / BACKUP) -->
+                                                <!-- Source Tag (MAIN / BACKUP) -->
                                                 <Border x:Name="SourceTag" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center" BorderThickness="1">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{StaticResource HoverColor}"/>
                                                             <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsActiveClient}" Value="True">
+                                                                <DataTrigger Binding="{Binding IsMainClient}" Value="True">
                                                                     <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
                                                                     <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                                                                 </DataTrigger>
@@ -105,8 +105,8 @@
                                                                 <Setter Property="Text" Value="BACKUP"/>
                                                                 <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
                                                                 <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsActiveClient}" Value="True">
-                                                                        <Setter Property="Text" Value="ACTIVE"/>
+                                                                    <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                        <Setter Property="Text" Value="MAIN"/>
                                                                         <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
