@@ -192,6 +192,7 @@ namespace AssetsManager
       services.AddTransient<ProgressDetailsWindow>();
       services.AddTransient<UpdateProgressWindow>();
       services.AddTransient<UpdateModeDialog>();
+      services.AddTransient<BackupActionDialog>();
       services.AddTransient<InputDialog>();
       services.AddTransient<ConfirmationDialog>();
       services.AddTransient<WadComparisonResultWindow>();

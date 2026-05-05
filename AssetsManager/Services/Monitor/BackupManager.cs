@@ -50,7 +50,7 @@ namespace AssetsManager.Services.Monitor
                         Directory.Delete(destinationBackupPath, true);
                     }
 
-                    _logService.Log("Starting directory backup...");
+                    _logService.Log("Starting backup...");
                     
                     // Count total files for progress
                     int totalFiles = 0;
@@ -87,6 +87,59 @@ namespace AssetsManager.Services.Monitor
                     _logService.LogError(ex, $"AssetsManager.Services.Monitor.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
                     BackupCompleted?.Invoke(this, false);
                     throw; 
+                }
+            }, cancellationToken);
+        }
+
+        public async Task CloneBackupAsync(string sourceBackupPath, string destinationBackupPath, CancellationToken cancellationToken)
+        {
+            BackupStarted?.Invoke(this, 0);
+
+            await Task.Run(async () =>
+            {
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (Directory.Exists(destinationBackupPath))
+                    {
+                        Directory.Delete(destinationBackupPath, true);
+                    }
+
+                    _logService.Log($"Cloning backup: {Path.GetFileName(sourceBackupPath)}...");
+
+                    int totalFiles = 0;
+                    try
+                    {
+                        totalFiles = Directory.GetFiles(sourceBackupPath, "*", SearchOption.AllDirectories).Length;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogWarning($"Could not count files for cloning progress: {ex.Message}");
+                    }
+
+                    BackupStarted?.Invoke(this, totalFiles);
+
+                    int processedFiles = 0;
+                    CopyDirectoryRecursive(sourceBackupPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
+
+                    _currentSessionBackups.Add(destinationBackupPath);
+                    BackupCompleted?.Invoke(this, true);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logService.LogWarning("Backup cloning was cancelled.");
+                    BackupCompleted?.Invoke(this, false);
+                    if (Directory.Exists(destinationBackupPath))
+                    {
+                        try { Directory.Delete(destinationBackupPath, true); } catch { }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Error cloning backup: {sourceBackupPath} to {destinationBackupPath}");
+                    BackupCompleted?.Invoke(this, false);
+                    throw;
                 }
             }, cancellationToken);
         }
