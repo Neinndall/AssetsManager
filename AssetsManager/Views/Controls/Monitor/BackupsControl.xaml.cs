@@ -232,7 +232,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 }
                 else
                 {
-                    await BackupManager.CreateLolPbeDirectoryBackupAsync(sourcePath, destinationPath, cancellationToken);
+                    string logMsg = !string.IsNullOrEmpty(oldBackupPathToDelete) ? "Updating backup..." : "Starting backup...";
+                    await BackupManager.CreateLolPbeDirectoryBackupAsync(sourcePath, destinationPath, cancellationToken, logMsg);
                 }
                 
                 if (!cancellationToken.IsCancellationRequested)

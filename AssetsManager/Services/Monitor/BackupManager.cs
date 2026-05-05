@@ -34,7 +34,7 @@ namespace AssetsManager.Services.Monitor
         }
 
 
-        public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath, CancellationToken cancellationToken)
+        public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath, CancellationToken cancellationToken, string logMessage = "Starting backup...")
         {
             // Notify UI immediately to show activity (Indeterminate spinner)
             BackupStarted?.Invoke(this, 0);
@@ -50,7 +50,7 @@ namespace AssetsManager.Services.Monitor
                         Directory.Delete(destinationBackupPath, true);
                     }
 
-                    _logService.Log("Starting backup...");
+                    _logService.Log(logMessage);
                     
                     // Count total files for progress
                     int totalFiles = 0;
