@@ -84,7 +84,8 @@
                                   ItemsSource="{Binding AvailableBackups}"
                                   SelectedItem="{Binding SelectedTargetBackup}"
                                   SelectionChanged="TargetQuickSelect_SelectionChanged"
-                                  VerticalAlignment="Center">
+                                  VerticalAlignment="Center"
+                                  Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="4,2">
@@ -95,8 +96,41 @@
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" Margin="0,0,12,0" VerticalAlignment="Center"/>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,1"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                
+                                                <!-- Client Type Badge (Restored & Refined) -->
+                                                <Border Margin="6,0,0,0" CornerRadius="2.5" Padding="4,0" VerticalAlignment="Center" Height="12">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                                            <Setter Property="BorderThickness" Value="1"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock FontSize="7" FontWeight="Bold" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="BACKUP"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                        <Setter Property="Text" Value="MAIN"/>
+                                                                        <Setter Property="Foreground" Value="White"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </StackPanel>
                                         </StackPanel>
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="16,0,4,0">
                                             <TextBlock Text="{Binding CreationDate, StringFormat={}{0:dd/MM/yyyy}}" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
@@ -106,6 +140,16 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
+
+                        <!-- Informative Icon for WAD Mode (Replaces QuickSelect) -->
+                        <Border Grid.Column="1" Width="38" Height="38" 
+                                Background="{StaticResource HoverColor}" 
+                                CornerRadius="8" 
+                                Cursor="Help"
+                                Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                                ToolTip="Please, select a manual WAD file or container. The system will auto-identify the root to apply synchronization on the base side.">
+                            <materialIcons:MaterialIcon Kind="InformationVariant" Foreground="{StaticResource TextMuted}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
                     </Grid>
 
                     <!-- Path Row (Primary Input) -->
@@ -252,8 +296,41 @@
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" Margin="0,0,12,0" VerticalAlignment="Center"/>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,1"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                
+                                                <!-- Client Type Badge (Restored & Refined) -->
+                                                <Border Margin="6,0,0,0" CornerRadius="2.5" Padding="4,0" VerticalAlignment="Center" Height="12">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                                            <Setter Property="BorderThickness" Value="1"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock FontSize="7" FontWeight="Bold" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="BACKUP"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                        <Setter Property="Text" Value="MAIN"/>
+                                                                        <Setter Property="Foreground" Value="White"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </StackPanel>
                                         </StackPanel>
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="16,0,4,0">
                                             <TextBlock Text="{Binding CreationDate, StringFormat={}{0:dd/MM/yyyy}}" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
