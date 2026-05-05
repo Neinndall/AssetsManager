@@ -118,3 +118,5 @@ Bug Fixes
   - Comparator / Mode State Isolation
     * Fixed a bug where version information and client metadata leaked between Directory and WAD File modes when switching.
     * Resolved an issue where auto-filled paths in Directory mode were lost after using the WAD File mode; the state is now correctly preserved for each mode independently.
+    * Added QoL logic for WAD mode: hidden the redundant QuickSelect in the Target section and replaced it with a professional HUD informative icon that guides the user towards manual WAD selection to enable auto-synchronization.
+    * Improved Browser Dialogs: the initial directory for folder and file pickers now correctly respects the "Preferred Protocol" setting (LIVE or PBE), providing a more consistent user experience.
