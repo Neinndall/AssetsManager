@@ -64,28 +64,31 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             if (ViewModel == null || AppSettings == null || VersionService == null) return;
 
-            string defaultPath = null;
-
-            // Respect user preference for default active client
-            if (AppSettings.PreferredBackupClient == PreferredClient.PBE && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
-            {
-                defaultPath = AppSettings.LolPbeDirectory;
-            }
-            else if (AppSettings.PreferredBackupClient == PreferredClient.LIVE && !string.IsNullOrEmpty(AppSettings.LolLiveDirectory))
-            {
-                defaultPath = AppSettings.LolLiveDirectory;
-            }
-            else
-            {
-                // Fallback if preferred is not set or not available
-                defaultPath = !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) ? AppSettings.LolPbeDirectory : AppSettings.LolLiveDirectory;
-            }
+            string defaultPath = GetPreferredInitialDirectory();
 
             if (!string.IsNullOrEmpty(defaultPath))
             {
                 ViewModel.NewDirectoryPath = defaultPath;
                 await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.TargetSourceRoot, VersionService, BackupManager);
             }
+        }
+
+        private string GetPreferredInitialDirectory()
+        {
+            if (AppSettings == null) return null;
+
+            // Respect user preference for default active client
+            if (AppSettings.PreferredBackupClient == PreferredClient.PBE && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
+            {
+                return AppSettings.LolPbeDirectory;
+            }
+            else if (AppSettings.PreferredBackupClient == PreferredClient.LIVE && !string.IsNullOrEmpty(AppSettings.LolLiveDirectory))
+            {
+                return AppSettings.LolLiveDirectory;
+            }
+            
+            // Fallback if preferred is not set or not available
+            return !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) ? AppSettings.LolPbeDirectory : AppSettings.LolLiveDirectory;
         }
 
         private async Task LoadBackupsAsync()
@@ -141,7 +144,7 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 IsFolderPicker = true,
                 Title = "Select old directory",
-                InitialDirectory = AppSettings.LolPbeDirectory
+                InitialDirectory = GetPreferredInitialDirectory()
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -165,7 +168,7 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 IsFolderPicker = true,
                 Title = "Select new directory",
-                InitialDirectory = AppSettings.LolPbeDirectory
+                InitialDirectory = GetPreferredInitialDirectory()
             })
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -184,7 +187,7 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
                 Title = "Select old wad file",
-                InitialDirectory = AppSettings.LolPbeDirectory
+                InitialDirectory = GetPreferredInitialDirectory()
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
@@ -202,7 +205,7 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") },
                 Title = "Select new wad file",
-                InitialDirectory = AppSettings.LolPbeDirectory
+                InitialDirectory = GetPreferredInitialDirectory()
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
