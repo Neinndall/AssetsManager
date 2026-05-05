@@ -252,7 +252,9 @@ namespace AssetsManager.Views.Models.Comparator
                 return;
             }
 
-            var version = await versionService.GetGameVersionAsync(path);
+            // Get game root directly to avoid recursive climbing in VersionService
+            string root = backupManager.GetGameRoot(path);
+            var version = await versionService.GetGameVersionAsync(root ?? path);
             var (isPbe, isMain) = backupManager.GetPathIdentification(path);
 
             if (isBase)

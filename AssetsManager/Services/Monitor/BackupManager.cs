@@ -227,13 +227,74 @@ namespace AssetsManager.Services.Monitor
         {
             if (string.IsNullOrEmpty(path)) return (false, false);
 
-            bool isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || 
-                         (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory) && path.StartsWith(_appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase));
+            string pbeRoot = _appSettings.LolPbeDirectory;
+            string liveRoot = _appSettings.LolLiveDirectory;
 
-            bool isMain = (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory) && path.Equals(_appSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase)) || 
-                            (!string.IsNullOrEmpty(_appSettings.LolLiveDirectory) && path.Equals(_appSettings.LolLiveDirectory, StringComparison.OrdinalIgnoreCase));
+            // Prioritize based on user preference
+            bool isPbe;
+            bool isMain;
+
+            if (_appSettings.PreferredBackupClient == PreferredClient.PBE)
+            {
+                bool isPbeSub = !string.IsNullOrEmpty(pbeRoot) && PathUtils.IsSameOrSubPath(pbeRoot, path);
+                bool isLiveSub = !string.IsNullOrEmpty(liveRoot) && PathUtils.IsSameOrSubPath(liveRoot, path);
+
+                isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || isPbeSub;
+                isMain = isPbeSub || isLiveSub;
+            }
+            else
+            {
+                bool isLiveSub = !string.IsNullOrEmpty(liveRoot) && PathUtils.IsSameOrSubPath(liveRoot, path);
+                bool isPbeSub = !string.IsNullOrEmpty(pbeRoot) && PathUtils.IsSameOrSubPath(pbeRoot, path);
+
+                isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || isPbeSub;
+                isMain = isLiveSub || isPbeSub;
+            }
 
             return (isPbe, isMain);
+        }
+
+        public string GetGameRoot(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+
+            string pbeRoot = _appSettings.LolPbeDirectory;
+            string liveRoot = _appSettings.LolLiveDirectory;
+
+            // Prioritize check based on preferred client
+            if (_appSettings.PreferredBackupClient == PreferredClient.PBE)
+            {
+                if (PathUtils.IsSameOrSubPath(pbeRoot, path)) return pbeRoot;
+                if (PathUtils.IsSameOrSubPath(liveRoot, path)) return liveRoot;
+            }
+            else
+            {
+                if (PathUtils.IsSameOrSubPath(liveRoot, path)) return liveRoot;
+                if (PathUtils.IsSameOrSubPath(pbeRoot, path)) return pbeRoot;
+            }
+
+            // Fast heuristic climbing (only if not a known main client)
+            string current = path;
+            for (int i = 0; i < 10; i++) // Safety limit
+            {
+                if (string.IsNullOrEmpty(current)) break;
+
+                if (File.Exists(Path.Combine(current, "content-metadata.json")) || 
+                    File.Exists(Path.Combine(current, "Game", "content-metadata.json")))
+                {
+                    return current;
+                }
+                var parent = Directory.GetParent(current);
+                if (parent == null) break;
+                current = parent.FullName;
+            }
+
+            return null;
+        }
+
+        private bool IsSameOrSubPath(string root, string sub)
+        {
+            return PathUtils.IsSameOrSubPath(root, sub);
         }
 
         private string GetBackupDisplayName(string folderName, string fullPath)

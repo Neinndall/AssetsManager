@@ -219,52 +219,40 @@ namespace AssetsManager.Services.Monitor
             return successCount > 0;
         }
 
-        public async Task<string> GetGameVersionAsync(string startDirectory)
+        public async Task<string> GetGameVersionAsync(string rootDirectory)
         {
-            if (string.IsNullOrEmpty(startDirectory) || !Directory.Exists(startDirectory)) return null;
+            if (string.IsNullOrEmpty(rootDirectory) || !Directory.Exists(rootDirectory)) return null;
 
             try
             {
-                string currentDir = startDirectory;
-                
-                // Climb up the directory tree to find the game root (where content-metadata.json lives)
-                // Limit to 5 levels to avoid infinite loops or searching the whole drive
-                for (int i = 0; i < 5; i++)
+                string metadataPath = Path.Combine(rootDirectory, "Game", "content-metadata.json");
+                if (!File.Exists(metadataPath))
                 {
-                    string metadataPath = Path.Combine(currentDir, "Game", "content-metadata.json");
-                    if (!File.Exists(metadataPath))
+                    metadataPath = Path.Combine(rootDirectory, "content-metadata.json");
+                }
+
+                if (File.Exists(metadataPath))
+                {
+                    string json = await File.ReadAllTextAsync(metadataPath);
+                    using var document = JsonDocument.Parse(json);
+                    if (document.RootElement.TryGetProperty("version", out var versionElement))
                     {
-                        metadataPath = Path.Combine(currentDir, "content-metadata.json");
+                        string fullVersion = versionElement.GetString();
+                        if (string.IsNullOrEmpty(fullVersion)) return null;
+
+                        int plusIndex = fullVersion.IndexOf('+');
+                        if (plusIndex > 0) return fullVersion.Substring(0, plusIndex);
+
+                        int spaceIndex = fullVersion.IndexOf(' ');
+                        if (spaceIndex > 0) return fullVersion.Substring(0, spaceIndex);
+
+                        return fullVersion;
                     }
-
-                    if (File.Exists(metadataPath))
-                    {
-                        string json = await File.ReadAllTextAsync(metadataPath);
-                        using var document = JsonDocument.Parse(json);
-                        if (document.RootElement.TryGetProperty("version", out var versionElement))
-                        {
-                            string fullVersion = versionElement.GetString();
-                            if (string.IsNullOrEmpty(fullVersion)) return null;
-
-                            int plusIndex = fullVersion.IndexOf('+');
-                            if (plusIndex > 0) return fullVersion.Substring(0, plusIndex);
-
-                            int spaceIndex = fullVersion.IndexOf(' ');
-                            if (spaceIndex > 0) return fullVersion.Substring(0, spaceIndex);
-
-                            return fullVersion;
-                        }
-                    }
-
-                    // Move to parent directory
-                    var parent = Directory.GetParent(currentDir);
-                    if (parent == null) break;
-                    currentDir = parent.FullName;
                 }
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Error searching for content-metadata.json version recursively");
+                _logService.LogError(ex, $"Error reading version from {rootDirectory}");
             }
             return null;
         }

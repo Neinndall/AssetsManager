@@ -90,6 +90,11 @@ namespace AssetsManager.Views.Controls.Comparator
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
                 await ViewModel.UpdateMetadataFromPathAsync(true, backup.Path, VersionService, BackupManager);
+                
+                if (ViewModel.IsFileMode)
+                {
+                    await SyncWadFilePathsAsync();
+                }
             }
         }
 
@@ -98,6 +103,11 @@ namespace AssetsManager.Views.Controls.Comparator
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
                 await ViewModel.UpdateMetadataFromPathAsync(false, backup.Path, VersionService, BackupManager);
+                
+                if (ViewModel.IsFileMode)
+                {
+                    await SyncWadFilePathsAsync();
+                }
             }
         }
 
@@ -116,6 +126,11 @@ namespace AssetsManager.Views.Controls.Comparator
                 {
                     ViewModel.OldDirectoryPath = folderBrowserDialog.FileName;
                     await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldDirectoryPath, VersionService, BackupManager);
+                    
+                    if (ViewModel.IsFileMode)
+                    {
+                        await SyncWadFilePathsAsync();
+                    }
                 }
             }
         }
@@ -172,7 +187,62 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 ViewModel.NewWadFilePath = openFileDialog.FileName;
                 await ViewModel.UpdateMetadataFromPathAsync(false, System.IO.Path.GetDirectoryName(ViewModel.NewWadFilePath), VersionService, BackupManager);
+                
+                await SyncWadFilePathsAsync();
             }
+        }
+
+        private async Task SyncWadFilePathsAsync()
+        {
+            if (ViewModel == null || !ViewModel.IsFileMode || string.IsNullOrEmpty(ViewModel.NewWadFilePath)) return;
+
+            string targetRoot = GetBaseGameDirectory(ViewModel.NewWadFilePath);
+            if (string.IsNullOrEmpty(targetRoot)) return;
+
+            string relativePath = System.IO.Path.GetRelativePath(targetRoot, ViewModel.NewWadFilePath);
+
+            // If we have a base source already (manual or backup), try to find the matching file there
+            if (!string.IsNullOrEmpty(ViewModel.BaseSourcePath))
+            {
+                string expectedPath = System.IO.Path.Combine(ViewModel.BaseSourcePath, relativePath);
+                
+                // Use Task.Run for File.Exists to ensure zero UI lag if many checks were to happen
+                bool exists = await Task.Run(() => System.IO.File.Exists(expectedPath));
+                
+                if (exists)
+                {
+                    ViewModel.OldWadFilePath = expectedPath;
+                    await ViewModel.UpdateMetadataFromPathAsync(true, System.IO.Path.GetDirectoryName(expectedPath), VersionService, BackupManager);
+                }
+            }
+        }
+
+        private string GetBaseGameDirectory(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath)) return null;
+
+            if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && filePath.StartsWith(AppSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase))
+                return AppSettings.LolPbeDirectory;
+
+            if (!string.IsNullOrEmpty(AppSettings.LolLiveDirectory) && filePath.StartsWith(AppSettings.LolLiveDirectory, StringComparison.OrdinalIgnoreCase))
+                return AppSettings.LolLiveDirectory;
+
+            foreach (var backup in ViewModel.AvailableBackups)
+            {
+                if (filePath.StartsWith(backup.Path, StringComparison.OrdinalIgnoreCase))
+                    return backup.Path;
+            }
+
+            // Heuristic
+            string dir = System.IO.Path.GetDirectoryName(filePath);
+            while (!string.IsNullOrEmpty(dir))
+            {
+                if (System.IO.Directory.Exists(System.IO.Path.Combine(dir, "Game")))
+                    return dir;
+                dir = System.IO.Path.GetDirectoryName(dir);
+            }
+
+            return null;
         }
 
         private async void compareWadButton_Click(object sender, RoutedEventArgs e)

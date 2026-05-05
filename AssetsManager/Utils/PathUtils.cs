@@ -137,6 +137,23 @@ namespace AssetsManager.Utils
         }
 
         /// <summary>
+        /// Robust check to see if a path is the same or a sub-path of another.
+        /// </summary>
+        public static bool IsSameOrSubPath(string root, string sub)
+        {
+            if (string.IsNullOrEmpty(root) || string.IsNullOrEmpty(sub)) return false;
+
+            try
+            {
+                string r = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                string s = Path.GetFullPath(sub).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+                return s.StartsWith(r, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
         /// Truncates the given name at the first occurrence of a dot ('.').
         /// e.g. "character_skin01.skins_character" -> "character_skin01"
         /// </summary>
