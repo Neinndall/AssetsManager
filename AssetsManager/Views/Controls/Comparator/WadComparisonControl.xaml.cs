@@ -30,12 +30,34 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             InitializeComponent();
             this.Loaded += WadComparisonControl_Loaded;
+            this.Unloaded += WadComparisonControl_Unloaded;
         }
 
         private async void WadComparisonControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
             await LoadBackupsAsync();
             await InitializeDefaultPathsAsync();
+        }
+
+        private void WadComparisonControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+        }
+
+        private async void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                await LoadBackupsAsync();
+                await InitializeDefaultPathsAsync();
+            });
         }
 
         private async Task InitializeDefaultPathsAsync()
