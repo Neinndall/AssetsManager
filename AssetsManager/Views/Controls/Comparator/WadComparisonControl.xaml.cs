@@ -84,7 +84,7 @@ namespace AssetsManager.Views.Controls.Comparator
             if (!string.IsNullOrEmpty(defaultPath))
             {
                 ViewModel.NewDirectoryPath = defaultPath;
-                await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.NewDirectoryPath, VersionService, BackupManager);
+                await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.TargetSourceRoot, VersionService, BackupManager);
             }
         }
 
@@ -111,7 +111,7 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
-                await ViewModel.UpdateMetadataFromPathAsync(true, backup.Path, VersionService, BackupManager);
+                await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.BaseSourceRoot, VersionService, BackupManager);
                 
                 if (ViewModel.IsFileMode)
                 {
@@ -124,7 +124,7 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
-                await ViewModel.UpdateMetadataFromPathAsync(false, backup.Path, VersionService, BackupManager);
+                await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.TargetSourceRoot, VersionService, BackupManager);
                 
                 if (ViewModel.IsFileMode)
                 {
@@ -147,7 +147,7 @@ namespace AssetsManager.Views.Controls.Comparator
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     ViewModel.OldDirectoryPath = folderBrowserDialog.FileName;
-                    await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldDirectoryPath, VersionService, BackupManager);
+                    await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.BaseSourceRoot, VersionService, BackupManager);
                     
                     if (ViewModel.IsFileMode)
                     {
@@ -171,7 +171,7 @@ namespace AssetsManager.Views.Controls.Comparator
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     ViewModel.NewDirectoryPath = folderBrowserDialog.FileName;
-                    await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.NewDirectoryPath, VersionService, BackupManager);
+                    await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.TargetSourceRoot, VersionService, BackupManager);
                 }
             }
         }
@@ -190,7 +190,7 @@ namespace AssetsManager.Views.Controls.Comparator
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 ViewModel.OldWadFilePath = openFileDialog.FileName;
-                await ViewModel.UpdateMetadataFromPathAsync(true, System.IO.Path.GetDirectoryName(ViewModel.OldWadFilePath), VersionService, BackupManager);
+                await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.BaseSourceRoot, VersionService, BackupManager);
             }
         }
 
@@ -208,7 +208,7 @@ namespace AssetsManager.Views.Controls.Comparator
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
                 ViewModel.NewWadFilePath = openFileDialog.FileName;
-                await ViewModel.UpdateMetadataFromPathAsync(false, System.IO.Path.GetDirectoryName(ViewModel.NewWadFilePath), VersionService, BackupManager);
+                await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.TargetSourceRoot, VersionService, BackupManager);
                 
                 await SyncWadFilePathsAsync();
             }
@@ -224,9 +224,9 @@ namespace AssetsManager.Views.Controls.Comparator
             string relativePath = System.IO.Path.GetRelativePath(targetRoot, ViewModel.NewWadFilePath);
 
             // If we have a base source already (manual or backup), try to find the matching file there
-            if (!string.IsNullOrEmpty(ViewModel.BaseSourcePath))
+            if (!string.IsNullOrEmpty(ViewModel.BaseSourceRoot))
             {
-                string expectedPath = System.IO.Path.Combine(ViewModel.BaseSourcePath, relativePath);
+                string expectedPath = System.IO.Path.Combine(ViewModel.BaseSourceRoot, relativePath);
                 
                 // Use Task.Run for File.Exists to ensure zero UI lag if many checks were to happen
                 bool exists = await Task.Run(() => System.IO.File.Exists(expectedPath));
