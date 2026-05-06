@@ -101,7 +101,7 @@
                                                 <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 
                                                 <!-- Client Type Badge (Restored & Refined) -->
-                                                <Border Margin="6,0,0,0" CornerRadius="2.5" Padding="4,0" VerticalAlignment="Center" Height="12">
+                                                <Border Margin="6,0,0,0" CornerRadius="2.5" Padding="4,1" VerticalAlignment="Center">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{StaticResource HoverColor}"/>
@@ -212,7 +212,7 @@
                                 <TextBlock Text="CLIENT TYPE" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4" HorizontalAlignment="Right"/>
                                 <StackPanel Orientation="Horizontal">
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0">
-                                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}">
+                                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Text" Value="LIVE"/>
@@ -229,7 +229,7 @@
                                         </TextBlock>
                                     </Border>
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsTargetMain, Converter={StaticResource BoolToVisibilityConverter}}">
-                                        <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                        <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                     </Border>
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                         <Border.Style>
@@ -246,7 +246,7 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
-                                        <TextBlock Text="BACKUP" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
+                                        <TextBlock Text="BACKUP" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                     </Border>
                                 </StackPanel>
                             </StackPanel>
@@ -301,7 +301,7 @@
                                                 <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 
                                                 <!-- Client Type Badge (Restored & Refined) -->
-                                                <Border Margin="6,0,0,0" CornerRadius="2.5" Padding="4,0" VerticalAlignment="Center" Height="12">
+                                                <Border Margin="6,0,0,0" CornerRadius="2.5" Padding="4,1" VerticalAlignment="Center">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{StaticResource HoverColor}"/>
@@ -402,7 +402,7 @@
                                 <TextBlock Text="CLIENT TYPE" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4" HorizontalAlignment="Right"/>
                                 <StackPanel Orientation="Horizontal">
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0">
-                                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}">
+                                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Text" Value="LIVE"/>
@@ -419,7 +419,7 @@
                                         </TextBlock>
                                     </Border>
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsBaseMain, Converter={StaticResource BoolToVisibilityConverter}}">
-                                        <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                        <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                     </Border>
                                     <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                         <Border.Style>
@@ -436,7 +436,7 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
-                                        <TextBlock Text="BACKUP" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
+                                        <TextBlock Text="BACKUP" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                     </Border>
                                 </StackPanel>
                             </StackPanel>
