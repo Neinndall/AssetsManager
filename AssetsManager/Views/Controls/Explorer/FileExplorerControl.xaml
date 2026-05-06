@@ -164,7 +164,7 @@
                                             </MultiDataTrigger>
                                             
                                             <!-- Selection Override -->
-                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                                 <Setter Property="Foreground" Value="White"/>
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -204,7 +204,7 @@
                                             </DataTrigger>
 
                                             <!-- Selection and Loading overrides -->
-                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                                 <Setter Property="Foreground" Value="White"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Name}" Value="Loading...">
