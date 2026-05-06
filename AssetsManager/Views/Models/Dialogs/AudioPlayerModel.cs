@@ -1,6 +1,10 @@
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using AssetsManager.Services.Audio;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Audio;
 
 namespace AssetsManager.Views.Models.Dialogs
 {
@@ -14,16 +18,17 @@ namespace AssetsManager.Views.Models.Dialogs
         private string _totalTimeText = "0:00";
         private double _currentTime;
         private double _totalTime = 100;
-        private string _activePackName = "New Playlist";
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         public AudioPlayerModel(AudioPlayerService service)
         {
             _service = service;
+            SavedPacks = new ObservableCollection<AudioPlaylistPack>();
         }
 
         public AudioPlayerService Service => _service;
+        public ObservableCollection<AudioPlaylistPack> SavedPacks { get; }
 
         public bool IsPlaying
         {
@@ -79,8 +84,15 @@ namespace AssetsManager.Views.Models.Dialogs
 
         public string ActivePackName
         {
-            get => _activePackName;
-            set { if (_activePackName != value) { _activePackName = value; OnPropertyChanged(); } }
+            get => _service.ActivePackName;
+            set 
+            { 
+                if (_service.ActivePackName != value) 
+                { 
+                    _service.ActivePackName = value; 
+                    OnPropertyChanged(); 
+                } 
+            }
         }
 
         public void ResetToDefault()

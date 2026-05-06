@@ -14,6 +14,8 @@ namespace AssetsManager.Services.Audio
 
         public ObservableRangeCollection<AudioPlaylistItem> Playlist { get; } = new ObservableRangeCollection<AudioPlaylistItem>();
         
+        public string ActivePackName { get; set; } = "New Playlist";
+
         public event EventHandler<AudioPlaylistItem> RequestPlay;
 
         public AudioPlayerService(AppSettings settings)
@@ -44,6 +46,7 @@ namespace AssetsManager.Services.Audio
         public void ClearPlaylist()
         {
             Playlist.Clear();
+            ActivePackName = "New Playlist";
         }
 
         public void PlayItem(AudioPlaylistItem item)
@@ -66,6 +69,7 @@ namespace AssetsManager.Services.Audio
             }
             
             _settings.AudioPlaylists.Add(pack);
+            ActivePackName = name;
             _settings.Save();
         }
 
@@ -84,6 +88,7 @@ namespace AssetsManager.Services.Audio
                     AddedAt = DateTime.Now
                 });
             }
+            ActivePackName = name;
         }
 
         public void DeletePlaylist(string name)
@@ -93,6 +98,7 @@ namespace AssetsManager.Services.Audio
             {
                 _settings.AudioPlaylists.Remove(pack);
                 _settings.Save();
+                if (ActivePackName == name) ActivePackName = "New Playlist";
             }
         }
     }

@@ -6,6 +6,7 @@
         xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
         xmlns:audio="clr-namespace:AssetsManager.Services.Audio"
+        xmlns:audioModel="clr-namespace:AssetsManager.Views.Models.Audio"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Height="600" Width="440"
         MinWidth="350" MinHeight="500"
@@ -15,6 +16,28 @@
         HeaderIcon="Waveform"
         Style="{StaticResource HudWindowStyle}"
         AllowDrop="True" Drop="Window_Drop">
+
+    <base:HudWindow.Resources>
+        <!-- Design for Load Playlist Action -->
+        <Style x:Key="LoadPlaylistMenuItemStyle" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+            <Setter Property="Header" Value="Load Playlist"/>
+            <Setter Property="Icon">
+                <Setter.Value>
+                    <icons:MaterialIcon Kind="PlayCircleOutline" Width="14" Height="14"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Design for Delete Pack Action -->
+        <Style x:Key="DeletePackMenuItemStyle" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+            <Setter Property="Header" Value="Delete Pack"/>
+            <Setter Property="Icon">
+                <Setter.Value>
+                    <icons:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14" Foreground="{StaticResource AccentRed}"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </base:HudWindow.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -49,6 +72,15 @@
                     </Button>
 
                     <Button Grid.Column="3" x:Name="LibraryButton" Style="{StaticResource TransparentIconButton}" Click="ShowLibrary_Click" ToolTip="Playlist Library" Margin="5,0">
+                        <Button.ContextMenu>
+                            <ContextMenu x:Name="LibraryContextMenu">
+                                <MenuItem Header="New (Clear Current)" Click="ClearPlaylist_Click">
+                                    <MenuItem.Icon>
+                                        <icons:MaterialIcon Kind="PlusCircleOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </Button.ContextMenu>
                         <icons:MaterialIcon Kind="LibraryMusicOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}"/>
                     </Button>
                 </Grid>

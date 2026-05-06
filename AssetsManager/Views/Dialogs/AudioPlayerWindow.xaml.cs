@@ -11,8 +11,12 @@ using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs;
+using AssetsManager.Views.Models.Audio;
 using VideoLibrary;
 using Microsoft.Extensions.DependencyInjection;
+using Material.Icons;
+using Material.Icons.WPF;
+using System.ComponentModel;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -40,6 +44,41 @@ namespace AssetsManager.Views.Dialogs
             _mediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
             _mediaPlayer.MediaEnded += MediaPlayer_MediaEnded;
             _mediaPlayer.Volume = ViewModel.Volume;
+
+            // Subscribe to configuration changes to refresh the playlist library automatically
+            _settings.ConfigurationSaved += OnConfigurationSaved;
+            
+            // Initial load
+            LoadPacks();
+            
+            this.Unloaded += (s, e) => _settings.ConfigurationSaved -= OnConfigurationSaved;
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            base.OnClosing(e);
+            
+            // Stop and cleanup when window closes to avoid "Zombie" player
+            _timer.Stop();
+            _mediaPlayer.Stop();
+            _mediaPlayer.Close();
+        }
+
+        private void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            Dispatcher.Invoke(LoadPacks);
+        }
+
+        private void LoadPacks()
+        {
+            ViewModel.SavedPacks.Clear();
+            if (_settings.AudioPlaylists != null)
+            {
+                foreach (var pack in _settings.AudioPlaylists)
+                {
+                    ViewModel.SavedPacks.Add(pack);
+                }
+            }
         }
 
         // ──────────────────────────────────────────────────────────────────────
@@ -171,56 +210,63 @@ namespace AssetsManager.Views.Dialogs
 
         private void ShowLibrary_Click(object sender, RoutedEventArgs e)
         {
-            var contextMenu = new ContextMenu();
+            // First item is static "New", so we keep it. We only refresh dynamic items.
+            while (LibraryContextMenu.Items.Count > 1)
+                LibraryContextMenu.Items.RemoveAt(1);
 
-            if (!_settings.AudioPlaylists.Any())
+            if (!ViewModel.SavedPacks.Any())
             {
-                var emptyItem = new MenuItem { Header = "No saved playlists", IsEnabled = false };
-                contextMenu.Items.Add(emptyItem);
+                LibraryContextMenu.Items.Add(new MenuItem { Header = "No saved playlists", IsEnabled = false });
             }
             else
             {
-                foreach (var pack in _settings.AudioPlaylists)
+                foreach (var pack in ViewModel.SavedPacks)
                 {
-                    var item = new MenuItem { Header = pack.Name };
+                    var packItem = new MenuItem { Header = pack.Name };
                     
-                    var loadItem = new MenuItem { Header = "Load Playlist" };
-                    loadItem.Click += (s, args) => 
-                    {
-                        ViewModel.Service.LoadPlaylist(pack.Name);
-                        ViewModel.ActivePackName = pack.Name;
-                        ViewModel.IsPlaying = false;
-                        _mediaPlayer.Stop();
-                        ViewModel.ResetToDefault(); // Reset track info on load
-                        ViewModel.ActivePackName = pack.Name; // Restore name after reset
-                    };
+                    var loadItem = new MenuItem { Style = (Style)FindResource("LoadPlaylistMenuItemStyle"), Tag = pack };
+                    loadItem.Click += LoadPlaylist_Click;
 
-                    var deleteItem = new MenuItem { Header = "Delete Pack" };
-                    deleteItem.Click += (s, args) => 
-                    {
-                        if (_customMessageBoxService.ShowYesNo("Delete Pack", $"Are you sure you want to delete '{pack.Name}'?", this) == true)
-                        {
-                            ViewModel.Service.DeletePlaylist(pack.Name);
-                            if (ViewModel.ActivePackName == pack.Name)
-                            {
-                                ViewModel.ActivePackName = "New Playlist";
-                            }
-                        }
-                    };
+                    var deleteItem = new MenuItem { Style = (Style)FindResource("DeletePackMenuItemStyle"), Tag = pack };
+                    deleteItem.Click += DeletePlaylist_Click;
 
-                    item.Items.Add(loadItem);
-                    item.Items.Add(deleteItem);
-                    contextMenu.Items.Add(item);
+                    packItem.Items.Add(loadItem);
+                    packItem.Items.Add(deleteItem);
+                    LibraryContextMenu.Items.Add(packItem);
                 }
             }
 
-            var clearItem = new MenuItem { Header = "New (Clear Current)" };
-            clearItem.Click += (s, args) => ClearPlaylist_Click(null, null);
-            contextMenu.Items.Add(clearItem);
+            LibraryContextMenu.PlacementTarget = LibraryButton;
+            LibraryContextMenu.Placement = PlacementMode.Bottom;
+            LibraryContextMenu.IsOpen = true;
+        }
 
-            contextMenu.PlacementTarget = LibraryButton;
-            contextMenu.Placement = PlacementMode.Bottom;
-            contextMenu.IsOpen = true;
+        private void LoadPlaylist_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem && menuItem.Tag is AudioPlaylistPack pack)
+            {
+                ViewModel.Service.LoadPlaylist(pack.Name);
+                ViewModel.ActivePackName = pack.Name;
+                ViewModel.IsPlaying = false;
+                _mediaPlayer.Stop();
+                ViewModel.ResetToDefault();
+                ViewModel.ActivePackName = pack.Name;
+            }
+        }
+
+        private void DeletePlaylist_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem && menuItem.Tag is AudioPlaylistPack pack)
+            {
+                if (_customMessageBoxService.ShowYesNo("Delete Pack", $"Are you sure you want to delete '{pack.Name}'?", this) == true)
+                {
+                    ViewModel.Service.DeletePlaylist(pack.Name);
+                    if (ViewModel.ActivePackName == pack.Name)
+                    {
+                        ViewModel.ActivePackName = "New Playlist";
+                    }
+                }
+            }
         }
 
         // ──────────────────────────────────────────────────────────────────────
