@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Settings;
+using AssetsManager.Views.Models.Audio;
 
 namespace AssetsManager.Utils
 {
@@ -49,6 +50,7 @@ namespace AssetsManager.Utils
 
         public Dictionary<string, List<long>> AssetTrackerUserRemovedIds { get; set; }
         public List<string> FavoritePaths { get; set; }
+        public List<AudioPlaylistPack> AudioPlaylists { get; set; }
 
         public ApiSettings ApiSettings { get; set; }
 
@@ -90,6 +92,7 @@ namespace AssetsManager.Utils
             settings.AssetTrackerUrlOverrides ??= new Dictionary<string, Dictionary<long, string>>();
             settings.AssetTrackerUserRemovedIds ??= new Dictionary<string, List<long>>();
             settings.FavoritePaths ??= new List<string>();
+            settings.AudioPlaylists ??= new List<AudioPlaylistPack>();
 
             // Robustly initialize and heal ApiSettings
             if (settings.ApiSettings == null)
@@ -154,6 +157,7 @@ namespace AssetsManager.Utils
                 AssetTrackerUrlOverrides = new Dictionary<string, Dictionary<long, string>>(),
                 AssetTrackerUserRemovedIds = new Dictionary<string, List<long>>(),
                 FavoritePaths = new List<string>(),
+                AudioPlaylists = new List<AudioPlaylistPack>(),
                 ApiSettings = new ApiSettings
                 {
                     Connection = new ConnectionInfo(),
@@ -202,6 +206,7 @@ namespace AssetsManager.Utils
             AssetTrackerUrlOverrides = defaultSettings.AssetTrackerUrlOverrides;
             AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
             FavoritePaths = defaultSettings.FavoritePaths;
+            AudioPlaylists = defaultSettings.AudioPlaylists;
             ApiSettings = defaultSettings.ApiSettings;
             SyncHashesWithCDTB = defaultSettings.SyncHashesWithCDTB;
             // HashesSizes is intentionally not reset to preserve local cache state.

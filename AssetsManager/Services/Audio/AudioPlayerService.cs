@@ -4,14 +4,22 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Audio
 {
     public class AudioPlayerService
     {
+        private readonly AppSettings _settings;
+
         public ObservableRangeCollection<AudioPlaylistItem> Playlist { get; } = new ObservableRangeCollection<AudioPlaylistItem>();
         
         public event EventHandler<AudioPlaylistItem> RequestPlay;
+
+        public AudioPlayerService(AppSettings settings)
+        {
+            _settings = settings;
+        }
 
         public void AddToPlaylist(string name, string url, byte[] data = null)
         {
@@ -41,6 +49,51 @@ namespace AssetsManager.Services.Audio
         public void PlayItem(AudioPlaylistItem item)
         {
             RequestPlay?.Invoke(this, item);
+        }
+
+        public void SavePlaylist(string name)
+        {
+            var existing = _settings.AudioPlaylists.FirstOrDefault(x => x.Name == name);
+            var pack = new AudioPlaylistPack
+            {
+                Name = name,
+                Tracks = Playlist.Select(x => new SavedAudioTrack { Name = x.Name, Url = x.Url }).ToList()
+            };
+
+            if (existing != null)
+            {
+                _settings.AudioPlaylists.Remove(existing);
+            }
+            
+            _settings.AudioPlaylists.Add(pack);
+            _settings.Save();
+        }
+
+        public void LoadPlaylist(string name)
+        {
+            var pack = _settings.AudioPlaylists.FirstOrDefault(x => x.Name == name);
+            if (pack == null) return;
+
+            Playlist.Clear();
+            foreach (var track in pack.Tracks)
+            {
+                Playlist.Add(new AudioPlaylistItem
+                {
+                    Name = track.Name,
+                    Url = track.Url,
+                    AddedAt = DateTime.Now
+                });
+            }
+        }
+
+        public void DeletePlaylist(string name)
+        {
+            var pack = _settings.AudioPlaylists.FirstOrDefault(x => x.Name == name);
+            if (pack != null)
+            {
+                _settings.AudioPlaylists.Remove(pack);
+                _settings.Save();
+            }
         }
     }
 

@@ -12,21 +12,24 @@ using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs;
 using VideoLibrary;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class AudioPlayerWindow : HudWindow
     {
         private readonly CustomMessageBoxService _customMessageBoxService;
+        private readonly AppSettings _settings;
         private readonly MediaPlayer _mediaPlayer = new MediaPlayer();
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private bool _isDragging = false;
 
         public AudioPlayerModel ViewModel { get; }
 
-        public AudioPlayerWindow(AudioPlayerService audioService, CustomMessageBoxService customMessageBoxService)
+        public AudioPlayerWindow(AudioPlayerService audioService, CustomMessageBoxService customMessageBoxService, AppSettings settings)
         {
             InitializeComponent();
+            _settings = settings;
             ViewModel = new AudioPlayerModel(audioService);
             DataContext = ViewModel;
             _customMessageBoxService = customMessageBoxService;
@@ -137,6 +140,87 @@ namespace AssetsManager.Views.Dialogs
                     _customMessageBoxService.ShowError("Error", $"Error processing URL: {ex.Message}", this);
                 }
             }
+        }
+
+        // ──────────────────────────────────────────────────────────────────────
+        // Playlist Hub (Library & Saving)
+        // ──────────────────────────────────────────────────────────────────────
+
+        private void SavePlaylist_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel.Service.Playlist.Count == 0)
+            {
+                _customMessageBoxService.ShowError("Playlist Empty", "You cannot save an empty playlist.", this);
+                return;
+            }
+
+            string initialName = ViewModel.ActivePackName == "New Playlist" ? "" : ViewModel.ActivePackName;
+            var dialog = new InputDialog();
+            dialog.Initialize("Save Playlist", "Enter a name for this playlist pack:", initialName);
+            dialog.Owner = this;
+
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
+            {
+                string packName = dialog.InputText.Trim();
+                ViewModel.Service.SavePlaylist(packName);
+                ViewModel.ActivePackName = packName;
+                
+                _customMessageBoxService.ShowSuccess("Playlist Saved", $"Playlist '{packName}' saved successfully!", this);
+            }
+        }
+
+        private void ShowLibrary_Click(object sender, RoutedEventArgs e)
+        {
+            var contextMenu = new ContextMenu();
+
+            if (!_settings.AudioPlaylists.Any())
+            {
+                var emptyItem = new MenuItem { Header = "No saved playlists", IsEnabled = false };
+                contextMenu.Items.Add(emptyItem);
+            }
+            else
+            {
+                foreach (var pack in _settings.AudioPlaylists)
+                {
+                    var item = new MenuItem { Header = pack.Name };
+                    
+                    var loadItem = new MenuItem { Header = "Load Playlist" };
+                    loadItem.Click += (s, args) => 
+                    {
+                        ViewModel.Service.LoadPlaylist(pack.Name);
+                        ViewModel.ActivePackName = pack.Name;
+                        ViewModel.IsPlaying = false;
+                        _mediaPlayer.Stop();
+                        ViewModel.ResetToDefault(); // Reset track info on load
+                        ViewModel.ActivePackName = pack.Name; // Restore name after reset
+                    };
+
+                    var deleteItem = new MenuItem { Header = "Delete Pack" };
+                    deleteItem.Click += (s, args) => 
+                    {
+                        if (_customMessageBoxService.ShowYesNo("Delete Pack", $"Are you sure you want to delete '{pack.Name}'?", this) == true)
+                        {
+                            ViewModel.Service.DeletePlaylist(pack.Name);
+                            if (ViewModel.ActivePackName == pack.Name)
+                            {
+                                ViewModel.ActivePackName = "New Playlist";
+                            }
+                        }
+                    };
+
+                    item.Items.Add(loadItem);
+                    item.Items.Add(deleteItem);
+                    contextMenu.Items.Add(item);
+                }
+            }
+
+            var clearItem = new MenuItem { Header = "New (Clear Current)" };
+            clearItem.Click += (s, args) => ClearPlaylist_Click(null, null);
+            contextMenu.Items.Add(clearItem);
+
+            contextMenu.PlacementTarget = LibraryButton;
+            contextMenu.Placement = PlacementMode.Bottom;
+            contextMenu.IsOpen = true;
         }
 
         // ──────────────────────────────────────────────────────────────────────

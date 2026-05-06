@@ -14,6 +14,7 @@ namespace AssetsManager.Views.Models.Dialogs
         private string _totalTimeText = "0:00";
         private double _currentTime;
         private double _totalTime = 100;
+        private string _activePackName = "New Playlist";
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -76,6 +77,12 @@ namespace AssetsManager.Views.Models.Dialogs
             set { if (_totalTime != value) { _totalTime = value; OnPropertyChanged(); } }
         }
 
+        public string ActivePackName
+        {
+            get => _activePackName;
+            set { if (_activePackName != value) { _activePackName = value; OnPropertyChanged(); } }
+        }
+
         public void ResetToDefault()
         {
             CurrentTrackName = "No track selected";
@@ -83,6 +90,7 @@ namespace AssetsManager.Views.Models.Dialogs
             TotalTimeText = "0:00";
             CurrentTime = 0;
             TotalTime = 100;
+            ActivePackName = "New Playlist";
         }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
