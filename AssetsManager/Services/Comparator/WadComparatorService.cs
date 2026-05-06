@@ -246,12 +246,18 @@ namespace AssetsManager.Services.Comparator
             }
 
             var oldChecksumMap = new Dictionary<ulong, ulong>();
+            // First pass: chunks that are NOT in new WAD (likely renames)
             foreach (var kvp in oldChunkChecksums)
             {
                 if (!newChunks.ContainsKey(kvp.Key))
                 {
                     oldChecksumMap.TryAdd(kvp.Value, kvp.Key);
                 }
+            }
+            // Second pass: chunks that ARE in new WAD (likely duplicates)
+            foreach (var kvp in oldChunkChecksums)
+            {
+                oldChecksumMap.TryAdd(kvp.Value, kvp.Key);
             }
 
             foreach (var newChunk in newChunks.Values)
@@ -262,7 +268,7 @@ namespace AssetsManager.Services.Comparator
                     var newPath = _hashResolverService.ResolveHash(newChunk.PathHash);
                     ulong newChecksum = newChunkChecksums[newChunk.PathHash];
 
-                    if (newChecksum != 0 && oldChecksumMap.TryGetValue(newChecksum, out ulong oldHash))
+                    if (oldChecksumMap.TryGetValue(newChecksum, out ulong oldHash))
                     {
                         var oldPath = _hashResolverService.ResolveHash(oldHash);
                         diffs.Add(new ChunkDiff { Type = ChunkDiffType.Renamed, OldChunk = oldChunks[oldHash], NewChunk = newChunk, OldPath = oldPath, NewPath = newPath, SourceWadFile = sourceWadFile });
