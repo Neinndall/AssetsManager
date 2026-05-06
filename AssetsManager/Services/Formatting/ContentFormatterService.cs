@@ -112,6 +112,9 @@ namespace AssetsManager.Services.Formatting
                 case "bnk":
                     formattedContent = await GetBnkJsonStringAsync(data);
                     break;
+                case "luabin64":
+                    formattedContent = await LuaDecompilerUtils.DecompileAsync(data);
+                    break;
                 case "text":
                 default:
                     formattedContent = Encoding.UTF8.GetString(data);
