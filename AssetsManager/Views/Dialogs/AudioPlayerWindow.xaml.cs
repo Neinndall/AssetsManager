@@ -7,6 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using AssetsManager.Services.Audio;
+using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs;
@@ -15,11 +16,13 @@ namespace AssetsManager.Views.Dialogs
 {
     public partial class AudioPlayerWindow : HudWindow
     {
+        private readonly LogService _logService;
         public AudioPlayerModel ViewModel { get; }
 
-        public AudioPlayerWindow(AudioPlayerService audioService)
+        public AudioPlayerWindow(AudioPlayerService audioService, LogService logService)
         {
             InitializeComponent();
+            _logService = logService;
             ViewModel = new AudioPlayerModel(audioService);
             DataContext = ViewModel;
         }
@@ -72,14 +75,40 @@ namespace AssetsManager.Views.Dialogs
             CurrentTrackName.Text = "No track selected";
         }
 
-        private void AddUrl_Click(object sender, RoutedEventArgs e)
+        private async void AddUrl_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new InputDialog();
-            dialog.Initialize("Add URL", "Paste the URL below:", "https://...");
+            dialog.Initialize("Add URL", "Paste the YouTube URL below:", string.Empty);
             dialog.Owner = this;
+
             if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
             {
-                ViewModel.Service.AddToPlaylist(Path.GetFileName(dialog.InputText), dialog.InputText);
+                string url = dialog.InputText.Trim();
+
+                try
+                {
+                    // Usamos VideoLibrary para resolver la URL de forma asíncrona
+                    var youtube = VideoLibrary.YouTube.Default;
+                    var video = await youtube.GetVideoAsync(url);
+
+                    if (video != null)
+                    {
+                        string title = video.Title;
+                        string streamUri = video.Uri;
+
+                        ViewModel.Service.AddToPlaylist(title, streamUri);
+                    }
+                    else
+                    {
+                        ViewModel.Service.AddToPlaylist(Path.GetFileName(url), url);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Error resolving YouTube URL: {url}");
+                    // Fallback al comportamiento original por si es una URL directa de audio
+                    ViewModel.Service.AddToPlaylist(Path.GetFileName(url), url);
+                }
             }
         }
 
