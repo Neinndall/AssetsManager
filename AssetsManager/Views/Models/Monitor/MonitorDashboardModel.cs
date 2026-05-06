@@ -218,7 +218,7 @@ namespace AssetsManager.Views.Models.Monitor
             // Initialize PBE status with last known message and check time
             if (_appSettings.LastPbeStatusMessage == "ONLINE")
             {
-                PbeStatusText = "SERVER ONLINE";
+                PbeStatusText = "Server Online";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
             }
             else if (!string.IsNullOrEmpty(_appSettings.LastPbeStatusMessage))
@@ -228,7 +228,7 @@ namespace AssetsManager.Views.Models.Monitor
             }
             else // Default if status is null or empty in settings
             {
-                PbeStatusText = "SERVER ONLINE";
+                PbeStatusText = "Server Online";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
             }
             PbeLastCheck = FormatLastCheckTime(_appSettings.LastPbeCheckTime);
@@ -311,7 +311,7 @@ namespace AssetsManager.Views.Models.Monitor
         private void UpdateGlobalStatus()
         {
             // Priority 1: Critical (PBE Down)
-            if (PbeStatusText != "No issues detected")
+            if (PbeStatusText != "Server Online")
             {
                 GlobalStatusText = "System Alert";
                 GlobalStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
@@ -407,7 +407,7 @@ namespace AssetsManager.Views.Models.Monitor
             string status = _appSettings.LastPbeStatusMessage;
             if (status == "ONLINE") // Use the specific "code" from PbeStatusService
             {
-                PbeStatusText = "SERVER ONLINE";
+                PbeStatusText = "Server Online";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
             }
             else if (!string.IsNullOrEmpty(status))
@@ -417,7 +417,7 @@ namespace AssetsManager.Views.Models.Monitor
             }
             else // Default if status is null or empty
             {
-                PbeStatusText = "SERVER ONLINE";
+                PbeStatusText = "Server Online";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
             }
             UpdateGlobalStatus();
