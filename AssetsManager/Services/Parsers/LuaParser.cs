@@ -5,19 +5,19 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Services.Parsers
 {
-    public static class LuaDecompilerUtils
+    public class LuaParser
     {
         /// <summary>
         /// Orchestrates the decompression/disassembly of Lua 5.1 bytecode files (.luabin64).
         /// </summary>
-        public static Task<string> DecompileAsync(byte[] data)
+        public Task<string> DecompileAsync(byte[] data)
         {
             return Task.Run(() => Decompile(data));
         }
 
-        public static string Decompile(byte[] data)
+        public string Decompile(byte[] data)
         {
             if (data == null || data.Length == 0)
                 return string.Empty;

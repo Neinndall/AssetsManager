@@ -26,6 +26,7 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Manifests;
+using AssetsManager.Services.Parsers;
 
 namespace AssetsManager
 {
@@ -106,6 +107,12 @@ namespace AssetsManager
       services.AddSingleton<JsonFormatterService>();
       services.AddSingleton<ContentFormatterService>();
       services.AddSingleton<AudioConversionService>();
+      services.AddSingleton<BinPropertyParser>();
+      services.AddSingleton<TroybinParser>();
+      services.AddSingleton<PreloadParser>();
+      services.AddSingleton<StringTableParser>();
+      services.AddSingleton<LuaParser>();
+      services.AddSingleton<SvgParser>();
  
       // Explorer Services
       services.AddTransient<ExplorerPreviewService>();

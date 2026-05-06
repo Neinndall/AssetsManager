@@ -26,8 +26,6 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Comparator;
-using SharpVectors.Converters;
-using SharpVectors.Renderers.Wpf;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -48,8 +46,16 @@ namespace AssetsManager.Services.Explorer
         private readonly ContentFormatterService _contentFormatterService;
         private readonly AudioConversionService _audioConversionService;
         private readonly WadContentProvider _wadContentProvider;
+        private readonly SvgParser _svgParser;
 
-        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDiffProvider wadDiffProvider, ContentFormatterService contentFormatterService, AudioConversionService audioConversionService, WadContentProvider wadContentProvider)
+        public ExplorerPreviewService(
+            LogService logService, 
+            DirectoriesCreator directoriesCreator, 
+            WadDiffProvider wadDiffProvider, 
+            ContentFormatterService contentFormatterService, 
+            AudioConversionService audioConversionService, 
+            WadContentProvider wadContentProvider,
+            SvgParser svgParser)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
@@ -57,6 +63,7 @@ namespace AssetsManager.Services.Explorer
             _contentFormatterService = contentFormatterService;
             _audioConversionService = audioConversionService;
             _wadContentProvider = wadContentProvider;
+            _svgParser = svgParser;
         }
 
         public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FilePreviewerModel viewModel)
@@ -382,7 +389,7 @@ namespace AssetsManager.Services.Explorer
         {
             try
             {
-                var drawingImage = await Task.Run(() => SvgUtils.LoadSvg(data));
+                var drawingImage = await Task.Run(() => _svgParser.LoadSvg(data));
                 if (drawingImage != null)
                 {
                     await SetPreviewerAsync(Previewer.Image, drawingImage);
@@ -554,7 +561,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 else if (SupportedFileTypes.VectorImages.Contains(node.Extension))
                 {
-                    return await Task.Run(() => SvgUtils.LoadSvg(data));
+                    return await Task.Run(() => _svgParser.LoadSvg(data));
                 }
             }
             catch (Exception ex)

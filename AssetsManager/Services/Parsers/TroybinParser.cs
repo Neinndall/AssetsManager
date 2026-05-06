@@ -4,16 +4,23 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
 using LeagueToolkit.IO.Inibin;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Services.Parsers
 {
-    public static class TroybinUtils
+    public class TroybinParser
     {
-        public static Task WriteInibinAsJsonAsync(Stream outputStream, InibinFile inibinFile, HashResolverService hashResolver)
+        private readonly HashResolverService _hashResolver;
+
+        public TroybinParser(HashResolverService hashResolver)
         {
-            return Task.Run(() => WriteInibinAsJson(outputStream, inibinFile, hashResolver));
+            _hashResolver = hashResolver;
         }
 
-        private static void WriteInibinAsJson(Stream outputStream, InibinFile inibinFile, HashResolverService hashResolver)
+        public Task WriteInibinAsJsonAsync(Stream outputStream, InibinFile inibinFile)
+        {
+            return Task.Run(() => WriteInibinAsJson(outputStream, inibinFile));
+        }
+
+        private void WriteInibinAsJson(Stream outputStream, InibinFile inibinFile)
         {
             var options = new JsonWriterOptions { Indented = true };
             using var writer = new Utf8JsonWriter(outputStream, options);
@@ -25,7 +32,7 @@ namespace AssetsManager.Utils
                 writer.WriteStartObject();
                 foreach (var prop in set.Value.Properties)
                 {
-                    writer.WritePropertyName(hashResolver.ResolveBinHashGeneral(prop.Key));
+                    writer.WritePropertyName(_hashResolver.ResolveBinHashGeneral(prop.Key));
                     WriteValue(writer, prop.Value);
                 }
                 writer.WriteEndObject();
@@ -34,7 +41,7 @@ namespace AssetsManager.Utils
             writer.Flush();
         }
 
-        private static void WriteValue(Utf8JsonWriter writer, object value)
+        private void WriteValue(Utf8JsonWriter writer, object value)
         {
             if (value == null)
             {
