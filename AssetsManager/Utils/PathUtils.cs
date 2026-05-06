@@ -163,5 +163,18 @@ namespace AssetsManager.Utils
             int dotIndex = name.IndexOf('.');
             return dotIndex == -1 ? name : name.Substring(0, dotIndex);
         }
+
+        /// <summary>
+        /// Simplifies a full mesh/material identifier by taking only the last segment of the path.
+        /// e.g. "Maps/KitPieces/TFT/Materials/Base/VertexAnimation/Bush_Wind_A" -> "Bush_Wind_A"
+        /// </summary>
+        public static string SimplifyMeshName(string fullName)
+        {
+            if (string.IsNullOrEmpty(fullName)) return "Default";
+
+            // Split by both types of slashes and take the last non-empty part
+            string[] parts = fullName.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length > 0 ? parts.Last() : fullName;
+        }
     }
 }
