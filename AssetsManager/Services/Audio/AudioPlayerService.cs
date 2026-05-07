@@ -23,7 +23,7 @@ namespace AssetsManager.Services.Audio
             _settings = settings;
         }
 
-        public void AddToPlaylist(string name, string url, byte[] data = null)
+        public void AddToPlaylist(string name, string url, string originalUrl = null, byte[] data = null)
         {
             if (Playlist.Any(x => x.Url == url)) return;
 
@@ -31,6 +31,7 @@ namespace AssetsManager.Services.Audio
             {
                 Name = name,
                 Url = url,
+                OriginalUrl = originalUrl ?? url,
                 Data = data,
                 AddedAt = DateTime.Now
             };
@@ -60,7 +61,7 @@ namespace AssetsManager.Services.Audio
             var pack = new AudioPlaylistPack
             {
                 Name = name,
-                Tracks = Playlist.Select(x => new SavedAudioTrack { Name = x.Name, Url = x.Url }).ToList()
+                Tracks = Playlist.Select(x => new SavedAudioTrack { Name = x.Name, Url = x.Url, OriginalUrl = x.OriginalUrl }).ToList()
             };
 
             if (existing != null)
@@ -85,6 +86,7 @@ namespace AssetsManager.Services.Audio
                 {
                     Name = track.Name,
                     Url = track.Url,
+                    OriginalUrl = track.OriginalUrl ?? track.Url,
                     AddedAt = DateTime.Now
                 });
             }
@@ -107,6 +109,7 @@ namespace AssetsManager.Services.Audio
     {
         public string Name { get; set; }
         public string Url { get; set; }
+        public string OriginalUrl { get; set; }
         public byte[] Data { get; set; }
         public DateTime AddedAt { get; set; }
     }

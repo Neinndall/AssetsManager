@@ -6,6 +6,7 @@ namespace AssetsManager.Views.Models.Audio
     {
         public string Name { get; set; }
         public string Url { get; set; }
+        public string OriginalUrl { get; set; }
     }
 
     public class AudioPlaylistPack

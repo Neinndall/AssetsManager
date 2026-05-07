@@ -87,11 +87,8 @@ namespace AssetsManager.Views.Models.Dialogs
             get => _service.ActivePackName;
             set 
             { 
-                if (_service.ActivePackName != value) 
-                { 
-                    _service.ActivePackName = value; 
-                    OnPropertyChanged(); 
-                } 
+                _service.ActivePackName = value; 
+                OnPropertyChanged(); 
             }
         }
 

@@ -85,7 +85,7 @@ namespace AssetsManager.Views.Dialogs
         // Playback Controls
         // ──────────────────────────────────────────────────────────────────────
 
-        private void PlayPause_Click(object sender, RoutedEventArgs e)
+        private async void PlayPause_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel.Service.Playlist.Count == 0) return;
 
@@ -94,7 +94,28 @@ namespace AssetsManager.Views.Dialogs
             {
                 if (ViewModel.CurrentTrackName != selectedItem.Name)
                 {
-                    _mediaPlayer.Open(new Uri(selectedItem.Url));
+                    // If it's a YouTube URL, check if it needs re-resolution (common for saved playlists)
+                    string playUrl = selectedItem.Url;
+                    if (selectedItem.OriginalUrl != null && (selectedItem.OriginalUrl.Contains("youtube.com") || selectedItem.OriginalUrl.Contains("youtu.be")))
+                    {
+                        try
+                        {
+                            // Re-resolve to get a fresh stream URI
+                            var youtube = YouTube.Default;
+                            var video = await youtube.GetVideoAsync(selectedItem.OriginalUrl);
+                            if (video != null)
+                            {
+                                playUrl = video.Uri;
+                                selectedItem.Url = playUrl; // Update in-memory to avoid immediate re-resolution
+                            }
+                        }
+                        catch
+                        {
+                            // Fallback to existing URL if re-resolution fails
+                        }
+                    }
+
+                    _mediaPlayer.Open(new Uri(playUrl));
                     ViewModel.CurrentTrackName = selectedItem.Name;
                     _mediaPlayer.Play();
                     ViewModel.IsPlaying = true;
@@ -166,7 +187,7 @@ namespace AssetsManager.Views.Dialogs
                         var video = await youtube.GetVideoAsync(url);
                         if (video != null)
                         {
-                            ViewModel.Service.AddToPlaylist(video.FullName, video.Uri);
+                            ViewModel.Service.AddToPlaylist(video.FullName, video.Uri, url);
                         }
                     }
                     else
@@ -201,7 +222,11 @@ namespace AssetsManager.Views.Dialogs
             if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
             {
                 string packName = dialog.InputText.Trim();
+                
+                // First update the service
                 ViewModel.Service.SavePlaylist(packName);
+                
+                // Then update the ViewModel property to trigger PropertyChanged notification
                 ViewModel.ActivePackName = packName;
                 
                 _customMessageBoxService.ShowSuccess("Playlist Saved", $"Playlist '{packName}' saved successfully!", this);
@@ -260,9 +285,16 @@ namespace AssetsManager.Views.Dialogs
             {
                 if (_customMessageBoxService.ShowYesNo("Delete Pack", $"Are you sure you want to delete '{pack.Name}'?", this) == true)
                 {
+                    bool wasActive = ViewModel.ActivePackName == pack.Name;
+                    
                     ViewModel.Service.DeletePlaylist(pack.Name);
-                    if (ViewModel.ActivePackName == pack.Name)
+                    
+                    // Refresh the local collection for the UI
+                    LoadPacks();
+
+                    if (wasActive)
                     {
+                        // Explicitly set the ViewModel property to force the UI refresh to "New Playlist"
                         ViewModel.ActivePackName = "New Playlist";
                     }
                 }
