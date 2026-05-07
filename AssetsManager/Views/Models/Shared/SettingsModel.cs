@@ -45,13 +45,6 @@ namespace AssetsManager.Views.Models.Shared
             new FormatOption<PreferredClient> { Name = "LIVE", Value = PreferredClient.LIVE }
         };
 
-        public List<FormatOption<PreferredDirectory>> PreferredDirectoryOptions { get; } = new List<FormatOption<PreferredDirectory>>
-        {
-            new FormatOption<PreferredDirectory> { Name = "All", Value = PreferredDirectory.All },
-            new FormatOption<PreferredDirectory> { Name = "Game", Value = PreferredDirectory.Game },
-            new FormatOption<PreferredDirectory> { Name = "Plugins", Value = PreferredDirectory.Plugins }
-        };
-
         public void NotifySettingsChanged()
         {
             // Notificamos que el objeto Settings ha cambiado para refrescar todos sus sub-bindings

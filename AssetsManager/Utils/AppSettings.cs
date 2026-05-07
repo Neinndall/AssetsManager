@@ -35,7 +35,6 @@ namespace AssetsManager.Utils
         public string LastPbeStatusMessage { get; set; }
         public string LastPbeCheckTime { get; set; }
         public PreferredClient PreferredBackupClient { get; set; } = PreferredClient.PBE;
-        public PreferredDirectory PreferredDirectory { get; set; } = PreferredDirectory.All;
         public string CustomFloorTexturePath { get; set; } = string.Empty;
         public Dictionary<string, long> HashesSizes { get; set; }
         public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
@@ -149,7 +148,6 @@ namespace AssetsManager.Utils
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
                 PreferredBackupClient = PreferredClient.PBE,
-                PreferredDirectory = PreferredDirectory.All,
                 HashesSizes = new Dictionary<string, long>(),
                 MonitoredAssets = new List<MonitoredAsset>(),
                 DiffHistory = new List<HistoryEntry>(),
@@ -196,7 +194,6 @@ namespace AssetsManager.Utils
             MinimizeToTrayOnClose = defaultSettings.MinimizeToTrayOnClose;
             LastPbeStatusMessage = defaultSettings.LastPbeStatusMessage;
             PreferredBackupClient = defaultSettings.PreferredBackupClient;
-            PreferredDirectory = defaultSettings.PreferredDirectory;
             UpdateCheckFrequency = defaultSettings.UpdateCheckFrequency;
             PbeStatusFrequency = defaultSettings.PbeStatusFrequency;
             MonitoredAssets = defaultSettings.MonitoredAssets;

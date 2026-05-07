@@ -12,7 +12,6 @@ using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Explorer;
-using AssetsManager.Views.Models.Settings;
 using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Services.Explorer.Tree
@@ -42,32 +41,26 @@ namespace AssetsManager.Services.Explorer.Tree
             _audioBankService = audioBankService;
         }
 
-        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken, PreferredDirectory preferredDirectory = PreferredDirectory.All)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken)
         {
             var rootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
 
-            if (preferredDirectory == PreferredDirectory.All || preferredDirectory == PreferredDirectory.Game)
+            string gamePath = Path.Combine(rootPath, "Game");
+            if (Directory.Exists(gamePath))
             {
-                string gamePath = Path.Combine(rootPath, "Game");
-                if (Directory.Exists(gamePath))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var gameNode = new FileSystemNodeModel(gamePath);
-                    rootNodes.Add(gameNode);
-                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(gameNode, rootPath, cancellationToken);
-                }
+                cancellationToken.ThrowIfCancellationRequested();
+                var gameNode = new FileSystemNodeModel(gamePath);
+                rootNodes.Add(gameNode);
+                await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(gameNode, rootPath, cancellationToken);
             }
 
-            if (preferredDirectory == PreferredDirectory.All || preferredDirectory == PreferredDirectory.Plugins)
+            string pluginsPath = Path.Combine(rootPath, "Plugins");
+            if (Directory.Exists(pluginsPath))
             {
-                string pluginsPath = Path.Combine(rootPath, "Plugins");
-                if (Directory.Exists(pluginsPath))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var pluginsNode = new FileSystemNodeModel(pluginsPath);
-                    rootNodes.Add(pluginsNode);
-                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(pluginsNode, rootPath, cancellationToken);
-                }
+                cancellationToken.ThrowIfCancellationRequested();
+                var pluginsNode = new FileSystemNodeModel(pluginsPath);
+                rootNodes.Add(pluginsNode);
+                await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(pluginsNode, rootPath, cancellationToken);
             }
 
             cancellationToken.ThrowIfCancellationRequested();

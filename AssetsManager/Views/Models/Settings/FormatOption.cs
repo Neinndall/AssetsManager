@@ -25,11 +25,4 @@ namespace AssetsManager.Views.Models.Settings
         PBE,
         LIVE
     }
-
-    public enum PreferredDirectory
-    {
-        All,
-        Game,
-        Plugins
-    }
 }

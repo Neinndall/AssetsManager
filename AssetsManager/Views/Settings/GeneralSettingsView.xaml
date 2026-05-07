@@ -199,7 +199,7 @@
                 </Grid>
 
                 <!-- Preferred Backup Client -->
-                <Grid Margin="0,0,0,24">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -213,23 +213,6 @@
                               ItemsSource="{Binding PreferredClientOptions}"
                               DisplayMemberPath="Name" SelectedValuePath="Value"
                               SelectedValue="{Binding Settings.PreferredBackupClient, Mode=TwoWay}"/>
-                </Grid>
-
-                <!-- Preferred Directory Folder -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Preferred directory folder" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Select the target folder to explore when entering directory mode" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
-                    </StackPanel>
-                    <ComboBox Grid.Column="1" Width="120" Height="28" 
-                              Style="{StaticResource ModernComboBox}"
-                              ItemsSource="{Binding PreferredDirectoryOptions}"
-                              DisplayMemberPath="Name" SelectedValuePath="Value"
-                              SelectedValue="{Binding Settings.PreferredDirectory, Mode=TwoWay}"/>
                 </Grid>
             </StackPanel>
         </StackPanel>
