@@ -115,7 +115,7 @@ namespace AssetsManager.Views.Helpers
 
         protected virtual IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            return WindowNative.HandleWindowMessage(msg, wParam, ref handled);
+            return WindowNative.HandleWindowMessage(msg, wParam, lParam, ref handled);
         }
     }
 }

@@ -39,7 +39,7 @@ namespace AssetsManager.Utils.Win
             catch { }
         }
 
-        public static IntPtr HandleWindowMessage(int msg, IntPtr wParam, ref bool handled)
+        public static IntPtr HandleWindowMessage(int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             switch (msg)
             {
