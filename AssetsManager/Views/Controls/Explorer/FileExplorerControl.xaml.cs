@@ -89,15 +89,37 @@ namespace AssetsManager.Views.Controls.Explorer
             DataContext = _viewModel;
             
             this.Loaded += FileExplorerControl_Loaded;
+            this.Unloaded += FileExplorerControl_Unloaded;
 
             _searchTimer = new DispatcherTimer();
             _searchTimer.Interval = TimeSpan.FromMilliseconds(300);
             _searchTimer.Tick += SearchTimer_Tick;
         }
 
+        private void FileExplorerControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+        }
+
+        private async void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                await ReloadTreeAsync();
+            });
+        }
+
         public void CleanupResources()
         {
             TaskCancellationManager.CancelCurrentOperation(true, "Cancelling tree building...");
+
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
 
             // 1. Detener el timer PRIMERO
             if (_searchTimer != null)
@@ -148,6 +170,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
+
             // First, do the synchronous checks to decide the initial UI state.
             bool shouldLoadWadTree = _viewModel.IsWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory);
             bool shouldLoadDirTree = !_viewModel.IsWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
@@ -372,7 +399,7 @@ namespace AssetsManager.Views.Controls.Explorer
             OldLolPath = null;
 
             await ExecuteTreeBuildInternalAsync(
-                async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct),
+                async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct, AppSettings.PreferredDirectory),
                 ExplorerLoadingState.LoadingWads,
                 "Failed to build WAD tree.",
                 false);
