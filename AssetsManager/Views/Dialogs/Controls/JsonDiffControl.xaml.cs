@@ -652,7 +652,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             _isSyncing = true;
             try
             {
-                // FIX: Sincronización por Línea Documental con Blindaje de Límites (v3.3.0.1)
+                // FIX: Sincronización por Línea Documental con Blindaje de Límites (v3.3.0.0)
                 // Esta lógica mantiene la alineación incluso con Word Wrap pero respeta los límites del documento (Anti-Crazy Jumps).
                 
                 var visualTop = sourceView.GetDocumentLineByVisualTop(sourceView.VerticalOffset);
