@@ -15,7 +15,7 @@ namespace AssetsManager.Views.Models.Explorer
         LoadingHashes,
         LoadingWads,
         ExploringDirectory,
-        LoadingBackup
+        LoadingResults
     }
 
     public class FileExplorerModel : INotifyPropertyChanged
@@ -200,10 +200,10 @@ namespace AssetsManager.Views.Models.Explorer
                     LoadingOperation = "DIRECTORY";
                     LoadingDetail = "Scanning files from the directory...";
                     break;
-                case ExplorerLoadingState.LoadingBackup:
-                    LoadingStatus = "Loading Backup";
-                    LoadingOperation = "BACKUP";
-                    LoadingDetail = "Reading Backup File...";
+                case ExplorerLoadingState.LoadingResults:
+                    LoadingStatus = "Loading Results";
+                    LoadingOperation = "RESULTS";
+                    LoadingDetail = "Reading comparison results...";
                     break;
                 default:
                     LoadingStatus = "Loading Explorer";

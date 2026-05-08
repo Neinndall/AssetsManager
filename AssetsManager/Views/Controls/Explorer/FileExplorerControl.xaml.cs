@@ -430,7 +430,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     OldLolPath = oldPath;
                     return nodes;
                 },
-                ExplorerLoadingState.LoadingBackup,
+                ExplorerLoadingState.LoadingResults,
                 "Failed to build tree from backup.",
                 true);
         }
