@@ -649,30 +649,49 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_isSyncing || target == null || target.TextArea?.TextView == null || !(sender is TextView sourceView)) return;
 
-            // Identificar el editor de origen para obtener las métricas correctas
-            var sourceEditor = target == OldJsonContent ? NewJsonContent : OldJsonContent;
-
-            // FIX: Usar porcentajes para garantizar alineación visual perfecta (v3.2.1.0 style)
-            // ANOTACION: Fix "Crazy Jumps" at boundaries using Clamping (0.0-1.0) and Sync Flag.
-            double sourceMax = sourceEditor.ExtentHeight - sourceEditor.ViewportHeight;
-            double targetMax = target.ExtentHeight - target.ViewportHeight;
-
-            if (sourceMax <= 0) return;
-            
-            // Clamp percentage between 0 and 1 to prevent "crazy jumps" beyond boundaries
-            double percentage = Math.Max(0, Math.Min(sourceView.VerticalOffset / sourceMax, 1.0));
-            double targetOffset = targetMax * percentage;
-
-            // Only scroll if there's a meaningful change to avoid jitter
-            if (Math.Abs(target.VerticalOffset - targetOffset) < 0.5 && 
-                Math.Abs(target.HorizontalOffset - sourceView.HorizontalOffset) < 0.5) 
-                return;
-
             _isSyncing = true;
             try
             {
-                target.ScrollToVerticalOffset(targetOffset);
-                target.ScrollToHorizontalOffset(sourceView.HorizontalOffset);
+                // FIX: Sincronización por Línea Documental con Blindaje de Límites (v3.3.0.1)
+                // Esta lógica mantiene la alineación incluso con Word Wrap pero respeta los límites del documento (Anti-Crazy Jumps).
+                
+                var visualTop = sourceView.GetDocumentLineByVisualTop(sourceView.VerticalOffset);
+                if (visualTop != null)
+                {
+                    int line = visualTop.LineNumber;
+                    double sourceLineTop = sourceView.GetVisualTopByDocumentLine(line);
+                    double relativeOffset = sourceView.VerticalOffset - sourceLineTop;
+
+                    double targetLineTop = target.TextArea.TextView.GetVisualTopByDocumentLine(line);
+                    double targetOffset = targetLineTop + relativeOffset;
+
+                    // CLAMPING: Evitar saltos fuera de los límites del target (Fix Crazy Jumps)
+                    double targetMax = target.ExtentHeight - target.ViewportHeight;
+                    targetOffset = Math.Max(0, Math.Min(targetOffset, targetMax));
+
+                    if (Math.Abs(target.VerticalOffset - targetOffset) > 0.5)
+                    {
+                        target.ScrollToVerticalOffset(targetOffset);
+                    }
+                }
+
+                // Sincronización horizontal (estándar)
+                if (Math.Abs(target.HorizontalOffset - sourceView.HorizontalOffset) > 0.5)
+                {
+                    target.ScrollToHorizontalOffset(sourceView.HorizontalOffset);
+                }
+            }
+            catch
+            {
+                // Fallback ultra-seguro por porcentajes si falla el cálculo por línea
+                var sourceEditor = target == OldJsonContent ? NewJsonContent : OldJsonContent;
+                double sourceMax = sourceEditor.ExtentHeight - sourceEditor.ViewportHeight;
+                double targetMax = target.ExtentHeight - target.ViewportHeight;
+                if (sourceMax > 0)
+                {
+                    double percentage = Math.Max(0, Math.Min(sourceView.VerticalOffset / sourceMax, 1.0));
+                    target.ScrollToVerticalOffset(targetMax * percentage);
+                }
             }
             finally
             {
