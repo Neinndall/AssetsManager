@@ -322,11 +322,11 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        public async void HandleLoadBackup()
+        public async void HandleLoadResults()
         {
             var openFileDialog = new CommonOpenFileDialog
             {
-                Title = "Select a backup file",
+                Title = "Select a comparison result file",
                 Filters = { new CommonFileDialogFilter("WAD Comparison JSON", "wadcomparison.json"), new CommonFileDialogFilter("All files", "*.*") },
                 InitialDirectory = DirectoriesCreator.WadComparisonSavePath
             };
