@@ -566,11 +566,98 @@ namespace AssetsManager.Services.Parsers
                                 for (int x = 1; x <= n; x++) _sb.AppendFormat("{3}var{0}[{1}] = {2}\n", i.A, (i.C == 0 ? 0 : i.C - 1) * 50 + x, GetRegValue(i.A + x), indents);
                             break;
 
-                        case Instruction.Op.Eq: _sb.AppendFormat("{3}if ({0} == {1}) ~= {2} then\n", WriteIndex(i.B, function), WriteIndex(i.C, function), i.A, indents); break;
-                        case Instruction.Op.Test: _sb.AppendFormat("{2}if not {0} <=> {1} then\n", GetRegValue(i.A), i.C, indents); break;
-                        
-                        default: _sb.AppendFormat("{0}-- UNKNOWN OPCODE: {1}\n", indents, i.OpCode); break;
+                        case Instruction.Op.GetUpVal:
+                            _regs[i.A].Value = (i.B < function.upvalues.Count) ? function.upvalues[i.B] : "upval" + i.B;
+                            _regs[i.A].IsConstant = false;
+                            _regs[i.A].TableEntries = null;
+                            break;
+
+                        case Instruction.Op.SetUpVal:
+                            string upName = (i.B < function.upvalues.Count) ? function.upvalues[i.B] : "upval" + i.B;
+                            _sb.AppendFormat("{2}{0} = {1}\n", upName, _regs[i.A].ToLuaString(indentLevel), indents);
+                            break;
+
+                        case Instruction.Op.Self:
+                            _regs[i.A + 1].Value = GetRegValue(i.B);
+                            _regs[i.A + 1].TableEntries = _regs[i.B].TableEntries;
+                            _regs[i.A].Value = GetRegValue(i.B) + ":" + WriteIndex(i.C, function).Trim('\"');
+                            _regs[i.A].TableEntries = null;
+                            break;
+
+                        case Instruction.Op.Not: _regs[i.A].Value = "not " + GetRegValue(i.B); _regs[i.A].TableEntries = null; break;
+                        case Instruction.Op.Len: _regs[i.A].Value = "#" + GetRegValue(i.B); _regs[i.A].TableEntries = null; break;
+                        case Instruction.Op.Concat:
+                            StringBuilder concatSb = new StringBuilder();
+                            for (int x = i.B; x <= i.C; x++) { concatSb.Append(GetRegValue(x)); if (x < i.C) concatSb.Append(" .. "); }
+                            _regs[i.A].Value = concatSb.ToString();
+                            _regs[i.A].TableEntries = null;
+                            break;
+
+                        case Instruction.Op.Eq:
+                        case Instruction.Op.Lt:
+                        case Instruction.Op.Le:
+                            _sb.AppendFormat("{3}if ({0} {4} {1}) ~= {2} then ", 
+                                WriteIndex(i.B, function), 
+                                WriteIndex(i.C, function), 
+                                i.A, 
+                                indents,
+                                i.OpCode == Instruction.Op.Eq ? "==" : (i.OpCode == Instruction.Op.Lt ? "<" : "<="));
+                            pc++;
+                            WriteInlineInstruction(function.instructions[pc], pc, function);
+                            _sb.Append(" end\n");
+                            break;
+
+                        case Instruction.Op.Test:
+                            _sb.AppendFormat("{2}if not {0} <=> {1} then ", GetRegValue(i.A), i.C, indents);
+                            pc++;
+                            WriteInlineInstruction(function.instructions[pc], pc, function);
+                            _sb.Append(" end\n");
+                            break;
+
+                        case Instruction.Op.TestSet:
+                            _sb.AppendFormat("{3}if not {0} <=> {2} then var{1} = {0} end\n", GetRegValue(i.B), i.A, i.C, indents);
+                            _regs[i.A].Value = "var" + i.A;
+                            break;
+
+                        case Instruction.Op.ForPrep: _sb.AppendFormat("{0}-- for prep\n", indents); break;
+                        case Instruction.Op.ForLoop: _sb.AppendFormat("{0}-- for loop end\n", indents); break;
+                        case Instruction.Op.TForLoop:
+                            _sb.Append(indents);
+                            for (int x = i.A + 3; x <= i.A + 2 + i.C; x++) _sb.AppendFormat("var{0}, ", x);
+                            _sb.Remove(_sb.Length - 2, 2);
+                            _sb.AppendFormat(" = var{0}(var{1}, var{2})\n", i.A, i.A + 1, i.A + 2);
+                            break;
+
+                        case Instruction.Op.VarArg:
+                            for (int x = i.A; x < i.A + i.B - 1; x++) _regs[x].Value = "...";
+                            break;
                     }
+                }
+            }
+
+            private void WriteInlineInstruction(Instruction i, int pc, Function function)
+            {
+                switch (i.OpCode)
+                {
+                    case Instruction.Op.Jmp: _sb.AppendFormat("goto pc_{0}", pc + 1 + i.sBx); break;
+                    case Instruction.Op.Call:
+                        _sb.AppendFormat("{0}(", GetRegValue(i.A));
+                        if (i.B != 0)
+                        {
+                            for (int x = i.A; x < i.A + i.B - 1; x++) _sb.AppendFormat("{0}{1}", GetRegValue(x + 1), (x + 1 < i.A + i.B - 1 ? ", " : ""));
+                        }
+                        else _sb.Append("...");
+                        _sb.Append(")");
+                        break;
+                    case Instruction.Op.Return:
+                        _sb.Append("return");
+                        if (i.B > 1)
+                        {
+                            _sb.Append(" ");
+                            for (int x = i.A; x < i.A + i.B - 1; x++) _sb.AppendFormat("{0}{1}", GetRegValue(x), (x < i.A + i.B - 2 ? ", " : ""));
+                        }
+                        break;
+                    default: _sb.AppendFormat("-- {0}", i.OpCode); break;
                 }
             }
 
