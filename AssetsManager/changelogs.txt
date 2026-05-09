@@ -3,12 +3,27 @@ AssetsManager - League of Legends | v3.3.0.0
 MAJOR UPDATE
 
 New Features
+  - Explorer / Unified Results Loading
+    *   Renamed the "Load Backup" tool to "Load Results" to better reflect its technical purpose of loading comparison data.
+    *   Updated the internal loading status to "Loading Results", ensuring consistency between the user interface and background processes.
+    *   Standardized the tool icon and labels across the technical suite for a more intuitive and professional experience.
+  - Explorer / Lua Decompilation Support
+    *   Added full support for `.luabin64` files: the system now automatically decompiles and formats Lua 5.1 bytecode into readable source code.
+    *   Integrated Automated Smart Save: when using the "Save" command, `.luabin64` files are now automatically decompiled and exported as `.json` data files, streamlining the asset extraction workflow and maintaining consistency with other data formats.
+    *   Implemented Intelligent Table Reconstruction: advanced logic that groups complex table assignments into clean, readable constructors, matching the original script structure.
+    *   Integrated Professional Syntax Highlighting: added automated code coloring for `.luabin64` in the explorer previewer, supporting both Lua-specific highlights and structured JSON fallback.
+    *   Enhanced Opcode Coverage: implemented support for all Lua 5.1 opcodes (TForLoop, Self, Concat, etc.), eliminating "UNKNOWN OPCODE" messages and ensuring perfect script fidelity.
+    *   Refined Structural Formatting: upgraded the generation engine for superior code layout, featuring cleaned-up conditional logic and human-readable argument naming.
+    *   Integrated Professional HUD Iconography: assigned the official Lua branding glif to the new file type for a consistent visual experience in the file explorer.
+    *   High-Performance In-Memory Engine: developed a zero-disk decompiler that processes game data directly in RAM for near-instant visualization.
   - Monitor / Advanced Backup System
     * Implemented Intelligent Installation Discovery: the system now automatically scans for any League of Legends installation by parsing internal metadata, categorizing clients as LIVE or PBE regardless of their folder names.
     * Added Selective Backup Creation: users can now create a backup of any specific installation from the list, providing total control over version cloning.
     * Professional Version-Date Naming: backups are now automatically named using a clean `Folder_Version_Date` format (e.g., `League of Legends PBE_14.9_20260504_1200`), ensuring a perfectly organized historical repository.
-    * Dynamic Role Identification: added interactive "MAIN" and "BACKUP" tags to the installation list for immediate visual clarity on which folder is the source of truth.
+    * Dynamic Role Identification: added interactive "MAIN" and "BACKUP" tags to the installation list for immediate visual clarity on which folder is being used.
   - Comparator / Intelligent WAD Selection
+    * Added QoL logic for WAD mode: hidden the redundant QuickSelect in the Target section and replaced it with a professional HUD informative icon that guides the user towards manual WAD selection to enable auto-synchronization.
+    * Improved Browser Dialogs: the initial directory for folder and file pickers now correctly respects the "Preferred Protocol" setting (LIVE or PBE), providing a more consistent user experience.
     * Implemented Intelligent WAD Version Selection: Selecting a WAD file in the "NEW" section now enables a smart synchronization system. When choosing a backup via "QUICK SELECT", the app automatically locates and loads the corresponding version of that specific WAD using relative path logic.
     * Integrated Direct-to-Root Version Detection: Re-engineered the identification motor to jump directly to installation roots, making version and role detection instantaneous and eliminating UI lag.
     * Enhanced Path Validation: Added a robust validation system that accurately distinguishes between official installations and similarly named backup folders.
@@ -25,6 +40,8 @@ New Features
     * Added "No Previous Information" Overlay: when an asset is tracked for the first time, the OLD version now displays a professional informative screen instead of empty braces {}.
     * Refined Initial Highlighting: disabled the redundant "all-green" insertion effect for first-time assets, presenting the content in a clean, natural state for better readability.
     * Atomic Metrics: initial comparisons now correctly display 0 changes in the toolbar, reflecting that the view represents a baseline rather than a diff.
+  - Settings / Explorer Performance Optimization
+    * Added "Preferred Directory Folder" setting: users can now choose to load only "Game", "Plugins", or "All" subdirectories when entering Directory Mode in the Explorer. This significantly reduces loading times and RAM consumption for users focused on specific areas of the game data.
   - Settings / Generic Options Engine
     * Re-engineered the settings infrastructure with a high-performance generic `FormatOption<T>` model, eliminating redundant code for export protocols and client preferences.
     * Reorganized General Settings: introduced a new "PREFERRED PROTOCOLS" section to centralize all user preferences (Audio, Image, and Client) under a single, intuitive header.
@@ -38,9 +55,16 @@ New Features
     * Synchronized card headers with the main HUD style, featuring professional icons and refined typography (13px SemiBold).
     * Optimized workspace utilization by expanding card width and standardizing horizontal padding to 24px for perfect vertical icon alignment.
     * Enhanced card aesthetics with symmetrical 26px internal vertical padding for better breathing room.
-
-Improvements
+  - Audio / Professional Playlist Management
+    * Enhanced Playlist Persistence: implemented a dual-URL storage system that preserves the `OriginalUrl` (permanent YouTube link) alongside the temporary stream URI, guaranteeing long-term data integrity for saved packs.
+    * Introduced "Playlist Packs": users can now save multiple independent playlists containing both YouTube URLs and local media files.
+    * Integrated HUB Interface: added a new header to the Audio Player for quick saving and library navigation.
+    * Persistent Storage: playlists are now saved directly to the application configuration, allowing them to be restored instantly upon startup.
   - User Interface / HUD Aesthetic Refinement
+    * Window Performance & Resize Stability:
+      - Implemented Professional DWM Synchronization: set `GlassFrameThickness` to a technical value of 1. This creates a synchronization anchor that eliminates white "flashes" during resize without introducing visual artifacts.
+      - Enhanced Resize Precision: increased `ResizeBorderThickness` to 6px, providing a much more stable and reliable "grip" area for window resizing, reducing frame drops and jitter.
+      - Optimized Win32 Message Pipeline: updated the internal `WndProc` to correctly handle `lParam` context and enforced a Hard-Lock on background erasure (`WM_ERASEBKGND`), ensuring the UI remains steady and flickers-free during movement.
     * Refined the History View: unified the accent strip thickness to 2px to match the sleek design of the Asset Watcher, achieving absolute visual consistency across the monitor module.
     * Standardized Selection Behavior: improved the "Create Backup" workflow to prioritize selected items while maintaining a smart fallback to the active client (PBE/LIVE) based on user preferences.
     * Technical Control Optimization: implemented the `Tag="Icon"` standard for ComboBoxes, allowing automatic arrow centering for icon-only selectors without code duplication.
@@ -94,14 +118,25 @@ Changes
     * Rebalanced the workspace in the Comparison Result Window, optimizing the distribution of space between the file explorer and the asset inspector.
   - 3D Viewer / Inspector Reordering
     * Reorganized the inspector sections to prioritize "Textures & Meshes" as the primary tab.
+  - 3D Viewer / MapGeo Readability
+    * Optimized Mesh Identification: the system now simplifies long, complex material paths into clean, readable names (e.g., "Bush_Wind_A") specifically for map geometry, making it easier to identify assets.
   - Architecture / Service Refactoring
     * Refined the RiotApiService by centralizing WAD management and icon path resolution.
 
 Bug Fixes
+  - Text Comparison / Word Wrap & Boundary Alignment
+    *   Fixed a critical misalignment bug where the OLD and NEW panels would desync when Word Wrap was enabled.
+    *   Re-engineered the synchronization engine to use Line-Based Sync (v3.3.0.0) with absolute boundary clamping, ensuring that document lines remain perfectly aligned regardless of wrapping and eliminating "crazy jumps" at document limits.
   - Monitor / Advanced Backup system
     * Fixed a logic error where PBE backups were incorrectly identified as LIVE due to path string overlap.
   - Core / System Stability
     * Resolved a NullReferenceException in the backup interface by correctly synchronizing the version service injection.
+  - Audio / Playback & YouTube
+    * Fixed a regression in the Audio Player that prevented the playback of YouTube URLs and local media files, restoring full functionality to the hybrid player.
+    * Resolved "Zombie Audio" issue: implemented explicit resource cleanup on window close to ensure media playback and timers stop correctly.
+    * Fixed Playlist State persistence: moved active pack tracking to a singleton service to prevent state loss when closing and reopening the player.
+    * Implemented YouTube URL Auto-Resolution: fixed a critical issue where saved YouTube tracks would expire after a few hours. The system now stores the permanent video link and automatically generates a fresh stream URI upon playback, ensuring playlists remain functional indefinitely.
+    * Improved UI Reactivity: fixed an issue where the playlist library and active pack name failed to update immediately after saving or deleting a pack. The header now instantly reflects the current session state.
   - Explorer / Extraction & Tree Integrity
     * Fixed bug in extraction folder naming and interactive log links.
     * Fixed critical bug causing duplicate file nodes in large WADs.
@@ -116,7 +151,7 @@ Bug Fixes
     * Fixed a bug in the ModernComboBox style where the dropdown arrow was incorrectly centered; it is now perfectly aligned to the right.
     * Resolved vertical alignment issues in the Comparator view, ensuring the central icon and footer are perfectly synchronized with the section headers.
   - Comparator / Mode State Isolation
+    * Fixed a regression in the comparison engine where renamed or moved files were incorrectly identified as new assets.
+    * Improved the accuracy of the "Renamed" status to correctly track files even when duplicates exist or when files lack technical integrity signatures.
     * Fixed a bug where version information and client metadata leaked between Directory and WAD File modes when switching.
     * Resolved an issue where auto-filled paths in Directory mode were lost after using the WAD File mode; the state is now correctly preserved for each mode independently.
-    * Added QoL logic for WAD mode: hidden the redundant QuickSelect in the Target section and replaced it with a professional HUD informative icon that guides the user towards manual WAD selection to enable auto-synchronization.
-    * Improved Browser Dialogs: the initial directory for folder and file pickers now correctly respects the "Preferred Protocol" setting (LIVE or PBE), providing a more consistent user experience.

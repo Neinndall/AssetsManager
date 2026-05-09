@@ -163,7 +163,7 @@
                             <!-- Text -->
                             <StackPanel Grid.Row="1" VerticalAlignment="Center">
                                 <TextBlock Text="File Explorer" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,8"/>
-                                <TextBlock Text="Deep dive into WAD archives. Preview audio, textures, and data." FontSize="14" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="20"/>
+                                <TextBlock Text="Deep dive into WAD archives. High-fidelity previews for multimedia and game data." FontSize="14" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="20"/>
                             </StackPanel>
                             
                             <!-- Action Hint -->

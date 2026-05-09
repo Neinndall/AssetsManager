@@ -75,7 +75,7 @@ namespace AssetsManager.Views.Models.Explorer
             SearchNoResultsDescription = "Try adjusting your search or filters.";
         }
 
-        // ── Proxy Properties (The Toolbar is the Source of Truth) ───────────
+        // ── Proxy Properties ─────────────────────────────────────────────────
 
         public bool IsWadMode
         {

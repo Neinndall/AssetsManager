@@ -249,7 +249,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async void HandleSwitchMode()
         {
-            // The Toolbar is the source of truth, so we switch its state
+            // Update the toolbar state to switch modes
             _viewModel.Toolbar.IsWadMode = !_viewModel.Toolbar.IsWadMode;
             
             if (FilePreviewer != null)
