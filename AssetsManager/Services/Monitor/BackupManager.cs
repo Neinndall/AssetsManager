@@ -202,6 +202,7 @@ namespace AssetsManager.Services.Monitor
                                 Name = Path.GetFileName(dir),
                                 DisplayName = GetBackupDisplayName(null, dir),
                                 Version = version,
+                                IsPbe = isPbe,
                                 Path = dir,
                                 IsMainClient = isMain,
                                 CreationDate = Directory.GetCreationTime(dir),

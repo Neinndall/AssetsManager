@@ -78,16 +78,43 @@ namespace AssetsManager.Views.Controls.Monitor
             try
             {
                 var backups = await BackupManager.GetBackupsAsync();
+                
+                // Filter actual snapshots for metrics
+                var snapshots = backups.Where(b => !b.IsMainClient).ToList();
+                
+                // Calculate metrics (only for actual backups)
+                long totalSizeBytes = snapshots.Sum(b => b.Size);
+                int count = snapshots.Count;
+                string activeEnv = AppSettings.PreferredClient == PreferredClient.PBE ? "PBE ACTIVE" : "LIVE ACTIVE";
+
                 ViewModel.AllBackups.Clear();
                 foreach (var backup in backups)
                 {
                     ViewModel.AllBackups.Add(backup);
                 }
+
+                // Update Dashboard Properties
+                ViewModel.TotalBackupsCount = count;
+                ViewModel.TotalStorageSize = FormatBytes(totalSizeBytes);
+                ViewModel.ActiveClientEnvironment = activeEnv;
             }
             catch (Exception ex)
             {
                 LogService.LogError(ex, "Error loading backups.");
             }
+        }
+
+        private string FormatBytes(long bytes)
+        {
+            string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+            int counter = 0;
+            decimal number = (decimal)bytes;
+            while (Math.Round(number / 1024) >= 1)
+            {
+                number = number / 1024;
+                counter++;
+            }
+            return string.Format("{0:n1} {1}", number, suffixes[counter]);
         }
 
         private void DeleteSelectedBackups_Click(object sender, RoutedEventArgs e)

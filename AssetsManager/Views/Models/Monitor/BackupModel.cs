@@ -11,6 +11,9 @@ namespace AssetsManager.Views.Models.Monitor
 
         private ObservableCollection<BackupModel> _allBackups;
         private bool _isBusy;
+        private int _totalBackupsCount;
+        private string _totalStorageSize;
+        private string _activeClientEnvironment;
 
         public BackupsControlModel()
         {
@@ -29,6 +32,24 @@ namespace AssetsManager.Views.Models.Monitor
             set { if (_isBusy != value) { _isBusy = value; OnPropertyChanged(); } }
         }
 
+        public int TotalBackupsCount
+        {
+            get => _totalBackupsCount;
+            set { if (_totalBackupsCount != value) { _totalBackupsCount = value; OnPropertyChanged(); } }
+        }
+
+        public string TotalStorageSize
+        {
+            get => _totalStorageSize;
+            set { if (_totalStorageSize != value) { _totalStorageSize = value; OnPropertyChanged(); } }
+        }
+
+        public string ActiveClientEnvironment
+        {
+            get => _activeClientEnvironment;
+            set { if (_activeClientEnvironment != value) { _activeClientEnvironment = value; OnPropertyChanged(); } }
+        }
+
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -41,6 +62,7 @@ namespace AssetsManager.Views.Models.Monitor
         public string Name { get; set; }
         public string DisplayName { get; set; }
         public string Version { get; set; }
+        public bool IsPbe { get; set; }
         public DateTime CreationDate { get; set; }
         public bool IsMainClient { get; set; }
         public long Size { get; set; }
