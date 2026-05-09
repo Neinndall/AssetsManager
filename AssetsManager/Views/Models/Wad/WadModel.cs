@@ -88,10 +88,10 @@ namespace AssetsManager.Views.Models.Wad
         }
 
         [JsonIgnore]
-        public string OldSizeString => OldUncompressedSize.HasValue ? FormatUtils.FormatSize(OldUncompressedSize.Value) : "N/A";
+        public string OldSizeString => OldUncompressedSize.HasValue ? FormatUtils.FormatSize((long)OldUncompressedSize.Value) : "N/A";
         
         [JsonIgnore]
-        public string NewSizeString => NewUncompressedSize.HasValue ? FormatUtils.FormatSize(NewUncompressedSize.Value) : "N/A";
+        public string NewSizeString => NewUncompressedSize.HasValue ? FormatUtils.FormatSize((long)NewUncompressedSize.Value) : "N/A";
 
         [JsonIgnore]
         public string SizeDifferenceString
@@ -115,7 +115,7 @@ namespace AssetsManager.Views.Models.Wad
                     return "0 B";
                 }
                 
-                return (diff > 0 ? "+" : "-") + FormatUtils.FormatSize((ulong)Math.Abs(diff));
+                return (diff > 0 ? "+" : "-") + FormatUtils.FormatSize(Math.Abs(diff));
             }
         }
 

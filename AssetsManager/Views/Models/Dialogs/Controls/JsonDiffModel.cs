@@ -143,8 +143,8 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             // after the DiffPlex model is built.
             
             // Metadata Updates
-            OldSize = FormatUtils.FormatSize((ulong)(oldText?.Length ?? 0));
-            NewSize = FormatUtils.FormatSize((ulong)(newText?.Length ?? 0));
+            OldSize = FormatUtils.FormatSize((long)(oldText?.Length ?? 0));
+            NewSize = FormatUtils.FormatSize((long)(newText?.Length ?? 0));
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

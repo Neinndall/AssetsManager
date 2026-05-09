@@ -115,8 +115,19 @@
                                         </Border.Effect>
                                     </Border>
                                     
-                                    <!-- Side Color Accent (Universal Teal) -->
-                                    <Border x:Name="AccentStrip" BorderThickness="2,0,0,0" CornerRadius="10,0,0,10" BorderBrush="{StaticResource AccentBrush}"/>
+                                    <!-- Side Color Accent (Environment Based) -->
+                                    <Border x:Name="AccentStrip" BorderThickness="2,0,0,0" CornerRadius="10,0,0,10">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPbe}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
 
                                     <!-- Content -->
                                     <Grid Margin="20,14">
@@ -126,15 +137,17 @@
                                             <ColumnDefinition Width="Auto"/> <!-- Selection Mark -->
                                         </Grid.ColumnDefinitions>
 
-                                        <!-- Folder Icon Box (Universal Teal) -->
+                                        <!-- Folder Icon Box (Environment Based) -->
                                         <Border Grid.Column="0" Width="48" Height="48" CornerRadius="12" Background="{StaticResource DarkBackground}" Margin="4,0,20,0">
-                                            <materialIcons:MaterialIcon Foreground="{StaticResource AccentBrush}" Width="24" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Width="24" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                 <materialIcons:MaterialIcon.Style>
                                                     <Style TargetType="materialIcons:MaterialIcon">
                                                         <Setter Property="Kind" Value="SealVariant"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsPbe}" Value="True">
                                                                 <Setter Property="Kind" Value="FlaskOutline"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
@@ -160,11 +173,24 @@
                                                             <Setter Property="Background" Value="{StaticResource HoverColor}"/>
                                                             <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                <MultiDataTrigger>
+                                                                    <MultiDataTrigger.Conditions>
+                                                                        <Condition Binding="{Binding IsMainClient}" Value="True"/>
+                                                                        <Condition Binding="{Binding IsPbe}" Value="True"/>
+                                                                    </MultiDataTrigger.Conditions>
+                                                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
                                                                     <Setter Property="BorderBrush" Value="Transparent"/>
                                                                     <Setter Property="BorderThickness" Value="0"/>
-                                                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                                                                </DataTrigger>
+                                                                </MultiDataTrigger>
+                                                                <MultiDataTrigger>
+                                                                    <MultiDataTrigger.Conditions>
+                                                                        <Condition Binding="{Binding IsMainClient}" Value="True"/>
+                                                                        <Condition Binding="{Binding IsPbe}" Value="False"/>
+                                                                    </MultiDataTrigger.Conditions>
+                                                                    <Setter Property="Background" Value="{StaticResource AccentGreen}"/>
+                                                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                                </MultiDataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
@@ -207,25 +233,52 @@
                                             </StackPanel>
                                         </StackPanel>
 
-                                        <!-- Selection Mark (Check Circle) -->
+                                        <!-- Selection Mark (Check Circle - Environment Based) -->
                                         <materialIcons:MaterialIcon Grid.Column="2" 
                                                                     Kind="CheckCircle" 
-                                                                    Foreground="{StaticResource AccentBrush}" 
                                                                     Width="20" Height="20" 
                                                                     VerticalAlignment="Center" 
                                                                     Margin="16,0,4,0"
-                                                                    Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                                                    Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <materialIcons:MaterialIcon.Style>
+                                                <Style TargetType="materialIcons:MaterialIcon">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPbe}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialIcons:MaterialIcon.Style>
+                                        </materialIcons:MaterialIcon>
                                     </Grid>
                                 </Grid>
                                 <ControlTemplate.Triggers>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
-                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                    </Trigger>
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                                     </Trigger>
+                                    
+                                    <!-- Selection Logic: PBE (AccentBrush) -->
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsSelected}" Value="True"/>
+                                            <Condition Binding="{Binding IsPbe}" Value="True"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
+                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    </MultiDataTrigger>
+
+                                    <!-- Selection Logic: LIVE (AccentGreen) -->
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsSelected}" Value="True"/>
+                                            <Condition Binding="{Binding IsPbe}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
+                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
+                                    </MultiDataTrigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
                         </Setter.Value>
