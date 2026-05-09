@@ -78,11 +78,11 @@ namespace AssetsManager.Views.Controls.Comparator
             if (AppSettings == null) return null;
 
             // Respect user preference for default active client
-            if (AppSettings.PreferredBackupClient == PreferredClient.PBE && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
+            if (AppSettings.PreferredClient == PreferredClient.PBE && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
             {
                 return AppSettings.LolPbeDirectory;
             }
-            else if (AppSettings.PreferredBackupClient == PreferredClient.LIVE && !string.IsNullOrEmpty(AppSettings.LolLiveDirectory))
+            else if (AppSettings.PreferredClient == PreferredClient.LIVE && !string.IsNullOrEmpty(AppSettings.LolLiveDirectory))
             {
                 return AppSettings.LolLiveDirectory;
             }

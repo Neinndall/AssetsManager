@@ -28,6 +28,7 @@ using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Views.Controls.Explorer
 {

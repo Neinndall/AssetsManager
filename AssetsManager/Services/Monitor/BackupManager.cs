@@ -194,8 +194,8 @@ namespace AssetsManager.Services.Monitor
                             var (isPbe, isMain) = GetPathIdentification(dir);
 
                             // Filter by preference
-                            if (_appSettings.PreferredBackupClient == PreferredClient.PBE && !isPbe) continue;
-                            if (_appSettings.PreferredBackupClient == PreferredClient.LIVE && isPbe) continue;
+                            if (_appSettings.PreferredClient == PreferredClient.PBE && !isPbe) continue;
+                            if (_appSettings.PreferredClient == PreferredClient.LIVE && isPbe) continue;
 
                             backups.Add(new BackupModel
                             {
@@ -234,7 +234,7 @@ namespace AssetsManager.Services.Monitor
             bool isPbe;
             bool isMain;
 
-            if (_appSettings.PreferredBackupClient == PreferredClient.PBE)
+            if (_appSettings.PreferredClient == PreferredClient.PBE)
             {
                 bool isPbeSub = !string.IsNullOrEmpty(pbeRoot) && PathUtils.IsSameOrSubPath(pbeRoot, path);
                 bool isLiveSub = !string.IsNullOrEmpty(liveRoot) && PathUtils.IsSameOrSubPath(liveRoot, path);
@@ -262,7 +262,7 @@ namespace AssetsManager.Services.Monitor
             string liveRoot = _appSettings.LolLiveDirectory;
 
             // Prioritize check based on preferred client
-            if (_appSettings.PreferredBackupClient == PreferredClient.PBE)
+            if (_appSettings.PreferredClient == PreferredClient.PBE)
             {
                 if (PathUtils.IsSameOrSubPath(pbeRoot, path)) return pbeRoot;
                 if (PathUtils.IsSameOrSubPath(liveRoot, path)) return liveRoot;

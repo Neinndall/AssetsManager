@@ -192,10 +192,10 @@ namespace AssetsManager.Views.Controls.Monitor
             else
             {
                 // NEW BACKUP MODE
-                sourcePath = AppSettings.PreferredBackupClient == PreferredClient.LIVE 
+                sourcePath = AppSettings.PreferredClient == PreferredClient.LIVE 
                     ? AppSettings.LolLiveDirectory 
                     : AppSettings.LolPbeDirectory;
-                clientName = AppSettings.PreferredBackupClient == PreferredClient.LIVE ? "LIVE" : "PBE";
+                clientName = AppSettings.PreferredClient == PreferredClient.LIVE ? "LIVE" : "PBE";
 
                 string cleanSource = sourcePath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
                 string baseName = cleanSource;

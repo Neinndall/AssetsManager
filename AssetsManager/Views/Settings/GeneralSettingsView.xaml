@@ -206,7 +206,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="Preferred game client" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Select the primary game client for initial exploration and automated backups" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Primary game client for initial exploration and automated backups" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1" Width="120" Height="28" 
                               Style="{StaticResource ModernComboBox}"
