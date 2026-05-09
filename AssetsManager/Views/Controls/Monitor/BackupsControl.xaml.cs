@@ -85,7 +85,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 // Calculate metrics (only for actual backups)
                 long totalSizeBytes = snapshots.Sum(b => b.Size);
                 int count = snapshots.Count;
-                string activeEnv = AppSettings.PreferredClient == PreferredClient.PBE ? "PBE ACTIVE" : "LIVE ACTIVE";
+                string activeEnv = AppSettings.PreferredClient == PreferredClient.PBE ? "PBE" : "LIVE";
 
                 ViewModel.AllBackups.Clear();
                 foreach (var backup in backups)
