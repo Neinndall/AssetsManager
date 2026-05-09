@@ -223,6 +223,10 @@ namespace AssetsManager.Services.Explorer
                     await HandleDataFile(node, destinationPath, extension.TrimStart('.'), cancellationToken, onFileSavedCallback);
                     break;
 
+                case ".luabin64":
+                    await HandleLuaFile(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    break;
+
                 case ".js":
                     await HandleJsFile(node, destinationPath, cancellationToken, onFileSavedCallback);
                     break;
@@ -310,6 +314,19 @@ namespace AssetsManager.Services.Explorer
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync("js", fileBytes);
             string filePath = PathUtils.GetUniqueFilePath(destinationPath, node.Name);
+
+            await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
+            onFileSavedCallback?.Invoke(filePath);
+        }
+
+        private async Task HandleLuaFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        {
+            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
+            if (fileBytes == null) return;
+
+            var formattedContent = await _contentFormatterService.GetFormattedStringAsync("luabin64", fileBytes);
+            string fileName = Path.ChangeExtension(node.Name, ".lua");
+            string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
 
             await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
             onFileSavedCallback?.Invoke(filePath);
