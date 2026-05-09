@@ -9,30 +9,16 @@ namespace AssetsManager.Services.Parsers
 {
     public class LuaParser
     {
-        /// <summary>
-        /// Orchestrates the decompression/disassembly of Lua 5.1 bytecode files (.luabin64).
-        /// </summary>
-        public Task<string> DecompileAsync(byte[] data)
-        {
-            return Task.Run(() => Decompile(data));
-        }
+        public Task<string> DecompileAsync(byte[] data) => Task.Run(() => Decompile(data));
 
         public string Decompile(byte[] data)
         {
-            if (data == null || data.Length == 0)
-                return string.Empty;
-
+            if (data == null || data.Length == 0) return string.Empty;
             try
             {
-                using (var reader = new FileReader(data))
-                {
-                    var function = reader.NextFunctionBlock();
-                    if (function == null)
-                        return "-- No function blocks found.";
-
-                    var generator = new Generator();
-                    return generator.Generate(function);
-                }
+                using var reader = new FileReader(data);
+                var fn = reader.NextFunctionBlock();
+                return fn == null ? "-- No function blocks found." : new Generator().Generate(fn);
             }
             catch (Exception ex)
             {
@@ -40,72 +26,46 @@ namespace AssetsManager.Services.Parsers
             }
         }
 
-        #region Internal Lua Decompiler Classes
+        // ── Constants ────────────────────────────────────────────────────────
 
-        public enum LuaType
+        public enum LuaType { Nil = 0, Bool = 1, Number = 3, String = 4 }
+
+        public abstract class Constant { public abstract override string ToString(); }
+
+        public class NilConstant    : Constant { public override string ToString() => "nil"; }
+        public class BoolConstant   : Constant
         {
-            Nil = 0,
-            Bool = 1,
-            Number = 3,
-            String = 4,
+            readonly bool _v; public BoolConstant(bool v) { _v = v; }
+            public override string ToString() => _v ? "true" : "false";
         }
-
-        public abstract class Constant
+        public class NumberConstant : Constant
         {
-            public LuaType Type { get; protected set; }
-            public override abstract string ToString();
+            readonly double _v; public NumberConstant(double v) { _v = v; }
+            public override string ToString()
+                => (_v == Math.Floor(_v) && !double.IsInfinity(_v) && Math.Abs(_v) < 1e15)
+                   ? ((long)_v).ToString() : _v.ToString("G");
         }
-
-        public class Constant<T> : Constant
+        public class StringConstant : Constant
         {
-            public T Value { get; private set; }
-            protected Constant(LuaType type, T value)
-            {
-                Type = type;
-                Value = value;
-            }
-            public override string ToString() => Value?.ToString() ?? "nil";
-        }
-
-        public class NilConstant : Constant<object>
-        {
-            public NilConstant() : base(LuaType.Nil, null) { }
-            public override string ToString() => "nil";
-        }
-
-        public class BoolConstant : Constant<bool>
-        {
-            public BoolConstant(bool value) : base(LuaType.Bool, value) { }
-            public override string ToString() => Value ? "true" : "false";
-        }
-
-        public class NumberConstant : Constant<double>
-        {
-            public NumberConstant(double value) : base(LuaType.Number, value) { }
-        }
-
-        public class StringConstant : Constant<string>
-        {
-            public StringConstant(string value) : base(LuaType.String, value) { }
+            readonly string _v; public StringConstant(string v) { _v = v; }
             public override string ToString()
             {
-                if (string.IsNullOrEmpty(Value)) return "\"\"";
-                string val = Value.EndsWith("\0") ? Value.Substring(0, Value.Length - 1) : Value;
-                return '\"' + val + '\"';
+                if (string.IsNullOrEmpty(_v)) return "\"\"";
+                string s = (_v.EndsWith("\0") ? _v[..^1] : _v)
+                    .Replace("\\", "\\\\").Replace("\"", "\\\"")
+                    .Replace("\n", "\\n").Replace("\r", "\\r");
+                return '"' + s + '"';
             }
         }
+
+        // ── Data structures ──────────────────────────────────────────────────
 
         public class Local
         {
-            public string Name { get; private set; }
-            public int ScopeStart { get; private set; }
-            public int ScopeEnd { get; private set; }
-            public Local(string name, int scopeStart, int scopeEnd)
-            {
-                Name = name;
-                ScopeStart = scopeStart;
-                ScopeEnd = scopeEnd;
-            }
+            public string Name       { get; }
+            public int    ScopeStart { get; }
+            public int    ScopeEnd   { get; }
+            public Local(string name, int start, int end) { Name = name; ScopeStart = start; ScopeEnd = end; }
         }
 
         public class Instruction
@@ -117,560 +77,648 @@ namespace AssetsManager.Services.Parsers
                 Test, TestSet, Call, TailCall, Return, ForLoop, ForPrep, TForLoop, SetList, Close, Closure, VarArg
             }
 
-            private const int HalfMax18Bit = 131071;
-            public int Data { get; private set; }
-            public Op OpCode { get; private set; }
-            public int A { get; private set; }
-            public int B { get; private set; }
-            public int C { get; private set; }
-            public int Bx => ((B << 9) & 0xFFE00 | C) & 0x3FFFF;
-            public int sBx => Bx - HalfMax18Bit;
-            public bool HasBx { get; private set; }
-            public bool Signed { get; private set; }
+            private const int HalfMax18 = 131071;
+            public Op  OpCode { get; }
+            public int A      { get; }
+            public int B      { get; }
+            public int C      { get; }
+            public int Bx     => ((B << 9) & 0xFFE00 | C) & 0x3FFFF;
+            public int sBx    => Bx - HalfMax18;
 
             public Instruction(int data)
             {
-                Data = data;
                 OpCode = (Op)(data & 0x3F);
-                A = (data >> 6) & 0xFF;
+                A = (data >> 6)  & 0xFF;
                 B = (data >> 23) & 0x1FF;
                 C = (data >> 14) & 0x1FF;
-
-                switch (OpCode)
-                {
-                    case Op.Jmp:
-                    case Op.ForLoop:
-                    case Op.ForPrep:
-                        Signed = true;
-                        HasBx = true;
-                        break;
-                    case Op.LoadK:
-                    case Op.GetGlobal:
-                    case Op.SetGlobal:
-                    case Op.Closure:
-                        HasBx = true;
-                        break;
-                }
             }
         }
 
         public class Function
         {
             public enum VarArg { Has = 1, Is = 2, Needs = 4 }
-            public string sourceName;
-            public int lineNumber;
-            public int lastLineNumber;
-            public byte numUpvalues;
-            public byte numParameters;
-            public VarArg varArgFlag;
-            public byte maxStackSize;
-            public List<Instruction> instructions;
-            public List<Constant> constants;
-            public List<Function> functions;
-            public List<int> sourceLinePositions;
-            public List<Local> locals;
-            public List<string> upvalues;
+            public string            SourceName;
+            public int               LineNumber, LastLineNumber;
+            public byte              NumUpvalues, NumParameters;
+            public VarArg            VarArgFlag;
+            public byte              MaxStackSize;
+            public List<Instruction> Instructions;
+            public List<Constant>    Constants;
+            public List<Function>    Functions;
+            public List<int>         SourceLinePositions;
+            public List<Local>       Locals;
+            public List<string>      Upvalues;
         }
 
-        public struct FileHeader
-        {
-            public const int HeaderSize = 12;
-            public const byte Lua51Version = 0x51;
-            public string signature;
-            public byte version;
-            public byte format;
-            public bool isLittleEndian;
-            public byte intSize;
-            public byte size_tSize;
-            public byte instructionSize;
-            public byte lua_NumberSize;
-            public bool isIntegral;
-        }
+        // ── FileReader ───────────────────────────────────────────────────────
 
         public class FileReader : IDisposable
         {
-            private MemoryStream memoryStream;
-            private BinaryReader reader;
-            private FileHeader header;
-
-            public FileHeader Header => header;
+            private readonly MemoryStream _stream;
+            private readonly BinaryReader _reader;
+            private byte _intSize, _sizeTSize, _instrSize, _numSize;
+            private bool _le;
 
             public FileReader(byte[] data)
             {
-                memoryStream = new MemoryStream(data);
-                reader = new BinaryReader(memoryStream, Encoding.ASCII);
+                _stream = new MemoryStream(data);
+                _reader = new BinaryReader(_stream, Encoding.ASCII);
                 ReadHeader();
             }
 
+            public void Dispose() { _reader.Dispose(); _stream.Dispose(); }
+
             public Function NextFunctionBlock()
             {
-                if (memoryStream.Position >= memoryStream.Length) return null;
-                Function data = new Function();
-                data.sourceName = ReadString();
-                data.lineNumber = ReadInteger(header.intSize);
-                data.lastLineNumber = ReadInteger(header.intSize);
-                data.numUpvalues = reader.ReadByte();
-                data.numParameters = reader.ReadByte();
-                data.varArgFlag = (Function.VarArg)reader.ReadByte();
-                data.maxStackSize = reader.ReadByte();
-                data.instructions = ReadInstructions();
-                data.constants = ReadConstants();
-                data.functions = ReadFunctions();
-                data.sourceLinePositions = ReadLineNumbers();
-                data.locals = ReadLocals();
-                data.upvalues = ReadUpvalues();
-                return data;
-            }
-
-            public void Dispose()
-            {
-                reader.Dispose();
-                memoryStream.Dispose();
+                if (_stream.Position >= _stream.Length) return null;
+                return new Function
+                {
+                    SourceName          = ReadString(),
+                    LineNumber          = ReadInt(),
+                    LastLineNumber      = ReadInt(),
+                    NumUpvalues         = _reader.ReadByte(),
+                    NumParameters       = _reader.ReadByte(),
+                    VarArgFlag          = (Function.VarArg)_reader.ReadByte(),
+                    MaxStackSize        = _reader.ReadByte(),
+                    Instructions        = ReadList(_ => new Instruction(ReadInt(_instrSize))),
+                    Constants           = ReadConstants(),
+                    Functions           = ReadList(_ => NextFunctionBlock()),
+                    SourceLinePositions = ReadList(_ => ReadInt() - 1),
+                    Locals              = ReadList(_ => new Local(ReadString(), ReadInt(), ReadInt())),
+                    Upvalues            = ReadList(_ => ReadString()),
+                };
             }
 
             private void ReadHeader()
             {
-                byte[] bytes = reader.ReadBytes(12);
-                if (bytes.Length < 12) throw new InvalidDataException("File is too short for a Lua header.");
-                header.signature = new string(new char[] { (char)bytes[0], (char)bytes[1], (char)bytes[2], (char)bytes[3] });
-                if (header.signature != (char)27 + "Lua") throw new InvalidDataException("Invalid Lua bytecode file.");
-                header.version = bytes[4];
-                if (header.version != FileHeader.Lua51Version) throw new NotImplementedException("Only Lua 5.1 is supported.");
-                header.format = bytes[5];
-                header.isLittleEndian = bytes[6] != 0;
-                header.intSize = bytes[7];
-                header.size_tSize = bytes[8];
-                header.instructionSize = bytes[9];
-                header.lua_NumberSize = bytes[10];
-                header.isIntegral = bytes[11] != 0;
+                var b = _reader.ReadBytes(12);
+                if (b.Length < 12) throw new InvalidDataException("File too short for a Lua header.");
+                if (b[0] != 0x1b || b[1] != 'L' || b[2] != 'u' || b[3] != 'a')
+                    throw new InvalidDataException("Invalid Lua bytecode signature.");
+                if (b[4] != 0x51)
+                    throw new NotSupportedException($"Only Lua 5.1 is supported (got 0x{b[4]:X2}).");
+                _le = b[6] != 0;
+                _intSize = b[7]; _sizeTSize = b[8]; _instrSize = b[9]; _numSize = b[10];
             }
 
-            private List<Instruction> ReadInstructions()
+            private List<T> ReadList<T>(Func<int, T> f)
             {
-                int num = ReadInteger(header.intSize);
-                var list = new List<Instruction>(num);
-                for (int i = 0; i < num; i++) list.Add(new Instruction(ReadInteger(header.instructionSize)));
+                int n = ReadInt(); var list = new List<T>(n);
+                for (int i = 0; i < n; i++) list.Add(f(i));
                 return list;
             }
 
             private List<Constant> ReadConstants()
             {
-                int num = ReadInteger(header.intSize);
-                var list = new List<Constant>(num);
-                for (int i = 0; i < num; i++)
+                int n = ReadInt(); var list = new List<Constant>(n);
+                for (int i = 0; i < n; i++)
                 {
-                    byte type = reader.ReadByte();
-                    switch ((LuaType)type)
+                    byte tag = _reader.ReadByte();
+                    list.Add((LuaType)tag switch
                     {
-                        case LuaType.Nil: list.Add(new NilConstant()); break;
-                        case LuaType.Bool: list.Add(new BoolConstant(reader.ReadBoolean())); break;
-                        case LuaType.Number: list.Add(new NumberConstant(ReadNumber(header.lua_NumberSize))); break;
-                        case LuaType.String: list.Add(new StringConstant(ReadString())); break;
-                    }
+                        LuaType.Nil    => (Constant)new NilConstant(),
+                        LuaType.Bool   => new BoolConstant(_reader.ReadBoolean()),
+                        LuaType.Number => new NumberConstant(ReadNumber()),
+                        LuaType.String => new StringConstant(ReadString()),
+                        _              => throw new InvalidDataException($"Unknown constant type: {tag}"),
+                    });
                 }
-                return list;
-            }
-
-            private List<Function> ReadFunctions()
-            {
-                int num = ReadInteger(header.intSize);
-                var list = new List<Function>(num);
-                for (int i = 0; i < num; i++) list.Add(NextFunctionBlock());
-                return list;
-            }
-
-            private List<int> ReadLineNumbers()
-            {
-                int num = ReadInteger(header.intSize);
-                var list = new List<int>(num);
-                for (int i = 0; i < num; i++) list.Add(ReadInteger(header.intSize) - 1);
-                return list;
-            }
-
-            private List<Local> ReadLocals()
-            {
-                int num = ReadInteger(header.intSize);
-                var list = new List<Local>(num);
-                for (int i = 0; i < num; i++) list.Add(new Local(ReadString(), ReadInteger(header.intSize), ReadInteger(header.intSize)));
-                return list;
-            }
-
-            private List<string> ReadUpvalues()
-            {
-                int num = ReadInteger(header.intSize);
-                var list = new List<string>(num);
-                for (int i = 0; i < num; i++) list.Add(ReadString());
                 return list;
             }
 
             private string ReadString()
             {
-                int size = ReadInteger(header.size_tSize);
-                if (size == 0) return string.Empty;
-                byte[] bytes = reader.ReadBytes(size);
-                return Encoding.ASCII.GetString(bytes);
+                int sz = ReadInt(_sizeTSize);
+                return sz == 0 ? string.Empty : Encoding.ASCII.GetString(_reader.ReadBytes(sz));
             }
 
-            private int ReadInteger(byte size)
+            private int ReadInt(byte? size = null)
             {
-                byte[] bytes = reader.ReadBytes(size);
-                int ret = 0;
-                if (header.isLittleEndian) { for (int i = 0; i < size; i++) ret += bytes[i] << (i * 8); }
-                else { for (int i = 0; i < size; i++) ret = (ret << 8) | bytes[i]; }
-                return ret;
+                byte sz = size ?? _intSize;
+                var b   = _reader.ReadBytes(sz);
+                int r   = 0;
+                if (_le) for (int i = 0; i < sz; i++) r |= b[i] << (i * 8);
+                else     for (int i = 0; i < sz; i++) r  = (r << 8) | b[i];
+                return r;
             }
 
-            private double ReadNumber(byte size)
+            private double ReadNumber()
             {
-                byte[] bytes = reader.ReadBytes(size);
-                if (size == 8) return BitConverter.ToDouble(bytes, 0);
-                if (size == 4) return BitConverter.ToSingle(bytes, 0);
-                throw new NotImplementedException("Unsupported lua_Number size: " + size);
+                var b = _reader.ReadBytes(_numSize);
+                return _numSize switch
+                {
+                    8 => BitConverter.ToDouble(b, 0),
+                    4 => BitConverter.ToSingle(b,  0),
+                    _ => throw new NotSupportedException($"Unsupported lua_Number size: {_numSize}"),
+                };
             }
         }
+
+        // ── Generator ───────────────────────────────────────────────────────
 
         public class Generator
         {
-            private StringBuilder _sb = new StringBuilder();
-            private uint _functionCount;
-            private RegisterState[] _regs;
+            private StringBuilder _sb;
+            private int           _funcIdx;
 
-            private class TableEntry
+            public string Generate(Function fn)
             {
-                public string Key; // null for array part
-                public string Value;
-            }
-
-            private class RegisterState
-            {
-                public string Value;
-                public bool IsConstant;
-                public List<TableEntry> TableEntries;
-                public bool IsTable => TableEntries != null;
-
-                public string ToLuaString(int indent = 0)
-                {
-                    if (!IsTable) return Value ?? "nil";
-                    if (TableEntries.Count == 0) return "{}";
-
-                    StringBuilder sb = new StringBuilder();
-                    bool allArray = TableEntries.All(e => e.Key == null);
-
-                    if (allArray && TableEntries.Count < 8)
-                    {
-                        sb.Append("{ ");
-                        for (int i = 0; i < TableEntries.Count; i++)
-                        {
-                            sb.Append(TableEntries[i].Value);
-                            if (i < TableEntries.Count - 1) sb.Append(", ");
-                        }
-                        sb.Append(" }");
-                    }
-                    else
-                    {
-                        sb.AppendLine("{");
-                        string indents = new string('\t', indent + 1);
-                        for (int i = 0; i < TableEntries.Count; i++)
-                        {
-                            sb.Append(indents);
-                            if (TableEntries[i].Key != null)
-                            {
-                                string key = TableEntries[i].Key;
-                                if (key.StartsWith("\"") && key.EndsWith("\""))
-                                {
-                                    string k = key.Trim('\"');
-                                    if (IsValidIdentifier(k)) sb.Append(k);
-                                    else sb.Append("[").Append(key).Append("]");
-                                }
-                                else sb.Append("[").Append(key).Append("]");
-                                sb.Append(" = ");
-                            }
-                            sb.Append(TableEntries[i].Value);
-                            if (i < TableEntries.Count - 1) sb.Append(",");
-                            sb.AppendLine();
-                        }
-                        sb.Append(new string('\t', indent)).Append("}");
-                    }
-                    return sb.ToString();
-                }
-
-                private bool IsValidIdentifier(string s)
-                {
-                    if (string.IsNullOrEmpty(s)) return false;
-                    if (!char.IsLetter(s[0]) && s[0] != '_') return false;
-                    return s.All(c => char.IsLetterOrDigit(c) || c == '_');
-                }
-            }
-
-            public string Generate(Function function)
-            {
-                _sb.Clear();
-                _functionCount = 0;
-                Write(function, 0);
+                _sb = new StringBuilder(); _funcIdx = 0;
+                EmitFunction(fn, isRoot: true, indent: 0);
                 return _sb.ToString();
             }
 
-            private void Write(Function function, int indentLevel)
+            // ── Function ─────────────────────────────────────────────────────
+
+            private void EmitFunction(Function fn, bool isRoot, int indent)
             {
-                if (function.lineNumber == 0 && function.lastLineNumber == 0)
+                var localMap = BuildLocalMap(fn);
+
+                if (!isRoot)
                 {
-                    WriteChildFunctions(function, indentLevel);
-                    WriteInstructions(function, indentLevel);
+                    _sb.Append(Tab(indent)).Append($"function func_{_funcIdx++}(");
+                    EmitParams(fn, localMap);
+                    _sb.AppendLine(")");
                 }
-                else
+
+                int childBase = _funcIdx;
+                foreach (var child in fn.Functions)
                 {
-                    string indents = new string('\t', indentLevel);
-                    _sb.Append(indents).Append("function func").Append(_functionCount).Append("(");
-                    for (int i = 0; i < function.numParameters; i++)
-                        _sb.Append("arg").Append(i).Append(i + 1 != function.numParameters ? ", " : ")");
+                    EmitFunction(child, isRoot: false, indent + (isRoot ? 0 : 1));
                     _sb.AppendLine();
-                    _functionCount++;
-                    WriteChildFunctions(function, indentLevel + 1);
-                    WriteInstructions(function, indentLevel + 1);
-                    _sb.Append(indents).AppendLine("end");
+                }
+
+                EmitBody(fn, indent + (isRoot ? 0 : 1), localMap, childBase);
+
+                if (!isRoot) _sb.Append(Tab(indent)).AppendLine("end");
+            }
+
+            private void EmitParams(Function fn, List<Local>[] localMap)
+            {
+                for (int p = 0; p < fn.NumParameters; p++)
+                {
+                    string name = (p < localMap.Length && localMap[p].Count > 0)
+                        ? Clean(localMap[p][0].Name) ?? $"arg{p}" : $"arg{p}";
+                    _sb.Append(name);
+                    if (p + 1 < fn.NumParameters) _sb.Append(", ");
+                }
+                if ((fn.VarArgFlag & Function.VarArg.Has) != 0)
+                {
+                    if (fn.NumParameters > 0) _sb.Append(", ");
+                    _sb.Append("...");
                 }
             }
 
-            private void WriteChildFunctions(Function function, int indentLevel)
+            // ── Body ─────────────────────────────────────────────────────────
+            //
+            // Lua 5.1 generic-for layout in bytecode:
+            //   pc_open : JMP  → pc_tfor       (forward; emitted as "for x in y do")
+            //   pc_open+1 .. pc_tfor-1 : body
+            //   pc_tfor : TFORLOOP A C          (if results → jump back to body start; skipped)
+            //   pc_back : JMP  → pc_tfor        (back-edge; skipped)
+            //
+            // Numeric-for layout:
+            //   pc_prep : FORPREP → FORLOOP     (emitted as "for x = a, b, c do")
+            //   body
+            //   pc_loop : FORLOOP               (skipped; pendingEnds closes the block)
+
+            private void EmitBody(Function fn, int baseIndent, List<Local>[] localMap, int childBase)
             {
-                foreach (var f in function.functions)
+                var regs  = new RegisterBank(fn, localMap);
+                var instr = fn.Instructions;
+                int count = instr.Count;
+
+                // ── Pre-pass: identify structured loop boundaries ──────────────
+                var numForEnd   = new Dictionary<int, int>(); // ForPrep pc → ForLoop pc
+                var gForOpen    = new Dictionary<int, int>(); // opening JMP pc → TForLoop pc
+                var gForSkipJmp = new HashSet<int>();          // back-edge JMP pcs (32-bit Lua only)
+
+                for (int pc = 0; pc < count; pc++)
                 {
-                    Write(f, indentLevel);
-                    _sb.AppendLine();
-                }
-            }
+                    var ins = instr[pc];
 
-            private void WriteInstructions(Function function, int indentLevel)
-            {
-                string indents = new string('\t', indentLevel);
-                _regs = new RegisterState[256];
-                for (int i = 0; i < 256; i++) _regs[i] = new RegisterState { Value = "var" + i };
-
-                // Pass 1: Identify jump targets
-                HashSet<int> jumpTargets = new HashSet<int>();
-                for (int pc = 0; pc < function.instructions.Count; pc++)
-                {
-                    var instr = function.instructions[pc];
-                    if (instr.OpCode == Instruction.Op.Jmp || instr.OpCode == Instruction.Op.ForLoop || instr.OpCode == Instruction.Op.ForPrep)
-                        jumpTargets.Add(pc + 1 + instr.sBx);
-                }
-
-                for (int pc = 0; pc < function.instructions.Count; pc++)
-                {
-                    if (jumpTargets.Contains(pc)) _sb.AppendFormat("{0}::pc_{1}::\n", indents, pc);
-
-                    var i = function.instructions[pc];
-                    switch (i.OpCode)
+                    if (ins.OpCode == Instruction.Op.ForPrep)
                     {
-                        case Instruction.Op.Move:
-                            _regs[i.A].Value = GetRegValue(i.B);
-                            _regs[i.A].IsConstant = _regs[i.B].IsConstant;
-                            _regs[i.A].TableEntries = _regs[i.B].TableEntries;
-                            break;
-
-                        case Instruction.Op.LoadK:
-                            _regs[i.A].Value = GetConstant(i.Bx, function);
-                            _regs[i.A].IsConstant = true;
-                            _regs[i.A].TableEntries = null;
-                            break;
-
-                        case Instruction.Op.LoadBool:
-                            _regs[i.A].Value = (i.B != 0 ? "true" : "false");
-                            _regs[i.A].IsConstant = true;
-                            _regs[i.A].TableEntries = null;
-                            break;
-
-                        case Instruction.Op.LoadNil:
-                            for (int x = i.A; x <= i.B; x++) { _regs[x].Value = "nil"; _regs[x].IsConstant = true; _regs[x].TableEntries = null; }
-                            break;
-
-                        case Instruction.Op.GetGlobal:
-                            _regs[i.A].Value = GetConstant(i.Bx, function).Trim('\"');
-                            _regs[i.A].IsConstant = false;
-                            _regs[i.A].TableEntries = null;
-                            break;
-
-                        case Instruction.Op.NewTable:
-                            _regs[i.A].Value = null;
-                            _regs[i.A].IsConstant = false;
-                            _regs[i.A].TableEntries = new List<TableEntry>();
-                            break;
-
-                        case Instruction.Op.SetGlobal:
-                            string globalName = GetConstant(i.Bx, function).Trim('\"');
-                            _sb.AppendFormat("{2}{0} = {1}\n", globalName, _regs[i.A].ToLuaString(indentLevel), indents);
-                            break;
-
-                        case Instruction.Op.SetTable:
-                            if (_regs[i.A].IsTable)
-                                _regs[i.A].TableEntries.Add(new TableEntry { Key = WriteIndex(i.B, function), Value = WriteIndex(i.C, function) });
-                            else
-                                _sb.AppendFormat("{3}{0}[{1}] = {2}\n", GetRegValue(i.A), WriteIndex(i.B, function), WriteIndex(i.C, function), indents);
-                            break;
-
-                        case Instruction.Op.GetTable:
-                            _sb.AppendFormat("{3}var{0} = {1}[{2}]\n", i.A, GetRegValue(i.B), WriteIndex(i.C, function), indents);
-                            _regs[i.A].Value = "var" + i.A;
-                            _regs[i.A].IsConstant = false;
-                            _regs[i.A].TableEntries = null;
-                            break;
-
-                        case Instruction.Op.Add: _sb.AppendFormat("{3}var{0} = {1} + {2}\n", i.A, WriteIndex(i.B, function), WriteIndex(i.C, function), indents); _regs[i.A].TableEntries = null; break;
-                        case Instruction.Op.Sub: _sb.AppendFormat("{3}var{0} = {1} - {2}\n", i.A, WriteIndex(i.B, function), WriteIndex(i.C, function), indents); _regs[i.A].TableEntries = null; break;
-                        case Instruction.Op.Mul: _sb.AppendFormat("{3}var{0} = {1} * {2}\n", i.A, WriteIndex(i.B, function), WriteIndex(i.C, function), indents); _regs[i.A].TableEntries = null; break;
-                        case Instruction.Op.Div: _sb.AppendFormat("{3}var{0} = {1} / {2}\n", i.A, WriteIndex(i.B, function), WriteIndex(i.C, function), indents); _regs[i.A].TableEntries = null; break;
-
-                        case Instruction.Op.Call:
-                            if (i.C != 0)
-                            {
-                                _sb.Append(indents);
-                                int preLen = _sb.Length;
-                                for (int x = i.A; x < i.A + i.C - 1; x++) _sb.AppendFormat("var{0}, ", x);
-                                if (_sb.Length > preLen) { _sb.Remove(_sb.Length - 2, 2); _sb.Append(" = "); }
-                            }
-                            _sb.AppendFormat("{0}(", GetRegValue(i.A));
-                            if (i.B != 0)
-                            {
-                                int preArgs = _sb.Length;
-                                for (int x = i.A; x < i.A + i.B - 1; x++) _sb.AppendFormat("{0}, ", GetRegValue(x + 1));
-                                if (_sb.Length > preArgs) _sb.Remove(_sb.Length - 2, 2);
-                            }
-                            else _sb.Append("...");
-                            _sb.AppendLine(")");
-                            break;
-
-                        case Instruction.Op.Return:
-                            _sb.Append(indents).Append("return");
-                            if (i.B > 1)
-                            {
-                                _sb.Append(" ");
-                                for (int x = i.A; x < i.A + i.B - 1; x++) _sb.AppendFormat("{0}, ", GetRegValue(x));
-                                _sb.Remove(_sb.Length - 2, 2);
-                            }
-                            _sb.AppendLine();
-                            break;
-
-                        case Instruction.Op.Jmp: _sb.AppendFormat("{0}goto pc_{1}\n", indents, pc + 1 + i.sBx); break;
-                        case Instruction.Op.Closure:
-                            _regs[i.A].Value = "function_block_" + i.Bx;
-                            _regs[i.A].IsConstant = false;
-                            _regs[i.A].TableEntries = null;
-                            break;
-
-                        case Instruction.Op.SetList:
-                            int n = i.B;
-                            if (n == 0) n = (int)function.maxStackSize - i.A - 1;
-                            if (_regs[i.A].IsTable)
-                                for (int x = 1; x <= n; x++) _regs[i.A].TableEntries.Add(new TableEntry { Key = null, Value = GetRegValue(i.A + x) });
-                            else
-                                for (int x = 1; x <= n; x++) _sb.AppendFormat("{3}var{0}[{1}] = {2}\n", i.A, (i.C == 0 ? 0 : i.C - 1) * 50 + x, GetRegValue(i.A + x), indents);
-                            break;
-
-                        case Instruction.Op.GetUpVal:
-                            _regs[i.A].Value = (i.B < function.upvalues.Count) ? function.upvalues[i.B] : "upval" + i.B;
-                            _regs[i.A].IsConstant = false;
-                            _regs[i.A].TableEntries = null;
-                            break;
-
-                        case Instruction.Op.SetUpVal:
-                            string upName = (i.B < function.upvalues.Count) ? function.upvalues[i.B] : "upval" + i.B;
-                            _sb.AppendFormat("{2}{0} = {1}\n", upName, _regs[i.A].ToLuaString(indentLevel), indents);
-                            break;
-
-                        case Instruction.Op.Self:
-                            _regs[i.A + 1].Value = GetRegValue(i.B);
-                            _regs[i.A + 1].TableEntries = _regs[i.B].TableEntries;
-                            _regs[i.A].Value = GetRegValue(i.B) + ":" + WriteIndex(i.C, function).Trim('\"');
-                            _regs[i.A].TableEntries = null;
-                            break;
-
-                        case Instruction.Op.Not: _regs[i.A].Value = "not " + GetRegValue(i.B); _regs[i.A].TableEntries = null; break;
-                        case Instruction.Op.Len: _regs[i.A].Value = "#" + GetRegValue(i.B); _regs[i.A].TableEntries = null; break;
-                        case Instruction.Op.Concat:
-                            StringBuilder concatSb = new StringBuilder();
-                            for (int x = i.B; x <= i.C; x++) { concatSb.Append(GetRegValue(x)); if (x < i.C) concatSb.Append(" .. "); }
-                            _regs[i.A].Value = concatSb.ToString();
-                            _regs[i.A].TableEntries = null;
-                            break;
-
-                        case Instruction.Op.Eq:
-                        case Instruction.Op.Lt:
-                        case Instruction.Op.Le:
-                            _sb.AppendFormat("{3}if ({0} {4} {1}) ~= {2} then ", 
-                                WriteIndex(i.B, function), 
-                                WriteIndex(i.C, function), 
-                                i.A, 
-                                indents,
-                                i.OpCode == Instruction.Op.Eq ? "==" : (i.OpCode == Instruction.Op.Lt ? "<" : "<="));
-                            pc++;
-                            WriteInlineInstruction(function.instructions[pc], pc, function);
-                            _sb.Append(" end\n");
-                            break;
-
-                        case Instruction.Op.Test:
-                            _sb.AppendFormat("{2}if not {0} <=> {1} then ", GetRegValue(i.A), i.C, indents);
-                            pc++;
-                            WriteInlineInstruction(function.instructions[pc], pc, function);
-                            _sb.Append(" end\n");
-                            break;
-
-                        case Instruction.Op.TestSet:
-                            _sb.AppendFormat("{3}if not {0} <=> {2} then var{1} = {0} end\n", GetRegValue(i.B), i.A, i.C, indents);
-                            _regs[i.A].Value = "var" + i.A;
-                            break;
-
-                        case Instruction.Op.ForPrep: _sb.AppendFormat("{0}-- for prep\n", indents); break;
-                        case Instruction.Op.ForLoop: _sb.AppendFormat("{0}-- for loop end\n", indents); break;
-                        case Instruction.Op.TForLoop:
-                            _sb.Append(indents);
-                            for (int x = i.A + 3; x <= i.A + 2 + i.C; x++) _sb.AppendFormat("var{0}, ", x);
-                            _sb.Remove(_sb.Length - 2, 2);
-                            _sb.AppendFormat(" = var{0}(var{1}, var{2})\n", i.A, i.A + 1, i.A + 2);
-                            break;
-
-                        case Instruction.Op.VarArg:
-                            for (int x = i.A; x < i.A + i.B - 1; x++) _regs[x].Value = "...";
-                            break;
+                        int lpc = pc + 1 + ins.sBx;
+                        if (lpc < count && instr[lpc].OpCode == Instruction.Op.ForLoop)
+                            numForEnd[pc] = lpc;
+                    }
+                    else if (ins.OpCode == Instruction.Op.Jmp)
+                    {
+                        int target = pc + 1 + ins.sBx;
+                        if (target >= 0 && target < count && instr[target].OpCode == Instruction.Op.TForLoop)
+                        {
+                            if (ins.sBx > 0) gForOpen[pc] = target; // forward → opening JMP
+                            else             gForSkipJmp.Add(pc);    // backward → back-edge JMP (32-bit)
+                        }
                     }
                 }
+
+                // All TForLoop pcs that are targets of an opening JMP — always skipped in emission
+                var knownTForLoops = new HashSet<int>(gForOpen.Values);
+
+                // PCs that are loop machinery — never emitted as ::label:: targets
+                var structured = new HashSet<int>();
+                foreach (var kv in numForEnd) { structured.Add(kv.Key); structured.Add(kv.Value); }
+                foreach (var kv in gForOpen)
+                {
+                    structured.Add(kv.Key);     // opening JMP
+                    structured.Add(kv.Value);   // TForLoop
+                    structured.Add(kv.Key + 1); // body start — not a visible label
+                }
+                foreach (int pc in gForSkipJmp) structured.Add(pc);
+
+                // Remaining forward/backward JMP targets need ::label:: markers
+                var labels = new HashSet<int>();
+                for (int pc = 0; pc < count; pc++)
+                {
+                    var ins = instr[pc];
+                    if (ins.OpCode == Instruction.Op.Jmp && !structured.Contains(pc))
+                        labels.Add(pc + 1 + ins.sBx);
+                }
+
+                // ── Emission pass ─────────────────────────────────────────────
+                // pending: (closePc, depthToRestoreAfterClose)
+                var pending = new Stack<(int closePc, int depth)>();
+                int depth   = baseIndent;
+
+                for (int pc = 0; pc < count; pc++)
+                {
+                    // Close any blocks whose end has arrived, restoring depth
+                    while (pending.Count > 0 && pending.Peek().closePc == pc)
+                    {
+                        var (_, d) = pending.Pop();
+                        depth = d;
+                        _sb.AppendLine($"{Tab(depth)}end");
+                    }
+
+                    if (labels.Contains(pc))
+                        _sb.AppendLine($"{Tab(depth)}::pc_{pc}::");
+
+                    var    i = instr[pc];
+                    string t = Tab(depth);
+
+                    // ── Numeric for ───────────────────────────────────────────
+                    if (i.OpCode == Instruction.Op.ForPrep && numForEnd.ContainsKey(pc))
+                    {
+                        int endPc = numForEnd[pc];
+                        _sb.AppendLine($"{t}for {regs.NameAt(i.A + 3, pc + 1)} = "
+                                     + $"{regs.Get(i.A)}, {regs.Get(i.A + 1)}, {regs.Get(i.A + 2)} do");
+                        pending.Push((endPc + 1, depth));
+                        depth++;
+                        continue;
+                    }
+                    if (i.OpCode == Instruction.Op.ForLoop && numForEnd.ContainsValue(pc))
+                        continue;
+
+                    // ── Generic for ───────────────────────────────────────────
+                    if (i.OpCode == Instruction.Op.Jmp && gForOpen.ContainsKey(pc))
+                    {
+                        int tforPc = gForOpen[pc];
+                        var tfor   = instr[tforPc];
+                        var vars   = Enumerable.Range(tfor.A + 3, tfor.C)
+                                               .Select(x => regs.NameAt(x, pc + 1));
+                        _sb.AppendLine($"{t}for {string.Join(", ", vars)} in {regs.Get(tfor.A)} do");
+                        // TForLoop.sBx points back to the body start — use it to find block end.
+                        // In 32-bit Lua a separate back-edge JMP exists after TForLoop;
+                        // in 64-bit Lua TForLoop does the back-branch itself, so we close right after it.
+                        int bodyStart = tforPc + 1 + tfor.sBx; // == pc_open + 1
+                        int closePc   = gForSkipJmp.Count > 0   // 32-bit: back-edge JMP follows TForLoop
+                            ? tforPc + 2 : tforPc + 1;
+                        pending.Push((closePc, depth));
+                        depth++;
+                        continue;
+                    }
+                    // TForLoop is always loop machinery — skip unconditionally when known
+                    if (i.OpCode == Instruction.Op.TForLoop && knownTForLoops.Contains(pc)) continue;
+                    if (i.OpCode == Instruction.Op.Jmp      && gForSkipJmp.Contains(pc))    continue;
+
+                    EmitInstruction(fn, i, ref pc, regs, t, childBase);
+                }
+
+                while (pending.Count > 0)
+                {
+                    var (_, d) = pending.Pop();
+                    _sb.AppendLine($"{Tab(d)}end");
+                }
             }
 
-            private void WriteInlineInstruction(Instruction i, int pc, Function function)
+            // ── Instruction emission ──────────────────────────────────────────
+
+            private void EmitInstruction(Function fn, Instruction i, ref int pc,
+                                         RegisterBank regs, string t, int childBase)
             {
                 switch (i.OpCode)
                 {
-                    case Instruction.Op.Jmp: _sb.AppendFormat("goto pc_{0}", pc + 1 + i.sBx); break;
-                    case Instruction.Op.Call:
-                        _sb.AppendFormat("{0}(", GetRegValue(i.A));
-                        if (i.B != 0)
-                        {
-                            for (int x = i.A; x < i.A + i.B - 1; x++) _sb.AppendFormat("{0}{1}", GetRegValue(x + 1), (x + 1 < i.A + i.B - 1 ? ", " : ""));
-                        }
-                        else _sb.Append("...");
-                        _sb.Append(")");
+                    // ── Loads / moves ─────────────────────────────────────────
+                    case Instruction.Op.Move:     regs.Assign(i.A, regs.Get(i.B)); break;
+                    case Instruction.Op.LoadK:    regs.Set(i.A, Const(i.Bx, fn));  break;
+                    case Instruction.Op.LoadBool: regs.Set(i.A, i.B != 0 ? "true" : "false"); if (i.C != 0) pc++; break;
+                    case Instruction.Op.LoadNil:  for (int x = i.A; x <= i.B; x++) regs.Set(x, "nil"); break;
+                    case Instruction.Op.VarArg:
+                    {
+                        int n = i.B - 1;
+                        if (n <= 0) { regs.Set(i.A, "..."); break; }
+                        for (int x = 0; x < n; x++) regs.Set(i.A + x, "...");
                         break;
+                    }
+
+                    // ── Globals ───────────────────────────────────────────────
+                    case Instruction.Op.GetGlobal: regs.Set(i.A, Const(i.Bx, fn).Trim('"')); break;
+                    case Instruction.Op.SetGlobal: _sb.AppendLine($"{t}{Const(i.Bx, fn).Trim('"')} = {regs.Get(i.A)}"); break;
+
+                    // ── Upvalues ──────────────────────────────────────────────
+                    case Instruction.Op.GetUpVal:
+                        regs.Set(i.A, i.B < fn.Upvalues.Count ? fn.Upvalues[i.B] : $"upval_{i.B}");
+                        break;
+                    case Instruction.Op.SetUpVal:
+                        _sb.AppendLine($"{t}{(i.B < fn.Upvalues.Count ? fn.Upvalues[i.B] : $"upval_{i.B}")} = {regs.Get(i.A)}");
+                        break;
+
+                    // ── Tables ────────────────────────────────────────────────
+                    case Instruction.Op.NewTable: regs.SetTable(i.A); break;
+
+                    case Instruction.Op.GetTable:
+                    {
+                        string lhs = regs.NameAt(i.A, pc);
+                        _sb.AppendLine($"{t}{lhs} = {TryDot(regs.Get(i.B), RK(i.C, fn, regs))}");
+                        regs.Set(i.A, lhs);
+                        break;
+                    }
+
+                    case Instruction.Op.SetTable:
+                        if (regs.IsTable(i.A))
+                            regs.AddTableEntry(i.A, RK(i.B, fn, regs), RK(i.C, fn, regs));
+                        else
+                            _sb.AppendLine($"{t}{TryDot(regs.Get(i.A), RK(i.B, fn, regs))} = {RK(i.C, fn, regs)}");
+                        break;
+
+                    case Instruction.Op.SetList:
+                    {
+                        int n = i.B == 0 ? fn.MaxStackSize - i.A - 1 : i.B;
+                        int baseIdx = (i.C == 0 ? 1 : i.C) * 50;
+                        for (int x = 1; x <= n; x++)
+                        {
+                            if (regs.IsTable(i.A)) regs.AddTableEntry(i.A, null, regs.Get(i.A + x));
+                            else _sb.AppendLine($"{t}{regs.Get(i.A)}[{baseIdx - 50 + x}] = {regs.Get(i.A + x)}");
+                        }
+                        break;
+                    }
+
+                    // ── Arithmetic / unary ────────────────────────────────────
+                    case Instruction.Op.Add:    regs.Set(i.A, $"{RK(i.B,fn,regs)} + {RK(i.C,fn,regs)}"); break;
+                    case Instruction.Op.Sub:    regs.Set(i.A, $"{RK(i.B,fn,regs)} - {RK(i.C,fn,regs)}"); break;
+                    case Instruction.Op.Mul:    regs.Set(i.A, $"{RK(i.B,fn,regs)} * {RK(i.C,fn,regs)}"); break;
+                    case Instruction.Op.Div:    regs.Set(i.A, $"{RK(i.B,fn,regs)} / {RK(i.C,fn,regs)}"); break;
+                    case Instruction.Op.Mod:    regs.Set(i.A, $"{RK(i.B,fn,regs)} % {RK(i.C,fn,regs)}"); break;
+                    case Instruction.Op.Pow:    regs.Set(i.A, $"{RK(i.B,fn,regs)} ^ {RK(i.C,fn,regs)}"); break;
+                    case Instruction.Op.Unm:    regs.Set(i.A, $"-{regs.Get(i.B)}");    break;
+                    case Instruction.Op.Not:    regs.Set(i.A, $"not {regs.Get(i.B)}"); break;
+                    case Instruction.Op.Len:    regs.Set(i.A, $"#{regs.Get(i.B)}");    break;
+                    case Instruction.Op.Concat:
+                        regs.Set(i.A, string.Join(" .. ", Enumerable.Range(i.B, i.C - i.B + 1).Select(x => regs.Get(x))));
+                        break;
+
+                    // ── Calls ─────────────────────────────────────────────────
+                    case Instruction.Op.Self:
+                    {
+                        regs.Set(i.A + 1, regs.Get(i.B));
+                        string k = RK(i.C, fn, regs);
+                        regs.Set(i.A, $"{regs.Get(i.B)}:{(IsIdent(k, out string m) ? m : k.Trim('"'))}");
+                        break;
+                    }
+                    case Instruction.Op.Call:     EmitCall(fn, i, regs, t, tail: false); break;
+                    case Instruction.Op.TailCall: EmitCall(fn, i, regs, t, tail: true);  break;
+
                     case Instruction.Op.Return:
-                        _sb.Append("return");
-                        if (i.B > 1)
-                        {
-                            _sb.Append(" ");
-                            for (int x = i.A; x < i.A + i.B - 1; x++) _sb.AppendFormat("{0}{1}", GetRegValue(x), (x < i.A + i.B - 2 ? ", " : ""));
-                        }
+                        _sb.Append(t).Append("return");
+                        if      (i.B > 1)  _sb.Append(" ").Append(string.Join(", ", Enumerable.Range(i.A, i.B - 1).Select(x => regs.Get(x))));
+                        else if (i.B == 0) _sb.Append(" ...");
+                        _sb.AppendLine();
                         break;
-                    default: _sb.AppendFormat("-- {0}", i.OpCode); break;
+
+                    case Instruction.Op.Closure:
+                        regs.Set(i.A, $"func_{childBase + i.Bx}");
+                        break;
+
+                    // ── Jumps ─────────────────────────────────────────────────
+                    case Instruction.Op.Jmp:
+                        _sb.AppendLine($"{t}goto pc_{pc + 1 + i.sBx}");
+                        break;
+
+                    // ── Comparisons (always followed by a Jmp) ────────────────
+                    case Instruction.Op.Eq:
+                    case Instruction.Op.Lt:
+                    case Instruction.Op.Le:
+                    {
+                        string op   = i.OpCode == Instruction.Op.Eq ? "==" : i.OpCode == Instruction.Op.Lt ? "<" : "<=";
+                        string cond = CompareCond(RK(i.B, fn, regs), RK(i.C, fn, regs), op, i.A);
+                        pc++;
+                        _sb.Append($"{t}if {cond} then "); EmitInlineJump(fn.Instructions[pc], pc); _sb.AppendLine(" end");
+                        break;
+                    }
+
+                    case Instruction.Op.Test:
+                    {
+                        string cond = i.C == 0 ? regs.Get(i.A) : $"not {regs.Get(i.A)}";
+                        pc++;
+                        _sb.Append($"{t}if {cond} then "); EmitInlineJump(fn.Instructions[pc], pc); _sb.AppendLine(" end");
+                        break;
+                    }
+
+                    case Instruction.Op.TestSet:
+                    {
+                        string cond = i.C == 0 ? regs.Get(i.B) : $"not {regs.Get(i.B)}";
+                        string dest = regs.Name(i.A);
+                        _sb.AppendLine($"{t}if {cond} then {dest} = {regs.Get(i.B)} end");
+                        regs.Set(i.A, dest);
+                        break;
+                    }
+
+                    case Instruction.Op.Close: break; // upvalue close — no output needed
+
+                    default:
+                        _sb.AppendLine($"{t}-- unhandled: {i.OpCode}");
+                        break;
                 }
             }
 
-            private string GetRegValue(int reg) => _regs[reg].ToLuaString();
-            private string GetConstant(int idx, Function function) => (idx >= 0 && idx < function.constants.Count) ? function.constants[idx].ToString() : "const[" + idx + "]";
+            // ── Helpers ───────────────────────────────────────────────────────
 
-            private string WriteIndex(int val, Function func)
+            private void EmitCall(Function fn, Instruction i, RegisterBank regs, string t, bool tail)
             {
-                if ((val & 1 << 8) != 0) return GetConstant(val & ~(1 << 8), func);
-                return GetRegValue(val);
+                string args = i.B == 0 ? "..." : string.Join(", ", Enumerable.Range(i.A + 1, i.B - 1).Select(x => regs.Get(x)));
+                string call = $"{regs.Get(i.A)}({args})";
+                if (tail) { _sb.AppendLine($"{t}return {call}"); return; }
+                int rc = i.C == 0 ? 1 : i.C - 1;
+                if (rc <= 0) { _sb.AppendLine($"{t}{call}"); return; }
+                var results = Enumerable.Range(i.A, rc).Select(x => { regs.Set(x, regs.Name(x)); return regs.Name(x); });
+                _sb.AppendLine($"{t}{string.Join(", ", results)} = {call}");
+            }
+
+            private void EmitInlineJump(Instruction i, int pc)
+            {
+                if      (i.OpCode == Instruction.Op.Jmp)    _sb.Append($"goto pc_{pc + 1 + i.sBx}");
+                else if (i.OpCode == Instruction.Op.Return)  _sb.Append("return");
+                else                                          _sb.Append($"-- {i.OpCode}");
+            }
+
+            // A==0 → emit comparison directly; A==1 → negate (flip operator for readability)
+            private static string CompareCond(string l, string r, string op, int a)
+            {
+                if (a == 0) return $"{l} {op} {r}";
+                string neg = op switch { "==" => "~=", "<" => ">=", "<=" => ">", _ => null };
+                return neg != null ? $"{l} {neg} {r}" : $"not ({l} {op} {r})";
+            }
+
+            // "tbl" + "\"field\"" → "tbl.field" when field is a valid identifier
+            private static string TryDot(string tbl, string key)
+                => IsIdent(key, out string f) ? $"{tbl}.{f}" : $"{tbl}[{key}]";
+
+            private static bool IsIdent(string s, out string inner)
+            {
+                inner = null;
+                if (s.Length >= 2 && s[0] == '"' && s[^1] == '"')
+                {
+                    string c = s[1..^1];
+                    if (!string.IsNullOrEmpty(c) && (char.IsLetter(c[0]) || c[0] == '_')
+                        && c.All(ch => char.IsLetterOrDigit(ch) || ch == '_'))
+                    { inner = c; return true; }
+                }
+                return false;
+            }
+
+            private string RK(int val, Function fn, RegisterBank regs)
+                => (val & 0x100) != 0 ? Const(val & 0xFF, fn) : regs.Get(val);
+
+            private string Const(int idx, Function fn)
+                => idx >= 0 && idx < fn.Constants.Count ? fn.Constants[idx].ToString() : $"const[{idx}]";
+
+            private static string Tab(int n) => new string('\t', n);
+
+            // Strip null-terminator; return null for Lua internal names like "(for index)"
+            private static string Clean(string s)
+            {
+                if (string.IsNullOrEmpty(s)) return null;
+                if (s.EndsWith("\0")) s = s[..^1];
+                return s.StartsWith("(") ? null : s;
+            }
+
+            // ── Local-map builder ─────────────────────────────────────────────
+            // Simulates Lua 5.1's register allocator: maps each slot to the list
+            // of Local debug entries that ever occupied it (in declaration order).
+
+            private static List<Local>[] BuildLocalMap(Function fn)
+            {
+                int size = fn.MaxStackSize > 0 ? fn.MaxStackSize : 256;
+                var map  = Enumerable.Range(0, size).Select(_ => new List<Local>()).ToArray();
+                var free = new int[size]; // free[r] = first pc where r is available again
+
+                foreach (var loc in fn.Locals)
+                {
+                    int slot = Array.FindIndex(free, f => f <= loc.ScopeStart);
+                    if (slot < 0) slot = fn.Locals.IndexOf(loc);
+                    free[slot] = loc.ScopeEnd;
+                    map[slot].Add(loc);
+                }
+                return map;
             }
         }
 
-        #endregion
+        // ── RegisterBank ─────────────────────────────────────────────────────
+
+        private class RegisterBank
+        {
+            private readonly List<Local>[]                    _map;
+            private readonly string[]                         _vals;
+            private readonly bool[]                           _isTbl;
+            private readonly List<(string Key, string Val)>[] _entries;
+
+            public RegisterBank(Function fn, List<Local>[] map)
+            {
+                _map     = map;
+                int sz   = map.Length;
+                _vals    = new string[sz];
+                _isTbl   = new bool[sz];
+                _entries = new List<(string, string)>[sz];
+                for (int r = 0; r < sz; r++) _vals[r] = DefaultName(r);
+            }
+
+            public string Name(int r)    => r < _map.Length ? DefaultName(r) : $"var{r}";
+            public bool   IsTable(int r) => r < _map.Length && _isTbl[r];
+
+            public string NameAt(int r, int pc)
+            {
+                if (r >= _map.Length) return $"var{r}";
+                foreach (var loc in _map[r])
+                    if (pc >= loc.ScopeStart && pc < loc.ScopeEnd)
+                        return Sanitize(loc.Name) ?? DefaultName(r);
+                return DefaultName(r);
+            }
+
+            public string Get(int r) => r < _map.Length ? Format(r) : $"var{r}";
+
+            public void Set(int r, string v)    { if (r < _map.Length) { _vals[r] = v; _isTbl[r] = false; } }
+            public void Assign(int r, string v) => Set(r, v);
+
+            public void SetTable(int r)
+            {
+                if (r >= _map.Length) return;
+                _isTbl[r]   = true;
+                _entries[r] = new List<(string, string)>();
+                _vals[r]    = null;
+            }
+
+            public void AddTableEntry(int r, string key, string val)
+            {
+                if (r < _map.Length && _isTbl[r]) _entries[r].Add((key, val));
+            }
+
+            // ── private ──────────────────────────────────────────────────────
+
+            private string DefaultName(int r)
+            {
+                if (r < _map.Length && _map[r].Count > 0)
+                    return Sanitize(_map[r][0].Name) ?? $"var{r}";
+                return $"var{r}";
+            }
+
+            private string Format(int r)
+            {
+                if (!_isTbl[r]) return _vals[r] ?? DefaultName(r);
+                var e = _entries[r];
+                if (e == null || e.Count == 0) return "{}";
+                if (e.All(x => x.Key == null) && e.Count < 8)
+                    return "{ " + string.Join(", ", e.Select(x => x.Val)) + " }";
+                var sb = new StringBuilder("{\n");
+                foreach (var (k, v) in e)
+                {
+                    sb.Append("\t\t");
+                    if (k != null) sb.Append(IsIdent(k, out string inner) ? inner : $"[{k}]").Append(" = ");
+                    sb.AppendLine(v + ",");
+                }
+                return sb.Append("\t}").ToString();
+            }
+
+            private static string Sanitize(string s)
+            {
+                if (string.IsNullOrEmpty(s)) return null;
+                if (s.EndsWith("\0")) s = s[..^1];
+                return s.StartsWith("(") ? null : s;
+            }
+
+            internal static bool IsIdent(string s, out string inner)
+            {
+                inner = null;
+                if (s.Length >= 2 && s[0] == '"' && s[^1] == '"')
+                {
+                    string c = s[1..^1];
+                    if (!string.IsNullOrEmpty(c) && (char.IsLetter(c[0]) || c[0] == '_')
+                        && c.All(ch => char.IsLetterOrDigit(ch) || ch == '_'))
+                    { inner = c; return true; }
+                }
+                return false;
+            }
+        }
     }
 }
