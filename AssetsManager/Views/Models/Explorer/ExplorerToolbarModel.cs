@@ -13,7 +13,7 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isWadMode = true;
         private bool _isGridMode = false;
         private bool _isBreadcrumbVisible = true;
-        private bool _isFavoritesEnabled = false;
+        private bool _isFavoritesEnabled = true;
         private string _searchText = string.Empty;
         private bool _isGroupingEnabled;
         private bool _isBackupMode;
