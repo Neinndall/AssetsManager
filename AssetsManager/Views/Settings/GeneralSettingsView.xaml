@@ -82,7 +82,7 @@
                             Visibility="{Binding IsChecked, ElementName=swBackgroundUpdates, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="POLLING INTERVAL (MINUTES)" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" FontSize="10" FontWeight="Black"/>
+                            <TextBlock Text="POLLING INTERVAL (MINUTES)" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" FontSize="11" FontWeight="Black"/>
                             <ComboBox Grid.Column="1" SelectedItem="{Binding Settings.UpdateCheckFrequency, Mode=TwoWay}" Width="80" Height="26" Style="{StaticResource ModernComboBox}" ItemsSource="{StaticResource UpdateFrequencies}"/>
                         </Grid>
                     </Border>
@@ -128,8 +128,8 @@
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="ORGANIZE EXTRACTED ASSETS" Foreground="{StaticResource TextSecondary}" FontSize="10" FontWeight="Black"/>
-                                <TextBlock Text="Keep original directory structure during extraction" Foreground="{StaticResource TextMuted}" FontSize="9"/>
+                                <TextBlock Text="ORGANIZE EXTRACTED ASSETS" Foreground="{StaticResource TextSecondary}" FontSize="11" FontWeight="Black"/>
+                                <TextBlock Text="Keep original directory structure during extraction" Foreground="{StaticResource TextMuted}" FontSize="10"/>
                             </StackPanel>
                             <CheckBox Grid.Column="1" IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                         </Grid>
@@ -153,12 +153,12 @@
                     <Border Margin="0,12,0,0" Background="{StaticResource CardBackground}" CornerRadius="4" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                             Visibility="{Binding IsChecked, ElementName=swGenerateReport, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="REPORT FILTERS" Foreground="{StaticResource TextSecondary}" FontSize="10" FontWeight="Black" Margin="0,0,0,12"/>
-                            <WrapPanel Orientation="Horizontal">
-                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterNew, Mode=TwoWay}" Content="NEW" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,0" FontSize="10"/>
-                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterModified, Mode=TwoWay}" Content="MODIFIED" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,0" FontSize="10"/>
-                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRenamed, Mode=TwoWay}" Content="RENAMED" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,0" FontSize="10"/>
-                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRemoved, Mode=TwoWay}" Content="REMOVED" Style="{StaticResource ModernCheckBox}" FontSize="10"/>
+                            <TextBlock Text="REPORT FILTERS" Foreground="{StaticResource TextSecondary}" FontSize="11" FontWeight="Black" Margin="0,0,0,4"/>
+                            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterNew, Mode=TwoWay}" Content="NEW" Style="{StaticResource ModernCheckBox}" Margin="0,0,18,0" FontSize="10" VerticalAlignment="Center"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterModified, Mode=TwoWay}" Content="MODIFIED" Style="{StaticResource ModernCheckBox}" Margin="0,0,18,0" FontSize="10" VerticalAlignment="Center"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRenamed, Mode=TwoWay}" Content="RENAMED" Style="{StaticResource ModernCheckBox}" Margin="0,0,18,0" FontSize="10" VerticalAlignment="Center"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRemoved, Mode=TwoWay}" Content="REMOVED" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,0" FontSize="10" VerticalAlignment="Center"/>
                             </WrapPanel>
                         </StackPanel>
                     </Border>
