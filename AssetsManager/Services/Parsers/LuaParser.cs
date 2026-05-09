@@ -122,7 +122,7 @@ namespace AssetsManager.Services.Parsers
             public FileReader(byte[] data)
             {
                 _stream = new MemoryStream(data);
-                _reader = new BinaryReader(_stream, Encoding.ASCII);
+                _reader = new BinaryReader(_stream, Encoding.UTF8);
                 ReadHeader();
             }
 
@@ -189,7 +189,7 @@ namespace AssetsManager.Services.Parsers
             private string ReadString()
             {
                 int sz = ReadInt(_sizeTSize);
-                return sz == 0 ? string.Empty : Encoding.ASCII.GetString(_reader.ReadBytes(sz));
+                return sz == 0 ? string.Empty : Encoding.UTF8.GetString(_reader.ReadBytes(sz));
             }
 
             private int ReadInt(byte? size = null)
@@ -219,7 +219,7 @@ namespace AssetsManager.Services.Parsers
         public class Generator
         {
             private StringBuilder _sb;
-            private int           _funcIdx;
+            private int _funcIdx;
 
             public string Generate(Function fn)
             {
@@ -270,17 +270,6 @@ namespace AssetsManager.Services.Parsers
             }
 
             // ── Body ─────────────────────────────────────────────────────────
-            //
-            // Lua 5.1 generic-for layout in bytecode:
-            //   pc_open : JMP  → pc_tfor       (forward; emitted as "for x in y do")
-            //   pc_open+1 .. pc_tfor-1 : body
-            //   pc_tfor : TFORLOOP A C          (if results → jump back to body start; skipped)
-            //   pc_back : JMP  → pc_tfor        (back-edge; skipped)
-            //
-            // Numeric-for layout:
-            //   pc_prep : FORPREP → FORLOOP     (emitted as "for x = a, b, c do")
-            //   body
-            //   pc_loop : FORLOOP               (skipped; pendingEnds closes the block)
 
             private void EmitBody(Function fn, int baseIndent, List<Local>[] localMap, int childBase)
             {
@@ -291,7 +280,8 @@ namespace AssetsManager.Services.Parsers
                 // ── Pre-pass: identify structured loop boundaries ──────────────
                 var numForEnd   = new Dictionary<int, int>(); // ForPrep pc → ForLoop pc
                 var gForOpen    = new Dictionary<int, int>(); // opening JMP pc → TForLoop pc
-                var gForSkipJmp = new HashSet<int>();          // back-edge JMP pcs (32-bit Lua only)
+                var gForSkipJmp = new HashSet<int>();          // back-edge JMP pcs
+                var loopRanges  = new List<(int Start, int End, int ClosingJmp)>();
 
                 for (int pc = 0; pc < count; pc++)
                 {
@@ -301,54 +291,83 @@ namespace AssetsManager.Services.Parsers
                     {
                         int lpc = pc + 1 + ins.sBx;
                         if (lpc < count && instr[lpc].OpCode == Instruction.Op.ForLoop)
+                        {
                             numForEnd[pc] = lpc;
+                            loopRanges.Add((pc + 1, lpc, -1));
+                        }
                     }
                     else if (ins.OpCode == Instruction.Op.Jmp)
                     {
                         int target = pc + 1 + ins.sBx;
+                        
+                        // Generic for start
                         if (target >= 0 && target < count && instr[target].OpCode == Instruction.Op.TForLoop)
                         {
-                            if (ins.sBx > 0) gForOpen[pc] = target; // forward → opening JMP
-                            else             gForSkipJmp.Add(pc);    // backward → back-edge JMP (32-bit)
+                            if (ins.sBx > 0)
+                            {
+                                gForOpen[pc] = target;
+                                // In 32-bit/Riot Lua, a back-edge JMP usually follows TForLoop
+                                int backJmp = (target + 1 < count && instr[target + 1].OpCode == Instruction.Op.Jmp) ? target + 1 : -1;
+                                loopRanges.Add((pc + 1, target + 1, backJmp));
+                            }
                         }
                     }
                 }
 
-                // All TForLoop pcs that are targets of an opening JMP — always skipped in emission
-                var knownTForLoops = new HashSet<int>(gForOpen.Values);
+                // Second pass to find back-edge jumps that point to loop starts
+                for (int pc = 0; pc < count; pc++)
+                {
+                    var ins = instr[pc];
+                    if (ins.OpCode != Instruction.Op.Jmp) continue;
+                    int target = pc + 1 + ins.sBx;
 
-                // PCs that are loop machinery — never emitted as ::label:: targets
+                    foreach (var open in gForOpen)
+                    {
+                        if (target == open.Key + 1 && pc > open.Value)
+                        {
+                            gForSkipJmp.Add(pc);
+                            break;
+                        }
+                    }
+                }
+
+                var knownTForLoops = new HashSet<int>(gForOpen.Values);
                 var structured = new HashSet<int>();
                 foreach (var kv in numForEnd) { structured.Add(kv.Key); structured.Add(kv.Value); }
-                foreach (var kv in gForOpen)
-                {
-                    structured.Add(kv.Key);     // opening JMP
-                    structured.Add(kv.Value);   // TForLoop
-                    structured.Add(kv.Key + 1); // body start — not a visible label
-                }
+                foreach (var kv in gForOpen)   { structured.Add(kv.Key); structured.Add(kv.Value); structured.Add(kv.Key + 1); }
                 foreach (int pc in gForSkipJmp) structured.Add(pc);
 
-                // Remaining forward/backward JMP targets need ::label:: markers
+                // ── Labels ────────────────────────────────────────────────────
                 var labels = new HashSet<int>();
                 for (int pc = 0; pc < count; pc++)
                 {
                     var ins = instr[pc];
                     if (ins.OpCode == Instruction.Op.Jmp && !structured.Contains(pc))
-                        labels.Add(pc + 1 + ins.sBx);
+                    {
+                        int target = pc + 1 + ins.sBx;
+                        bool isLoopInternal = false;
+                        foreach (var range in loopRanges)
+                        {
+                            // A jump is internal if BOTH pc and target are within the loop range
+                            if (target >= range.Start && target < range.End && pc >= range.Start && pc < range.End)
+                            {
+                                isLoopInternal = true;
+                                break;
+                            }
+                        }
+                        if (!isLoopInternal) labels.Add(target);
+                    }
                 }
 
                 // ── Emission pass ─────────────────────────────────────────────
-                // pending: (closePc, depthToRestoreAfterClose)
                 var pending = new Stack<(int closePc, int depth)>();
                 int depth   = baseIndent;
 
                 for (int pc = 0; pc < count; pc++)
                 {
-                    // Close any blocks whose end has arrived, restoring depth
                     while (pending.Count > 0 && pending.Peek().closePc == pc)
                     {
-                        var (_, d) = pending.Pop();
-                        depth = d;
+                        depth = pending.Pop().depth;
                         _sb.AppendLine($"{Tab(depth)}end");
                     }
 
@@ -358,49 +377,38 @@ namespace AssetsManager.Services.Parsers
                     var    i = instr[pc];
                     string t = Tab(depth);
 
-                    // ── Numeric for ───────────────────────────────────────────
-                    if (i.OpCode == Instruction.Op.ForPrep && numForEnd.ContainsKey(pc))
+                    // Numeric for
+                    if (i.OpCode == Instruction.Op.ForPrep && numForEnd.TryGetValue(pc, out int forLoopPc))
                     {
-                        int endPc = numForEnd[pc];
-                        _sb.AppendLine($"{t}for {regs.NameAt(i.A + 3, pc + 1)} = "
-                                     + $"{regs.Get(i.A)}, {regs.Get(i.A + 1)}, {regs.Get(i.A + 2)} do");
-                        pending.Push((endPc + 1, depth));
+                        _sb.AppendLine($"{t}for {regs.NameAt(i.A + 3, pc + 1)} = {regs.Get(i.A)}, {regs.Get(i.A + 1)}, {regs.Get(i.A + 2)} do");
+                        pending.Push((forLoopPc + 1, depth));
                         depth++;
                         continue;
                     }
-                    if (i.OpCode == Instruction.Op.ForLoop && numForEnd.ContainsValue(pc))
-                        continue;
+                    if (i.OpCode == Instruction.Op.ForLoop && numForEnd.ContainsValue(pc)) continue;
 
-                    // ── Generic for ───────────────────────────────────────────
-                    if (i.OpCode == Instruction.Op.Jmp && gForOpen.ContainsKey(pc))
+                    // Generic for
+                    if (i.OpCode == Instruction.Op.Jmp && gForOpen.TryGetValue(pc, out int tforPc))
                     {
-                        int tforPc = gForOpen[pc];
-                        var tfor   = instr[tforPc];
-                        var vars   = Enumerable.Range(tfor.A + 3, tfor.C)
-                                               .Select(x => regs.NameAt(x, pc + 1));
+                        var tfor = instr[tforPc];
+                        var vars = Enumerable.Range(tfor.A + 3, tfor.C).Select(x => regs.NameAt(x, pc + 1));
                         _sb.AppendLine($"{t}for {string.Join(", ", vars)} in {regs.Get(tfor.A)} do");
-                        // TForLoop.sBx points back to the body start — use it to find block end.
-                        // In 32-bit Lua a separate back-edge JMP exists after TForLoop;
-                        // in 64-bit Lua TForLoop does the back-branch itself, so we close right after it.
-                        int bodyStart = tforPc + 1 + tfor.sBx; // == pc_open + 1
-                        int closePc   = gForSkipJmp.Count > 0   // 32-bit: back-edge JMP follows TForLoop
-                            ? tforPc + 2 : tforPc + 1;
+                        
+                        int backJmp = -1;
+                        foreach(var r in loopRanges) if (r.Start == pc + 1) { backJmp = r.ClosingJmp; break; }
+                        int closePc = backJmp != -1 ? backJmp + 1 : tforPc + 1;
+                        
                         pending.Push((closePc, depth));
                         depth++;
                         continue;
                     }
-                    // TForLoop is always loop machinery — skip unconditionally when known
                     if (i.OpCode == Instruction.Op.TForLoop && knownTForLoops.Contains(pc)) continue;
                     if (i.OpCode == Instruction.Op.Jmp      && gForSkipJmp.Contains(pc))    continue;
 
                     EmitInstruction(fn, i, ref pc, regs, t, childBase);
                 }
 
-                while (pending.Count > 0)
-                {
-                    var (_, d) = pending.Pop();
-                    _sb.AppendLine($"{Tab(d)}end");
-                }
+                while (pending.Count > 0) _sb.AppendLine($"{Tab(pending.Pop().depth)}end");
             }
 
             // ── Instruction emission ──────────────────────────────────────────
@@ -529,7 +537,7 @@ namespace AssetsManager.Services.Parsers
                     case Instruction.Op.TestSet:
                     {
                         string cond = i.C == 0 ? regs.Get(i.B) : $"not {regs.Get(i.B)}";
-                        string dest = regs.Name(i.A);
+                        string dest = regs.NameAt(i.A, pc);
                         _sb.AppendLine($"{t}if {cond} then {dest} = {regs.Get(i.B)} end");
                         regs.Set(i.A, dest);
                         break;
@@ -552,7 +560,7 @@ namespace AssetsManager.Services.Parsers
                 if (tail) { _sb.AppendLine($"{t}return {call}"); return; }
                 int rc = i.C == 0 ? 1 : i.C - 1;
                 if (rc <= 0) { _sb.AppendLine($"{t}{call}"); return; }
-                var results = Enumerable.Range(i.A, rc).Select(x => { regs.Set(x, regs.Name(x)); return regs.Name(x); });
+                var results = Enumerable.Range(i.A, rc).Select(x => { regs.Set(x, regs.NameAt(x, 0)); return regs.NameAt(x, 0); });
                 _sb.AppendLine($"{t}{string.Join(", ", results)} = {call}");
             }
 
@@ -618,6 +626,7 @@ namespace AssetsManager.Services.Parsers
                 {
                     int slot = Array.FindIndex(free, f => f <= loc.ScopeStart);
                     if (slot < 0) slot = fn.Locals.IndexOf(loc);
+                    if (slot < 0 || slot >= size) continue;
                     free[slot] = loc.ScopeEnd;
                     map[slot].Add(loc);
                 }
@@ -643,9 +652,6 @@ namespace AssetsManager.Services.Parsers
                 _entries = new List<(string, string)>[sz];
                 for (int r = 0; r < sz; r++) _vals[r] = DefaultName(r);
             }
-
-            public string Name(int r)    => r < _map.Length ? DefaultName(r) : $"var{r}";
-            public bool   IsTable(int r) => r < _map.Length && _isTbl[r];
 
             public string NameAt(int r, int pc)
             {
@@ -673,6 +679,8 @@ namespace AssetsManager.Services.Parsers
             {
                 if (r < _map.Length && _isTbl[r]) _entries[r].Add((key, val));
             }
+
+            public bool IsTable(int r) => r < _map.Length && _isTbl[r];
 
             // ── private ──────────────────────────────────────────────────────
 

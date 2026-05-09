@@ -6,12 +6,12 @@ namespace AssetsManager.Utils
     public static class PerformanceBenchmark
     {
         /// <summary>
-        /// Placeholder for future performance tests.
+        /// Entry point for the diagnostic suite.
         /// </summary>
         public static async Task<string> RunBenchmarkAsync()
         {
             await Task.Yield();
-            return "No benchmarks configured.";
+            return "READY: No active tests configured.";
         }
     }
 }
