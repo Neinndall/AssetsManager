@@ -37,6 +37,7 @@ namespace AssetsManager.Views
             FavoritesManager favoritesManager,
             ImageMergerService imageMergerService,
             MonitorService monitorService,
+            BackupManager backupManager,
             AssetWatcherService assetWatcherService,
             ProgressUIManager progressUIManager)
         {
@@ -60,6 +61,7 @@ namespace AssetsManager.Views
             FileExplorer.FavoritesManager = favoritesManager;
             FileExplorer.ImageMergerService = imageMergerService;
             FileExplorer.MonitorService = monitorService;
+            FileExplorer.BackupManager = backupManager;
             FileExplorer.AssetWatcherService = assetWatcherService;
             FileExplorer.ProgressUIManager = progressUIManager;
 

@@ -64,6 +64,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public AssetWatcherService AssetWatcherService { get; set; }
         public VersionService VersionService { get; set; }
         public MonitorService MonitorService { get; set; }
+        public BackupManager BackupManager { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
         public ImageMergerService ImageMergerService { get; set; }
         public ProgressUIManager ProgressUIManager { get; set; }
@@ -393,6 +394,15 @@ namespace AssetsManager.Views.Controls.Explorer
             NewLolPath = null;
             OldLolPath = null;
 
+            // Identity Badge Logic
+            if (BackupManager != null)
+            {
+                var (isPbe, _) = BackupManager.GetPathIdentification(rootPath);
+                _viewModel.Toolbar.CurrentClientName = isPbe ? "PBE" : "LIVE";
+                _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource(isPbe ? "AccentBlue" : "AccentBrush");
+                _viewModel.Toolbar.CurrentClientIcon = isPbe ? Material.Icons.MaterialIconKind.FlaskOutline : Material.Icons.MaterialIconKind.SealVariant;
+            }
+
             await ExecuteTreeBuildInternalAsync(
                 async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct, AppSettings.PreferredDirectory),
                 ExplorerLoadingState.LoadingWads,
@@ -406,6 +416,9 @@ namespace AssetsManager.Views.Controls.Explorer
             NewLolPath = null;
             OldLolPath = null;
 
+            _viewModel.Toolbar.CurrentClientName = "LOCAL";
+            _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource("TextMuted");
+
             await ExecuteTreeBuildInternalAsync(
                 async ct => await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct),
                 ExplorerLoadingState.ExploringDirectory,
@@ -416,6 +429,9 @@ namespace AssetsManager.Views.Controls.Explorer
         private async Task BuildTreeFromBackupAsync(string jsonPath)
         {
             _backupJsonPath = jsonPath;
+
+            _viewModel.Toolbar.CurrentClientName = "RESULT";
+            _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource("AccentTeal");
 
             await ExecuteTreeBuildInternalAsync(
                 async ct => 
