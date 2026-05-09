@@ -26,10 +26,6 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isTreeReady;
         private bool _isEmptyState;
         private bool _isNoResultsFound;
-        private bool _isWadMode = true; // Default WAD mode
-        private bool _isBackupMode = false;
-        private bool _isSortingEnabled = true;
-        private bool _isFavoritesEnabled = true; // Default toggle state
         private bool _hasFavorites;
         private string _loadingStatus = "Loading assets...";
         private string _loadingOperation = "LOADING";
@@ -50,6 +46,27 @@ namespace AssetsManager.Views.Models.Explorer
         {
             RootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
             Toolbar = new ExplorerToolbarModel();
+            
+            // Centralized Listener: React to ANY toolbar change and notify dependent properties
+            Toolbar.PropertyChanged += (s, e) => 
+            { 
+                switch(e.PropertyName)
+                {
+                    case nameof(ExplorerToolbarModel.IsFavoritesEnabled):
+                    case nameof(ExplorerToolbarModel.IsWadMode):
+                    case nameof(ExplorerToolbarModel.IsBackupMode):
+                        OnPropertyChanged(nameof(AreFavoritesVisible)); 
+                        OnPropertyChanged(nameof(IsFavoritesToggleVisible));
+                        OnPropertyChanged(nameof(IsWadMode));
+                        OnPropertyChanged(nameof(IsBackupMode));
+                        OnPropertyChanged(nameof(IsToolbarVisible));
+                        break;
+                    case nameof(ExplorerToolbarModel.IsGroupingEnabled):
+                        OnPropertyChanged(nameof(IsSortingEnabled));
+                        break;
+                }
+            };
+
             IsBusy = false;
             IsTreeReady = false;
             IsEmptyState = true; // Start empty
@@ -57,6 +74,34 @@ namespace AssetsManager.Views.Models.Explorer
             SearchNoResultsTitle = "No Matching Results";
             SearchNoResultsDescription = "Try adjusting your search or filters.";
         }
+
+        // ── Proxy Properties (The Toolbar is the Source of Truth) ───────────
+
+        public bool IsWadMode
+        {
+            get => Toolbar.IsWadMode;
+            set { if (Toolbar.IsWadMode != value) { Toolbar.IsWadMode = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsBackupMode
+        {
+            get => Toolbar.IsBackupMode;
+            set { if (Toolbar.IsBackupMode != value) { Toolbar.IsBackupMode = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsSortingEnabled
+        {
+            get => !Toolbar.IsGroupingEnabled;
+            set { if (Toolbar.IsGroupingEnabled == value) { Toolbar.IsGroupingEnabled = !value; OnPropertyChanged(); } }
+        }
+
+        public bool IsFavoritesEnabled
+        {
+            get => Toolbar.IsFavoritesEnabled;
+            set { if (Toolbar.IsFavoritesEnabled != value) { Toolbar.IsFavoritesEnabled = value; OnPropertyChanged(); } }
+        }
+
+        // ── Standard Properties ──────────────────────────────────────────────
 
         public FileSystemNodeModel SelectedItem
         {
@@ -170,7 +215,6 @@ namespace AssetsManager.Views.Models.Explorer
             if (state == ExplorerLoadingState.None)
             {
                 IsBusy = false;
-                // Only show tree if we actually have nodes
                 if (RootNodes.Count > 0)
                 {
                     IsTreeReady = true;
@@ -298,66 +342,12 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public bool IsWadMode
-        {
-            get => _isWadMode;
-            set
-            {
-                if (_isWadMode != value)
-                {
-                    _isWadMode = value;
-                    Toolbar.IsWadMode = value;
-                    OnPropertyChanged();
-                    OnPropertyChanged(nameof(IsToolbarVisible));
-                    OnPropertyChanged(nameof(AreFavoritesVisible));
-                    OnPropertyChanged(nameof(IsFavoritesToggleVisible));
-                }
-            }
-        }
+        // ── Computed Visibility Properties ─────────────────────────────────
 
-        public bool IsBackupMode
-        {
-            get => _isBackupMode;
-            set 
-            { 
-                if (_isBackupMode != value) 
-                { 
-                    _isBackupMode = value; 
-                    Toolbar.IsBackupMode = value;
-                    OnPropertyChanged(); 
-                    OnPropertyChanged(nameof(AreFavoritesVisible));
-                    OnPropertyChanged(nameof(IsFavoritesToggleVisible));
-                } 
-            }
-        }
-
-        public bool IsSortingEnabled
-        {
-            get => _isSortingEnabled;
-            set { if (_isSortingEnabled != value) { _isSortingEnabled = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsFavoritesEnabled
-        {
-            get => _isFavoritesEnabled;
-            set
-            {
-                if (_isFavoritesEnabled != value)
-                {
-                    _isFavoritesEnabled = value;
-                    Toolbar.IsFavoritesEnabled = value;
-                    OnPropertyChanged();
-                    OnPropertyChanged(nameof(AreFavoritesVisible));
-                }
-            }
-        }
-
-        // Computed property for visibility
-        public bool AreFavoritesVisible => IsTreeReady && IsFavoritesEnabled && IsWadMode && !IsBackupMode && HasFavorites;
+        public bool AreFavoritesVisible => IsTreeReady && Toolbar.IsFavoritesEnabled && IsWadMode && !IsBackupMode && HasFavorites;
 
         public bool IsFavoritesToggleVisible => IsWadMode && !IsBackupMode;
         
-        // Toolbar is visible if Tree is ready OR if we are NOT in WAD mode
         public bool IsToolbarVisible => IsTreeReady || !IsWadMode;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

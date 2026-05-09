@@ -228,28 +228,17 @@ namespace AssetsManager.Views.Controls.Explorer
             switch (e.PropertyName)
             {
                 case nameof(ExplorerToolbarModel.IsGridMode):
-                    HandleViewModeChanged(_viewModel.Toolbar.IsGridMode);
+                    FilePreviewer?.SetViewMode(_viewModel.Toolbar.IsGridMode);
                     break;
                 case nameof(ExplorerToolbarModel.IsBreadcrumbVisible):
-                    HandleBreadcrumbVisibilityChanged(_viewModel.Toolbar.IsBreadcrumbVisible);
-                    break;
-                case nameof(ExplorerToolbarModel.IsFavoritesEnabled):
-                    HandleFavoritesVisibilityChanged(_viewModel.Toolbar.IsFavoritesEnabled);
+                    FilePreviewer?.SetBreadcrumbToggleState(_viewModel.Toolbar.IsBreadcrumbVisible);
                     break;
                 case nameof(ExplorerToolbarModel.IsGroupingEnabled):
-                    HandleSortStateChanged(_viewModel.Toolbar.IsGroupingEnabled);
+                    HandleSortStateChanged();
                     break;
                 case nameof(ExplorerToolbarModel.SearchText):
                     HandleSearchTextChanged();
                     break;
-            }
-        }
-
-        public void HandleViewModeChanged(bool isGridMode)
-        {
-            if (FilePreviewer != null)
-            {
-                FilePreviewer.SetViewMode(isGridMode);
             }
         }
 
@@ -260,8 +249,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async void HandleSwitchMode()
         {
-            _viewModel.IsWadMode = !_viewModel.IsWadMode;
-            // Mode switched, we keep the current view mode (Grid/Preview) preference.
+            // The Toolbar is the source of truth, so we switch its state
+            _viewModel.Toolbar.IsWadMode = !_viewModel.Toolbar.IsWadMode;
             
             if (FilePreviewer != null)
             {
@@ -270,21 +259,8 @@ namespace AssetsManager.Views.Controls.Explorer
             await ReloadTreeAsync();
         }
 
-        public void HandleBreadcrumbVisibilityChanged(bool isVisible)
+        public async void HandleSortStateChanged()
         {
-            FilePreviewer?.SetBreadcrumbToggleState(isVisible);
-        }
-
-        public void HandleFavoritesVisibilityChanged(bool isVisible)
-        {
-            _viewModel.IsFavoritesEnabled = isVisible;
-        }
-
-        public async void HandleSortStateChanged(bool isEnabled)
-        {
-            // Toolbar 'IsEnabled' means Categories mode (IsSortingEnabled = false)
-            // Default (Unchecked) is Path Mode (IsSortingEnabled = true)
-            _viewModel.IsSortingEnabled = !isEnabled;
             if (_viewModel.IsBackupMode)
             {
                 await BuildTreeFromBackupAsync(_backupJsonPath);
