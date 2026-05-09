@@ -325,7 +325,7 @@ namespace AssetsManager.Services.Explorer
             if (fileBytes == null) return;
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync("luabin64", fileBytes);
-            string fileName = Path.ChangeExtension(node.Name, ".lua");
+            string fileName = Path.ChangeExtension(node.Name, ".json");
             string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
 
             await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
