@@ -198,21 +198,21 @@
                               SelectedValue="{Binding Settings.ImageExportFormat, Mode=TwoWay}"/>
                 </Grid>
 
-                <!-- Preferred Backup Client -->
+                <!-- Preferred Game Client -->
                 <Grid Margin="0,0,0,24">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Preferred backup client" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Select the default game client for scanning and creating backups" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Preferred game client" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Select the primary game client for initial exploration and automated backups" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1" Width="120" Height="28" 
                               Style="{StaticResource ModernComboBox}"
                               ItemsSource="{Binding PreferredClientOptions}"
                               DisplayMemberPath="Name" SelectedValuePath="Value"
-                              SelectedValue="{Binding Settings.PreferredBackupClient, Mode=TwoWay}"/>
+                              SelectedValue="{Binding Settings.PreferredClient, Mode=TwoWay}"/>
                 </Grid>
 
                 <!-- Preferred Directory Folder -->

@@ -175,8 +175,24 @@ namespace AssetsManager.Views.Controls.Explorer
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
 
+            // Smart discovery based on preference
+            string pbe = AppSettings.LolPbeDirectory;
+            string live = AppSettings.LolLiveDirectory;
+            bool pbeValid = !string.IsNullOrEmpty(pbe) && Directory.Exists(pbe);
+            bool liveValid = !string.IsNullOrEmpty(live) && Directory.Exists(live);
+            
+            string wadPath = null;
+            if (AppSettings.PreferredClient == PreferredClient.PBE)
+            {
+                wadPath = pbeValid ? pbe : (liveValid ? live : null);
+            }
+            else
+            {
+                wadPath = liveValid ? live : (pbeValid ? pbe : null);
+            }
+
             // First, do the synchronous checks to decide the initial UI state.
-            bool shouldLoadWadTree = _viewModel.IsWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory);
+            bool shouldLoadWadTree = _viewModel.IsWadMode && wadPath != null;
             bool shouldLoadDirTree = !_viewModel.IsWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
 
             if (shouldLoadWadTree || shouldLoadDirTree)
@@ -210,7 +226,7 @@ namespace AssetsManager.Views.Controls.Explorer
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
             {
-                await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
+                await BuildWadTreeAsync(wadPath);
             }
             else if (shouldLoadDirTree)
             {
@@ -276,9 +292,11 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (_viewModel.IsWadMode)
             {
-                if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
+                string path = Directory.Exists(AppSettings.LolPbeDirectory ?? "") ? AppSettings.LolPbeDirectory : (Directory.Exists(AppSettings.LolLiveDirectory ?? "") ? AppSettings.LolLiveDirectory : null);
+
+                if (path != null)
                 {
-                    await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
+                    await BuildWadTreeAsync(path);
                 }
                 else
                 {

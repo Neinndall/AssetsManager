@@ -34,7 +34,7 @@ namespace AssetsManager.Utils
         public string DefaultExtractedSelectDirectory { get; set; }
         public string LastPbeStatusMessage { get; set; }
         public string LastPbeCheckTime { get; set; }
-        public PreferredClient PreferredBackupClient { get; set; } = PreferredClient.PBE;
+        public PreferredClient PreferredClient { get; set; } = PreferredClient.PBE;
         public PreferredDirectory PreferredDirectory { get; set; } = PreferredDirectory.All;
         public string CustomFloorTexturePath { get; set; } = string.Empty;
         public Dictionary<string, long> HashesSizes { get; set; }
@@ -148,7 +148,7 @@ namespace AssetsManager.Utils
                 ImageExportFormat = ImageExportFormat.Original,
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
-                PreferredBackupClient = PreferredClient.PBE,
+                PreferredClient = PreferredClient.PBE,
                 PreferredDirectory = PreferredDirectory.All,
                 HashesSizes = new Dictionary<string, long>(),
                 MonitoredAssets = new List<MonitoredAsset>(),
@@ -195,7 +195,7 @@ namespace AssetsManager.Utils
             CheckPbeStatus = defaultSettings.CheckPbeStatus;
             MinimizeToTrayOnClose = defaultSettings.MinimizeToTrayOnClose;
             LastPbeStatusMessage = defaultSettings.LastPbeStatusMessage;
-            PreferredBackupClient = defaultSettings.PreferredBackupClient;
+            PreferredClient = defaultSettings.PreferredClient;
             PreferredDirectory = defaultSettings.PreferredDirectory;
             UpdateCheckFrequency = defaultSettings.UpdateCheckFrequency;
             PbeStatusFrequency = defaultSettings.PbeStatusFrequency;
