@@ -27,6 +27,7 @@ namespace AssetsManager.Views.Dialogs.Controls
     public partial class JsonDiffControl : UserControl, IDisposable
     {
         #region Fields
+        private static readonly IDiffer _differ = new Differ();
         private SideBySideDiffModel _originalDiffModel;
         private DiffPaneModel _unifiedModel;
         private string _oldText;
@@ -276,17 +277,15 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                 _cachedOldDoc = null;
                 _cachedNewDoc = null;
+                _originalDiffModel = null;
                 _unifiedModel = null;
 
                 // Detection: Is this the first time the asset is being tracked?
                 ViewModel.IsInitialComparison = string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(newText);
 
-                // Build model in background
-                _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(new Differ()).BuildDiffModel(oldText, newText, false));
-
-                // Delegate to ViewModel
+                // Build metrics using the most efficient way (Raw blocks)
                 ViewModel.UpdateMetrics(oldText, newText);
-                UpdateChangeCounts();
+                await Task.Run(() => UpdateChangeCounts());
 
                 // IMPORTANT: We do the UI update, but the Window is still Hidden
                 await UpdateDiffView();
@@ -300,7 +299,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void UpdateChangeCounts()
         {
-            // Initial comparison: Don't show technical "changes" as it's the first time
             if (ViewModel.IsInitialComparison)
             {
                 ViewModel.InsertionsCount = 0;
@@ -309,27 +307,16 @@ namespace AssetsManager.Views.Dialogs.Controls
                 return;
             }
 
-            // Calculate detailed metrics (One single pass over the built model)
-            int ins = 0, del = 0, mod = 0;
+            // FAST TRACK: Use raw diff blocks to count changes (O(Blocks) instead of O(Lines))
+            // DiffPlex 1.9.0 handles hashing internally for performance.
+            var diffResult = _differ.CreateDiffs(_oldText, _newText, false, false, new DiffPlex.Chunkers.LineChunker());
             
-            if (_originalDiffModel?.NewText?.Lines != null)
+            int ins = 0, del = 0, mod = 0;
+            foreach (var block in diffResult.DiffBlocks)
             {
-                foreach (var line in _originalDiffModel.NewText.Lines)
-                {
-                    switch (line.Type)
-                    {
-                        case ChangeType.Inserted: ins++; break;
-                        case ChangeType.Modified: mod++; break;
-                    }
-                }
-            }
-
-            if (_originalDiffModel?.OldText?.Lines != null)
-            {
-                foreach (var line in _originalDiffModel.OldText.Lines)
-                {
-                    if (line.Type == ChangeType.Deleted) del++;
-                }
+                if (block.DeleteCountA > 0 && block.InsertCountB > 0) mod += Math.Max(block.DeleteCountA, block.InsertCountB);
+                else if (block.InsertCountB > 0) ins += block.InsertCountB;
+                else if (block.DeleteCountA > 0) del += block.DeleteCountA;
             }
 
             ViewModel.InsertionsCount = ins;
@@ -385,8 +372,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         #region View Logic
         private async Task UpdateDiffView(double? percentageToRestore = null, int? explicitLine = null)
         {
-            if (_originalDiffModel == null) return;
-
             try
             {
                 if (ViewModel.IsInlineMode)
@@ -408,7 +393,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_unifiedModel == null)
             {
-                _unifiedModel = await Task.Run(() => new InlineDiffBuilder(new Differ()).BuildDiffModel(_oldText, _newText));
+                _unifiedModel = await Task.Run(() => new InlineDiffBuilder(_differ).BuildDiffModel(_oldText, _newText));
             }
 
             var linesToShow = ViewModel.HideUnchangedLines
@@ -435,6 +420,11 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async Task SwitchToSideBySideView(double? percentageToRestore, int? explicitLine)
         {
+            if (_originalDiffModel == null)
+            {
+                _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false));
+            }
+
             var modelToShow = ViewModel.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
             var originalModelForNav = ViewModel.HideUnchangedLines ? _originalDiffModel : null;
 

@@ -15,6 +15,9 @@ namespace AssetsManager.Views.Helpers
         private readonly SolidColorBrush _removedBrush;
         private readonly SolidColorBrush _addedBrush;
         private readonly SolidColorBrush _modifiedBrush;
+        private readonly SolidColorBrush _removedOpacityBrush;
+        private readonly SolidColorBrush _addedOpacityBrush;
+        private readonly SolidColorBrush _modifiedOpacityBrush;
 
         public DiffBackgroundRenderer(SideBySideDiffModel diffModel, bool isWordLevel, bool isOldEditor)
         {
@@ -29,6 +32,18 @@ namespace AssetsManager.Views.Helpers
             _addedBrush.Freeze();
             _removedBrush.Freeze();
             _modifiedBrush.Freeze();
+
+            _addedOpacityBrush = _addedBrush.Clone();
+            _addedOpacityBrush.Opacity = 0.85;
+            _addedOpacityBrush.Freeze();
+
+            _removedOpacityBrush = _removedBrush.Clone();
+            _removedOpacityBrush.Opacity = 0.85;
+            _removedOpacityBrush.Freeze();
+
+            _modifiedOpacityBrush = _modifiedBrush.Clone();
+            _modifiedOpacityBrush.Opacity = 0.85;
+            _modifiedOpacityBrush.Freeze();
         }
 
         public KnownLayer Layer => KnownLayer.Background;
@@ -89,23 +104,24 @@ namespace AssetsManager.Views.Helpers
 
         private SolidColorBrush GetBrushForChangeType(ChangeType changeType, bool useOpacity = false)
         {
-            SolidColorBrush brush = changeType switch
+            if (useOpacity)
+            {
+                return changeType switch
+                {
+                    ChangeType.Inserted => _addedOpacityBrush,
+                    ChangeType.Deleted => _removedOpacityBrush,
+                    ChangeType.Modified => _modifiedOpacityBrush,
+                    _ => null
+                };
+            }
+
+            return changeType switch
             {
                 ChangeType.Inserted => _addedBrush,
                 ChangeType.Deleted => _removedBrush,
                 ChangeType.Modified => _modifiedBrush,
                 _ => null
             };
-
-            if (brush != null && useOpacity)
-            {
-                var clonedBrush = brush.Clone();
-                clonedBrush.Opacity = 0.85; // Este valor es para la opcion de resaltado (high level word)
-                clonedBrush.Freeze();
-                return clonedBrush;
-            }
-
-            return brush;
         }
     }
 }
