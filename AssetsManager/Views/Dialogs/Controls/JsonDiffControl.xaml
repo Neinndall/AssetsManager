@@ -203,18 +203,7 @@
                                           Style="{StaticResource TransparentIconToggleButton}"
                                           Width="30" Height="30"
                                           ToolTip="Toggle Word Wrap">
-                                <icons:MaterialIcon Kind="Wrap" Width="16" Height="16">
-                                    <icons:MaterialIcon.Style>
-                                        <Style TargetType="icons:MaterialIcon">
-                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsWordWrapEnabled}" Value="True">
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </icons:MaterialIcon.Style>
-                                </icons:MaterialIcon>
+                                 <icons:MaterialIcon Kind="Wrap" Width="16" Height="16"/>
                             </ToggleButton>
                             <ToggleButton x:Name="WordLevelDiffButton"
                                           IsChecked="{Binding IsWordLevelDiff}"
@@ -222,18 +211,7 @@
                                           Style="{StaticResource TransparentIconToggleButton}"
                                           Width="30" Height="30"
                                           ToolTip="Toggle Word-Level Diff">
-                                <icons:MaterialIcon Kind="FormatText" Width="16" Height="16">
-                                    <icons:MaterialIcon.Style>
-                                        <Style TargetType="icons:MaterialIcon">
-                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsWordLevelDiff}" Value="True">
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </icons:MaterialIcon.Style>
-                                </icons:MaterialIcon>
+                                 <icons:MaterialIcon Kind="FormatText" Width="16" Height="16"/>
                             </ToggleButton>
                             <ToggleButton x:Name="HideUnchangedButton"
                                           IsChecked="{Binding HideUnchangedLines}"
@@ -241,18 +219,7 @@
                                           Style="{StaticResource TransparentIconToggleButton}"
                                           Width="30" Height="30"
                                           ToolTip="Show/Hide Unchanged Lines">
-                                <icons:MaterialIcon Kind="FilterVariant" Width="16" Height="16">
-                                    <icons:MaterialIcon.Style>
-                                        <Style TargetType="icons:MaterialIcon">
-                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HideUnchangedLines}" Value="True">
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </icons:MaterialIcon.Style>
-                                </icons:MaterialIcon>
+                                 <icons:MaterialIcon Kind="FilterVariant" Width="16" Height="16"/>
                             </ToggleButton>
                         </StackPanel>
                     </Border>
