@@ -14,6 +14,9 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         private bool _isWordLevelDiff;
         private bool _hideUnchangedLines;
         private bool _isWordWrapEnabled;
+        private bool _showInsertions = true;
+        private bool _showDeletions = true;
+        private bool _showModifications = true;
 
         // Metrics Properties
         private int _insertionsCount;
@@ -61,6 +64,24 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         {
             get => _isWordWrapEnabled;
             set { _isWordWrapEnabled = value; OnPropertyChanged(); }
+        }
+
+        public bool ShowInsertions
+        {
+            get => _showInsertions;
+            set { _showInsertions = value; OnPropertyChanged(); }
+        }
+
+        public bool ShowDeletions
+        {
+            get => _showDeletions;
+            set { _showDeletions = value; OnPropertyChanged(); }
+        }
+
+        public bool ShowModifications
+        {
+            get => _showModifications;
+            set { _showModifications = value; OnPropertyChanged(); }
         }
 
         public int InsertionsCount

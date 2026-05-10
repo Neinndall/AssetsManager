@@ -51,21 +51,21 @@
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,12,0">
                                 <TextBlock Text="INSIGHTS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,12,0"/>
                                 
-                                <Border Background="#1A00E676" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Insertion" MouseLeftButtonDown="JumpToInsertion_Click" Cursor="Hand">
+                                <Border Background="#1A00E676" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Insertion" MouseLeftButtonDown="JumpToInsertion_Click" MouseRightButtonDown="FilterInsertion_Click" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal">
                                         <icons:MaterialIcon Kind="Plus" Width="12" Height="12" Foreground="{StaticResource AccentGreen}" Margin="0,0,4,0"/>
                                         <TextBlock Text="{Binding InsertionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1AFF5252" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Deletion" MouseLeftButtonDown="JumpToDeletion_Click" Cursor="Hand">
+                                <Border Background="#1AFF5252" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Deletion" MouseLeftButtonDown="JumpToDeletion_Click" MouseRightButtonDown="FilterDeletion_Click" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal">
                                         <icons:MaterialIcon Kind="Minus" Width="12" Height="12" Foreground="{StaticResource AccentRed}" Margin="0,0,4,0"/>
                                         <TextBlock Text="{Binding DeletionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentRed}"/>
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1A5C85FF" CornerRadius="4" Padding="6,2" ToolTip="Jump to first Modification" MouseLeftButtonDown="JumpToModification_Click" Cursor="Hand">
+                                <Border Background="#1A5C85FF" CornerRadius="4" Padding="6,2" ToolTip="Jump to first Modification" MouseLeftButtonDown="JumpToModification_Click" MouseRightButtonDown="FilterModification_Click" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal">
                                         <icons:MaterialIcon Kind="EditOutline" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0"/>
                                         <TextBlock Text="{Binding ModificationsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
@@ -115,6 +115,66 @@
                             <!-- SEPARATOR -->
                             <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
 
+                            <!-- FILTERS SECTION -->
+                            <TextBlock Text="FILTERS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0"/>
+                            <ToggleButton IsChecked="{Binding ShowInsertions}" 
+                                          Click="FilterButton_Click" 
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Insertions">
+                                <icons:MaterialIcon Kind="Plus" Width="14" Height="14">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowInsertions}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding ShowDeletions}" 
+                                          Click="FilterButton_Click" 
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Deletions">
+                                <icons:MaterialIcon Kind="Minus" Width="14" Height="14">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowDeletions}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding ShowModifications}" 
+                                          Click="FilterButton_Click" 
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Modifications">
+                                <icons:MaterialIcon Kind="EditOutline" Width="14" Height="14">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowModifications}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
+                            </ToggleButton>
+
+                            <!-- SEPARATOR -->
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
+
                             <!-- DIFFS SECTION (Navigation within file) -->
                             <TextBlock Text="DIFFS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0"/>
                             <Button x:Name="PreviousDiffButton" 
@@ -143,7 +203,18 @@
                                           Style="{StaticResource TransparentIconToggleButton}"
                                           Width="30" Height="30"
                                           ToolTip="Toggle Word Wrap">
-                                 <icons:MaterialIcon Kind="Wrap" Width="16" Height="16"/>
+                                <icons:MaterialIcon Kind="Wrap" Width="16" Height="16">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsWordWrapEnabled}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
                             </ToggleButton>
                             <ToggleButton x:Name="WordLevelDiffButton"
                                           IsChecked="{Binding IsWordLevelDiff}"
@@ -151,7 +222,18 @@
                                           Style="{StaticResource TransparentIconToggleButton}"
                                           Width="30" Height="30"
                                           ToolTip="Toggle Word-Level Diff">
-                                 <icons:MaterialIcon Kind="FormatText" Width="16" Height="16"/>
+                                <icons:MaterialIcon Kind="FormatText" Width="16" Height="16">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsWordLevelDiff}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
                             </ToggleButton>
                             <ToggleButton x:Name="HideUnchangedButton"
                                           IsChecked="{Binding HideUnchangedLines}"
@@ -159,7 +241,18 @@
                                           Style="{StaticResource TransparentIconToggleButton}"
                                           Width="30" Height="30"
                                           ToolTip="Show/Hide Unchanged Lines">
-                                 <icons:MaterialIcon Kind="FilterVariant" Width="16" Height="16"/>
+                                <icons:MaterialIcon Kind="FilterVariant" Width="16" Height="16">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HideUnchangedLines}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
                             </ToggleButton>
                         </StackPanel>
                     </Border>

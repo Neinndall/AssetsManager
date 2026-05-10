@@ -396,9 +396,19 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _unifiedModel = await Task.Run(() => new InlineDiffBuilder(_differ).BuildDiffModel(_oldText, _newText));
             }
 
-            var linesToShow = ViewModel.HideUnchangedLines
-                ? _unifiedModel.Lines.Where(l => l.Type != ChangeType.Unchanged).ToList()
-                : _unifiedModel.Lines;
+            var linesToShow = _unifiedModel.Lines;
+
+            if (ViewModel.HideUnchangedLines)
+            {
+                linesToShow = _unifiedModel.Lines.Where(l => 
+                {
+                    if (l.Type == ChangeType.Unchanged) return false;
+                    if (l.Type == ChangeType.Inserted && !ViewModel.ShowInsertions) return false;
+                    if (l.Type == ChangeType.Deleted && !ViewModel.ShowDeletions) return false;
+                    if (l.Type == ChangeType.Modified && !ViewModel.ShowModifications) return false;
+                    return true;
+                }).ToList();
+            }
 
             string combinedText = string.Join(Environment.NewLine, linesToShow.Select(l => l.Text));
 
@@ -617,6 +627,39 @@ namespace AssetsManager.Views.Dialogs.Controls
                 await UpdateDiffView(null, _lastAbsoluteLine);
             }
         }
+
+        private async void FilterButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ViewModel.HideUnchangedLines)
+            {
+                // If we are showing all lines, specific filters don't make sense unless we also hide unchanged
+                ViewModel.HideUnchangedLines = true;
+            }
+
+            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            double currentPercentage = GetCurrentScrollPercentage(editor);
+
+            _cachedOldDoc = null;
+            await UpdateDiffView(currentPercentage);
+        }
+
+        private void FilterInsertion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => ApplySoloFilter(true, false, false);
+        private void FilterDeletion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => ApplySoloFilter(false, true, false);
+        private void FilterModification_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => ApplySoloFilter(false, false, true);
+
+        private async void ApplySoloFilter(bool ins, bool del, bool mod)
+        {
+            ViewModel.HideUnchangedLines = true;
+            ViewModel.ShowInsertions = ins;
+            ViewModel.ShowDeletions = del;
+            ViewModel.ShowModifications = mod;
+
+            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            double currentPercentage = GetCurrentScrollPercentage(editor);
+
+            _cachedOldDoc = null;
+            await UpdateDiffView(currentPercentage);
+        }
         #endregion
 
         #region Helpers
@@ -754,10 +797,33 @@ namespace AssetsManager.Views.Dialogs.Controls
                 var oldLine = originalModel.OldText.Lines[i];
                 var newLine = originalModel.NewText.Lines[i];
 
-                if (oldLine.Type != ChangeType.Unchanged || newLine.Type != ChangeType.Unchanged)
+                bool isChanged = oldLine.Type != ChangeType.Unchanged || newLine.Type != ChangeType.Unchanged;
+                if (isChanged)
                 {
-                    filteredModel.OldText.Lines.Add(oldLine);
-                    filteredModel.NewText.Lines.Add(newLine);
+                    bool shouldShow = false;
+                    
+                    // Logic: If a line is a deletion, it only exists in OldText (usually)
+                    // If it's an insertion, it only exists in NewText.
+                    // If it's a modification, both have changed.
+                    
+                    if (oldLine.Type == ChangeType.Deleted || newLine.Type == ChangeType.Deleted)
+                    {
+                        if (ViewModel.ShowDeletions) shouldShow = true;
+                    }
+                    else if (oldLine.Type == ChangeType.Inserted || newLine.Type == ChangeType.Inserted)
+                    {
+                        if (ViewModel.ShowInsertions) shouldShow = true;
+                    }
+                    else if (oldLine.Type == ChangeType.Modified || newLine.Type == ChangeType.Modified)
+                    {
+                        if (ViewModel.ShowModifications) shouldShow = true;
+                    }
+
+                    if (shouldShow)
+                    {
+                        filteredModel.OldText.Lines.Add(oldLine);
+                        filteredModel.NewText.Lines.Add(newLine);
+                    }
                 }
             }
             return filteredModel;
