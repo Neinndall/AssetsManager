@@ -155,6 +155,8 @@ Changes
     * Optimized Mesh Identification: the system now simplifies long, complex material paths into clean, readable names (e.g., "Bush_Wind_A") specifically for map geometry, making it easier to identify assets.
   - Architecture / Service Refactoring
     * Refined the RiotApiService by centralizing WAD management and icon path resolution.
+  - Text Analysis / UI Simplification
+    * Removed the JSON path breadcrumb and copy button from the bottom bar to provide a cleaner, line-focused workspace.
 
 Bug Fixes
   - Text Comparison / Word Wrap & Boundary Alignment
@@ -163,6 +165,7 @@ Bug Fixes
     *   Fixed caret position loss when toggling Word Wrap: the system now intelligently captures and restores the technical line and caret position after layout recalculation.
   - Text Comparison / Filtering & Caret Visibility
     *   Fixed an issue where the caret would disappear when toggling "Hide Unchanged Lines"; the system now automatically focuses the editor and positions the caret at the first difference.
+    *   Fixed caret position loss when switching between Side-by-Side and Inline modes: the system now accurately captures and restores the active line during view transitions.
   - Monitor / Advanced Backup system
     * Fixed a logic error where PBE backups were incorrectly identified as LIVE due to path string overlap.
   - Core / System Stability
@@ -184,6 +187,7 @@ Bug Fixes
     * Fixed bug where .bnk files failed to display correctly in Batch Mode.
     * Refined comparison processing with type-based safety checks.
   - User Interface / Control & Layout Precision
+    * Fixed a bug in the Text Comparison view where the caret and scroll position would jump to line 1 when toggling filters or the "Hide Unchanged Lines" tool; the system now correctly preserves and restores the last known absolute position.
     * Fixed a bug in the ModernComboBox style where the dropdown arrow was incorrectly centered; it is now perfectly aligned to the right.
     * Fixed a visual issue in the ModernComboBox style where an extra empty space appeared at the bottom of the dropdown after the last item.
     * Resolved vertical alignment issues in the Comparator view, ensuring the central icon and footer are perfectly synchronized with the section headers.

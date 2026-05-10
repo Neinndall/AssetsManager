@@ -432,9 +432,10 @@ namespace AssetsManager.Views.Dialogs.Controls
             var sourceEditor = switchingToInline ? NewJsonContent : UnifiedDiffEditor;
 
             // Smart persistence: Save current scroll percentage before switching
+            int currentLine = GetCurrentLineRobust(sourceEditor);
             double currentPercentage = GetCurrentScrollPercentage(sourceEditor);
 
-            await UpdateDiffView(currentPercentage);
+            await UpdateDiffView(currentPercentage, currentLine);
         }
 
         private void OldEditor_ScrollChanged(object sender, EventArgs e)
