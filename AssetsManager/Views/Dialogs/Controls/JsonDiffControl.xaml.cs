@@ -54,7 +54,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             InitializeComponent();
             _viewModel = new JsonDiffModel();
             this.DataContext = _viewModel;
-            
+
             // Peer injection
             DiffNavigationPanel.ParentControl = this;
 
@@ -515,19 +515,16 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
             
-            // 1. Si vamos a OCULTAR (acaba de pasar a true), guardamos la línea real
             if (ViewModel.HideUnchangedLines)
             {
+                // 1. Si vamos a OCULTAR, guardamos la línea real y vamos al inicio de resultados
                 _lastAbsoluteLine = GetCurrentLineRobust(editor);
                 _cachedOldDoc = null;
-                await UpdateDiffView(GetCurrentScrollPercentage(editor), null);
-                
-                // Forzar el caret a ser visible en la nueva vista filtrada (v4.0.0.0 fix)
-                ScrollToLine(1); // Opcional: Centrar en la primera diferencia
+                await UpdateDiffView(null, null);
             }
             else
             {
-                // 2. Si vamos a MOSTRAR todo (acaba de pasar a false), restauramos la línea absoluta
+                // 2. Si vamos a MOSTRAR todo, restauramos la línea absoluta guardada
                 _cachedOldDoc = null;
                 await UpdateDiffView(null, _lastAbsoluteLine);
             }
@@ -535,17 +532,18 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async void FilterButton_Click(object sender, RoutedEventArgs e)
         {
+            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+
             if (!ViewModel.HideUnchangedLines)
             {
-                // If we are showing all lines, specific filters don't make sense unless we also hide unchanged
+                // Capturar posición antes de activar el filtrado automático
+                _lastAbsoluteLine = GetCurrentLineRobust(editor);
                 ViewModel.HideUnchangedLines = true;
             }
 
-            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
-            double currentPercentage = GetCurrentScrollPercentage(editor);
-
+            // Al cambiar filtros siempre vamos al inicio de los resultados para inspección fresca
             _cachedOldDoc = null;
-            await UpdateDiffView(currentPercentage);
+            await UpdateDiffView(null, null);
         }
 
         private void FilterInsertion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => ApplySoloFilter(true, false, false);
@@ -554,16 +552,20 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async void ApplySoloFilter(bool ins, bool del, bool mod)
         {
-            ViewModel.HideUnchangedLines = true;
+            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+
+            if (!ViewModel.HideUnchangedLines)
+            {
+                _lastAbsoluteLine = GetCurrentLineRobust(editor);
+                ViewModel.HideUnchangedLines = true;
+            }
+
             ViewModel.ShowInsertions = ins;
             ViewModel.ShowDeletions = del;
             ViewModel.ShowModifications = mod;
 
-            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
-            double currentPercentage = GetCurrentScrollPercentage(editor);
-
             _cachedOldDoc = null;
-            await UpdateDiffView(currentPercentage);
+            await UpdateDiffView(null, null);
         }
         #endregion
 
@@ -681,6 +683,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                 UnifiedDiffEditor.ScrollTo(lineNumber, 0);
                 UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
                 UpdateLineNumber(lineNumber);
+                UnifiedDiffEditor.Focus();
                 return;
             }
 
