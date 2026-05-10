@@ -1,12 +1,8 @@
-AssetsManager - League of Legends | v3.3.0.0
+AssetsManager - League of Legends | v4.0.0.0
 
 MAJOR UPDATE
 
 New Features
-  - Explorer / Unified Results Loading
-    *   Renamed the "Load Backup" tool to "Load Results" to better reflect its technical purpose of loading comparison data.
-    *   Updated the internal loading status to "Loading Results", ensuring consistency between the user interface and background processes.
-    *   Standardized the tool icon and labels across the technical suite for a more intuitive and professional experience.
   - Explorer / Lua Decompilation Support
     *   Added full support for `.luabin64` files: the system now automatically decompiles and formats Lua 5.1 bytecode into readable source code.
     *   Integrated Automated Smart Save: when using the "Save" command, `.luabin64` files are now automatically decompiled and exported as `.json` data files, streamlining the asset extraction workflow and maintaining consistency with other data formats.
@@ -21,6 +17,30 @@ New Features
     * Added Selective Backup Creation: users can now create a backup of any specific installation from the list, providing total control over version cloning.
     * Professional Version-Date Naming: backups are now automatically named using a clean `Folder_Version_Date` format (e.g., `League of Legends PBE_14.9_20260504_1200`), ensuring a perfectly organized historical repository.
     * Dynamic Role Identification: added interactive "MAIN" and "BACKUP" tags to the installation list for immediate visual clarity on which folder is being used.
+  - Settings / Explorer Performance Optimization
+    * Added "Preferred Directory Folder" setting: users can now choose to load only "Game", "Plugins", or "All" subdirectories when entering Directory Mode in the Explorer. This significantly reduces loading times and RAM consumption for users focused on specific areas of the game data.
+  - Audio / Professional Playlist Management
+    * Enhanced Playlist Persistence: implemented a dual-URL storage system that preserves the `OriginalUrl` (permanent YouTube link) alongside the temporary stream URI, guaranteeing long-term data integrity for saved packs.
+    * Introduced "Playlist Packs": users can now save multiple independent playlists containing both YouTube URLs and local media files.
+    * Integrated HUB Interface: added a new header to the Audio Player for quick saving and library navigation.
+    * Persistent Storage: playlists are now saved directly to the application configuration, allowing them to be restored instantly upon startup.
+  - Text Comparison / Granular Filtering
+    *   Introduced Granular Filter Controls: added a new "FILTERS" section in the toolbar allowing users to independently toggle the visibility of Insertions (+), Deletions (-), and Modifications (Edit).
+    *   Implemented Intelligent Filter Activation: clicking any granular filter now automatically activates the "Hide Unchanged Lines" mode, providing an instant focused view of the selected change types.
+    *   Added "Filter Only" Rapid Isolation (Right-Click): right-clicking on any INSIGHTS badge (Insertions, Deletions, or Modifications) now instantly isolates only that type of change, disabling all other filters for a lightning-fast analysis.
+
+Improvements
+  - Settings / Generalized User Preference
+    * Renamed "Preferred Backup Client" to "Preferred Client" to serve as a global preference that now also governs the initial client discovery in the Explorer and automated backups, ensuring a consistent environment priority.
+  - Explorer / Intelligent Path Discovery
+    * Enhanced the startup workflow by automatically detecting and loading the game tree if either PBE or Live client directory is configured, eliminating unnecessary selection screens.
+  - Explorer / Professional Mode Indicator
+    * Implemented a dedicated "MODE" status area in the toolbar that dynamically identifies the loaded environment (PBE, LIVE, LOCAL, or RESULT).
+    * Integrated semantic iconography and a high-visibility HUD-style pill for immediate environmental context.
+  - Explorer / Unified Results Loading
+    *   Renamed the "Load Backup" tool to "Load Results" to better reflect its technical purpose of loading comparison data.
+    *   Updated the internal loading status to "Loading Results", ensuring consistency between the user interface and background processes.
+    *   Standardized the tool icon and labels across the technical suite for a more intuitive and professional experience.
   - Comparator / Intelligent WAD Selection
     * Added QoL logic for WAD mode: hidden the redundant QuickSelect in the Target section and replaced it with a professional HUD informative icon that guides the user towards manual WAD selection to enable auto-synchronization.
     * Improved Browser Dialogs: the initial directory for folder and file pickers now correctly respects the "Preferred Protocol" setting (LIVE or PBE), providing a more consistent user experience.
@@ -40,8 +60,6 @@ New Features
     * Added "No Previous Information" Overlay: when an asset is tracked for the first time, the OLD version now displays a professional informative screen instead of empty braces {}.
     * Refined Initial Highlighting: disabled the redundant "all-green" insertion effect for first-time assets, presenting the content in a clean, natural state for better readability.
     * Atomic Metrics: initial comparisons now correctly display 0 changes in the toolbar, reflecting that the view represents a baseline rather than a diff.
-  - Settings / Explorer Performance Optimization
-    * Added "Preferred Directory Folder" setting: users can now choose to load only "Game", "Plugins", or "All" subdirectories when entering Directory Mode in the Explorer. This significantly reduces loading times and RAM consumption for users focused on specific areas of the game data.
   - Settings / Generic Options Engine
     * Re-engineered the settings infrastructure with a high-performance generic `FormatOption<T>` model, eliminating redundant code for export protocols and client preferences.
     * Reorganized General Settings: introduced a new "PREFERRED PROTOCOLS" section to centralize all user preferences (Audio, Image, and Client) under a single, intuitive header.
@@ -55,20 +73,21 @@ New Features
     * Synchronized card headers with the main HUD style, featuring professional icons and refined typography (13px SemiBold).
     * Optimized workspace utilization by expanding card width and standardizing horizontal padding to 24px for perfect vertical icon alignment.
     * Enhanced card aesthetics with symmetrical 26px internal vertical padding for better breathing room.
-  - Audio / Professional Playlist Management
-    * Enhanced Playlist Persistence: implemented a dual-URL storage system that preserves the `OriginalUrl` (permanent YouTube link) alongside the temporary stream URI, guaranteeing long-term data integrity for saved packs.
-    * Introduced "Playlist Packs": users can now save multiple independent playlists containing both YouTube URLs and local media files.
-    * Integrated HUB Interface: added a new header to the Audio Player for quick saving and library navigation.
-    * Persistent Storage: playlists are now saved directly to the application configuration, allowing them to be restored instantly upon startup.
   - User Interface / HUD Aesthetic Refinement
     * Window Performance & Resize Stability:
-      - Implemented Professional DWM Synchronization: set `GlassFrameThickness` to a technical value of 1. This creates a synchronization anchor that eliminates white "flashes" during resize without introducing visual artifacts.
-      - Enhanced Resize Precision: increased `ResizeBorderThickness` to 6px, providing a much more stable and reliable "grip" area for window resizing, reducing frame drops and jitter.
-      - Optimized Win32 Message Pipeline: updated the internal `WndProc` to correctly handle `lParam` context and enforced a Hard-Lock on background erasure (`WM_ERASEBKGND`), ensuring the UI remains steady and flickers-free during movement.
-    * Refined the History View: unified the accent strip thickness to 2px to match the sleek design of the Asset Watcher, achieving absolute visual consistency across the monitor module.
-    * Standardized Selection Behavior: improved the "Create Backup" workflow to prioritize selected items while maintaining a smart fallback to the active client (PBE/LIVE) based on user preferences.
-    * Technical Control Optimization: implemented the `Tag="Icon"` standard for ComboBoxes, allowing automatic arrow centering for icon-only selectors without code duplication.
-    - Monitor / Refined Backup Naming & Logic
+      - Improved window synchronization during resizing to eliminate white flashes and visual artifacts.
+      - Enhanced resize precision for a much more stable and reliable window control.
+      - Optimized internal message handling to ensure the UI remains steady and flicker-free during movement.
+    * Refined the History View: unified the accent strip thickness to match the sleek design of the Asset Watcher, achieving absolute visual consistency across the monitor module.
+    * Standardized Selection Behavior: improved the "Create Backup" workflow to prioritize selected items with a smart fallback system.
+    * Technical Control Optimization: standardized icon-only selectors for better visual alignment across all dialogs.
+  - Monitor / Precision Backups Redesign
+    * Re-engineered the Backups view layout for a perfectly balanced horizontal distribution, matching the main navigation flow.
+    * Synchronized header alignment for a seamless, flicker-free transition between Monitor modules.
+    * Implemented environment-specific color coding: backups now dynamically switch between Teal (PBE) and Green (LIVE) branding.
+    * Added a professional selection indicator to backup cards for clear visual confirmation.
+    * Standardized the "Backups Repository" title for better typographic consistency.
+  - Monitor / Refined Backup Naming & Logic
     * Simplified backup naming convention to a clean `_old_DATE` format, removing redundant version info from folder names.
     * Implemented "Refresh" protocol: selecting an existing backup now allows overwriting it directly with the latest data after confirmation.
     * Added intelligent prefix handling to prevent redundant `_old` tags when backing up already archived folders.
@@ -91,6 +110,11 @@ New Features
     * Optimized Hash System (Zero-RAM Architecture): Eradicated massive memory spikes during hash updates. The system now utilizes a Direct MMF Binary Search engine, allowing instant hash resolution with virtually zero impact on the application's private RAM.
     * Added a new buffer pooling strategy for WAD file reading, providing a much smoother and snappier experience during intensive navigation.
     * Polished Visual Transitions: implemented a new window "Handover Protocol" with accelerated feedback that eliminates flickering and transparency gaps when opening heavy data files.
+    * High-Performance Text Comparison:
+      - Optimized the rendering engine to eliminate micro-stuttering during scrolling in large JSON/Diff files.
+      - Re-engineered the diffing pipeline with a "Compute Once" architecture, making view mode switching nearly instantaneous.
+      - Accelerated change calculations by up to 90% for large files using a direct block-analysis motor.
+      - Enhanced navigation map responsiveness through a brand new grouped drawing system, providing a much smoother experience when exploring massive datasets.
   - API Center / Network & Auth Stability
     * Upgraded the internal network engine to use a specialized HttpClientHandler with a global SSL validation bypass for 100% stable local LCU connections.
     * Refined the JWT parsing logic to handle varied LCU response formats, ensuring that Summoner ID, Region, and PUUID are always correctly displayed.
@@ -110,6 +134,15 @@ New Features
     * Re-engineered the internal asset loading engine and optimized WAD comparisons (up to 60% faster rename detection).
     * Enhanced Stability: integrated a new dictionary-cached tree construction algorithm.
     * Added **Performance Lab**: integrated a brand new technical benchmark suite to validate speed and memory gains in real-time.
+  - Security / Dependency Update
+    * Upgraded `SharpCompress` to version `0.48.0` to resolve a known moderate vulnerability (GHSA-6c8g-7p36-r338), ensuring robust and secure asset decompression.
+  - Monitor / Professional Backups Dashboard
+    * Completely redesigned the Backups view into a high-fidelity "Dashboard" featuring live metrics for total snapshots, storage usage, and client priority.
+    * Integrated a professional card-based layout with environment-specific branding (PBE/LIVE) and structural synchronization with the Monitor module.
+    * Enhanced role identification: added prominent "MAIN" and "BACKUP" badges with high-contrast styling and improved technical metadata clarity.
+  - Text Comparison / Interface Feedback
+    * Synchronized Icon Feedback: filter icons now dynamically change color (Gray when disabled, Brand-specific when active) to provide clear and immediate visual feedback of the active filtering state.
+    * Enhanced Word-Level Diff Visibility: increased the highlight opacity to 1.0, ensuring that granular changes within lines stand out with maximum clarity.
 
 Changes
   - Explorer / Interface Refinement
@@ -127,6 +160,9 @@ Bug Fixes
   - Text Comparison / Word Wrap & Boundary Alignment
     *   Fixed a critical misalignment bug where the OLD and NEW panels would desync when Word Wrap was enabled.
     *   Re-engineered the synchronization engine to use Line-Based Sync (v3.3.0.0) with absolute boundary clamping, ensuring that document lines remain perfectly aligned regardless of wrapping and eliminating "crazy jumps" at document limits.
+    *   Fixed caret position loss when toggling Word Wrap: the system now intelligently captures and restores the technical line and caret position after layout recalculation.
+  - Text Comparison / Filtering & Caret Visibility
+    *   Fixed an issue where the caret would disappear when toggling "Hide Unchanged Lines"; the system now automatically focuses the editor and positions the caret at the first difference.
   - Monitor / Advanced Backup system
     * Fixed a logic error where PBE backups were incorrectly identified as LIVE due to path string overlap.
   - Core / System Stability
@@ -149,6 +185,7 @@ Bug Fixes
     * Refined comparison processing with type-based safety checks.
   - User Interface / Control & Layout Precision
     * Fixed a bug in the ModernComboBox style where the dropdown arrow was incorrectly centered; it is now perfectly aligned to the right.
+    * Fixed a visual issue in the ModernComboBox style where an extra empty space appeared at the bottom of the dropdown after the last item.
     * Resolved vertical alignment issues in the Comparator view, ensuring the central icon and footer are perfectly synchronized with the section headers.
   - Comparator / Mode State Isolation
     * Fixed a regression in the comparison engine where renamed or moved files were incorrectly identified as new assets.

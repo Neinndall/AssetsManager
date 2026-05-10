@@ -34,15 +34,15 @@ namespace AssetsManager.Views.Helpers
             _modifiedBrush.Freeze();
 
             _addedOpacityBrush = _addedBrush.Clone();
-            _addedOpacityBrush.Opacity = 0.85;
+            _addedOpacityBrush.Opacity = 1.0;
             _addedOpacityBrush.Freeze();
 
             _removedOpacityBrush = _removedBrush.Clone();
-            _removedOpacityBrush.Opacity = 0.85;
+            _removedOpacityBrush.Opacity = 1.0;
             _removedOpacityBrush.Freeze();
 
             _modifiedOpacityBrush = _modifiedBrush.Clone();
-            _modifiedOpacityBrush.Opacity = 0.85;
+            _modifiedOpacityBrush.Opacity = 1.0;
             _modifiedOpacityBrush.Freeze();
         }
 
