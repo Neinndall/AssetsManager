@@ -400,48 +400,16 @@
             </Border>
         </Grid>
 
-        <!-- Bottom Info Bar (Breadcrumbs / JSON Path) -->
+        <!-- Bottom Info Bar (Line Info) -->
         <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,6">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/> <!-- Icons and Line Info -->
-                    <ColumnDefinition Width="*"/>    <!-- Flexible Line Content -->
-                    <ColumnDefinition Width="Auto"/> <!-- Actions -->
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal">
                     <!-- LINE INDICATOR -->
                     <icons:MaterialIcon Kind="LineScan" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
                     <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,12,0">
                         <Run Text="Line "/><Run Text="{Binding CurrentLine, FallbackValue='1'}"/>
                     </TextBlock>
-
-                    <!-- SEPARATOR -->
-                    <Border Width="1" Height="12" Background="{StaticResource BorderColor}" Margin="0,0,12,0" VerticalAlignment="Center" Opacity="0.5"/>
-
-                    <!-- PATH INDICATOR ICON -->
-                    <icons:MaterialIcon Kind="CodeBraces" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" Opacity="0.8"/>
                 </StackPanel>
-
-                <!-- PATH INDICATOR CONTENT (Now in a star column with Trimming) -->
-                <TextBlock Grid.Column="1" 
-                           Text="{Binding CurrentLineText, FallbackValue='root'}" 
-                           FontSize="10" 
-                           FontWeight="SemiBold" 
-                           Foreground="{StaticResource TextPrimary}" 
-                           VerticalAlignment="Center" 
-                           Opacity="0.9"
-                           TextTrimming="CharacterEllipsis"
-                           Margin="0,0,12,0"/>
-
-                <Button Grid.Column="2"
-                        HorizontalAlignment="Right"
-                        Click="BtnCopyPath_Click"
-                        Style="{StaticResource TransparentIconButton}"
-                        Width="26" Height="26"
-                        ToolTip="Copy JSON Path">
-                    <icons:MaterialIcon Kind="ContentCopy" Width="12" Height="12"/>
-                </Button>
             </Grid>
         </Border>
     </Grid>

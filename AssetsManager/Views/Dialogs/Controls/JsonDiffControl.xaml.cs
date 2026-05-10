@@ -114,100 +114,13 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (sender is ICSharpCode.AvalonEdit.Editing.Caret caret)
             {
-                UpdateJsonPath(caret.Line);
+                UpdateLineNumber(caret.Line);
             }
         }
 
-        private void UpdateJsonPath(int line)
+        private void UpdateLineNumber(int line)
         {
             ViewModel.CurrentLine = line;
-            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
-            if (editor.Document == null) return;
-
-            try
-            {
-                var docLine = editor.Document.GetLineByNumber(line);
-                ViewModel.CurrentLineText = editor.Document.GetText(docLine).Trim();
-            }
-            catch { ViewModel.CurrentLineText = ""; }
-
-            ViewModel.CurrentPath = GetJsonPathAtLine(editor.Document, line);
-        }
-
-        private string GetJsonPathAtLine(TextDocument doc, int lineNumber)
-        {
-            try
-            {
-                if (doc == null || lineNumber <= 0) return "root";
-
-                var path = new List<string>();
-                int currentLineNum = lineNumber;
-                
-                // Heurística de escaneo ascendente
-                // 1. Empezamos buscando si la línea actual ya tiene una clave (ej: "key": "val")
-                var startLine = doc.GetLineByNumber(currentLineNum);
-                var startText = doc.GetText(startLine);
-                int lastIndent = GetIndentLevel(startText);
-
-                // Si la línea actual es una propiedad simple, la añadimos como primer segmento
-                string initialKey = ExtractKeyFromLine(startText);
-                if (!string.IsNullOrEmpty(initialKey)) path.Insert(0, initialKey);
-
-                while (currentLineNum > 1)
-                {
-                    currentLineNum--;
-                    var line = doc.GetLineByNumber(currentLineNum);
-                    var text = doc.GetText(line);
-                    int indent = GetIndentLevel(text);
-                    var trimmed = text.Trim();
-
-                    // Detectamos apertura de bloques con menor sangría
-                    if (indent < lastIndent && (trimmed.EndsWith("{") || trimmed.EndsWith("[")))
-                    {
-                        string key = ExtractKeyFromLine(trimmed);
-                        if (!string.IsNullOrEmpty(key))
-                        {
-                            path.Insert(0, key);
-                        }
-                        else if (trimmed.EndsWith("["))
-                        {
-                            path.Insert(0, "[]");
-                        }
-                        lastIndent = indent;
-                    }
-                    if (lastIndent <= 0) break;
-                }
-
-                return path.Count > 0 ? string.Join(" > ", path) : "root";
-            }
-            catch { return "root"; }
-        }
-
-        private string ExtractKeyFromLine(string text)
-        {
-            if (string.IsNullOrEmpty(text) || !text.Contains(":")) return null;
-            try
-            {
-                var parts = text.Split(':');
-                if (parts.Length > 0)
-                {
-                    return parts[0].Trim('"', ' ', '{', '[', ',');
-                }
-            }
-            catch { }
-            return null;
-        }
-
-        private int GetIndentLevel(string text)
-        {
-            int count = 0;
-            foreach (char c in text)
-            {
-                if (c == ' ') count++;
-                else if (c == '\t') count += 4;
-                else break;
-            }
-            return count;
         }
 
         private void Editor_GuideScrollChanged(object sender, EventArgs e)
@@ -322,14 +235,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             ViewModel.InsertionsCount = ins;
             ViewModel.DeletionsCount = del;
             ViewModel.ModificationsCount = mod;
-        }
-
-        private void BtnCopyPath_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.IsNullOrEmpty(ViewModel.CurrentPath))
-            {
-                Clipboard.SetText(ViewModel.CurrentPath);
-            }
         }
 
         private void JumpToInsertion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Inserted);
@@ -775,7 +680,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 UnifiedDiffEditor.ScrollTo(lineNumber, 0);
                 UnifiedDiffEditor.TextArea.Caret.Line = lineNumber;
-                UpdateJsonPath(lineNumber);
+                UpdateLineNumber(lineNumber);
                 return;
             }
 
@@ -785,7 +690,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             OldJsonContent.TextArea.Caret.Line = lineNumber;
             NewJsonContent.TextArea.Caret.Line = lineNumber;
             
-            UpdateJsonPath(lineNumber);
+            UpdateLineNumber(lineNumber);
             NewJsonContent.Focus();
         }
 

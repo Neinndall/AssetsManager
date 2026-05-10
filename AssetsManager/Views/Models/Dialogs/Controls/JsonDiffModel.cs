@@ -26,8 +26,6 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         // Metadata Properties
         private string _oldSize;
         private string _newSize;
-        private string _currentPath;
-        private string _currentLineText;
         private int _currentLine = 1;
 
         // Batch Mode Properties
@@ -114,22 +112,10 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             set { _newSize = value; OnPropertyChanged(); }
         }
 
-        public string CurrentPath
-        {
-            get => _currentPath;
-            set { _currentPath = value; OnPropertyChanged(); }
-        }
-
         public int CurrentLine
         {
             get => _currentLine;
             set { _currentLine = value; OnPropertyChanged(); }
-        }
-
-        public string CurrentLineText
-        {
-            get => _currentLineText;
-            set { _currentLineText = value; OnPropertyChanged(); }
         }
 
         public bool IsBatchMode
