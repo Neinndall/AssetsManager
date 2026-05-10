@@ -534,9 +534,28 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void WordWrapButton_Click(object sender, RoutedEventArgs e)
         {
+            var editor = ViewModel.IsInlineMode ? UnifiedDiffEditor : NewJsonContent;
+            int currentLine = GetCurrentLineRobust(editor);
+
             OldJsonContent.WordWrap = ViewModel.IsWordWrapEnabled;
             NewJsonContent.WordWrap = ViewModel.IsWordWrapEnabled;
             UnifiedDiffEditor.WordWrap = ViewModel.IsWordWrapEnabled;
+
+            ForceLayoutUpdate();
+            ScrollToLine(currentLine);
+        }
+
+        private void ForceLayoutUpdate()
+        {
+            if (ViewModel.IsInlineMode)
+            {
+                UnifiedDiffEditor.UpdateLayout();
+            }
+            else
+            {
+                OldJsonContent.UpdateLayout();
+                NewJsonContent.UpdateLayout();
+            }
         }
 
         private void NextDiffButton_Click(object sender, RoutedEventArgs e)
@@ -587,6 +606,9 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _lastAbsoluteLine = GetCurrentLineRobust(editor);
                 _cachedOldDoc = null;
                 await UpdateDiffView(GetCurrentScrollPercentage(editor), null);
+                
+                // Forzar el caret a ser visible en la nueva vista filtrada (v4.0.0.0 fix)
+                ScrollToLine(1); // Opcional: Centrar en la primera diferencia
             }
             else
             {
