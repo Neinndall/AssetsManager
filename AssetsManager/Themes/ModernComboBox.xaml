@@ -8,7 +8,7 @@
     <Style x:Key="ModernComboBoxItem" TargetType="ComboBoxItem">
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Padding" Value="12,8"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -114,14 +114,14 @@
                                   SnapsToDevicePixels="True"
                                   MinWidth="{TemplateBinding ActualWidth}"
                                   MaxHeight="{TemplateBinding MaxDropDownHeight}"
-                                  Margin="0,4">
+                                  Margin="4,2,4,6">
                                 <Border x:Name="DropDownBorder"
                                         Background="{StaticResource SidebarBackground}"
                                         BorderThickness="1"
                                         BorderBrush="{StaticResource BorderColor}"
-                                        CornerRadius="12">
+                                        CornerRadius="10">
                                     <Border.Effect>
-                                        <DropShadowEffect BlurRadius="10" ShadowDepth="3" Opacity="0.2" Color="Black"/>
+                                        <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.2" Color="Black"/>
                                     </Border.Effect>
                                 </Border>
                                 <ScrollViewer Margin="1" SnapsToDevicePixels="True">
