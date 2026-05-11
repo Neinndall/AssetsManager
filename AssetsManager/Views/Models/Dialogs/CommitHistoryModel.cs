@@ -32,7 +32,7 @@ namespace AssetsManager.Views.Models.Dialogs
 
         public CommitHistoryModel()
         {
-            StatusMessage = "Checking for revisions...";
+            StatusMessage = "Checking for commits...";
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

@@ -54,7 +54,7 @@ namespace AssetsManager.Views.Dialogs
                 
                 // Update UI state
                 _viewModel.Commits.ReplaceRange(enrichedCommits);
-                _viewModel.StatusMessage = _viewModel.Commits.Count > 0 ? "Revisions synchronized" : "No revisions found";
+                _viewModel.StatusMessage = _viewModel.Commits.Count > 0 ? "Commits synchronized" : "No commits found";
             }
             catch (Exception ex)
             {
