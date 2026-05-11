@@ -4,14 +4,14 @@ MAJOR UPDATE
 
 New Features
   - Explorer / Lua Decompilation Support
-    *   Added full support for `.luabin64` files: the system now automatically decompiles and formats Lua 5.1 bytecode into readable source code.
-    *   Integrated Automated Smart Save: when using the "Save" command, `.luabin64` files are now automatically decompiled and exported as `.json` data files, streamlining the asset extraction workflow and maintaining consistency with other data formats.
-    *   Implemented Intelligent Table Reconstruction: advanced logic that groups complex table assignments into clean, readable constructors, matching the original script structure.
-    *   Integrated Professional Syntax Highlighting: added automated code coloring for `.luabin64` in the explorer previewer, supporting both Lua-specific highlights and structured JSON fallback.
-    *   Enhanced Opcode Coverage: implemented support for all Lua 5.1 opcodes (TForLoop, Self, Concat, etc.), eliminating "UNKNOWN OPCODE" messages and ensuring perfect script fidelity.
-    *   Refined Structural Formatting: upgraded the generation engine for superior code layout, featuring cleaned-up conditional logic and human-readable argument naming.
-    *   Integrated Professional HUD Iconography: assigned the official Lua branding glif to the new file type for a consistent visual experience in the file explorer.
-    *   High-Performance In-Memory Engine: developed a zero-disk decompiler that processes game data directly in RAM for near-instant visualization.
+    * Added full support for `.luabin64` files: the system now automatically decompiles and formats Lua 5.1 bytecode into readable source code.
+    * Integrated Automated Smart Save: when using the "Save" command, `.luabin64` files are now automatically decompiled and exported as `.json` data files, streamlining the asset extraction workflow and maintaining consistency with other data formats.
+    * Implemented Intelligent Table Reconstruction: advanced logic that groups complex table assignments into clean, readable constructors, matching the original script structure.
+    * Integrated Professional Syntax Highlighting: added automated code coloring for `.luabin64` in the explorer previewer, supporting both Lua-specific highlights and structured JSON fallback.
+    * Enhanced Opcode Coverage: implemented support for all Lua 5.1 opcodes (TForLoop, Self, Concat, etc.), eliminating "UNKNOWN OPCODE" messages and ensuring perfect script fidelity.
+    * Refined Structural Formatting: upgraded the generation engine for superior code layout, featuring cleaned-up conditional logic and human-readable argument naming.
+    * Integrated Professional HUD Iconography: assigned the official Lua branding glif to the new file type for a consistent visual experience in the file explorer.
+    * High-Performance In-Memory Engine: developed a zero-disk decompiler that processes game data directly in RAM for near-instant visualization.
   - Monitor / Advanced Backup System
     * Implemented Intelligent Installation Discovery: the system now automatically scans for any League of Legends installation by parsing internal metadata, categorizing clients as LIVE or PBE regardless of their folder names.
     * Added Selective Backup Creation: users can now create a backup of any specific installation from the list, providing total control over version cloning.
@@ -25,11 +25,21 @@ New Features
     * Integrated HUB Interface: added a new header to the Audio Player for quick saving and library navigation.
     * Persistent Storage: playlists are now saved directly to the application configuration, allowing them to be restored instantly upon startup.
   - Text Comparison / Granular Filtering
-    *   Introduced Granular Filter Controls: added a new "FILTERS" section in the toolbar allowing users to independently toggle the visibility of Insertions (+), Deletions (-), and Modifications (Edit).
-    *   Implemented Intelligent Filter Activation: clicking any granular filter now automatically activates the "Hide Unchanged Lines" mode, providing an instant focused view of the selected change types.
-    *   Added "Filter Only" Rapid Isolation (Right-Click): right-clicking on any INSIGHTS badge (Insertions, Deletions, or Modifications) now instantly isolates only that type of change, disabling all other filters for a lightning-fast analysis.
+    * Introduced Granular Filter Controls: added a new "FILTERS" section in the toolbar allowing users to independently toggle the visibility of Insertions (+), Deletions (-), and Modifications (Edit).
+    * Implemented Intelligent Filter Activation: clicking any granular filter now automatically activates the "Hide Unchanged Lines" mode, providing an instant focused view of the selected change types.
+    * Added "Filter Only" Rapid Isolation (Right-Click): right-clicking on any INSIGHTS badge (Insertions, Deletions, or Modifications) now instantly isolates only that type of change, disabling all other filters for a lightning-fast analysis.
 
 Improvements
+  - Home / Professional Launcher Dashboard
+    * Implemented a cinematic "Launcher Style" design featuring three massive interactive pillars for LIVE, PBE, and LOCAL environment selection.
+    * Integrated High-Fidelity Status Badges: each environment card now features a technical "READY", "SETUP", or "MISSING" badge with dynamic color-coding (Green/Orange) for immediate configuration awareness.
+    * Reorganized "Technical Suite": centralized major tools (WAD Comparator, Monitor, Model Viewer) with professional descriptions and refined horizontal layout.
+    * Refined "Utilities" Section: dedicated compact area for secondary apps (Notepad, Audio Player, Converter) using high-density technical cards.
+    * Sleek Centered Footer: redesigned the bottom information bar to feature a centered, dynamic configuration status with pulsing alerting icons for missing essential paths.
+    * Reactive Configuration Engine: integrated real-time synchronization with AppSettings, allowing the dashboard to automatically refresh its status and pillar badges the moment new paths are saved.
+  - Explorer / Technical HUD Refinement
+    * Standardized Professional Mode Indicator: removed redundant "MODE" text from the toolbar to achieve a cleaner look and upgraded visibility to TextPrimary.
+    * Integrated Dynamic Iconography: verified and refined the semantic glifs for PBE, LIVE, RESULTS, and LOCAL modes for a more intuitive navigation experience.
   - Help / Documentation Redesign
     * Refined the layout of the Documentation view by standardizing the footer spacing and removing excessive margins to match the About module's aesthetic.
     * Updated all module descriptions (Comparator, Explorer, Viewer, Monitor) and setup guides to reflect the latest technical standards and features.
@@ -45,9 +55,9 @@ Improvements
     * Implemented a dedicated "MODE" status area in the toolbar that dynamically identifies the loaded environment (PBE, LIVE, LOCAL, or RESULT).
     * Integrated semantic iconography and a high-visibility HUD-style pill for immediate environmental context.
   - Explorer / Unified Results Loading
-    *   Renamed the "Load Backup" tool to "Load Results" to better reflect its technical purpose of loading comparison data.
-    *   Updated the internal loading status to "Loading Results", ensuring consistency between the user interface and background processes.
-    *   Standardized the tool icon and labels across the technical suite for a more intuitive and professional experience.
+    * Renamed the "Load Backup" tool to "Load Results" to better reflect its technical purpose of loading comparison data.
+    * Updated the internal loading status to "Loading Results", ensuring consistency between the user interface and background processes.
+    * Standardized the tool icon and labels across the technical suite for a more intuitive and professional experience.
   - Comparator / Intelligent WAD Selection
     * Added QoL logic for WAD mode: hidden the redundant QuickSelect in the Target section and replaced it with a professional HUD informative icon that guides the user towards manual WAD selection to enable auto-synchronization.
     * Improved Browser Dialogs: the initial directory for folder and file pickers now correctly respects the "Preferred Protocol" setting (LIVE or PBE), providing a more consistent user experience.
@@ -137,13 +147,13 @@ Improvements
     * Perfected Menu Symmetry: re-engineered context menus and submenus for absolute pixel-perfect balance.
     * Optimized Context Menu Responsiveness: disabled all system fade-out animations for a significantly snappier experience.
     * Refined Window Transitions: implemented an optimized dispatching protocol that eliminates "flickering" or lingering context menus.
-    * Implemented Universal **Smooth Handover Protocol**: extended the specialized window transition logic to both Text and Image viewers. The loading screen now remains active until the final rendering of the results is completed, ensuring a seamless, flicker-free experience even for heavy data files or high-resolution textures.
+    * Implemented Universal Smooth Handover Protocol: extended the specialized window transition logic to both Text and Image viewers. The loading screen now remains active until the final rendering of the results is completed, ensuring a seamless, flicker-free experience even for heavy data files or high-resolution textures.
   - Core / High-Efficiency Content Engine
     * Re-engineered the internal asset loading engine and optimized WAD comparisons (up to 60% faster rename detection).
     * Enhanced Stability: integrated a new dictionary-cached tree construction algorithm.
-    * Added **Performance Lab**: integrated a brand new technical benchmark suite to validate speed and memory gains in real-time.
+    * Added Performance Lab: integrated a brand new technical benchmark suite to validate speed and memory gains in real-time.
   - Security / Dependency Update
-    * Upgraded `SharpCompress` to version `0.48.0` to resolve a known moderate vulnerability (GHSA-6c8g-7p36-r338), ensuring robust and secure asset decompression.
+    * Upgraded SharpCompress to version 0.48.0 to resolve a known moderate vulnerability (GHSA-6c8g-7p36-r338), ensuring robust and secure asset decompression.
   - Monitor / Professional Backups Dashboard
     * Completely redesigned the Backups view into a high-fidelity "Dashboard" featuring live metrics for total snapshots, storage usage, and client priority.
     * Integrated a professional card-based layout with environment-specific branding (PBE/LIVE) and structural synchronization with the Monitor module.
@@ -167,13 +177,21 @@ Changes
     * Removed the JSON path breadcrumb and copy button from the bottom bar to provide a cleaner, line-focused workspace.
 
 Bug Fixes
+  - Core / Stability & Robustness
+    * Resolved a critical NullReferenceException in the directory loader that occurred when attempting to explore non-existent local download paths.
+  - Explorer / Initialization Flow
+    * Fixed a race condition between the automated tree discovery and manual dashboard selection.
+    * Implemented an "External Initialization" protocol to ensure that clicking a specific environment on the Home dashboard correctly overrides the user's default preferred client.
+  - User Interface / Build & Layout Precision
+    * Fixed malformed XAML structure in HomeWindow caused by duplicated closing tags and attribute typos.
+    * Cleaned up redundant virtualization properties and duplicate loading overlays in FileExplorerControl to optimize performance and code maintainability.
   - Text Comparison / Word Wrap & Boundary Alignment
-    *   Fixed a critical misalignment bug where the OLD and NEW panels would desync when Word Wrap was enabled.
-    *   Re-engineered the synchronization engine to use Line-Based Sync (v3.3.0.0) with absolute boundary clamping, ensuring that document lines remain perfectly aligned regardless of wrapping and eliminating "crazy jumps" at document limits.
-    *   Fixed caret position loss when toggling Word Wrap: the system now intelligently captures and restores the technical line and caret position after layout recalculation.
+    * Fixed a critical misalignment bug where the OLD and NEW panels would desync when Word Wrap was enabled.
+    * Re-engineered the synchronization engine to use Line-Based Sync (v3.3.0.0) with absolute boundary clamping, ensuring that document lines remain perfectly aligned regardless of wrapping and eliminating "crazy jumps" at document limits.
+    * Fixed caret position loss when toggling Word Wrap: the system now intelligently captures and restores the technical line and caret position after layout recalculation.
   - Text Comparison / Filtering & Caret Visibility
-    *   Fixed an issue where the caret would disappear when toggling "Hide Unchanged Lines"; the system now automatically focuses the editor and positions the caret at the first difference.
-    *   Fixed caret position loss when switching between Side-by-Side and Inline modes: the system now accurately captures and restores the active line during view transitions.
+    * Fixed an issue where the caret would disappear when toggling "Hide Unchanged Lines"; the system now automatically focuses the editor and positions the caret at the first difference.
+    * Fixed caret position loss when switching between Side-by-Side and Inline modes: the system now accurately captures and restores the active line during view transitions.
   - Monitor / Advanced Backup system
     * Fixed a logic error where PBE backups were incorrectly identified as LIVE due to path string overlap.
   - Core / System Stability
