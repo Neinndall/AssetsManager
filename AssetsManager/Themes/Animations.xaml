@@ -139,5 +139,62 @@
             </DoubleAnimation.EasingFunction>
         </DoubleAnimation>
     </Storyboard>
+
+    <!-- MODERN GLINDER (GridSplitter) STYLE & ANIMATIONS -->
+    <Style x:Key="ModernGlinderStyle" TargetType="GridSplitter">
+        <Setter Property="Height" Value="8"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Cursor" Value="SizeNS"/>
+        <Setter Property="ResizeDirection" Value="Rows"/>
+        <Setter Property="ResizeBehavior" Value="PreviousAndNext"/>
+        <Setter Property="ShowsPreview" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border Background="Transparent" x:Name="RootBorder">
+                        <Border x:Name="Handle" 
+                                Width="42" Height="4" 
+                                Background="{StaticResource BorderColor}" 
+                                CornerRadius="2" 
+                                VerticalAlignment="Center" 
+                                HorizontalAlignment="Center"
+                                Opacity="0.4">
+                            <Border.Effect>
+                                <DropShadowEffect x:Name="HandleGlow" Color="{Binding Color, Source={StaticResource AccentBrush}}" BlurRadius="0" ShadowDepth="0" Opacity="0"/>
+                            </Border.Effect>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Handle" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Handle" Property="Opacity" Value="1"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="Width" To="64" Duration="0:0:0.2">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="(Effect).BlurRadius" To="12" Duration="0:0:0.2"/>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="(Effect).Opacity" To="0.6" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="Width" To="42" Duration="0:0:0.2"/>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="(Effect).BlurRadius" To="0" Duration="0:0:0.2"/>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="(Effect).Opacity" To="0" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
         
 </ResourceDictionary>
