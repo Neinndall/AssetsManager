@@ -39,7 +39,7 @@ namespace AssetsManager.Services.Core
         /// <summary>
         /// Fetches the recent commit history from a specific branch.
         /// </summary>
-        public async Task<List<GitHubCommit>> GetCommitsAsync(string branch = "qa", int count = 20)
+        public async Task<List<GitHubCommit>> GetCommitsAsync(string branch = "qa", int count = 50)
         {
             string cacheKey = $"commits_{branch}_{count}";
             string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/commits?sha={branch}&per_page={count}";
@@ -185,7 +185,7 @@ namespace AssetsManager.Services.Core
         /// Fetches commits and automatically links them with their direct or inherited builds.
         /// Centralizes revision domain logic in the service layer for a cleaner architecture.
         /// </summary>
-        public async Task<List<GitHubCommit>> GetEnrichedCommitsAsync(string branch = "qa", string releaseTag = "qa-testing", int count = 20)
+        public async Task<List<GitHubCommit>> GetEnrichedCommitsAsync(string branch = "qa", string releaseTag = "qa-testing", int count = 50)
         {
             try
             {
