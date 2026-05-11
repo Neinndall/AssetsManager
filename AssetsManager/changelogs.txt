@@ -30,6 +30,13 @@ New Features
     *   Added "Filter Only" Rapid Isolation (Right-Click): right-clicking on any INSIGHTS badge (Insertions, Deletions, or Modifications) now instantly isolates only that type of change, disabling all other filters for a lightning-fast analysis.
 
 Improvements
+  - Help / Documentation Redesign
+    * Refined the layout of the Documentation view by standardizing the footer spacing and removing excessive margins to match the About module's aesthetic.
+    * Updated all module descriptions (Comparator, Explorer, Viewer, Monitor) and setup guides to reflect the latest technical standards and features.
+    * Integrated new professional tips including "Linked Audio Banks" for better guidance on advanced audio discovery.
+  - Help / Update Center Enhancements
+    * Professional Redesign: transformed the Update Center into a high-fidelity "Revision Dashboard" featuring a timeline-style layout, real GitHub author avatars, and refined action cards.
+    * Increased History Depth: expanded the visible commit history from 20 to 100 revisions, maximizing the reach of real commit data and minimizing generic "GitHub Action" placeholders.
   - Settings / Generalized User Preference
     * Renamed "Preferred Backup Client" to "Preferred Client" to serve as a global preference that now also governs the initial client discovery in the Explorer and automated backups, ensuring a consistent environment priority.
   - Explorer / Intelligent Path Discovery
@@ -74,6 +81,7 @@ Improvements
     * Optimized workspace utilization by expanding card width and standardizing horizontal padding to 24px for perfect vertical icon alignment.
     * Enhanced card aesthetics with symmetrical 26px internal vertical padding for better breathing room.
   - User Interface / HUD Aesthetic Refinement
+    * Enhanced Scrollbar Accessibility: reduced the window resize "hitbox" from 6px to 3px across all application windows. This ensures much easier interaction with scrollbars when they are located near the window edges, preventing accidental window resizing.
     * Window Performance & Resize Stability:
       - Improved window synchronization during resizing to eliminate white flashes and visual artifacts.
       - Enhanced resize precision for a much more stable and reliable window control.

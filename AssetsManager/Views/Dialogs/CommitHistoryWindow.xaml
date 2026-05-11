@@ -158,12 +158,12 @@
                                                 <!-- 1. Direct Install -->
                                                 <Button x:Name="BtnDownload"
                                                         Style="{StaticResource PrimaryButton}"
-                                                        Height="34" Padding="16,0"
+                                                        Height="34" Padding="12,0"
                                                         Click="BtnDownload_Click"
                                                         Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <materialIcons:MaterialIcon Kind="LightningBolt" Width="16" Height="16" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="White"/>
-                                                        <TextBlock Text="INSTALL BUILD" VerticalAlignment="Center" FontSize="11" FontWeight="Black"/>
+                                                        <materialIcons:MaterialIcon Kind="CloudDownloadOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="White"/>
+                                                        <TextBlock Text="INSTALL" VerticalAlignment="Center" FontSize="11" FontWeight="Black"/>
                                                     </StackPanel>
                                                 </Button>
 
