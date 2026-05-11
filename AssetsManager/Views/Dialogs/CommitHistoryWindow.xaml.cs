@@ -49,8 +49,8 @@ namespace AssetsManager.Views.Dialogs
             _viewModel.IsLoading = true;
             try
             {
-                // Call the enriched service layer with a deeper history (50 commits)
-                var enrichedCommits = await _gitHubApi.GetEnrichedCommitsAsync("qa", "qa-testing", 50);
+                // Call the enriched service layer with maximum history depth (100 commits)
+                var enrichedCommits = await _gitHubApi.GetEnrichedCommitsAsync("qa", "qa-testing", 100);
                 
                 // Update UI state
                 _viewModel.Commits.ReplaceRange(enrichedCommits);

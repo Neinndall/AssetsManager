@@ -22,18 +22,26 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- TOP BAR: CURRENT STATUS -->
-        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" Padding="32,24,32,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+        <!-- TOP BAR: REVISION DASHBOARD -->
+        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" Padding="32,28,32,24" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
             <Grid>
                 <StackPanel Orientation="Horizontal">
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="12" Width="48" Height="48" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="12" Width="52" Height="52" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <materialIcons:MaterialIcon Kind="SourceBranch" Width="28" Height="28" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <StackPanel Margin="16,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="QA BRANCH" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                    <StackPanel Margin="18,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="QA BRANCH REVISIONS" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextPrimary}" Margin="0,0,12,0"/>
+                            <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="8,2" VerticalAlignment="Center">
+                                <TextBlock Text="LIVE TRACKING" FontSize="9" FontWeight="Black" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                             <TextBlock Text="Current Version: " FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="{Binding CurrentVersion}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                            <TextBlock Text="{Binding CurrentVersion}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                            <Rectangle Width="1" Height="10" Fill="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Total Revisions: " FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="{Binding Commits.Count}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
@@ -41,18 +49,18 @@
                 <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button x:Name="BtnRefresh" 
                             Style="{StaticResource SecondaryButton}" 
-                            Height="34" Padding="16,0" 
+                            Height="36" Padding="20,0" 
                             Click="BtnRefresh_Click">
                         <StackPanel Orientation="Horizontal">
-                            <materialIcons:MaterialIcon Kind="Refresh" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="REFRESH HISTORY" VerticalAlignment="Center" FontSize="11" FontWeight="Black"/>
+                            <materialIcons:MaterialIcon Kind="Refresh" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="REFRESH REVISIONS" VerticalAlignment="Center" FontSize="11" FontWeight="Black"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- MAIN CONTENT: COMMIT HISTORY -->
+        <!-- MAIN CONTENT: TIMELINE -->
         <Grid Grid.Row="1">
             <!-- Loading Indicator -->
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -70,109 +78,153 @@
                         </EventTrigger>
                     </materialIcons:MaterialIcon.Triggers>
                 </materialIcons:MaterialIcon>
-                <TextBlock Text="Updating history..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Margin="0,12,0,0" HorizontalAlignment="Center"/>
+                <TextBlock Text="Synchronizing QA builds..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Margin="0,12,0,0" HorizontalAlignment="Center"/>
             </StackPanel>
 
-            <!-- Commits List -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="32,16" Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                <ItemsControl ItemsSource="{Binding Commits}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,12" Margin="0,0,0,4">
-                                <Grid>
+            <!-- Commits List with Timeline Style -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,16" Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <Grid>
+                    <!-- Timeline Vertical Line -->
+                    <Border HorizontalAlignment="Left" Width="2" Background="{StaticResource BorderColor}" Margin="49,0,0,0" Opacity="0.5"/>
+                    
+                    <ItemsControl ItemsSource="{Binding Commits}" Margin="32,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,24">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="36"/> <!-- Timeline Hub -->
+                                        <ColumnDefinition Width="*"/>  <!-- Content -->
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Author Avatar (Placeholder for HUD style) -->
-                                    <Border Grid.Column="0" Width="36" Height="36" CornerRadius="18" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Background="{StaticResource CardBackground}" Margin="0,0,16,0" VerticalAlignment="Top">
-                                        <materialIcons:MaterialIcon Kind="AccountOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <!-- Timeline Node -->
+                                    <Border Grid.Column="0" Width="12" Height="12" CornerRadius="6" 
+                                            Background="{StaticResource SidebarBackground}" 
+                                            BorderBrush="{StaticResource BorderColor}" 
+                                            BorderThickness="2" 
+                                            VerticalAlignment="Top" Margin="0,12,0,0" Panel.ZIndex="5">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsLatest}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
                                     </Border>
 
-                                    <!-- Commit Info -->
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Commit.Author.Name}" FontWeight="Black" FontSize="12" Foreground="{StaticResource TextPrimary}"/>
-                                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                                <TextBlock Text="{Binding ShortSha}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" FontFamily="Consolas"/>
+                                    <!-- Revision Card -->
+                                    <Border Grid.Column="1" Style="{StaticResource SettingsCard}" Margin="20,0,0,0" Padding="24,20">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Author Avatar -->
+                                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="21" BorderBrush="{StaticResource BorderColor}" BorderThickness="1.5" Margin="0,0,20,0" VerticalAlignment="Top" ClipToBounds="True">
+                                                <Grid>
+                                                    <!-- Initial Placeholder -->
+                                                    <materialIcons:MaterialIcon Kind="Account" Width="24" Height="24" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <!-- Real GitHub Avatar -->
+                                                    <Image Source="{Binding Author.AvatarUrl}" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                </Grid>
                                             </Border>
-                                            <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center" Visibility="{Binding IsLatest, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                <TextBlock Text="LATEST" FontSize="9" FontWeight="Black" Foreground="White" VerticalAlignment="Center" Margin="0,-0.5,0,0"/>
-                                            </Border>
-                                        </StackPanel>
-                                        
-                                        <TextBlock Text="{Binding Commit.Message}" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                        
-                                        <TextBlock Text="{Binding Commit.Author.Date, StringFormat='{}Committed {0:MMM dd, yyyy HH:mm}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Opacity="0.7" Margin="0,4,0,0"/>
-                                    </StackPanel>
 
-                                    <!-- Download Action (Mutually Exclusive States via Grid) -->
-                                    <Grid Grid.Column="2" VerticalAlignment="Center" Margin="16,0,0,0">
-                                        <!-- 1. Direct Build Available -->
-                                        <Button x:Name="BtnDownload"
-                                                Style="{StaticResource PrimaryButton}"
-                                                Height="30" Padding="12,0"
-                                                Click="BtnDownload_Click"
-                                                Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}">
-                                            <StackPanel Orientation="Horizontal">
-                                                <materialIcons:MaterialIcon Kind="CloudDownloadOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="White"/>
-                                                <TextBlock Text="INSTALL" VerticalAlignment="Center" FontSize="10" FontWeight="Black"/>
+                                            <!-- Revision Info -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Commit.Author.Name}" FontWeight="Black" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="8,2" Margin="10,0,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                                        <TextBlock Text="{Binding ShortSha}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" FontFamily="Consolas"/>
+                                                    </Border>
+                                                    <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center" Visibility="{Binding IsLatest, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <TextBlock Text="LATEST" FontSize="9" FontWeight="Black" Foreground="White" VerticalAlignment="Center" Margin="0,-0.5,0,0"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                
+                                                <TextBlock Text="{Binding Commit.Message}" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,8,0,0" TextWrapping="Wrap" LineHeight="20"/>
+                                                
+                                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0" Opacity="0.6">
+                                                    <materialIcons:MaterialIcon Kind="ClockOutline" Width="12" Height="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="{Binding Commit.Author.Date, StringFormat='{}Committed {0:MMM dd, yyyy HH:mm}'}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                </StackPanel>
                                             </StackPanel>
-                                        </Button>
 
-                                        <!-- 2. Included in Later Build (Minimalist Label) -->
-                                        <StackPanel Visibility="{Binding HasInheritedBuild, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                    VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                <materialIcons:MaterialIcon Kind="PackageVariant" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" Opacity="0.6" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding ParentBuildSha, StringFormat='Included in build {0}'}"
-                                                         FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"
-                                                         VerticalAlignment="Center" Opacity="0.8"/>
-                                            </StackPanel>
-                                        </StackPanel>
+                                            <!-- Actions -->
+                                            <Grid Grid.Column="2" VerticalAlignment="Center" Margin="24,0,0,0">
+                                                <!-- 1. Direct Install -->
+                                                <Button x:Name="BtnDownload"
+                                                        Style="{StaticResource PrimaryButton}"
+                                                        Height="34" Padding="16,0"
+                                                        Click="BtnDownload_Click"
+                                                        Visibility="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <materialIcons:MaterialIcon Kind="LightningBolt" Width="16" Height="16" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="White"/>
+                                                        <TextBlock Text="INSTALL BUILD" VerticalAlignment="Center" FontSize="11" FontWeight="Black"/>
+                                                    </StackPanel>
+                                                </Button>
 
-                                        <!-- 3. No Build Found Anywhere -->
-                                        <TextBlock Text="No build available"
-                                                 FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
-                                                 HorizontalAlignment="Right" Opacity="0.6">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Style.Triggers>
-                                                        <MultiDataTrigger>
-                                                            <MultiDataTrigger.Conditions>
-                                                                <Condition Binding="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}" Value="Collapsed"/>
-                                                                <Condition Binding="{Binding HasInheritedBuild}" Value="False"/>
-                                                            </MultiDataTrigger.Conditions>
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                        </MultiDataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </Grid>                                
-                               </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                                                <!-- 2. Inherited Build -->
+                                                <Border Background="{StaticResource HoverColor}" CornerRadius="8" Padding="12,8" Visibility="{Binding HasInheritedBuild, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <materialIcons:MaterialIcon Kind="PackageVariantClosed" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                        <StackPanel>
+                                                            <TextBlock Text="INHERITED BUILD" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentBrush}"/>
+                                                            <TextBlock Text="{Binding ParentBuildSha, StringFormat='{}Revision {0}'}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- 3. Orphaned (No Build) -->
+                                                <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="12,8" Opacity="0.5">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <MultiDataTrigger>
+                                                                    <MultiDataTrigger.Conditions>
+                                                                        <Condition Binding="{Binding DownloadableAsset, Converter={StaticResource NullToVisibilityConverter}}" Value="Collapsed"/>
+                                                                        <Condition Binding="{Binding HasInheritedBuild}" Value="False"/>
+                                                                    </MultiDataTrigger.Conditions>
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </MultiDataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <materialIcons:MaterialIcon Kind="CloudOffOutline" Width="16" Height="16" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="NO BUILD FOUND" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>                                
+                                       </Grid>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
             </ScrollViewer>
         </Grid>
 
-        <!-- FOOTER: INFO -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" Padding="32,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <materialIcons:MaterialIcon Kind="Github" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Opacity="0.8"/>
-                <TextBlock Text="GITHUB REVISION HISTORY" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Black" VerticalAlignment="Center" Margin="10,1,0,0" Opacity="0.9"/>
+        <!-- FOOTER: TECHNICAL STATUS -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" Padding="32,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Github" Width="16" Height="16" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Opacity="0.8"/>
+                    <TextBlock Text="GITHUB QA REPOSITORY" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="Black" VerticalAlignment="Center" Margin="10,1,0,0" Opacity="0.9"/>
+                    <Rectangle Width="1" Height="12" Fill="{StaticResource BorderColor}" Margin="16,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,1,0,0" Opacity="0.7"/>
+                </StackPanel>
 
-                <Rectangle Width="1" Height="12" Fill="{StaticResource BorderColor}" Margin="16,0" VerticalAlignment="Center"/>
-
-                <materialIcons:MaterialIcon Kind="CloudCheckOutline" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Opacity="0.8" 
-                                            Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="6,1,0,0" Opacity="0.7"/>
-            </StackPanel>
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <materialIcons:MaterialIcon Kind="InformationOutline" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Development builds may be unstable." Foreground="{StaticResource TextMuted}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </base:HudWindow>
