@@ -623,13 +623,24 @@ namespace AssetsManager.Services.Explorer
         /// </summary>
         public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrEmpty(rootPath) || !Directory.Exists(rootPath))
+            {
+                return new ObservableRangeCollection<FileSystemNodeModel>();
+            }
+
             return await Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var rootNode = new FileSystemNodeModel(rootPath);
-                rootNode.Children.Clear();
-                AddNodeToRealTree(rootNode, rootPath, cancellationToken);
-                return rootNode.Children;
+                
+                if (rootNode.Children != null)
+                {
+                    rootNode.Children.Clear();
+                    AddNodeToRealTree(rootNode, rootPath, cancellationToken);
+                    return rootNode.Children;
+                }
+
+                return new ObservableRangeCollection<FileSystemNodeModel>();
             }, cancellationToken);
         }
 
