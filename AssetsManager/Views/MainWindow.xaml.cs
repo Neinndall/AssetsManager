@@ -437,7 +437,7 @@ namespace AssetsManager.Views
             }
         }
 
-        public void OnSidebarNavigationRequested(string viewTag)
+        public async void OnSidebarNavigationRequested(string viewTag)
         {
             // Only clean up the current view if we are navigating to a *main content view*
             // Dialogs (Settings, Help) do not replace the main content, so no cleanup is needed.
@@ -457,12 +457,22 @@ namespace AssetsManager.Views
             {
                 case "Home": LoadHomeWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
+                case "Explorer_Live": await LoadExplorerWithModeAsync("Live"); break;
+                case "Explorer_Pbe": await LoadExplorerWithModeAsync("Pbe"); break;
+                case "Explorer_Local": await LoadExplorerWithModeAsync("Local"); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Viewer": LoadViewerWindow(); break;
                 case "Monitor": LoadMonitorWindow(); break;
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
+        }
+
+        private async Task LoadExplorerWithModeAsync(string mode)
+        {
+            var explorerWindow = _serviceProvider.GetRequiredService<ExplorerWindow>();
+            MainContentArea.Content = explorerWindow;
+            await explorerWindow.InitializeWithMode(mode);
         }
 
         private void LoadHomeWindow()

@@ -82,6 +82,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
         private string _backupJsonPath;
+        private bool _isExternalInitRequested = false;
 
         public FileExplorerControl()
         {
@@ -176,6 +177,8 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
+
+            if (_isExternalInitRequested) return;
 
             // Smart discovery based on preference
             string pbe = AppSettings.LolPbeDirectory;
@@ -290,6 +293,36 @@ namespace AssetsManager.Views.Controls.Explorer
             ImageMergerService.ShowWindow();
         }
 
+        public async Task InitializeWithMode(string mode)
+        {
+            _isExternalInitRequested = true;
+
+            switch (mode)
+            {
+                case "Live":
+                    _viewModel.IsWadMode = true;
+                    if (!string.IsNullOrEmpty(AppSettings.LolLiveDirectory) && Directory.Exists(AppSettings.LolLiveDirectory))
+                        await BuildWadTreeAsync(AppSettings.LolLiveDirectory);
+                    else
+                        _viewModel.UpdateEmptyState(true);
+                    break;
+                case "Pbe":
+                    _viewModel.IsWadMode = true;
+                    if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
+                        await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
+                    else
+                        _viewModel.UpdateEmptyState(true);
+                    break;
+                case "Local":
+                    _viewModel.IsWadMode = false;
+                    if (!string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath))
+                        await BuildDirectoryTreeAsync(DirectoriesCreator.AssetsDownloadedPath);
+                    else
+                        _viewModel.UpdateEmptyState(false);
+                    break;
+            }
+        }
+
         public async Task ReloadTreeAsync()
         {
             if (_viewModel.IsWadMode)
@@ -360,7 +393,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 if (_viewModel.RootNodes.Count == 0 && !isBackupMode)
                 {
-                    CustomMessageBoxService.ShowError("Error", "No items found in the selected location.", Window.GetWindow(this));
+                    LogService.LogWarning("No items found in the selected location.");
                     _viewModel.IsEmptyState = true;
                 }
 

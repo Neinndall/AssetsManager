@@ -10,7 +10,6 @@
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
              mc:Ignorable="d" 
              PreviewKeyDown="FilePreviewerControl_PreviewKeyDown">
-    
     <DockPanel>
         <!-- Pinned Tabs Area -->
         <Grid DockPanel.Dock="Top" 

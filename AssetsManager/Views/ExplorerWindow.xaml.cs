@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Services.Hashes;
@@ -73,6 +74,14 @@ namespace AssetsManager.Views
 
             FileExplorer.FilePreviewer = FilePreviewer;
             FilePreviewer.FileExplorer = FileExplorer;
+        }
+
+        public async Task InitializeWithMode(string mode)
+        {
+            if (FileExplorer != null)
+            {
+                await FileExplorer.InitializeWithMode(mode);
+            }
         }
 
         public void CleanupResources()
