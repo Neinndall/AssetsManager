@@ -6,7 +6,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="1200" d:DesignWidth="900">
-    <StackPanel Margin="0,16,0,40">
+    <StackPanel Margin="0,16,0,0">
         <!-- SECTION: TECHNICAL DOCUMENTATION -->
         <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
             <StackPanel Orientation="Horizontal">
@@ -34,7 +34,7 @@
                         </Border>
                         <TextBlock Text="WAD Comparator" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Text="Detects changes between patches with byte-level precision. Compare two game versions to instantly isolate new content." 
+                    <TextBlock Grid.Row="1" Text="Advanced differential analysis with byte-level precision. Features rename detection via checksum mapping and automated backup packaging for historical fidelity." 
                                FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </Grid>
             </Border>
@@ -52,7 +52,7 @@
                         </Border>
                         <TextBlock Text="Archive Explorer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Text="Navigate deep into .wad archives. Preview 3D models, textures, and code directly without extraction." 
+                    <TextBlock Grid.Row="1" Text="High-performance archive navigation. Powered by a thin-path optimization engine for low RAM usage and smart VO/SFX filtering for a clean hierarchy." 
                                FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </Grid>
             </Border>
@@ -70,7 +70,7 @@
                         </Border>
                         <TextBlock Text="Model Viewer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Text="Inspect champions, skins, and maps in a high-fidelity real-time viewport with animation support." 
+                    <TextBlock Grid.Row="1" Text="Inspect champions, skins, and maps in real-time. Supports Linear Blend Skinning (LBS) and animation synchronization across all scene assets." 
                                FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </Grid>
             </Border>
@@ -88,7 +88,7 @@
                         </Border>
                         <TextBlock Text="Real-time Monitor" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Text="Live tracking of PBE status, CDN assets, and API endpoints. Get instant alerts on server changes." 
+                    <TextBlock Grid.Row="1" Text="Global integrity tracking for PBE and CDN assets. Detects file changes post-patch using shadow caching and real-time maintenance status analysis." 
                                FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </Grid>
             </Border>
@@ -112,8 +112,8 @@
                             <TextBlock Text="1" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="Directory Configuration" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                            <TextBlock Text="Navigate to Settings and set your League of Legends paths. Ensure the 'PBE Path' is correctly pointed for the Asset Tracker." 
+                            <TextBlock Text="Environment Setup" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="Navigate to Settings and configure your game paths. Use the 'Preferred Client' option to automate WAD discovery and jump directly to roots." 
                                        FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                         </StackPanel>
                     </Grid>
@@ -128,8 +128,8 @@
                             <TextBlock Text="2" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="Hash Synchronization" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                            <TextBlock Text="The app syncs encryption hashes automatically on start. Check the 'Hash Sync' pill in the Monitor Dashboard to ensure they are up to date." 
+                            <TextBlock Text="Asset Surveillance" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="The app periodically checks for PBE status and asset updates using ETags. Check the Monitor Dashboard for versioning and server health alerts." 
                                        FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                         </StackPanel>
                     </Grid>
@@ -144,8 +144,8 @@
                             <TextBlock Text="3" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="Start Exploring" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                            <TextBlock Text="Use the WAD Comparator to start your first analysis. Select 'Old' and 'New' folders and click 'Scan' to see what's changed." 
+                            <TextBlock Text="Differential Analysis" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="Use the WAD Comparator to isolate changes between versions. Leverage 'Quick Select' to automatically find matching archives for analysis." 
                                        FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                         </StackPanel>
                     </Grid>
@@ -182,18 +182,18 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Border Grid.Column="0" Background="{StaticResource HoverColor}" Width="44" Height="44" CornerRadius="10" VerticalAlignment="Top">
-                        <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentBlue}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="Audio" Foreground="{StaticResource AccentBlue}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="20,0,0,0">
-                        <TextBlock Text="Clean Workspace" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
-                        <TextBlock Text="If the Log panel is taking too much space, use the Toggle button in the log header to minimize it to a slim toolbar for a focused experience." 
+                        <TextBlock Text="Linked Audio Banks" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
+                        <TextBlock Text="The explorer automatically detects and links voice-over (VO) regional banks to their master containers, allowing full HIRC logic resolution." 
                                    FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
             <!-- Tip 3 -->
-            <Border Style="{StaticResource SettingsCard}">
+            <Border Style="{StaticResource SettingsCard}" Margin="0">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -212,8 +212,8 @@
         </StackPanel>
 
         <!-- FOOTER -->
-        <StackPanel Margin="0,8,0,8" HorizontalAlignment="Center" Opacity="0.6">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+        <StackPanel Margin="0,30,0,0" HorizontalAlignment="Center">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Opacity="0.6">
                 <materialIcons:MaterialIcon Kind="Github" Foreground="{StaticResource TextSecondary}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                 <TextBlock FontSize="12" VerticalAlignment="Center">
                     <Hyperlink NavigateUri="https://github.com/Neinndall/AssetsManager" RequestNavigate="Hyperlink_RequestNavigate" Foreground="{StaticResource TextSecondary}" TextDecorations="None">
