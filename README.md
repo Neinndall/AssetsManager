@@ -75,15 +75,15 @@ The **Home Dashboard** acts as the professional launcher and central hub of the 
 
 ## 📡 Monitoring Engine
 
-AssetsManager includes a robust monitoring suite with specialized views for system and asset tracking:
+AssetsManager includes a robust monitoring suite designed as a technical command center for tracking game updates and asset integrity:
 
-*   **Dashboard**: Real-time telemetry for background services, PBE server status, and global system health overview.
-*   **Asset Watcher**: Automated monitoring of local game files and plugins with version history and granular diff logging.
-*   **Asset Tracker**: Persistent monitoring of specific assets with intelligent sequence management and extension fallback.
-*   **Backups**: Comprehensive management of local game snapshots. Allows creating, refreshing, and organizing historical data from different installations with automatic version and role discovery.
-*   **History**: Persistent registry of all past WAD comparisons and monitored remote data, allowing instant access to differential results.
-*   **API Center**: Technical utility for querying official Riot APIs (Sales, Mythic Shop, Pass Rewards) with professional PNG export capabilities for community sharing.
-*   **Manage Versions**: Specialized view for regional version discovery and manifest acquisition. Allows obtaining the latest technical data to update game files and plugins across different regions.
+*   **Dashboard**: A global integrity hub providing real-time telemetry for background services, PBE server status, and a consolidated overview of system health and update readiness.
+*   **Asset Watcher**: Powered by a hybrid integrity engine (XXHash64), it performs automated monitoring of local game files and plugins, preserving version history and generating granular differential logs after each patch.
+*   **Asset Tracker**: Enables persistent monitoring of specific high-priority assets, featuring intelligent sequence management and automated extension fallback for reliable long-term tracking.
+*   **Backups**: Comprehensive management of local game snapshots. Allows creating, refreshing, and organizing historical data from different installations with automatic version discovery and role identification (MAIN vs BACKUP).
+*   **History**: A persistent registry and repository for all past WAD comparisons. Features asynchronous pagination and the ability to reconstruct complete results from cached JSON indices.
+*   **API Center**: Advanced utility for querying Riot's official production APIs (Sales, Mythic Shop, Pass Rewards). Includes specialized milestone mapping and professional PNG export capabilities for community sharing.
+*   **Manage Versions**: Specialized view for regional version discovery and manifest acquisition. Facilitates the retrieval of technical data required to update core game files and plugins across all supported regions.
 
 ## 🚀 Getting Started
 
