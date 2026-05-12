@@ -172,6 +172,10 @@ Changes
     * Reorganized the inspector sections to prioritize "Textures & Meshes" as the primary tab.
   - 3D Viewer / MapGeo Readability
     * Optimized Mesh Identification: the system now simplifies long, complex material paths into clean, readable names (e.g., "Bush_Wind_A") specifically for map geometry, making it easier to identify assets.
+  - Monitoring Engine / Backup Workflow Polish
+    * Refined Backup Logs: suppressed redundant deletion messages during overwrite operations and introduced action-specific logs ("Overwriting backup...", "Creating backup...") for better traceability.
+    * Enhanced Action Dialog: updated the overwrite description to "current main data" to better reflect the source of the refresh operation.
+    * Fixed Metrics Synchronization: ensured that backup repository counts and storage sizes are recalculated and updated immediately after a deletion.
   - Architecture / Service Refactoring
     * Refined the RiotApiService by centralizing WAD management and icon path resolution.
   - Home / Technical Suite Rebranding

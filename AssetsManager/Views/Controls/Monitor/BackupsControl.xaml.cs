@@ -104,7 +104,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
         }
 
-        private void DeleteSelectedBackups_Click(object sender, RoutedEventArgs e)
+        private async void DeleteSelectedBackups_Click(object sender, RoutedEventArgs e)
         {
             var selectedBackups = ViewModel.AllBackups.Where(b => b.IsSelected).ToList();
 
