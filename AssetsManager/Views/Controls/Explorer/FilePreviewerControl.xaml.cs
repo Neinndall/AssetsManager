@@ -289,8 +289,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ResetToDefaultState()
         {
-            ViewModel.IsGridMode = false;
-            
+            _currentFolderNode = null;
             UpdateSelectedNode(null, null);
             await ExplorerPreviewService.ResetPreviewAsync();
         }
@@ -330,19 +329,24 @@ namespace AssetsManager.Views.Controls.Explorer
                 _thumbnailCts = new CancellationTokenSource();
                 _ = LoadThumbnailsQueueAsync(gridItems, _thumbnailCts.Token);
             }
-            else if (node != null)
+            else
             {
-                // If it's a file, hide status messages immediately to avoid flickers during load
-                ViewModel.IsWelcomeVisible = false;
+                _currentFolderNode = null;
 
-                // Selective hide: Only hide unsupported if the new file is NOT an image
-                bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                               SupportedFileTypes.Textures.Contains(node.Extension) || 
-                               SupportedFileTypes.VectorImages.Contains(node.Extension);
-                
-                if (!isImage)
+                if (node != null)
                 {
-                    ViewModel.IsUnsupportedVisible = false;
+                    // If it's a file, hide status messages immediately to avoid flickers during load
+                    ViewModel.IsWelcomeVisible = false;
+
+                    // Selective hide: Only hide unsupported if the new file is NOT an image
+                    bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
+                                   SupportedFileTypes.Textures.Contains(node.Extension) || 
+                                   SupportedFileTypes.VectorImages.Contains(node.Extension);
+                    
+                    if (!isImage)
+                    {
+                        ViewModel.IsUnsupportedVisible = false;
+                    }
                 }
             }
         }

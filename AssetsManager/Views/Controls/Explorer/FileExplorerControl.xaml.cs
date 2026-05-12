@@ -169,6 +169,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             // 8. Limpiar paths
             _currentRootPath = null;
+            _isExternalInitRequested = false;
         }
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
@@ -177,6 +178,11 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
+
+            // Setup toolbar peer connection - ALWAYS do this
+            _viewModel.Toolbar.ParentExplorer = this;
+            _viewModel.Toolbar.PropertyChanged -= Toolbar_PropertyChanged; // Prevent double subscription
+            _viewModel.Toolbar.PropertyChanged += Toolbar_PropertyChanged;
 
             if (_isExternalInitRequested) return;
 
@@ -224,10 +230,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
             }
 
-            // Setup toolbar peer connection
-            _viewModel.Toolbar.ParentExplorer = this;
-            _viewModel.Toolbar.PropertyChanged += Toolbar_PropertyChanged;
-
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
             {
@@ -272,6 +274,11 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             // Update the toolbar state to switch modes
             _viewModel.Toolbar.IsWadMode = !_viewModel.Toolbar.IsWadMode;
+            _viewModel.Toolbar.IsBackupMode = false;
+
+            // Reset paths so ReloadTree can re-discover the correct root
+            _currentRootPath = null;
+            _backupJsonPath = null;
             
             if (FilePreviewer != null)
             {
@@ -327,7 +334,25 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (_viewModel.IsWadMode)
             {
-                string path = Directory.Exists(AppSettings.LolPbeDirectory ?? "") ? AppSettings.LolPbeDirectory : (Directory.Exists(AppSettings.LolLiveDirectory ?? "") ? AppSettings.LolLiveDirectory : null);
+                string path = _currentRootPath;
+                
+                if (string.IsNullOrEmpty(path))
+                {
+                    // Discovery logic based on preference
+                    string pbe = AppSettings.LolPbeDirectory;
+                    string live = AppSettings.LolLiveDirectory;
+                    bool pbeValid = !string.IsNullOrEmpty(pbe) && Directory.Exists(pbe);
+                    bool liveValid = !string.IsNullOrEmpty(live) && Directory.Exists(live);
+
+                    if (AppSettings.PreferredClient == PreferredClient.PBE)
+                    {
+                        path = pbeValid ? pbe : (liveValid ? live : null);
+                    }
+                    else
+                    {
+                        path = liveValid ? live : (pbeValid ? pbe : null);
+                    }
+                }
 
                 if (path != null)
                 {
@@ -362,6 +387,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
+                _currentRootPath = null; // Important: Clear root when loading result
+
                 if (FilePreviewer != null)
                 {
                     await FilePreviewer.ResetToDefaultState();
