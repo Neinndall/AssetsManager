@@ -36,16 +36,10 @@ AssetsManager is built upon four primary technical pillars, designed to provide 
     *   **Asset Watcher**: Background tracking of local game files with automatic diff logging and version history preservation.
     *   **History & Tracker**: Centralized registries for persistent asset monitoring and instant access to past comparison results.
 
-## 🏠 Home Dashboard
+## 🔍 Explorer Capabilities
 
-The **Home Dashboard** acts as the professional launcher and central hub of the application:
+The **Archive Explorer** includes advanced technical features for deep game data analysis:
 
-*   **Unified Entry Point**: Instant access to all Core Systems and secondary utilities from a single, high-fidelity HUD interface.
-*   **Environment Awareness**: Features dynamic status badges (READY, SETUP, MISSING) for LIVE, PBE, and LOCAL paths, ensuring your workspace is always properly configured.
-*   **Greeting & Context**: Personalized greeting system and quick-start subtitles to guide your workflow.
-*   **Quick Utility Access**: Discrete icon-based links to support apps like the **Asset Converter**, **Audio Player**, and **Quick Notepad**.
-
-### 🔍 Specialized Archive Explorer Functions
 *   **Multi-Format Visualization**: High-fidelity previewers for a wide range of game formats:
     *   **3D Models**: Native rendering of `.skn`, `.sco`, `.scb` meshes and `.mapgeo` environments.
     *   **Textures**: Instant preview of `.dds` and `.tex` files with transparency support.
@@ -54,6 +48,15 @@ The **Home Dashboard** acts as the professional launcher and central hub of the 
 *   **Adaptive Engineering Toolbar**: A dual-panel architecture featuring a clean header for core actions and an expanded technical suite (Mode, Grid, Breadcrumb).
 *   **Intelligent Navigation**: Deep-seek engine with match highlighting and asynchronous "Go To" absolute path navigation.
 *   **Contextual Tools**: Image Merger for texture sheets, Favorites for quick access, and a professional traceability menu for extraction and tracking.
+
+## 🏠 Home Dashboard
+
+The **Home Dashboard** acts as the professional launcher and central hub of the application:
+
+*   **Unified Entry Point**: Instant access to all Core Systems and secondary utilities from a single, high-fidelity HUD interface.
+*   **Environment Awareness**: Features dynamic status badges (READY, SETUP, MISSING) for LIVE, PBE, and LOCAL paths, ensuring your workspace is always properly configured.
+*   **Greeting & Context**: Personalized greeting system and quick-start subtitles to guide your workflow.
+*   **Quick Utility Access**: Discrete icon-based links to support apps like the **Asset Converter**, **Audio Player**, and **Quick Notepad**.
 
 ### 🔊 Audio Bank Center
 Deep inspection of Wwise audio banks (`.wpk`, `.bnk`), supporting event hierarchy resolution, linked master bank discovery, and direct media access.
