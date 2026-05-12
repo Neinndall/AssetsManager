@@ -31,12 +31,13 @@ New Features
 
 Improvements
   - Home / Professional Launcher Dashboard
-    * Implemented a cinematic "Launcher Style" design featuring three massive interactive pillars for LIVE, PBE, and LOCAL environment selection.
-    * Integrated High-Fidelity Status Badges: each environment card now features a technical "READY", "SETUP", or "MISSING" badge with dynamic color-coding (Green/Orange) for immediate configuration awareness.
-    * Reorganized "Technical Suite": centralized major tools (WAD Comparator, Monitor, Model Viewer) with professional descriptions and refined horizontal layout.
-    * Refined "Utilities" Section: dedicated compact area for secondary apps (Notepad, Audio Player, Converter) using high-density technical cards.
-    * Sleek Centered Footer: redesigned the bottom information bar to feature a centered, dynamic configuration status with pulsing alerting icons for missing essential paths.
-    * Reactive Configuration Engine: integrated real-time synchronization with AppSettings, allowing the dashboard to automatically refresh its status and pillar badges the moment new paths are saved.
+    * Unified Core Workspace: merged Environments and Analysis Suite into a single "CORE SYSTEMS" section with a cohesive 3x2 grid layout.
+    * Refined Information Layout: added detailed functional descriptions and professional category headers (TOOLS, STATUS, STUDIO) to all 6 core modules.
+    * Optimized Card Geometry: standardized all core module cards to 180px height, achieving perfect vertical alignment and eliminating text clipping.
+    * Compact Utilities Section: reimagined utilities as discrete secondary icon-buttons with tooltips, maximizing dashboard workspace and focusing on core tools.
+    * Enhanced HUD Alignment: perfected horizontal alignment between the greeting section and the core systems grid for a cleaner vertical sightline.
+    * Accurate Status Reporting: updated the system status footer with a more descriptive and accurate message regarding environment path configuration for exploration and analysis.
+    * Reactive Configuration Engine: integrated real-time synchronization with AppSettings, allowing the dashboard to automatically refresh its status and badges the moment new paths are saved.
   - Explorer / Technical HUD Refinement
     * Standardized Professional Mode Indicator: removed redundant "MODE" text from the toolbar to achieve a cleaner look and upgraded visibility to TextPrimary.
     * Integrated Dynamic Iconography: verified and refined the semantic glifs for PBE, LIVE, RESULTS, and LOCAL modes for a more intuitive navigation experience.
@@ -173,6 +174,8 @@ Changes
     * Optimized Mesh Identification: the system now simplifies long, complex material paths into clean, readable names (e.g., "Bush_Wind_A") specifically for map geometry, making it easier to identify assets.
   - Architecture / Service Refactoring
     * Refined the RiotApiService by centralizing WAD management and icon path resolution.
+  - Home / Technical Suite Rebranding
+    * Renamed "WAD Comparator" to "Comparator" for a more concise and professional module identity.
   - Text Analysis / UI Simplification
     * Removed the JSON path breadcrumb and copy button from the bottom bar to provide a cleaner, line-focused workspace.
 
