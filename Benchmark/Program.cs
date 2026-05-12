@@ -29,10 +29,9 @@ namespace BenchmarkApp
             var hashService = serviceProvider.GetRequiredService<HashResolverService>();
 
             Console.WriteLine("=== ASSETSMANAGER PERFORMANCE LAB ===");
-            PerformanceBenchmark.RunDecompressionBenchmark(logService);
-            PerformanceBenchmark.RunRealWorldWadBenchmark(logService);
-            PerformanceBenchmark.RunBinaryHashBenchmark(logService);
-            PerformanceBenchmark.RunFullZeroCopyBenchmark(logService);
+            
+            // Lab is ready for new technical tests.
+
             Console.WriteLine("=====================================");
         }
     }

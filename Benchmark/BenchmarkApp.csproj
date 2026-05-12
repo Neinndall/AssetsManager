@@ -5,6 +5,6 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\AssetsManager_v3.2.6.0\AssetsManager\AssetsManager.csproj" />
+    <ProjectReference Include="..\AssetsManager\AssetsManager.csproj" />
   </ItemGroup>
 </Project>
