@@ -109,14 +109,13 @@
             <Grid Margin="50,40,50,40">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/> <!-- 1. Hero -->
-                    <RowDefinition Height="Auto"/> <!-- 2. Explorer Section -->
-                    <RowDefinition Height="Auto"/> <!-- 3. Technical Section -->
-                    <RowDefinition Height="Auto"/> <!-- 4. Utilities Section -->
-                    <RowDefinition Height="Auto"/> <!-- 5. System Status (Footer) -->
+                    <RowDefinition Height="Auto"/> <!-- 2. Core Systems Section -->
+                    <RowDefinition Height="Auto"/> <!-- 3. Utilities Section -->
+                    <RowDefinition Height="Auto"/> <!-- 4. System Status (Footer) -->
                 </Grid.RowDefinitions>
 
                 <!-- 1. HERO SECTION -->
-                <Grid Grid.Row="0" Margin="0,0,0,32">
+                <Grid Grid.Row="0" Margin="8,0,0,32">
                     <StackPanel>
                         <TextBlock Text="{Binding Greeting}" 
                                    FontSize="32" 
@@ -130,9 +129,9 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- 2. EXPLORER SECTION: Smaller Pillars -->
+                <!-- 2. CORE SYSTEMS SECTION -->
                 <StackPanel Grid.Row="1" Margin="0,0,0,24">
-                    <TextBlock Text="ENVIRONMENTS" Style="{StaticResource ToolSectionLabel}" Margin="8,0,0,12"/>
+                    <TextBlock Text="CORE SYSTEMS" Style="{StaticResource ToolSectionLabel}" Margin="8,0,0,12"/>
                     <UniformGrid Columns="3">
                         <!-- LIVE -->
                         <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBlue}" Height="180">
@@ -307,101 +306,104 @@
                                 <materialIcons:MaterialIcon Kind="FolderHomeOutline" Width="80" Height="80" Foreground="{StaticResource TextSecondary}" Opacity="0.03" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-15,-15"/>
                             </Grid>
                         </Button>
-                    </UniformGrid>
-                </StackPanel>
 
-                <!-- 3. TECHNICAL SECTION -->
-                <StackPanel Grid.Row="2" Margin="0,0,0,24">
-                    <TextBlock Text="ANALYSIS SUITE" Style="{StaticResource ToolSectionLabel}" Margin="8,0,0,12"/>
-                    <UniformGrid Columns="3">
                         <!-- Comparator -->
-                        <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBrush}" Height="100">
+                        <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBrush}" Height="180">
                             <Button.CommandParameter>Comparator</Button.CommandParameter>
-                            <Grid Margin="16,0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Width="40" Height="40" CornerRadius="10" Background="#1A5577CC" Margin="0,0,16,0">
-                                        <materialIcons:MaterialIcon Kind="Compare" Width="22" Height="22" Foreground="{StaticResource AccentBrush}"/>
+                            <Grid Margin="24,20">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                                    <Border Width="44" Height="44" CornerRadius="12" Background="#1A5577CC" Margin="0,0,16,0">
+                                        <materialIcons:MaterialIcon Kind="Compare" Width="24" Height="24" Foreground="{StaticResource AccentBrush}"/>
                                     </Border>
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="WAD Comparator" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="Diff analysis" FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                        <TextBlock Text="TOOLS" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentBrush}" Opacity="0.6"/>
+                                        <TextBlock Text="Comparator" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                                     </StackPanel>
                                 </StackPanel>
+
+                                <TextBlock Grid.Row="1" Text="Perform deep differential analysis between WAD versions to track every change in game assets." 
+                                           FontSize="13" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="18"/>
                             </Grid>
                         </Button>
 
                         <!-- Monitor -->
-                        <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentGreen}" Height="100">
+                        <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentGreen}" Height="180">
                             <Button.CommandParameter>Monitor</Button.CommandParameter>
-                            <Grid Margin="16,0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Width="40" Height="40" CornerRadius="10" Background="#1A4CAF50" Margin="0,0,16,0">
-                                        <materialIcons:MaterialIcon Kind="Radar" Width="22" Height="22" Foreground="{StaticResource AccentGreen}"/>
+                            <Grid Margin="24,20">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                                    <Border Width="44" Height="44" CornerRadius="12" Background="#1A4CAF50" Margin="0,0,16,0">
+                                        <materialIcons:MaterialIcon Kind="Radar" Width="24" Height="24" Foreground="{StaticResource AccentGreen}"/>
                                     </Border>
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Monitor" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="Server status" FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                        <TextBlock Text="STATUS" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.6"/>
+                                        <TextBlock Text="Monitor" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                                     </StackPanel>
                                 </StackPanel>
+
+                                <TextBlock Grid.Row="1" Text="Real-time server tracking, version discovery and automatic PBE update notifications." 
+                                           FontSize="13" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="18"/>
                             </Grid>
                         </Button>
 
                         <!-- Viewer -->
-                        <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentPurple}" Height="100">
+                        <Button Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentPurple}" Height="180">
                             <Button.CommandParameter>Viewer</Button.CommandParameter>
-                            <Grid Margin="16,0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Width="40" Height="40" CornerRadius="10" Background="#1A9C27B0" Margin="0,0,16,0">
-                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="22" Height="22" Foreground="{StaticResource AccentPurple}"/>
+                            <Grid Margin="24,20">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                                    <Border Width="44" Height="44" CornerRadius="12" Background="#1A9C27B0" Margin="0,0,16,0">
+                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}"/>
                                     </Border>
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Model Viewer" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="3D visualization" FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                                        <TextBlock Text="STUDIO" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentPurple}" Opacity="0.6"/>
+                                        <TextBlock Text="Model Viewer" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                                     </StackPanel>
                                 </StackPanel>
+
+                                <TextBlock Grid.Row="1" Text="High-fidelity 3D viewport for skin inspection, animation playback and asset export." 
+                                           FontSize="13" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="18"/>
                             </Grid>
                         </Button>
                     </UniformGrid>
                 </StackPanel>
 
-                <!-- 4. UTILITIES SECTION (Mini Apps as smaller cards) -->
-                <StackPanel Grid.Row="3" Margin="0,0,0,32">
+                <!-- 3. UTILITIES SECTION (Minimal Secondary Icons) -->
+                <StackPanel Grid.Row="2" Margin="0,0,0,32">
                     <TextBlock Text="UTILITIES" Style="{StaticResource ToolSectionLabel}" Margin="8,0,0,12"/>
-                    <UniformGrid Columns="3">
+                    <StackPanel Orientation="Horizontal" Margin="4,0">
                          <!-- Notepad -->
-                        <Button Style="{StaticResource DashboardTileStyle}" Click="Notepad_Click" Tag="{StaticResource AccentOrange}" Height="80">
-                            <Grid Margin="16,0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <materialIcons:MaterialIcon Kind="NoteTextOutline" Width="20" Height="20" Foreground="{StaticResource AccentOrange}" Margin="0,0,12,0"/>
-                                    <TextBlock Text="Quick Notepad" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                </StackPanel>
-                            </Grid>
+                        <Button Style="{StaticResource DashboardTileStyle}" Click="Notepad_Click" Tag="{StaticResource AccentOrange}" Height="48" Width="48" Margin="4" ToolTip="Quick Notepad">
+                            <materialIcons:MaterialIcon Kind="NoteTextOutline" Width="20" Height="20" Foreground="{StaticResource AccentOrange}"/>
                         </Button>
 
                         <!-- Audio Player -->
-                        <Button Style="{StaticResource DashboardTileStyle}" Click="AudioPlayer_Click" Tag="{StaticResource AccentBlue}" Height="80">
-                            <Grid Margin="16,0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <materialIcons:MaterialIcon Kind="Waveform" Width="20" Height="20" Foreground="{StaticResource AccentBlue}" Margin="0,0,12,0"/>
-                                    <TextBlock Text="Audio Player" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                </StackPanel>
-                            </Grid>
+                        <Button Style="{StaticResource DashboardTileStyle}" Click="AudioPlayer_Click" Tag="{StaticResource AccentBlue}" Height="48" Width="48" Margin="4" ToolTip="Audio Player">
+                            <materialIcons:MaterialIcon Kind="Waveform" Width="20" Height="20" Foreground="{StaticResource AccentBlue}"/>
                         </Button>
 
                         <!-- Converter -->
-                        <Button Style="{StaticResource DashboardTileStyle}" Click="Converter_Click" Tag="{StaticResource AccentTeal}" Height="80">
-                            <Grid Margin="16,0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <materialIcons:MaterialIcon Kind="AutoFix" Width="20" Height="20" Foreground="{StaticResource AccentTeal}" Margin="0,0,12,0"/>
-                                    <TextBlock Text="Asset Converter" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                                </StackPanel>
-                            </Grid>
+                        <Button Style="{StaticResource DashboardTileStyle}" Click="Converter_Click" Tag="{StaticResource AccentTeal}" Height="48" Width="48" Margin="4" ToolTip="Asset Converter">
+                            <materialIcons:MaterialIcon Kind="AutoFix" Width="20" Height="20" Foreground="{StaticResource AccentTeal}"/>
                         </Button>
-                    </UniformGrid>
+                    </StackPanel>
                 </StackPanel>
 
-                <!-- 5. SYSTEM STATUS FOOTER -->
-                <Border Grid.Row="4" Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="20,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                <!-- 4. SYSTEM STATUS FOOTER -->
+                <Border Grid.Row="3" Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="20,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <materialIcons:MaterialIcon Kind="{Binding IsConfigIncomplete, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='AlertCircleOutline,CheckCircleOutline'}" 
                                                     Width="16" Height="16" Margin="0,0,10,0">

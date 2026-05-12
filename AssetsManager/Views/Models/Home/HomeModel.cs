@@ -88,7 +88,7 @@ namespace AssetsManager.Views.Models.Home
 
             if (IsLiveConfigured && IsPbeConfigured)
             {
-                LastComparisonText = "Environment paths are fully configured for comparative analysis.";
+                LastComparisonText = "Core installation paths are fully configured for exploration and analysis.";
                 IsConfigIncomplete = false;
             }
             else
