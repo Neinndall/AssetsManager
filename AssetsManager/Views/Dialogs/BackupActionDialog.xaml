@@ -50,7 +50,7 @@
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="Overwrite Backup (Refresh)" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock Text="Replaces this backup with the current game client data." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                            <TextBlock Text="Replaces this backup with the current main data." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </Grid>
                 </Button>

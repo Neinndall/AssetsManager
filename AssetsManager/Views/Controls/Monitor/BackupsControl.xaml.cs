@@ -129,6 +129,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 if(deletedCount > 0)
                 {
+                    await LoadBackupsAsync();
                     CustomMessageBoxService.ShowInfo("Success", $"Successfully deleted {deletedCount} backup(s).", Window.GetWindow(this));
                 }
                 else
@@ -246,7 +247,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 }
                 else
                 {
-                    string logMsg = !string.IsNullOrEmpty(oldBackupPathToDelete) ? "Updating backup..." : "Starting backup...";
+                    string logMsg = !string.IsNullOrEmpty(oldBackupPathToDelete) ? "Overwriting backup..." : "Creating backup...";
                     await BackupManager.CreateLolPbeDirectoryBackupAsync(sourcePath, destinationPath, cancellationToken, logMsg);
                 }
                 
@@ -255,7 +256,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     // SAFE-REFRESH: Delete old backup only after success
                     if (!string.IsNullOrEmpty(oldBackupPathToDelete) && destinationPath != oldBackupPathToDelete)
                     {
-                        BackupManager.DeleteBackup(oldBackupPathToDelete);
+                        BackupManager.DeleteBackup(oldBackupPathToDelete, false);
                     }
 
                     LogService.LogSuccess("Backup completed successfully.");

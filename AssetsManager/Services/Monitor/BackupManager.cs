@@ -324,14 +324,17 @@ namespace AssetsManager.Services.Monitor
             return size;
         }
 
-        public bool DeleteBackup(string backupPath)
+        public bool DeleteBackup(string backupPath, bool showLog = true)
         {
             try
             {
                 if (Directory.Exists(backupPath))
                 {
                     Directory.Delete(backupPath, true);
-                    _logService.LogSuccess("The selected backup was deleted successfully.");
+                    if (showLog)
+                    {
+                        _logService.LogSuccess("The selected backup was deleted successfully.");
+                    }
                     _currentSessionBackups.Remove(backupPath);
                     return true;
                 }
