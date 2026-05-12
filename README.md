@@ -83,6 +83,7 @@ AssetsManager includes a robust monitoring suite with specialized views for syst
 *   **Backups**: Comprehensive management of local game snapshots. Allows creating, refreshing, and organizing historical data from different installations with automatic version and role discovery.
 *   **History**: Persistent registry of all past WAD comparisons and monitored remote data, allowing instant access to differential results.
 *   **API Center**: Technical utility for querying official Riot APIs (Sales, Mythic Shop, Pass Rewards) with professional PNG export capabilities for community sharing.
+*   **Manage Versions**: Specialized view for regional version discovery and manifest acquisition. Allows obtaining the latest technical data to update game files and plugins across different regions.
 
 ## 🚀 Getting Started
 
