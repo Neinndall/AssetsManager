@@ -10,48 +10,70 @@
 
 AssetsManager is a powerful tool designed for League of Legends enthusiasts who need to analyze, manage, and track changes to game assets from PBE updates. It offers a comprehensive suite of features for deep asset inspection, 3D model visualization, archive exploration, and real-time monitoring.
 
-## 🏛️ Core Modules
+## 🏛️ Core Systems
 
-*   **Advanced WAD Comparator**: A high-speed comparison engine featuring **Fast Mode** (Reflection-based) to identify changes in seconds. Includes a **Diagnostic Studio** with multi-view navigation: **Hierarchy** (Tree), **Discovery** (Gallery), and **Analytics** (Overview).
-*   **Archive Explorer**: A professional navigation suite for the WAD game files with advanced tools:
-    *   **Open WAD (Standalone)**: Support for loading individual `.wad.client` files directly for fast inspection.
-    *   **Adaptive Engineering Toolbar**: A dual-panel architecture featuring a clean header for core actions and an expanded technical suite for secondary tools (Open WAD, Collapse, Backup, Mode, Grouping, Grid, Breadcrumb, Favs, Merger) with seamless visual fusion.
+AssetsManager is built upon four primary technical pillars, designed to provide a professional-grade workspace for League of Legends asset analysis:
+
+*   **Comparator**: A specialized differential analysis engine.
+    *   **Fast Mode**: Uses reflection-based XXHash64 checksums to identify modified or renamed files across WAD versions in seconds.
+    *   **Diagnostic Studio**: A dedicated workspace for exploring results via **Hierarchy Tree**, visual **Asset Discovery** gallery, and technical **Patch Intelligence** analytics.
+    *   **Metadata Traceability**: High-density inspector providing size deltas, rename history, and category-based impact mapping.
+*   **Explorer**: A high-performance archive navigation suite with specialized modules:
+    *   **Universal Mode Support**: A single, high-performance engine for browsing **LIVE**, **PBE**, **LOCAL** extractions, and **RESULTS** comparison data.
+    *   **Adaptive Engineering Toolbar**: A dual-panel architecture featuring a clean header for core actions and an expanded technical suite (Mode, Grid, Breadcrumb, Grouping).
     *   **Premium Gallery (Grid View)**: High-performance visual explorer with asynchronous thumbnail generation and rich metadata badges.
-    *   **Load Backups**: Ability to load your previous comparison backups from WAD Explorer.
-    *   **Image Merger**: Specialized tray to "collect" and composite multiple textures into professional contact sheets.
-    *   **Quick Access (Favorites)**: Persistent system to pin frequently used assets for instant cross-session navigation.
-    *   **Intelligent Search**: Deep-seek engine with real-time filtering, match highlighting, and asynchronous "Go To" capabilities.
-    *   **Contextual Trazability**: Professional right-click menu for extracting, saving, copying paths, pinning to tabs, and tracking assets.
-*   **3D Workspace**: Fully integrated HelixToolkit viewport for visualizing champion models (`.skn`), animations (`.anm`), and environment MapGeometry (`.mapgeo`).
-*   **Version Management**: Native integration with Riot APIs to manage manifests, plugins, and full game client downloads via a parallel RMAN engine.
-*   **Audio Bank Center**: Deep inspection of Wwise audio banks (`.wpk`, `.bnk`), supporting event hierarchy resolution and direct media access.
+    *   **Intelligent Search & Navigation**: Deep-seek engine with match highlighting and asynchronous "Go To" absolute path navigation.
+    *   **Image Merger**: Specialized tray to composite multiple textures into professional contact sheets.
+    *   **Quick Access Favorites**: Persistent system to pin frequently used assets for instant cross-session navigation.
+    *   **Direct Asset Monitoring**: Seamless integration with the Monitoring Engine to track specific files or containers directly from the explorer.
+    *   **Contextual Traceability**: Professional right-click menu for extracting, saving, and pinning to tabs.
+*   **Model Viewer**: A high-fidelity 3D studio for asset inspection.
+    *   **Advanced Rendering**: Native support for `.skn` meshes and complex `.mapgeo` environments with PBR-lite material resolution.
+    *   **Animation Playback**: Features Linear Blend Skinning (LBS) calculated via Parallel.For for smooth playback of `.anm` sequences.
+    *   **Visual Export**: Capture professional 4K snapshots of skins and models with transparency support.
+*   **Monitor**: An automated telemetry and tracking center.
+    *   **Real-time Intelligence**: Continuous monitoring of PBE server status and regional version discovery via Riot APIs.
+    *   **Asset Watcher**: Background tracking of local game files with automatic diff logging and version history preservation.
+    *   **History & Tracker**: Centralized registries for persistent asset monitoring and instant access to past comparison results.
 
-## 🧰 Integrated Utility Suite (Home Apps)
+## 🏠 Home Dashboard
 
-*   **Universal Converter**: A unified multi-threaded engine for batch processing.
-    *   **Images**: `.dds`, `.tex` → PNG/JPG.
-    *   **Audio**: `.wem`, `.ogg`, `.mp3`, `.wav` → OGG/WAV/MP3.
-*   **Professional Audio Player**: Advanced session-based player featuring playlist management, real-time volume control, and YouTube streaming integration.
-*   **Smart Notepad**: Integrated technical editor powered by AvalonEdit for quick note-taking during asset analysis.
+The **Home Dashboard** acts as the professional launcher and central hub of the application:
 
-## 🦾 High-Performance Architecture
+*   **Unified Entry Point**: Instant access to all Core Systems and secondary utilities from a single, high-fidelity HUD interface.
+*   **Environment Awareness**: Features dynamic status badges (READY, SETUP, MISSING) for LIVE, PBE, and LOCAL paths, ensuring your workspace is always properly configured.
+*   **Greeting & Context**: Personalized greeting system and quick-start subtitles to guide your workflow.
+*   **Quick Utility Access**: Discrete icon-based links to support apps like the **Asset Converter**, **Audio Player**, and **Quick Notepad**.
 
-*   **Clean MVVM Architecture**: Unified pattern across core UI components using private field instantiation for model owners and public property exposure for external orchestration.
-*   **Parallel Sync Engine**: Simultaneous multi-file acquisition with atomic `.tmp` protection to guarantee local database integrity.
-*   **Optimized Hash Engine**: Re-engineered startup sequence with linear-seek parsing and proactive memory allocation for near-instant hash loading.
-*   **Blake3 Cryptography**: Implementation of Pure C# Blake3 for high-speed integrity verification across massive asset sets.
-*   **Chromeless HUD Design**: A hardware-accelerated UI with a 36px HUD title bar and professional technical aesthetics.
+### 🔍 Specialized Archive Explorer Functions
+*   **Multi-Format Visualization**: High-fidelity previewers for a wide range of game formats:
+    *   **3D Models**: Native rendering of `.skn`, `.sco`, `.scb` meshes and `.mapgeo` environments.
+    *   **Textures**: Instant preview of `.dds` and `.tex` files with transparency support.
+    *   **Audio**: Real-time playback of `.wem`, `.bnk`, and `.wpk` banks.
+    *   **Code & Data**: Decompilation of `.luabin64` (Lua 5.1) and formatting of `.bin`, `.json`, `.xml`, `.svg`, and `.stringtable`.
+*   **Adaptive Engineering Toolbar**: A dual-panel architecture featuring a clean header for core actions and an expanded technical suite (Mode, Grid, Breadcrumb).
+*   **Intelligent Navigation**: Deep-seek engine with match highlighting and asynchronous "Go To" absolute path navigation.
+*   **Contextual Tools**: Image Merger for texture sheets, Favorites for quick access, and a professional traceability menu for extraction and tracking.
 
-## 📡 Monitoring Engine (`MonitorWindow`)
+### 🔊 Audio Bank Center
+Deep inspection of Wwise audio banks (`.wpk`, `.bnk`), supporting event hierarchy resolution, linked master bank discovery, and direct media access.
 
-*   **Development Center**: Real-time commit history tracking from the `dev` branch with integrated one-click installation of experimental builds by linking unique SHAs with GitHub Release Assets.
-*   **Live Dashboard**: Real-time telemetry for background services, PBE server status, and global system health.
+## 🧰 Secondary Utilities (Quick Access)
+
+*   **Asset Converter**: Unified multi-threaded engine for batch processing images (`.dds`, `.tex`) and audio (`.wem`, `.ogg`, `.mp3`).
+*   **Audio Player**: Advanced session-based player featuring playlist management and YouTube streaming integration.
+*   **Quick Notepad**: Integrated technical editor powered by AvalonEdit for quick note-taking during analysis.
+
+## 📡 Monitoring Engine
+
+AssetsManager includes a robust monitoring suite with specialized views for system and asset tracking:
+
+*   **Dashboard**: Real-time telemetry for background services, PBE server status, and global system health overview.
 *   **Asset Watcher**: Automated monitoring of local game files and plugins with version history and granular diff logging.
-*   **History**: Storage where you will find your comparison backups and monitored remotes.
 *   **Asset Tracker**: Persistent monitoring of specific assets with intelligent sequence management and extension fallback.
-*   **Comparison History**: Persistent registry of all past WAD comparisons, allowing instant access to cached results and differential data.
-*   **Backup Manager**: Specialized tool to create and manage local snapshots of the PBE file system, ensuring data safety across patches.
-*   **API Center**: Technical utility for querying official Riot APIs for sales, Mythic Shop rotation, and **Pass Rewards** (event tracking and asset extraction). Includes support for exporting data as **professional PNG images** for community sharing.
+*   **Backups**: Comprehensive management of local game snapshots. Allows creating, refreshing, and organizing historical data from different installations with automatic version and role discovery.
+*   **History**: Persistent registry of all past WAD comparisons and monitored remote data, allowing instant access to differential results.
+*   **API Center**: Technical utility for querying official Riot APIs (Sales, Mythic Shop, Pass Rewards) with professional PNG export capabilities for community sharing.
 
 ## 🚀 Getting Started
 
