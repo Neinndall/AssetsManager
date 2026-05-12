@@ -49,6 +49,15 @@ The **Archive Explorer** includes advanced technical features for deep game data
 *   **Intelligent Navigation**: Deep-seek engine with match highlighting and asynchronous "Go To" absolute path navigation.
 *   **Contextual Tools**: Image Merger for texture sheets, Favorites for quick access, and a professional traceability menu for extraction and tracking.
 
+## 🔊 Audio Intelligence
+
+The **Audio Bank Center** provides professional-grade tools for inspecting and extracting Wwise-based game sound:
+
+*   **HIRC Hierarchy Traversal**: Deep inspection of `.bnk` structures, supporting event resolution, actor-mixer containers, and random/sequence containers.
+*   **Linked Master Bank Discovery**: Intelligent engine that automatically identifies and links regional VO containers with their corresponding master metadata for full logic reconstruction.
+*   **Dynamic Decoding**: Real-time playback and extraction of `.wem` assets using an integrated high-performance decoding motor.
+*   **Event-to-Media Mapping**: Instant identification of which audio files are triggered by specific game events.
+
 ## 🏠 Home Dashboard
 
 The **Home Dashboard** acts as the professional launcher and central hub of the application:
@@ -57,9 +66,6 @@ The **Home Dashboard** acts as the professional launcher and central hub of the 
 *   **Environment Awareness**: Features dynamic status badges (READY, SETUP, MISSING) for LIVE, PBE, and LOCAL paths, ensuring your workspace is always properly configured.
 *   **Greeting & Context**: Personalized greeting system and quick-start subtitles to guide your workflow.
 *   **Quick Utility Access**: Discrete icon-based links to support apps like the **Asset Converter**, **Audio Player**, and **Quick Notepad**.
-
-### 🔊 Audio Bank Center
-Deep inspection of Wwise audio banks (`.wpk`, `.bnk`), supporting event hierarchy resolution, linked master bank discovery, and direct media access.
 
 ## 🧰 Secondary Utilities (Quick Access)
 
