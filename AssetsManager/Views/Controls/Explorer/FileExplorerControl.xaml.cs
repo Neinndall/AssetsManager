@@ -181,7 +181,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
             // Setup toolbar peer connection - ALWAYS do this
             _viewModel.Toolbar.ParentExplorer = this;
-            _viewModel.Toolbar.PropertyChanged -= Toolbar_PropertyChanged; // Prevent double subscription
             _viewModel.Toolbar.PropertyChanged += Toolbar_PropertyChanged;
 
             if (_isExternalInitRequested) return;

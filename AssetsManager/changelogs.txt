@@ -177,6 +177,13 @@ Changes
     * Removed the JSON path breadcrumb and copy button from the bottom bar to provide a cleaner, line-focused workspace.
 
 Bug Fixes
+  - Explorer / Mode Switch & Grid View Stability
+    * Fixed a critical issue where the "Grid View" would fail to activate for the LIVE directory when entering directly from the Dashboard.
+    * Resolved a synchronization bug that caused the "Grid View" preference to be lost when switching between WAD and Local Dir modes.
+    * Fixed a navigation error that prevented the WAD tree from reloading correctly when switching back from Local Dir mode, ensuring the preferred client is always prioritized.
+    * Corrected a logic error in the tree reload process that caused the environment to incorrectly revert to PBE regardless of the active selection.
+    * Enhanced internal state management to ensure all toolbar actions and event subscriptions are correctly initialized during external navigation.
+    * Refined the file previewer to properly clear stale folder references when switching environments, preventing data desync.
   - Core / Stability & Robustness
     * Resolved a critical NullReferenceException in the directory loader that occurred when attempting to explore non-existent local download paths.
   - Explorer / Initialization Flow
