@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -91,6 +92,13 @@ namespace AssetsManager.Views.Models.Viewer
             set => SetField(ref _isVisible, value);
         }
 
+        private bool _isMeshSyncEnabled;
+        public bool IsMeshSyncEnabled
+        {
+            get => _isMeshSyncEnabled;
+            set => SetField(ref _isMeshSyncEnabled, value);
+        }
+
         private bool _areAllPartsVisible = true;
         public bool AreAllPartsVisible
         {
@@ -108,6 +116,7 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+        public event Action<ModelPart> MeshVisibilityChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
@@ -130,21 +139,20 @@ namespace AssetsManager.Views.Models.Viewer
             Animations = new ObservableRangeCollection<AnimationData>();
         }
 
-        private void Parts_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        private void Parts_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            if (e.NewItems != null)
-            {
-                foreach (ModelPart item in e.NewItems)
-                {
-                    item.PropertyChanged += Part_PropertyChanged;
-                }
-            }
-
             if (e.OldItems != null)
+                foreach (ModelPart item in e.OldItems) item.PropertyChanged -= Part_PropertyChanged;
+
+            if (e.NewItems != null)
+                foreach (ModelPart item in e.NewItems) item.PropertyChanged += Part_PropertyChanged;
+
+            if (e.Action == NotifyCollectionChangedAction.Reset)
             {
-                foreach (ModelPart item in e.OldItems)
+                foreach (var item in Parts)
                 {
                     item.PropertyChanged -= Part_PropertyChanged;
+                    item.PropertyChanged += Part_PropertyChanged;
                 }
             }
             UpdateMasterVisibility();
@@ -154,6 +162,13 @@ namespace AssetsManager.Views.Models.Viewer
         {
             if (e.PropertyName == nameof(ModelPart.IsVisible))
             {
+                if (sender is ModelPart part)
+                {
+                    if (IsMeshSyncEnabled)
+                    {
+                        MeshVisibilityChanged?.Invoke(part);
+                    }
+                }
                 UpdateMasterVisibility();
             }
         }

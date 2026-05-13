@@ -3,6 +3,10 @@ AssetsManager - League of Legends | v4.0.0.0
 MAJOR UPDATE
 
 New Features
+  - Viewer / Mesh Visibility Synchronization
+    * Implemented a brand new synchronization system for multiple chromas: when enabled, toggling a mesh part on one model automatically updates its visibility across all other loaded chromas with matching part names. This significantly improves the workflow when analyzing character variations.
+    * Integrated a safety-locking mechanism to prevent infinite event recursion during cross-model propagation.
+    * Streamlined the collection-changed logic in the 3D scene engine for optimal performance during bulk chroma loading.
   - Settings / Advanced Export Controls
     * Added "Data export target" setting: users can now choose between "Original" (RAW) and "JSON" (Smart) as the preferred format for data extraction. This provides full control over how technical files like `.bin`, `.lua`, and `.stringtable` are handled during extraction processes.
   - Explorer / Standardized Smart Save
@@ -108,6 +112,16 @@ Improvements
     * Refined the History View: unified the accent strip thickness to match the sleek design of the Asset Watcher, achieving absolute visual consistency across the monitor module.
     * Standardized Selection Behavior: improved the "Create Backup" workflow to prioritize selected items with a smart fallback system.
     * Technical Control Optimization: standardized icon-only selectors for better visual alignment across all dialogs.
+  - Explorer & Comparator / Extraction Logic Redefinition
+    * Redefined "EXTRACT" as a dedicated RAW/Crude extraction tool across all modules: it now always yields original files (preserving .bnk/.wpk integrity) regardless of global settings.
+    * Confirmed "SAVE" as the primary Smart conversion tool: it continues to force Mandatory Smart Conversion (PNG, JSON, OGG) for immediate asset utility.
+    * Improved workflow for technical users: WAD extractions now faithfully mirror the original archive structure, avoiding unwanted sub-container unpacking.
+  - Monitor / Unified HUD Badge Design
+    * Implemented a professional "Badge HUD" pattern across all monitor modules (Watcher, History, and Backups) for absolute visual consistency.
+    * Integrated high-fidelity metadata encapsulation: technical data (Version, Date, Size, Path) is now wrapped in "pills" with HoverColor background and 4px CornerRadius.
+    * Standardized Technical Iconography: unified all metadata icons to a sleek 11px size across the entire monitoring suite.
+    * Refined Typography & Clarity: upgraded all technical labels to 10px SemiBold and improved the "BACKUP" role visibility with TextSecondary for superior readability.
+    * Collaborative Refinement: credited user-led enhancements in Watcher and History modules, seamlessly integrated with the newly redesigned Backups interface.
   - Monitor / Precision Backups Redesign
     * Re-engineered the Backups view layout for a perfectly balanced horizontal distribution, matching the main navigation flow.
     * Synchronized header alignment for a seamless, flicker-free transition between Monitor modules.
@@ -229,6 +243,7 @@ Bug Fixes
     * Implemented YouTube URL Auto-Resolution: fixed a critical issue where saved YouTube tracks would expire after a few hours. The system now stores the permanent video link and automatically generates a fresh stream URI upon playback, ensuring playlists remain functional indefinitely.
     * Improved UI Reactivity: fixed an issue where the playlist library and active pack name failed to update immediately after saving or deleting a pack. The header now instantly reflects the current session state.
   - Explorer / Extraction & Tree Integrity
+    * Fixed a bug where the "EXTRACT" action incorrectly converted audio containers (.bnk/.wpk) to .ogg instead of preserving their RAW state.
     * Fixed bug in extraction folder naming and interactive log links.
     * Fixed critical bug causing duplicate file nodes in large WADs.
   - Audio / Linking & Metadata

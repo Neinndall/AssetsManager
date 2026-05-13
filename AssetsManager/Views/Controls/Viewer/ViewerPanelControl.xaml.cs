@@ -61,6 +61,25 @@ namespace AssetsManager.Views.Controls.Viewer
                 EmptyStateVisibilityChanged?.Invoke(Visibility.Visible);
             };
 
+            _viewModel.LoadedModels.CollectionChanged += (s, e) =>
+            {
+                if (e.NewItems != null)
+                {
+                    foreach (SceneModel model in e.NewItems)
+                    {
+                        model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
+                        model.MeshVisibilityChanged += HandleMeshVisibilityChanged;
+                    }
+                }
+                if (e.OldItems != null)
+                {
+                    foreach (SceneModel model in e.OldItems)
+                    {
+                        model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
+                    }
+                }
+            };
+
             _viewModel.PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(ViewerPanelModel.SelectedModel))
@@ -74,9 +93,48 @@ namespace AssetsManager.Views.Controls.Viewer
                         SyncLoadingForAllModels();
                     }
                 }
+                else if (e.PropertyName == nameof(ViewerPanelModel.IsMeshSyncEnabled))
+                {
+                    foreach (var model in _viewModel.LoadedModels)
+                    {
+                        model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
+                    }
+                }
             };
 
             Unloaded += (s, e) => Cleanup();
+        }
+
+        private void HandleMeshVisibilityChanged(ModelPart sourcePart)
+        {
+            if (!_viewModel.IsMeshSyncEnabled) return;
+
+            foreach (var model in _viewModel.LoadedModels)
+            {
+                // Find all parts with the same name (case-insensitive)
+                var targetParts = model.Parts.Where(p => string.Equals(p.Name, sourcePart.Name, StringComparison.OrdinalIgnoreCase)).ToList();
+                
+                foreach (var targetPart in targetParts)
+                {
+                    if (targetPart != sourcePart)
+                    {
+                        try
+                        {
+                            // Temporal deactivation of sync to avoid infinite recursion
+                            model.IsMeshSyncEnabled = false;
+                            targetPart.IsVisible = sourcePart.IsVisible;
+                        }
+                        catch (Exception ex)
+                        {
+                            LogService.LogError(ex, $"Failed to sync part '{targetPart.Name}' in model '{model.Name}'");
+                        }
+                        finally
+                        {
+                            model.IsMeshSyncEnabled = true;
+                        }
+                    }
+                }
+            }
         }
 
         private void SyncLoadingForAllModels()

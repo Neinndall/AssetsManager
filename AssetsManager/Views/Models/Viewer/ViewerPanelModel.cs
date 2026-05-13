@@ -23,6 +23,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isMainContentVisible = false;
         private bool _isAnimationSyncEnabled = false;
         private bool _isAnimationPlaybackSyncEnabled = false;
+        private bool _isMeshSyncEnabled = false;
         private ViewerViewportModel _viewportViewModel;
 
         // --- Data Collections ---
@@ -34,6 +35,12 @@ namespace AssetsManager.Views.Models.Viewer
 
         public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
+
+        public bool IsMeshSyncEnabled
+        {
+            get => _isMeshSyncEnabled;
+            set { if (_isMeshSyncEnabled != value) { _isMeshSyncEnabled = value; OnPropertyChanged(); } }
+        }
 
         public bool IsAnimationSyncEnabled
         {

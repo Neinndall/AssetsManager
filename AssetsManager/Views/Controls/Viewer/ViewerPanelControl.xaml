@@ -126,7 +126,35 @@
                         <!-- MESHES -->
                         <Grid x:Name="MeshesPanel"
                               Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Sync Meshes Header -->
+                            <Border Grid.Row="0" Margin="0,0,0,10" Padding="12,8" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialIcons:MaterialIcon Kind="AutoFix" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Sync Meshes" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="Sync visibility with chromas" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding IsMeshSyncEnabled, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}" VerticalAlignment="Center">
+                                        <CheckBox.LayoutTransform>
+                                            <ScaleTransform ScaleX="0.85" ScaleY="0.85"/>
+                                        </CheckBox.LayoutTransform>
+                                    </CheckBox>
+                                </Grid>
+                            </Border>
+
                             <ListBox x:Name="MeshesListBox" 
+                                     Grid.Row="1"
                                      ItemsSource="{Binding SelectedModelParts}"
                                      Background="Transparent" 
                                      BorderThickness="0"
