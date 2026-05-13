@@ -39,6 +39,10 @@ namespace AssetsManager.Services.Explorer
     /// <summary>
     /// Unified service for exporting assets to the disk.
     /// Handles both raw extraction (Original) and smart conversions (Smart).
+    /// 
+    /// Architecture Rule:
+    /// 1. Action SAVE: Performs Mandatory Smart Conversion (PNG, JSON, OGG) for immediate utility.
+    /// 2. Action EXTRACT: Performs Mandatory Original Extraction (RAW/CRUDO) to preserve data integrity.
     /// </summary>
     public class WadExportService
     {

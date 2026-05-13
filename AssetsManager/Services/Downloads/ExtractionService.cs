@@ -89,10 +89,8 @@ namespace AssetsManager.Services.Downloads
 
                     _directoriesCreator.CreateDirectory(fileDestinationDirectory);
 
-                    string extension = Path.GetExtension(node.Name).ToLower();
-
-                    // Decide mode based on type (Audio banks usually raw in this context)
-                    var mode = (extension == ".wpk" || extension == ".bnk") ? WadExportMode.Original : WadExportMode.Smart;
+                    // EXTRACT Action: Always use Original (Crude/RAW) for consistency across the system
+                    var mode = WadExportMode.Original;
 
                     await _wadExportService.ExportAsync(node, fileDestinationDirectory, mode, null, newLolPath, cancellationToken);
                 }
