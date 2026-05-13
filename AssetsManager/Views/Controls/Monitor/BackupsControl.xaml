@@ -161,12 +161,15 @@
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                                 
-                                                <!-- Version Tag -->
-                                                <Border Background="{StaticResource DarkBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="12,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Version, StringFormat='v{0}'}" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextSecondary}"/>
+                                                <!-- Version Tag (HUD Style) -->
+                                                <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="Tag" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Version, StringFormat='v{0}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
                                                 </Border>
 
-                                                <!-- MAIN/BACKUP Badge -->
+                                                <!-- MAIN/BACKUP Badge (Role Identity) -->
                                                 <Border CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center" BorderThickness="1">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
@@ -194,11 +197,11 @@
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
-                                                    <TextBlock FontSize="9" FontWeight="Black" VerticalAlignment="Center">
+                                                    <TextBlock FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Text" Value="BACKUP"/>
-                                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsMainClient}" Value="True">
                                                                         <Setter Property="Text" Value="MAIN"/>
@@ -217,19 +220,31 @@
                                                 </Border>
                                             </StackPanel>
 
-                                            <!-- Metadata Row -->
-                                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                                <!-- Date -->
-                                                <materialIcons:MaterialIcon Kind="CalendarClock" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy, HH:mm}'}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                            <!-- Metadata Row (Unified HUD Pattern) -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                <!-- 1. DATE BADGE -->
+                                                <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="CalendarClock" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy · HH:mm}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
 
-                                                <!-- Size -->
-                                                <materialIcons:MaterialIcon Kind="DatabaseOutline" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding SizeDisplay}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                                <!-- 2. SIZE BADGE -->
+                                                <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="DatabaseOutline" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding SizeDisplay}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
 
-                                                <!-- Path Info -->
-                                                <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="12" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding Path}" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                <!-- 3. PATH BADGE -->
+                                                <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Path}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
                                             </StackPanel>
                                         </StackPanel>
 
