@@ -132,7 +132,8 @@
                             </Grid.RowDefinitions>
 
                             <!-- Sync Meshes Header -->
-                            <Border Grid.Row="0" Margin="0,0,0,10" Padding="12,8" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                            <Border Grid.Row="0" Margin="0,0,0,10" Padding="12,8" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                    Visibility="{Binding SelectedModel.SourceType, Converter={StaticResource EqualityConverter}, ConverterParameter='Chroma'}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
