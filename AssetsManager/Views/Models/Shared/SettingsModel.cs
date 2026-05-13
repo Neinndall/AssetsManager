@@ -39,6 +39,12 @@ namespace AssetsManager.Views.Models.Shared
             new FormatOption<ImageExportFormat> { Name = "JPEG", Value = ImageExportFormat.Jpeg }
         };
 
+        public List<FormatOption<DataExportFormat>> DataFormatOptions { get; } = new List<FormatOption<DataExportFormat>>
+        {
+            new FormatOption<DataExportFormat> { Name = "Original", Value = DataExportFormat.Original },
+            new FormatOption<DataExportFormat> { Name = "JSON", Value = DataExportFormat.Json }
+        };
+
         public List<FormatOption<PreferredClient>> PreferredClientOptions { get; } = new List<FormatOption<PreferredClient>>
         {
             new FormatOption<PreferredClient> { Name = "PBE", Value = PreferredClient.PBE },

@@ -145,7 +145,7 @@ namespace AssetsManager.Services.Explorer
 
         #region Export Orchestration
 
-        public async Task ExportAsync(FileSystemNodeModel node, string destinationPath, WadExportMode mode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback = null)
+        public async Task ExportAsync(FileSystemNodeModel node, string destinationPath, WadExportMode mode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback = null, bool forceSmart = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -166,7 +166,7 @@ namespace AssetsManager.Services.Explorer
                 foreach (var child in node.Children)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await ExportAsync(child, currentDestinationPath, mode, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
+                    await ExportAsync(child, currentDestinationPath, mode, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback, forceSmart);
                 }
                 return;
             }
@@ -189,10 +189,10 @@ namespace AssetsManager.Services.Explorer
             }
 
             // 3. Single File Handling
-            await ExportSingleAsync(node, destinationPath, mode, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
+            await ExportSingleAsync(node, destinationPath, mode, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback, forceSmart);
         }
 
-        private async Task ExportSingleAsync(FileSystemNodeModel node, string destinationPath, WadExportMode mode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task ExportSingleAsync(FileSystemNodeModel node, string destinationPath, WadExportMode mode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
         {
             if (mode == WadExportMode.Original)
             {
@@ -214,21 +214,23 @@ namespace AssetsManager.Services.Explorer
 
                 case ".tex":
                 case ".dds":
-                    await HandleTextureFile(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    await HandleTextureFile(node, destinationPath, cancellationToken, onFileSavedCallback, forceSmart);
                     break;
 
                 case ".bin":
                 case ".stringtable":
                 case ".css":
-                    await HandleDataFile(node, destinationPath, extension.TrimStart('.'), cancellationToken, onFileSavedCallback);
+                case ".troybin":
+                case ".preload":
+                    await HandleDataFile(node, destinationPath, extension.TrimStart('.'), cancellationToken, onFileSavedCallback, forceSmart);
                     break;
 
                 case ".luabin64":
-                    await HandleLuaFile(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    await HandleLuaFile(node, destinationPath, cancellationToken, onFileSavedCallback, forceSmart);
                     break;
 
                 case ".js":
-                    await HandleJsFile(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    await HandleJsFile(node, destinationPath, cancellationToken, onFileSavedCallback, forceSmart);
                     break;
 
                 case ".wem":
@@ -273,9 +275,15 @@ namespace AssetsManager.Services.Explorer
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
         {
-            if (_appSettings.ImageExportFormat == ImageExportFormat.Original)
+            var format = _appSettings.ImageExportFormat;
+            if (forceSmart && format == ImageExportFormat.Original)
+            {
+                format = ImageExportFormat.Png; // Default to PNG when forcing smart
+            }
+
+            if (format == ImageExportFormat.Original)
             {
                 await HandleRawFileExtractionAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                 return;
@@ -289,13 +297,19 @@ namespace AssetsManager.Services.Explorer
                 var bitmapSource = TextureUtils.LoadTexture(memoryStream, Path.GetExtension(node.Name));
                 if (bitmapSource != null)
                 {
-                    TextureUtils.SaveBitmapSourceAsImage(bitmapSource, node.Name, destinationPath, _appSettings.ImageExportFormat, onFileSavedCallback);
+                    TextureUtils.SaveBitmapSourceAsImage(bitmapSource, node.Name, destinationPath, format, onFileSavedCallback);
                 }
             }
         }
 
-        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
         {
+            if (!forceSmart && _appSettings.DataExportFormat == DataExportFormat.Original)
+            {
+                await HandleRawFileExtractionAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                return;
+            }
+
             var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
@@ -307,8 +321,14 @@ namespace AssetsManager.Services.Explorer
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
         {
+            if (!forceSmart && _appSettings.DataExportFormat == DataExportFormat.Original)
+            {
+                await HandleRawFileExtractionAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                return;
+            }
+
             var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
@@ -319,8 +339,14 @@ namespace AssetsManager.Services.Explorer
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleLuaFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleLuaFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
         {
+            if (!forceSmart && _appSettings.DataExportFormat == DataExportFormat.Original)
+            {
+                await HandleRawFileExtractionAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                return;
+            }
+
             var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 

@@ -20,6 +20,12 @@ namespace AssetsManager.Views.Models.Settings
         Jpeg
     }
 
+    public enum DataExportFormat
+    {
+        Original,
+        Json
+    }
+
     public enum PreferredClient
     {
         PBE,

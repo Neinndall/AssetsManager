@@ -3,6 +3,11 @@ AssetsManager - League of Legends | v4.0.0.0
 MAJOR UPDATE
 
 New Features
+  - Settings / Advanced Export Controls
+    * Added "Data export target" setting: users can now choose between "Original" (RAW) and "JSON" (Smart) as the preferred format for data extraction. This provides full control over how technical files like `.bin`, `.lua`, and `.stringtable` are handled during extraction processes.
+  - Explorer / Standardized Smart Save
+    * Enforced Universal Smart Save: the "Save" action now consistently performs high-fidelity conversions regardless of user settings. Images are always saved as `.png` and data files as `.json` (including `.bin`, `.luabin64`, `.preload`, `.troybin`, etc.), ensuring all manual saves are immediately usable and professional.
+    * Expanded Data Support: added automated JSON conversion for `.preload` and `.troybin` files during Save and Smart Extract operations.
   - Explorer / Lua Decompilation Support
     * Added full support for `.luabin64` files: the system now automatically decompiles and formats Lua 5.1 bytecode into readable source code.
     * Integrated Automated Smart Save: when using the "Save" command, `.luabin64` files are now automatically decompiled and exported as `.json` data files, streamlining the asset extraction workflow and maintaining consistency with other data formats.
@@ -30,6 +35,9 @@ New Features
     * Added "Filter Only" Rapid Isolation (Right-Click): right-clicking on any INSIGHTS badge (Insertions, Deletions, or Modifications) now instantly isolates only that type of change, disabling all other filters for a lightning-fast analysis.
 
 Improvements
+  - Settings / Refined Export UI
+    * Simplified Export Labels: updated the "PREFERRED PROTOCOLS" section to clearly distinguish between Texture and Data export targets, focusing exclusively on their impact during manual and automated extraction.
+    * Optimized Description Layout: clarified that extraction settings only govern the "Extract" action and automated downloads, while the "Save" action remains standardized for user convenience.
   - Home / Professional Launcher Dashboard
     * Unified Core Workspace: merged Environments and Analysis Suite into a single "CORE SYSTEMS" section with a cohesive 3x2 grid layout.
     * Refined Information Layout: added detailed functional descriptions and professional category headers (TOOLS, STATUS, STUDIO) to all 6 core modules.
@@ -184,6 +192,10 @@ Changes
     * Removed the JSON path breadcrumb and copy button from the bottom bar to provide a cleaner, line-focused workspace.
 
 Bug Fixes
+  - Explorer / Extraction Fidelity
+    * Fixed a critical issue where data assets were being extracted in RAW format during automated patch downloads. The system now correctly respects the "Data export target" setting, ensuring files are converted to JSON when requested.
+  - Core / Build & Logic Stability
+    * Resolved a syntax error in the configuration engine that prevented application builds after adding new export protocols.
   - Explorer / Mode Switch & Grid View Stability
     * Fixed a critical issue where the "Grid View" would fail to activate for the LIVE directory when entering directly from the Dashboard.
     * Resolved a synchronization bug that caused the "Grid View" preference to be lost when switching between WAD and Local Dir modes.

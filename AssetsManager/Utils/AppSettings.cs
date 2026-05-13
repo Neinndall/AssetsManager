@@ -40,6 +40,7 @@ namespace AssetsManager.Utils
         public Dictionary<string, long> HashesSizes { get; set; }
         public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
         public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Original;
+        public DataExportFormat DataExportFormat { get; set; } = DataExportFormat.Original;
 
         // New structure for monitored assets (Local WADs/Plugins)
         public List<MonitoredAsset> MonitoredAssets { get; set; }
@@ -146,6 +147,7 @@ namespace AssetsManager.Utils
                 CustomFloorTexturePath = null,
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
+                DataExportFormat = DataExportFormat.Original,
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
                 PreferredClient = PreferredClient.PBE,

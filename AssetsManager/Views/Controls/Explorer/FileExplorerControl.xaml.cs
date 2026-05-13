@@ -569,8 +569,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     // Show immediate activity
                     ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", 0));
 
-                    // Calculate total files for accurate progress (Original Mode)
-                    int totalFiles = await WadExportService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, WadExportMode.Original, cancellationToken);
+                    // Calculate total files for accurate progress (Smart Mode)
+                    int totalFiles = await WadExportService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, WadExportMode.Smart, cancellationToken);
                     
                     // Update with real total
                     ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", totalFiles));
@@ -580,11 +580,11 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         
-                        await WadExportService.ExportAsync(node, destinationPath, WadExportMode.Original, _viewModel.RootNodes, _currentRootPath, cancellationToken, (fileName) => 
+                        await WadExportService.ExportAsync(node, destinationPath, WadExportMode.Smart, _viewModel.RootNodes, _currentRootPath, cancellationToken, (fileName) => 
                         {
                             processedCount++;
                             ProgressUIManager?.OnExtractionProgressChanged(processedCount, totalFiles, Path.GetFileName(fileName));
-                        });
+                        }, false); // forceSmart: false -> respects settings
                     }
 
                     if (selectedNodes.Count == 1)
@@ -693,7 +693,7 @@ namespace AssetsManager.Views.Controls.Explorer
                             processedCount++;
                             ProgressUIManager?.OnSavingProgressChanged(processedCount, totalFiles, Path.GetFileName(path));
                             savedFiles.Add(path);
-                        });
+                        }, true); // forceSmart: true -> always converts (ignores Original setting)
 
                         if (selectedNodes.Count == 1 && savedFiles.Count > 0)
                         {
