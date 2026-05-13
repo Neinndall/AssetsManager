@@ -161,20 +161,11 @@
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                                 
-                                                <!-- Version Tag (HUD Style) -->
-                                                <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="12,0,0,0" VerticalAlignment="Center">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <materialIcons:MaterialIcon Kind="Tag" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding Version, StringFormat='v{0}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </Border>
-
-                                                <!-- MAIN/BACKUP Badge (Role Identity) -->
-                                                <Border CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center" BorderThickness="1">
+                                                <!-- MAIN/BACKUP Badge (Role Identity - Master Level) -->
+                                                <Border CornerRadius="4" Padding="6,2" Margin="12,0,0,0" VerticalAlignment="Center">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                                                            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
                                                             <Style.Triggers>
                                                                 <MultiDataTrigger>
                                                                     <MultiDataTrigger.Conditions>
@@ -182,8 +173,6 @@
                                                                         <Condition Binding="{Binding IsPbe}" Value="True"/>
                                                                     </MultiDataTrigger.Conditions>
                                                                     <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                                                                    <Setter Property="BorderBrush" Value="Transparent"/>
-                                                                    <Setter Property="BorderThickness" Value="0"/>
                                                                 </MultiDataTrigger>
                                                                 <MultiDataTrigger>
                                                                     <MultiDataTrigger.Conditions>
@@ -191,8 +180,6 @@
                                                                         <Condition Binding="{Binding IsPbe}" Value="False"/>
                                                                     </MultiDataTrigger.Conditions>
                                                                     <Setter Property="Background" Value="{StaticResource AccentGreen}"/>
-                                                                    <Setter Property="BorderBrush" Value="Transparent"/>
-                                                                    <Setter Property="BorderThickness" Value="0"/>
                                                                 </MultiDataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
@@ -222,7 +209,15 @@
 
                                             <!-- Metadata Row (Unified HUD Pattern) -->
                                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                                <!-- 1. DATE BADGE -->
+                                                <!-- 1. VERSION BADGE -->
+                                                <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="Tag" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Version, StringFormat='v{0}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- 2. DATE BADGE -->
                                                 <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                         <materialIcons:MaterialIcon Kind="CalendarClock" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
@@ -230,7 +225,7 @@
                                                     </StackPanel>
                                                 </Border>
 
-                                                <!-- 2. SIZE BADGE -->
+                                                <!-- 3. SIZE BADGE -->
                                                 <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                         <materialIcons:MaterialIcon Kind="DatabaseOutline" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
@@ -238,7 +233,7 @@
                                                     </StackPanel>
                                                 </Border>
 
-                                                <!-- 3. PATH BADGE -->
+                                                <!-- 4. PATH BADGE -->
                                                 <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                         <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
