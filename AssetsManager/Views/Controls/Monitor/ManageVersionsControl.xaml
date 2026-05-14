@@ -204,7 +204,7 @@
                                                     <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
-                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Margin="0,0,6,0" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         </Grid>
                                     </Grid>
                                     <ControlTemplate.Triggers>
@@ -266,7 +266,7 @@
                                                     <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
-                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" Margin="0,0,6,0" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         </Grid>
                                     </Grid>
                                     <ControlTemplate.Triggers>
