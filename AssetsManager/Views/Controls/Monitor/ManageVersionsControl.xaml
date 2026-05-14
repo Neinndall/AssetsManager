@@ -62,21 +62,21 @@
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="Refresh" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                     <TextBlock Text="Fetch Versions" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Refresh manifests" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock Text="Refresh manifests" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Click="GetLeagueClient_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="DesktopClassic" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                     <TextBlock Text="Get Client" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Download specific ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock Text="Download specific ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Click="GetLoLGameClient_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                     <TextBlock Text="Get Game" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Download game ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock Text="Download game ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Click="DeleteSelectedVersions_Click" Style="{StaticResource DestructiveSelectionCardButtonStyle}" Margin="6,0,0,0" Height="86" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
@@ -85,7 +85,7 @@
                     <StackPanel VerticalAlignment="Center">
                         <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="24" Height="24" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                         <TextBlock Text="Delete Selected" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource AccentRed}"/>
-                        <TextBlock Text="Remove from disk" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                        <TextBlock Text="Remove from disk" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Button>
@@ -195,7 +195,7 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
-                                                <materialIcons:MaterialIcon Kind="DesktopClassic" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <materialIcons:MaterialIcon Kind="DesktopClassic" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
@@ -257,7 +257,7 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
-                                                <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="20" Height="20" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
@@ -285,6 +285,9 @@
                     </Style>
                 </ListView.ItemContainerStyle>
             </ListView>
+        </Grid>
+    </Grid>
+</UserControl>           </ListView>
         </Grid>
     </Grid>
 </UserControl>

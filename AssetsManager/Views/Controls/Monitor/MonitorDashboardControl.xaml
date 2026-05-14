@@ -32,8 +32,8 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Module Icon Spanning both lines -->
-                    <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="10" Width="48" Height="48" Margin="0,0,16,0">
-                        <materialIcons:MaterialIcon Kind="MonitorDashboard" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="MonitorDashboard" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
                     <!-- Titles Stacked to the right of the icon -->

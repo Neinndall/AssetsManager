@@ -76,9 +76,9 @@
                 <Grid>
                     <Border Background="{StaticResource AccentRed}" Opacity="0.05" CornerRadius="12"/>
                     <StackPanel VerticalAlignment="Center">
-                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="22" Height="22" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="24" Height="24" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                         <TextBlock Text="Clear All" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Reset list" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                        <TextBlock Text="Reset list" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Button>

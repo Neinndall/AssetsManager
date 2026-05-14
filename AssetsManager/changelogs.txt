@@ -39,6 +39,11 @@ New Features
     * Added "Filter Only" Rapid Isolation (Right-Click): right-clicking on any INSIGHTS badge (Insertions, Deletions, or Modifications) now instantly isolates only that type of change, disabling all other filters for a lightning-fast analysis.
 
 Improvements
+  - Monitor / Backups & Versions Refinement
+    * Streamlined Backup Cards: significantly reduced the footprint of list items by optimizing icon sizes (42px) and internal padding, achieving a more compact and professional grid feel.
+    * Standardized Hero Header Alignment: refined the "Backups Repository" header to perfectly match the Tracker and Versions views, ensuring absolute pixel-perfect consistency in iconography (44px box) and typographic margins.
+    * Unified Selection Feedback: synchronized the visual standards across the Monitor module by enforcing a consistent 2px accent strip and 1.5px selection border thickness.
+    * Improved Content Balance: optimized the global workspace margins to complement the new compact layout, providing a more symmetrical and polished user experience.
   - Settings / Refined Export UI
     * Simplified Export Labels: updated the "PREFERRED PROTOCOLS" section to clearly distinguish between Texture and Data export targets, focusing exclusively on their impact during manual and automated extraction.
     * Optimized Description Layout: clarified that extraction settings only govern the "Extract" action and automated downloads, while the "Save" action remains standardized for user convenience.

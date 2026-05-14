@@ -103,7 +103,7 @@
 
         <!-- 2. CONTENT AREA -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="32,0,32,32">
+            <Grid Margin="32,0,32,24">
                 <monitorControls:MonitorDashboardControl x:Name="MonitorDashboardControl">
                     <monitorControls:MonitorDashboardControl.Style>
                         <Style TargetType="UserControl">

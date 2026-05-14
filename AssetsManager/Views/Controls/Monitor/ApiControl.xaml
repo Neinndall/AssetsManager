@@ -39,8 +39,8 @@
                     <!-- Content -->
                     <Grid Grid.Column="1" VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
+                            <Grid.ColumnDefinition Width="Auto"/>
+                            <Grid.ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         
                         <!-- Texts -->
@@ -61,13 +61,13 @@
             <!-- 1.2 MAIN HEADER: Info Card & Connect -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>    <!-- Info Card -->
-                    <ColumnDefinition Width="Auto"/> <!-- Connect Button -->
-                    <ColumnDefinition Width="Auto"/> <!-- Action Buttons -->
+                    <Definition Width="*"/>    <!-- Info Card -->
+                    <Definition Width="Auto"/> <!-- Connect Button -->
+                    <Definition Width="Auto"/> <!-- Action Buttons -->
                 </Grid.ColumnDefinitions>
 
                 <!-- LEFT: LCU Info Card -->
-                <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0" Height="90">
+                <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0" Height="90">
                     <Grid VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/> <!-- Icon -->
@@ -96,184 +96,198 @@
                             </materialIcons:MaterialIcon>
                         </Border>
 
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,2,16,0">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="LCU SERVICE" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                            <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{Binding StatusColor}" Margin="-2,1,0,0"/>
-                            <StackPanel Orientation="Horizontal" Margin="-2,1,0,0">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsAuthenticated}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                <TextBlock Text="{Binding SummonerIdText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
-                                <TextBlock Text=" • " FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="4,0"/>
-                                <TextBlock Text="{Binding RegionText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                        </StackPanel>
+
+                        <!-- Profile/Connection Metrics (Right Aligned) -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <!-- Display Name -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,24,0">
+                                <materialIcons:MaterialIcon Kind="AccountCircle" Width="14" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center" Opacity="0.8"/>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="Black" Foreground="{StaticResource TextPrimary}" LineHeight="13"/>
+                                    <TextBlock Text="USER IDENTITY" FontSize="8" FontWeight="Black" Foreground="{StaticResource TextMuted}" Opacity="0.7"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Region -->
+                            <StackPanel Orientation="Horizontal">
+                                <materialIcons:MaterialIcon Kind="Earth" Width="14" Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0" VerticalAlignment="Center" Opacity="0.8"/>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Region}" FontSize="13" FontWeight="Black" Foreground="{StaticResource TextPrimary}" LineHeight="13"/>
+                                    <TextBlock Text="SERVER REGION" FontSize="8" FontWeight="Black" Foreground="{StaticResource TextMuted}" Opacity="0.7"/>
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
                     </Grid>
                 </Border>
 
-                <!-- CENTER: Connect Button Card -->
-                <Button Grid.Column="1" Click="ConnectButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                <!-- MIDDLE: Connect Button -->
+                <Button Grid.Column="1" Click="ConnectLcu_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,6,0" Width="140" Height="90" Padding="0">
                     <StackPanel VerticalAlignment="Center">
                         <materialIcons:MaterialIcon Kind="Link" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding ButtonContent}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Connect client" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Connect LCU" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Link local client" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
 
-                <!-- RIGHT: Action Buttons -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Sales -->
-                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabSales, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Button Click="RequestsSales_Click" IsEnabled="{Binding IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
-                            <StackPanel VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="Refresh" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                                <TextBlock Text="Fetch Sales" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Get skin offers" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Click="SaveButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0" Width="140" Height="90" Padding="0">
-                            <StackPanel VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="ImageOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                                <TextBlock Text="Export PNG" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Save image" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
+                <!-- RIGHT: Action Buttons (Uniform Grid for fixed sizing) -->
+                <UniformGrid Grid.Column="2" Columns="6" Visibility="{Binding IsConnected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Button Click="SyncLiveCatalog_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="90" Padding="0">
+                        <StackPanel VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="Refresh" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                            <TextBlock Text="Sync Sales" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Refresh offers" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
 
-                    <!-- Mythic -->
-                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabMythic, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Button Click="RequestsMythicShop_Click" IsEnabled="{Binding IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
-                            <StackPanel VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="AutoFix" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                                <TextBlock Text="Fetch Mythic" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Get rare loot" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Click="SaveMythicShopButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0" Width="140" Height="90" Padding="0">
-                            <StackPanel VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="CameraBurst" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                                <TextBlock Text="Export PNG" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Save image" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
+                    <Button Click="SyncMythicShop_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="90" Padding="0">
+                        <StackPanel VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="ImageOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                            <TextBlock Text="Mythic Shop" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="View rare items" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
 
-                    <!-- Pass Rewards -->
-                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabPass, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Button Click="RequestsPassRewards_Click" IsEnabled="{Binding IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
-                            <StackPanel VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="TicketOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                                <TextBlock Text="Fetch Pass" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Get rewards" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Click="SavePassRewardsButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0" Width="140" Height="90" Padding="0">
-                            <StackPanel VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FileImageOutline" Width="24" Height="24" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                                <TextBlock Text="Export PNG" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Save image" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </StackPanel>
+                    <Button Click="SyncPassRewards_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,0,0" Height="90" Padding="0">
+                        <StackPanel VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="AutoFix" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                            <TextBlock Text="Pass Rewards" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Track progress" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </UniformGrid>
             </Grid>
         </Grid>
 
-        <!-- 2. TABS & PAGINATION -->
-        <Grid Grid.Row="1" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
-                <StackPanel Orientation="Horizontal">
-                    <RadioButton x:Name="TabSales" Content="Sales" Click="TabSales_Click" IsChecked="True" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
-                    <RadioButton x:Name="TabMythic" Content="Mythic Shop" Click="TabMythic_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
-                    <RadioButton x:Name="TabPass" Content="Pass Rewards" Click="TabPass_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
-                </StackPanel>
-            </Border>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <StackPanel.Style>
-                    <Style TargetType="StackPanel">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                        <Style.Triggers>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding IsChecked, ElementName=TabSales}" Value="True"/>
-                                    <Condition Binding="{Binding Paginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}" Value="Visible"/>
-                                </MultiDataTrigger.Conditions>
-                                <Setter Property="Visibility" Value="Visible"/>
-                            </MultiDataTrigger>
-                            <DataTrigger Binding="{Binding Paginator.TotalPages}" Value="1">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </StackPanel.Style>
-                <Button Style="{StaticResource TransparentIconButton}" Click="PreviousPage_Click" IsEnabled="{Binding Paginator.CanGoToPreviousPage}">
-                    <materialIcons:MaterialIcon Kind="ChevronLeft"/>
-                </Button>
-                <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="12,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                    <TextBlock Text="{Binding Paginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                </Border>
-                <Button Style="{StaticResource TransparentIconButton}" Click="NextPage_Click" IsEnabled="{Binding Paginator.CanGoToNextPage}">
-                    <materialIcons:MaterialIcon Kind="ChevronRight"/>
-                </Button>
+        <!-- 2. TAB SELECTOR -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,12" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="TabSales" Content="Sales &amp; Offers" IsChecked="True" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="160"/>
+                <RadioButton x:Name="TabMythic" Content="Mythic Shop" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="160"/>
+                <RadioButton x:Name="TabPass" Content="Pass Rewards" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="160"/>
             </StackPanel>
-        </Grid>
+        </Border>
 
         <!-- 3. CONTENT AREA -->
-        <TabControl x:Name="MainTabControl" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="0">
-            <TabControl.ItemContainerStyle>
-                <Style TargetType="TabItem">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                </Style>
-            </TabControl.ItemContainerStyle>
-            <TabItem>
-                <ItemsControl x:Name="SalesItemsControl" ItemsSource="{Binding SalesCatalog}" ItemTemplate="{StaticResource StoreItemTemplate}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Columns="4"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
-            </TabItem>
-            <TabItem>
-                <ItemsControl x:Name="MythicShopCategoriesItemsControl" ItemsSource="{Binding MythicShopCategories}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="0,0,0,24">
-                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Left" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                    <TextBlock Text="{Binding CategoryName}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+        <Grid Grid.Row="2">
+            <!-- 3.1 SALES & OFFERS -->
+            <ListView x:Name="SalesListView" ItemsSource="{Binding ActiveSales}" Style="{StaticResource ModernListView}" Background="Transparent" BorderThickness="0"
+                      Visibility="{Binding IsChecked, ElementName=TabSales, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- DataTemplate shared with Mythic via ItemTemplate -->
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,0,0,6">
+                            <Border Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                            <Border BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentBrush}" CornerRadius="10,0,0,10"/>
+                            <Grid Margin="16,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,16,0">
+                                    <materialIcons:MaterialIcon Kind="ShoppingOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
-                                <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource MythicItemTemplate}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <UniformGrid Columns="4"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="{Binding Description}" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                    <TextBlock Text="{Binding PriceDisplay}" FontWeight="Black" FontSize="14" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Right"/>
+                                    <TextBlock Text="CURRENT OFFER" FontSize="8" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- 3.2 MYTHIC SHOP -->
+            <ListView x:Name="MythicListView" ItemsSource="{Binding MythicItems}" Style="{StaticResource ModernListView}" Background="Transparent" BorderThickness="0"
+                      Visibility="{Binding IsChecked, ElementName=TabMythic, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,0,0,6">
+                            <Border Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                            <Border BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentPurple}" CornerRadius="10,0,0,10"/>
+                            <Grid Margin="16,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,16,0">
+                                    <materialIcons:MaterialIcon Kind="StarCircleOutline" Width="20" Height="20" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Mythic Content" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                    <TextBlock Text="{Binding EssencePrice}" FontWeight="Black" FontSize="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Right"/>
+                                    <TextBlock Text="MYTHIC ESSENCE" FontSize="8" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- 3.3 PASS REWARDS (Grouped) -->
+            <ListView x:Name="PassListView" ItemsSource="{Binding PassGroups}" Style="{StaticResource ModernListView}" Background="Transparent" BorderThickness="0"
+                      Visibility="{Binding IsChecked, ElementName=TabPass, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,0,0,12">
+                            <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                            <Grid Margin="20,16">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                                    <Border Width="36" Height="36" CornerRadius="10" Background="{StaticResource HoverColor}">
+                                        <materialIcons:MaterialIcon Kind="TrophyOutline" Width="20" Height="20" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <TextBlock Text="{Binding GroupName}" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="{Binding GroupInfo}" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <ItemsControl Grid.Row="1" ItemsSource="{Binding Rewards}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Margin="0,0,0,4" Padding="12,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Grid.Column="0" Width="32" Height="32" CornerRadius="4" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
+                                                        <materialIcons:MaterialIcon Kind="GiftOutline" Width="16" Height="16" Foreground="{StaticResource AccentTeal}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding RewardName}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                                        <TextBlock Text="{Binding RewardType}" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                    </StackPanel>
+                                                    <Border Grid.Column="2" Background="{StaticResource CardBackground}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding MilestoneText}" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </TabItem>
-            <TabItem>
-                <ItemsControl x:Name="PassRewardsItemsControl" ItemsSource="{Binding PassRewards}" ItemTemplate="{StaticResource PassRewardTemplate}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Columns="5"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                </ItemsControl>
-            </TabItem>
-        </TabControl>
+                            </Grid>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
     </Grid>
 </UserControl>
