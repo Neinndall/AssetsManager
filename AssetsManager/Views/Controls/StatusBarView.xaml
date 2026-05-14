@@ -7,73 +7,70 @@
              mc:Ignorable="d" 
              d:DesignHeight="32" d:DesignWidth="1000">
 
-    <Border Background="{StaticResource SidebarBackground}" 
+    <Border x:Name="MainStatusBarBorder"
+            Background="{StaticResource SidebarBackground}" 
             BorderBrush="{StaticResource BorderColor}" 
+            BorderThickness="0,1,0,0"
             Height="32"
             Padding="16,0"
-            CornerRadius="0,0,11,0">
+            VerticalAlignment="Bottom">
         <Border.Style>
             <Style TargetType="Border">
                 <Setter Property="Visibility" Value="Visible"/>
-                <Setter Property="BorderThickness" Value="0,1,0,0"/>
                 <Style.Triggers>
-                    <!-- Hide if no Status Text is present -->
                     <DataTrigger Binding="{Binding StatusText}" Value="">
                         <Setter Property="Visibility" Value="Collapsed"/>
-                        <Setter Property="BorderThickness" Value="0"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
         </Border.Style>
+        
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+            <!-- NEON STATUS LINE (Dynamic Color via BorderBrush) -->
+            <ContentControl x:Name="StatusLine" VerticalAlignment="Top" Margin="-16,-1,-16,0" HorizontalAlignment="Stretch">
+                <ContentControl.Style>
+                    <Style TargetType="ContentControl" BasedOn="{StaticResource TechnicalScanStyle}">
+                        <Style.Triggers>
+                            <!-- 1. VISIBILITY: Show during progress or cancellation -->
+                            <DataTrigger Binding="{Binding ProgressPercentage, Converter={StaticResource NullToVisibilityConverter}}" Value="Visible">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                            
+                            <!-- 2. COLOR & VISIBILITY: Cancellation states -->
+                            <DataTrigger Binding="{Binding StatusText}" Value="Cancelling Task...">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Setter Property="BorderBrush" Value="Orange"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding StatusText}" Value="Cancelling tree building...">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Setter Property="BorderBrush" Value="Orange"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ContentControl.Style>
+            </ContentControl>
 
-            <!-- Left Side: Ready, Status Text & Notifications -->
-            <Grid Grid.Column="0" VerticalAlignment="Center">
+            <Grid VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/> <!-- Status Icon -->
+                    <ColumnDefinition Width="*"/>    <!-- Status Text -->
+                    <ColumnDefinition Width="Auto"/> <!-- Progress -->
                 </Grid.ColumnDefinitions>
 
-                <!-- 1. Status Icon (First) -->
-                <materialIcons:MaterialIcon Grid.Column="0" x:Name="ReadyIcon" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center">
+                <materialIcons:MaterialIcon Grid.Column="0" Width="14" Height="14" Margin="0,0,10,0" VerticalAlignment="Center">
                     <materialIcons:MaterialIcon.Style>
                         <Style TargetType="materialIcons:MaterialIcon">
-                            <!-- Default: Info (Blue) -->
                             <Setter Property="Kind" Value="InformationOutline"/>
                             <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
-                            <Setter Property="Visibility" Value="Visible"/>
-                            
                             <Style.Triggers>
-                                <!-- No Text -> Hide Icon -->
-                                <DataTrigger Binding="{Binding StatusText}" Value="">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-
-                                <!-- Success States -->
                                 <DataTrigger Binding="{Binding StatusText}" Value="Ready">
                                     <Setter Property="Kind" Value="CheckCircleOutline"/>
                                     <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding StatusText}" Value="Comparison Completed">
-                                    <Setter Property="Kind" Value="CheckCircleOutline"/>
-                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                <DataTrigger Binding="{Binding ProgressPercentage, Converter={StaticResource NullToVisibilityConverter}}" Value="Visible">
+                                    <Setter Property="Kind" Value="ProgressClock"/>
+                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding StatusText}" Value="Success">
-                                    <Setter Property="Kind" Value="CheckCircleOutline"/>
-                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
-                                </DataTrigger>
-
-                                <!-- Processing State (When Progress Spinner is Visible) -->
-                                <DataTrigger Binding="{Binding Visibility, ElementName=ProgressSummaryButton}" Value="Visible">
-                                    <Setter Property="Kind" Value="AlertCircleOutline"/>
-                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
-                                </DataTrigger>
-
-                                <!-- Warning/Cancelling States -->
                                 <DataTrigger Binding="{Binding StatusText}" Value="Cancelling Task...">
                                     <Setter Property="Kind" Value="AlertCircleOutline"/>
                                     <Setter Property="Foreground" Value="Orange"/>
@@ -87,53 +84,35 @@
                     </materialIcons:MaterialIcon.Style>
                 </materialIcons:MaterialIcon>
 
-                <!-- 2. Status Text (Right margin of 50px ensures spacing from progress indicators) -->
-                <TextBlock Grid.Column="1" x:Name="StatusTextBlock" 
+                <TextBlock Grid.Column="1" 
                            Text="{Binding StatusText}" 
                            FontSize="11" 
                            Foreground="{StaticResource TextSecondary}" 
-                           Margin="0,0,50,0" 
                            VerticalAlignment="Center" 
-                           TextTrimming="CharacterEllipsis">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Visible"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding StatusText}" Value="">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </Grid>
+                           TextTrimming="CharacterEllipsis"
+                           FontWeight="Medium"/>
 
-            <!-- Right Side: Progress Indicator -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
-                <Button x:Name="ProgressSummaryButton"
+                <Button Grid.Column="2"
+                        x:Name="ProgressSummaryButton"
                         Style="{StaticResource TransparentIconButton}"
                         Visibility="{Binding ProgressPercentage, Converter={StaticResource NullToVisibilityConverter}}"
-                        Padding="4,0"
+                        Padding="8,0,0,0"
                         VerticalAlignment="Center"
                         Click="ProgressSummaryButton_Click">
                     <Button.ToolTip>
                         <ToolTip Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}">
-                            <TextBlock Text="Click to see more details" Foreground="{StaticResource TextPrimary}" FontSize="12"/>
+                            <TextBlock Text="View detailed progress" Foreground="{StaticResource TextPrimary}" FontSize="11"/>
                         </ToolTip>
                     </Button.ToolTip>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock x:Name="ProgressPercentageTextBlock" 
-                                   Text="{Binding ProgressPercentage}" 
+                        <TextBlock Text="{Binding ProgressPercentage}" 
                                    FontSize="11" 
                                    Foreground="{StaticResource AccentBrush}" 
                                    Margin="0,0,8,0" 
                                    VerticalAlignment="Center" 
                                    FontWeight="SemiBold"/>
                         
-                        <materialIcons:MaterialIcon x:Name="ProgressIcon" Kind="Sync"
-                                                    Width="16" Height="16"
-                                                    Foreground="{StaticResource AccentBrush}"
-                                                    VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Sync" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center">
                             <materialIcons:MaterialIcon.Style>
                                 <Style TargetType="materialIcons:MaterialIcon">
                                     <Style.Triggers>
@@ -154,7 +133,7 @@
                         </materialIcons:MaterialIcon>
                     </StackPanel>
                 </Button>
-            </StackPanel>
+            </Grid>
         </Grid>
     </Border>
 </UserControl>
