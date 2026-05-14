@@ -37,8 +37,19 @@ New Features
     * Introduced Granular Filter Controls: added a new "FILTERS" section in the toolbar allowing users to independently toggle the visibility of Insertions (+), Deletions (-), and Modifications (Edit).
     * Implemented Intelligent Filter Activation: clicking any granular filter now automatically activates the "Hide Unchanged Lines" mode, providing an instant focused view of the selected change types.
     * Added "Filter Only" Rapid Isolation (Right-Click): right-clicking on any INSIGHTS badge (Insertions, Deletions, or Modifications) now instantly isolates only that type of change, disabling all other filters for a lightning-fast analysis.
+  - User Interface / Dynamic Neon HUD
+    * Implemented a brand new "Neon Glow Strip" in the StatusBar: a sophisticated visual feedback system that adds a 1.5px glowing line at the top of the bar.
+    * Integrated Dynamic Color Synchronization: the neon line now automatically switches between the brand's AccentBrush (Blue) for active operations and Orange for cancellation states, providing intuitive status awareness.
+    * Developed the "Neon Scan" Animation: a hardware-accelerated (GPU) light-sweep effect that provides a living, professional feel while maintaining zero impact on system performance.
+    * Advanced HUD Logic: the neon strip is strictly bound to active tasks, automatically hiding when the application returns to a 'Ready' state for a clean and focused workspace.
 
 Improvements
+  - Monitor / Module Metric Unification
+    * Perfected Hero Header Alignment: standardized the padding (20,14), internal margins, and icon sizes (24x24) across the entire Monitor suite (Dashboard, API Center, Versions, Backups).
+    * Unified Selection Rhythm: synchronized the "Tick" selection indicator position to an 18px horizontal bleed across all lists, achieving absolute visual harmony.
+    * Typographic Standardization: enforced the project's '13/10' button hierarchy (Title/Description) across the API Center for a consistent reading experience.
+  - Architecture / Centralized Animation Engine
+    * Re-engineered HUD animations into a centralized TechnicalScanStyle using a robust ControlTemplate architecture. This prevents "Immutable Object" exceptions and ensures seamless, crash-free UI transitions.
   - Monitor / Backups & Versions Refinement
     * Streamlined Backup Cards: significantly reduced the footprint of list items by optimizing icon sizes (42px) and internal padding, achieving a more compact and professional grid feel.
     * Standardized Hero Header Alignment: refined the "Backups Repository" header to perfectly match the Tracker and Versions views, ensuring absolute pixel-perfect consistency in iconography (44px box) and typographic margins.

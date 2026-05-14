@@ -140,6 +140,50 @@
         </DoubleAnimation>
     </Storyboard>
 
+    <!-- Global style for the animated status line sweep (v4 Premium) -->
+    <Style x:Key="TechnicalScanStyle" TargetType="ContentControl">
+        <Setter Property="Visibility" Value="Collapsed"/>
+        <Setter Property="Height" Value="1.5"/>
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/> <!-- Use project brand color -->
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContentControl">
+                    <Grid x:Name="Root">
+                        <Border x:Name="GlowPart" Height="{TemplateBinding Height}" HorizontalAlignment="Stretch">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <LinearGradientBrush.RelativeTransform>
+                                        <TranslateTransform x:Name="GlowTransform" X="-1"/>
+                                    </LinearGradientBrush.RelativeTransform>
+                                    <GradientStop Color="Transparent" Offset="0"/>
+                                    <!-- Binding to the TemplatedParent's BorderBrush -->
+                                    <GradientStop Color="{Binding BorderBrush.Color, RelativeSource={RelativeSource TemplatedParent}}" Offset="0.5"/>
+                                    <GradientStop Color="Transparent" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Visibility" Value="Visible">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="StartScan">
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="GlowTransform" 
+                                                         Storyboard.TargetProperty="X" 
+                                                         From="-1" To="1" Duration="0:0:2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="StartScan"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- MODERN GLINDER (GridSplitter) STYLE & ANIMATIONS -->
     <Style x:Key="ModernGlinderStyle" TargetType="GridSplitter">
         <Setter Property="Height" Value="8"/>
