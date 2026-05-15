@@ -74,7 +74,7 @@ namespace AssetsManager.Services.Monitor
                 }
                 catch (OperationCanceledException)
                 {
-                    _logService.LogWarning("Backup operation was cancelled by the user.");
+                    _logService.LogWarning("Backup process was cancelled.");
                     BackupCompleted?.Invoke(this, false);
                     // Clean up partially created backup if cancelled
                     if (Directory.Exists(destinationBackupPath))

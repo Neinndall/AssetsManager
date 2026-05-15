@@ -41,10 +41,6 @@
                                 <Setter Property="Visibility" Value="Visible"/>
                                 <Setter Property="BorderBrush" Value="Orange"/>
                             </DataTrigger>
-                            <DataTrigger Binding="{Binding StatusText}" Value="Cancelling tree building...">
-                                <Setter Property="Visibility" Value="Visible"/>
-                                <Setter Property="BorderBrush" Value="Orange"/>
-                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </ContentControl.Style>
@@ -72,10 +68,6 @@
                                     <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding StatusText}" Value="Cancelling Task...">
-                                    <Setter Property="Kind" Value="AlertCircleOutline"/>
-                                    <Setter Property="Foreground" Value="Orange"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding StatusText}" Value="Cancelling tree building...">
                                     <Setter Property="Kind" Value="AlertCircleOutline"/>
                                     <Setter Property="Foreground" Value="Orange"/>
                                 </DataTrigger>

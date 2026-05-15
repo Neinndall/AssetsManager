@@ -136,16 +136,16 @@ namespace AssetsManager.Services.Monitor
 
         public async Task DownloadPluginsAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
-            await ExecuteNativeDownloadTaskAsync("League Client", manifestUrl, lolPbeDirectory, locales);
+            await ExecuteNativeDownloadTaskAsync("League Client", manifestUrl, lolPbeDirectory, locales, cancellationToken);
         }
 
         public async Task DownloadGameClientAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
             string gameDirectory = Path.Combine(lolPbeDirectory, "Game");
-            await ExecuteNativeDownloadTaskAsync("Game Client", manifestUrl, gameDirectory, locales);
+            await ExecuteNativeDownloadTaskAsync("Game Client", manifestUrl, gameDirectory, locales, cancellationToken);
         }
 
-        private async Task ExecuteNativeDownloadTaskAsync(string taskName, string manifestUrl, string targetDirectory, List<string> locales)
+        private async Task ExecuteNativeDownloadTaskAsync(string taskName, string manifestUrl, string targetDirectory, List<string> locales, CancellationToken cancellationToken)
         {
             try
             {
@@ -154,10 +154,10 @@ namespace AssetsManager.Services.Monitor
                 
                 _logService.Log($"Verifying/Updating {taskName}...");
 
-                var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl);
+                var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl, cancellationToken);
                 var manifest = _rmanService.Parse(manifestBytes);
 
-                int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, null, locales);
+                int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, null, locales, cancellationToken);
 
                 if (updatedCount > 0)
                 {
@@ -168,6 +168,11 @@ namespace AssetsManager.Services.Monitor
                     _logService.Log("No updates required for this manifest.");
                 }
                 VersionDownloadCompleted?.Invoke(this, (taskName, true, "Finished"));
+            }
+            catch (OperationCanceledException)
+            {
+                // Note: Granular logging is handled inside ManifestDownloader for both Verification and Updating phases.
+                VersionDownloadCompleted?.Invoke(this, (taskName, false, "Cancelled"));
             }
             catch (Exception ex)
             {

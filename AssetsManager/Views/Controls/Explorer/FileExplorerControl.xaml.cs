@@ -117,7 +117,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void CleanupResources()
         {
-            TaskCancellationManager.CancelCurrentOperation(true, "Cancelling tree building...");
+            TaskCancellationManager.CancelCurrentOperation();
 
             if (AppSettings != null)
             {
@@ -611,7 +611,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 catch (OperationCanceledException)
                 {
-                    LogService.LogWarning("Extraction was cancelled by the user.");
+                    LogService.LogWarning("Extraction process was cancelled.");
                 }
                 catch (Exception ex)
                 {
@@ -735,7 +735,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 catch (OperationCanceledException)
                 {
-                    LogService.LogWarning("Save operation was cancelled by the user.");
+                    LogService.LogWarning("Save process was cancelled.");
                 }
                 catch (Exception ex)
                 {

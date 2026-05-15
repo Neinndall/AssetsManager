@@ -16,8 +16,16 @@ namespace AssetsManager.Utils
 
         public CancellationToken PrepareNewOperation()
         {
-            // Dispose the old one if it exists, to prevent leaks
-            _cancellationTokenSource?.Dispose();
+            // Cancel and dispose the old one if it exists, to signal ongoing tasks
+            if (_cancellationTokenSource != null)
+            {
+                if (!_cancellationTokenSource.IsCancellationRequested)
+                {
+                    _cancellationTokenSource.Cancel();
+                }
+                _cancellationTokenSource.Dispose();
+            }
+
             _cancellationTokenSource = new CancellationTokenSource();
             IsCancelling = false;
             OperationStateChanged?.Invoke(this, EventArgs.Empty);
