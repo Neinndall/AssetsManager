@@ -129,10 +129,10 @@
                                                     </Border>
 
                                                     <!-- Main Vertical Content Stack -->
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="8,2,0,0">
+                                                    <StackPanel Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8,2,0,0">
                                                         <!-- Line 1: Title and Status -->
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="{Binding MessageSummary}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap" MaxWidth="500"/>
+                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                                            <TextBlock Text="{Binding MessageSummary}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap" MaxWidth="500" HorizontalAlignment="Left"/>
                                                             
                                                             <!-- GitHub Style Expand Button (...) -->
                                                             <ToggleButton x:Name="BtnExpand" 
@@ -171,10 +171,11 @@
                                                                    FontSize="12" Foreground="{StaticResource TextMuted}" 
                                                                    Margin="0,8,0,0" TextWrapping="Wrap" MaxWidth="540" 
                                                                    LineHeight="18" FontFamily="Consolas" Opacity="0.8"
+                                                                   HorizontalAlignment="Left"
                                                                    TextAlignment="Left"/>
 
                                                         <!-- Line 3: Author Metadata Line -->
-                                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Left">
                                                             <!-- Small Avatar Icon -->
                                                             <Border Width="18" Height="18" CornerRadius="9" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0" VerticalAlignment="Center" ClipToBounds="True">
                                                                 <Grid>
