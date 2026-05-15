@@ -205,8 +205,8 @@ namespace AssetsManager.Services.Core
 
         private async Task<(string oldText, string newText)> PrepareAudioBankDiffTextsAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, string sourceJsonPath, LoadingDiffWindow loadingWindow)
         {
-            string oldJson = "{}";
-            string newJson = "{}";
+            string oldJson = string.Empty;
+            string newJson = string.Empty;
 
             if (string.IsNullOrEmpty(diff.SourceWadFile))
             {
@@ -238,6 +238,7 @@ namespace AssetsManager.Services.Core
                 else
                 {
                     _logService.LogWarning("[PrepareAudioBankDiffTextsAsync] Failed to link OLD version.");
+                    oldJson = "{}";
                 }
             }
 
@@ -261,6 +262,7 @@ namespace AssetsManager.Services.Core
                 else
                 {
                     _logService.LogWarning("[PrepareAudioBankDiffTextsAsync] Failed to link NEW version.");
+                    newJson = "{}";
                 }
             }
 
@@ -269,7 +271,7 @@ namespace AssetsManager.Services.Core
 
         private async Task<string> AudioBankToStringAsync(LinkedAudioBank linkedBank)
         {
-            if (linkedBank == null) return "{}";
+            if (linkedBank == null) return string.Empty;
 
             var wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
             var audioBnkData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
@@ -284,6 +286,8 @@ namespace AssetsManager.Services.Core
             {
                 result = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsBnkData);
             }
+
+            if (result == null || result.Count == 0) return "{}";
 
             var settings = new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
             return await _jsonFormatterService.FormatJsonAsync(result, settings);

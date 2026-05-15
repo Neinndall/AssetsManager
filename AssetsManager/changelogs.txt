@@ -9,6 +9,8 @@ New Features
     * Robust Path-Matching: enhanced the search algorithm to correctly identify emotes in complex subdirectories (charity, tft, esports, etc.) by using narrative path anchors.
     * Refined Minimalist UI: added a clean, typography-focused information card with a distinctive accent separator for a professional integrated look.
     * Enhanced Data Persistence: optimized the previewer logic to preserve narrative info while navigating related data files in Dual View.
+  - Diff Viewer / Layout Unification
+    * Unified "First Registration" feedback: standardized the difference viewer to correctly show the informative orange layout for newly created audio banks (_events.bnk), ensuring a consistent experience across all asset types.
   - Explorer / Persistent Grid Preference
     * Grid Mode now stays active while viewing file previews, allowing a seamless return to the grid when navigating back to folders.
   - Viewer / Mesh Visibility Synchronization
