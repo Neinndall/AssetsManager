@@ -42,8 +42,19 @@ New Features
     * Integrated Dynamic Color Synchronization: the neon line now automatically switches between the brand's AccentBrush (Blue) for active operations and Orange for cancellation states, providing intuitive status awareness.
     * Developed the "Neon Scan" Animation: a hardware-accelerated (GPU) light-sweep effect that provides a living, professional feel while maintaining zero impact on system performance.
     * Advanced HUD Logic: the neon strip is strictly bound to active tasks, automatically hiding when the application returns to a 'Ready' state for a clean and focused workspace.
+  - User Interface / Unified Cancellation HUD
+    * Standardized Global Cancellation System: unified all module-specific cancellation messages (Comparator, Explorer, Backups, Versions) into a single, generic "Cancelling Task..." HUD state.
+    * Implemented High-Fidelity Feedback Window: added a mandatory 1.5-second delay for all cancellations, ensuring users have sufficient time to see the orange icon and neon scan before the system resets.
+    * Resolved HUD Race Conditions: fixed a logic error in the tree build and download modules where the "Ready" state would prematurely overwrite the orange cancellation feedback.
 
 Improvements
+  - User Interface / High-Fidelity Cancellation HUD
+    * Standardized all cancellation states across the application (Comparator, Explorer, Versions, Backups) to use a unified "Cancelling Task..." message.
+    * Implemented a dedicated 1.5-second "Courtesy Window" for all cancellations, ensuring the orange neon line and alert iconography are clearly visible before the system resets.
+    * Integrated a "Cancellation Shield" in the status bar that prevents incoming progress updates from flickering or overwriting the cancellation state.
+  - Architecture / Robust Task Lifecycle
+    * Upgraded the global cancellation manager to automatically terminate stale background threads when starting new operations or switching environments.
+    * Synchronized the "Ready" state reset with the task completion event, ensuring a perfectly clean transition back to the green-tick state after any process.
   - Monitor / Module Metric Unification
     * Perfected Hero Header Alignment: standardized the padding (20,14), internal margins, and icon sizes (24x24) across the entire Monitor suite (Dashboard, API Center, Versions, Backups).
     * Unified Selection Rhythm: synchronized the "Tick" selection indicator position to an 18px horizontal bleed across all lists, achieving absolute visual harmony.
@@ -73,10 +84,13 @@ Improvements
     * Refined the layout of the Documentation view by standardizing the footer spacing and removing excessive margins to match the About module's aesthetic.
     * Updated all module descriptions (Comparator, Explorer, Viewer, Monitor) and setup guides to reflect the latest technical standards and features.
     * Integrated new professional tips including "Linked Audio Banks" for better guidance on advanced audio discovery.
-  - Help / Update Center Enhancements
-    * Professional Redesign: transformed the Update Center into a high-fidelity "Revision Dashboard" featuring a timeline-style layout, real GitHub author avatars, and refined action cards.
-    * Increased History Depth: expanded the visible commit history from 20 to 100 revisions, maximizing the reach of real commit data and minimizing generic "GitHub Action" placeholders.
-  - Settings / Generalized User Preference
+  - Help / Commit History GitHub-Style Rework
+    * Implemented a brand new GitHub-inspired timeline: commits are now organized along a continuous vertical line with dynamic connection dots for a professional dev-tracking experience.
+    * Added Intelligent Date Grouping: revisions are automatically categorized under "Commits on Date" headers, providing a clear chronological narrative.
+    * Enhanced Author Metadata: introduced a "committed X ago" narrative using a new TimeAgoConverter, placing author info and relative timing in a clean metadata line below the title.
+    * Integrated Collapsible Descriptions: long commit messages are now intelligently segmented, hiding the detailed body under a GitHub-style "..." expand button with a reinforced 1.5px technical border.
+    * Refined HUD Aesthetics: eliminated redundant action cards for a cleaner background flow, implementing surgical 3px indentation for descriptions and perfectly symmetric action badges.
+  - Help / Documentation Redesign
     * Renamed "Preferred Backup Client" to "Preferred Client" to serve as a global preference that now also governs the initial client discovery in the Explorer and automated backups, ensuring a consistent environment priority.
   - Explorer / Intelligent Path Discovery
     * Enhanced the startup workflow by automatically detecting and loading the game tree if either PBE or Live client directory is configured, eliminating unnecessary selection screens.
@@ -222,6 +236,14 @@ Changes
     * Removed the JSON path breadcrumb and copy button from the bottom bar to provide a cleaner, line-focused workspace.
 
 Bug Fixes
+  - Help / Commit History Stability
+    * Fixed a critical XamlParseException by correcting the invalid 'GitCommit' icon name to the standard 'SourceCommit' required by the Material library.
+    * Resolved multiple compilation errors in the update dashboard caused by incorrect type references and missing LINQ/Generic namespaces.
+  - Monitor / Manage Versions Stability
+    * Fixed a critical issue where cancelling a League or Game Client update was reported as a system error; the system now correctly identifies user-initiated interruptions and logs them as informative warnings.
+    * Resolved a token propagation bug in the native update engine, ensuring immediate termination of file verification and download processes upon cancellation.
+  - Core / Logging Narrative Refinement
+    * Standardized the internal log narrative for all module cancellations (Verification, Updating, Save, Extract, and Backups) to use a clean "process was cancelled" format.
   - Explorer / Extraction Fidelity
     * Fixed a critical issue where data assets were being extracted in RAW format during automated patch downloads. The system now correctly respects the "Data export target" setting, ensuring files are converted to JSON when requested.
   - Core / Build & Logic Stability

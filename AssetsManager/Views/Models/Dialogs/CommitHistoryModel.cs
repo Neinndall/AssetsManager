@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -7,6 +8,12 @@ using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Dialogs
 {
+    public class CommitGroup
+    {
+        public string DateHeader { get; set; }
+        public List<GitHubCommit> Commits { get; set; } = new();
+    }
+
     /// <summary>
     /// Pure data container for the Commit History window.
     /// Follows the project standard of keeping ViewModels focused on information and state.
@@ -14,6 +21,7 @@ namespace AssetsManager.Views.Models.Dialogs
     public class CommitHistoryModel : INotifyPropertyChanged
     {
         public ObservableRangeCollection<GitHubCommit> Commits { get; } = new();
+        public ObservableRangeCollection<CommitGroup> GroupedCommits { get; } = new();
 
         private string _currentVersion;
         public string CurrentVersion { get => _currentVersion; set { _currentVersion = value; OnPropertyChanged(); } }

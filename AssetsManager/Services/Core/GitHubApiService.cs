@@ -279,6 +279,20 @@ namespace AssetsManager.Services.Core
         public bool HasInheritedBuild => DownloadableAsset == null && ParentBuildAsset != null;
         public bool IsLatest { get; set; }
         public string ShortSha => Sha?.Substring(0, 7) ?? "";
+
+        // UI Helpers for segmented messages
+        public string MessageSummary => Commit?.Message?.Split('\n').FirstOrDefault()?.Trim() ?? string.Empty;
+        public string MessageBody
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(Commit?.Message)) return string.Empty;
+                var lines = Commit.Message.Split('\n');
+                if (lines.Length <= 1) return string.Empty;
+                return string.Join('\n', lines.Skip(1)).Trim();
+            }
+        }
+        public bool HasDescription => !string.IsNullOrEmpty(MessageBody);
     }
 
     public class CommitInfo

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using AssetsManager.Views.Models.Dialogs;
@@ -54,6 +55,19 @@ namespace AssetsManager.Views.Dialogs
                 
                 // Update UI state
                 _viewModel.Commits.ReplaceRange(enrichedCommits);
+
+                // Group commits by date for the new GitHub-style timeline
+                var groups = enrichedCommits
+                    .GroupBy(c => c.Commit.Author.Date.Date)
+                    .OrderByDescending(g => g.Key)
+                    .Select(g => new CommitGroup
+                    {
+                        DateHeader = $"Commits on {g.Key:MMM dd, yyyy}",
+                        Commits = g.ToList()
+                    })
+                    .ToList();
+
+                _viewModel.GroupedCommits.ReplaceRange(groups);
                 _viewModel.StatusMessage = _viewModel.Commits.Count > 0 ? "Commits synchronized" : "No commits found";
             }
             catch (Exception ex)
