@@ -237,6 +237,7 @@ Changes
 
 Bug Fixes
   - Help / Commit History Stability
+    * Fixed a layout issue where commit descriptions were misaligned; they are now perfectly positioned under the title for a cleaner reading experience.
     * Fixed a critical XamlParseException by correcting the invalid 'GitCommit' icon name to the standard 'SourceCommit' required by the Material library.
     * Resolved multiple compilation errors in the update dashboard caused by incorrect type references and missing LINQ/Generic namespaces.
   - Monitor / Manage Versions Stability
