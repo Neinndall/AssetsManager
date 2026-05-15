@@ -128,9 +128,9 @@
         <Setter Property="Padding" Value="0,5,0,0"/>
         <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
         
-        <!-- Core Virtualization Settings -->
+        <!-- Core Virtualization Settings (STABILIZED) -->
         <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
-        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Standard"/>
         <Setter Property="VirtualizingPanel.CacheLength" Value="2,2"/>
         <Setter Property="VirtualizingPanel.CacheLengthUnit" Value="Page"/>
         <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel"/>

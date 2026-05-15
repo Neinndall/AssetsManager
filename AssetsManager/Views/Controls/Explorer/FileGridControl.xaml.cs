@@ -35,27 +35,39 @@ namespace AssetsManager.Views.Controls.Explorer
             FileGridListBox.ItemsSource = DisplayItems;
         }
 
+        private bool _isUpdatingItemsSource = false;
+
         private static void OnItemsSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (d is FileGridControl control)
             {
-                var newItems = (ObservableRangeCollection<FileGridViewModel>)e.NewValue;
-                control._allItems = newItems ?? new ObservableRangeCollection<FileGridViewModel>();
-                
-                // Re-apply current filter when folder or search changes
-                if (control.ViewModel != null)
+                control._isUpdatingItemsSource = true;
+                try
                 {
-                    control.ApplyFilter(control.ViewModel.CurrentFilter);
+                    var newItems = (ObservableRangeCollection<FileGridViewModel>)e.NewValue;
+                    control._allItems = newItems ?? new ObservableRangeCollection<FileGridViewModel>();
+                    
+                    // Re-apply current filter when folder or search changes
+                    if (control.ViewModel != null)
+                    {
+                        control.ApplyFilter(control.ViewModel.CurrentFilter);
+                    }
+                    else
+                    {
+                        control.DisplayItems.ReplaceRange(control._allItems);
+                    }
                 }
-                else
+                finally
                 {
-                    control.DisplayItems.ReplaceRange(control._allItems);
+                    control._isUpdatingItemsSource = false;
                 }
             }
         }
 
         private void FileGridListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isUpdatingItemsSource) return;
+
             // Sync selection state to ViewModels for multi-select consistency
             foreach (FileGridViewModel item in e.RemovedItems) item.IsSelected = false;
             foreach (FileGridViewModel item in e.AddedItems) item.IsSelected = true;
