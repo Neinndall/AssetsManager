@@ -30,6 +30,15 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
+        private SummonerIconMetadata _summonerIconMetadata;
+        public SummonerIconMetadata SummonerIconMetadata
+        {
+            get => _summonerIconMetadata;
+            set { _summonerIconMetadata = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsSummonerIconVisible)); }
+        }
+
+        public bool IsSummonerIconVisible => SummonerIconMetadata != null;
+
         public bool IsRenamedInfoVisible => RenamedDiffDetails != null && RenamedDiffDetails.Type == ChunkDiffType.Renamed && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
 
         public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0;

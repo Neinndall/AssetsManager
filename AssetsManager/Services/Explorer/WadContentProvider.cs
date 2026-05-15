@@ -26,11 +26,57 @@ namespace AssetsManager.Services.Explorer
         private readonly WadNodeLoaderService _wadNodeLoaderService;
         private readonly DirectoriesCreator _directoriesCreator;
 
-        public WadContentProvider(LogService logService, WadNodeLoaderService wadNodeLoaderService, DirectoriesCreator directoriesCreator)
+        public WadContentProvider(
+            LogService logService, 
+            WadNodeLoaderService wadNodeLoaderService, 
+            DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
             _wadNodeLoaderService = wadNodeLoaderService;
             _directoriesCreator = directoriesCreator;
+        }
+
+        /// <summary>
+        /// Searches for a specific virtual path within all WAD files in a directory using direct hash comparison.
+        /// No dependency on HashResolverService.
+        /// </summary>
+        public async Task<FileSystemNodeModel> FindNodeByVirtualPathAsync(string virtualPath, string gameDataPath)
+        {
+            return await Task.Run(() =>
+            {
+                // WAD paths are hashed in lowercase
+                string normalizedPath = virtualPath.Replace('\\', '/').ToLowerInvariant();
+                ulong targetHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(normalizedPath);
+
+                var wadFiles = Directory.GetFiles(gameDataPath, "*.wad", SearchOption.AllDirectories)
+                                              .Concat(Directory.GetFiles(gameDataPath, "*.wad.client", SearchOption.AllDirectories))
+                                              .ToList();
+
+                foreach (var wadPath in wadFiles)
+                {
+                    try
+                    {
+                        using (var wadFile = new WadFile(wadPath))
+                        {
+                            if (wadFile.Chunks.TryGetValue(targetHash, out var chunk))
+                            {
+                                return new FileSystemNodeModel(Path.GetFileName(normalizedPath), false, normalizedPath, wadPath)
+                                {
+                                    SourceChunkPathHash = chunk.PathHash,
+                                    SourceWadPath = wadPath,
+                                    Type = NodeType.VirtualFile
+                                };
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogWarning($"Error processing WAD file {wadPath}: {ex.Message}");
+                    }
+                }
+
+                return null;
+            });
         }
 
         // Obtiene los bytes descomprimidos de un fichero virtual sin guardarlo, para usar en previsualizaciones.

@@ -666,51 +666,5 @@ namespace AssetsManager.Services.Explorer
                 parentNode.Children.Add(fileNode);
             }
         }
-
-        /// <summary>
-        /// Searches for a specific virtual path within all WAD files in a directory.
-        /// </summary>
-        public async Task<FileSystemNodeModel> FindNodeByVirtualPathAsync(string virtualPath, string gameDataPath)
-        {
-            return await Task.Run(() =>
-            {
-                string normalizedVirtualPath = virtualPath.Replace('\\', '/').ToUpperInvariant();
-
-                var wadFiles = Directory.GetFiles(gameDataPath, "*.wad", SearchOption.AllDirectories)
-                                              .Concat(Directory.GetFiles(gameDataPath, "*.wad.client", SearchOption.AllDirectories))
-                                              .ToList();
-
-                foreach (var wadPath in wadFiles)
-                {
-                    try
-                    {
-                        using (var wadFile = new WadFile(wadPath))
-                        {
-                            foreach (var chunk in wadFile.Chunks.Values)
-                            {
-                                string resolvedChunkPath = _hashResolverService.ResolveHash(chunk.PathHash);
-                                string normalizedResolvedChunkPath = resolvedChunkPath.Replace('\\', '/').ToUpperInvariant();
-
-                                if (normalizedResolvedChunkPath.Equals(normalizedVirtualPath, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    return new FileSystemNodeModel(Path.GetFileName(resolvedChunkPath), false, resolvedChunkPath, wadPath)
-                                    {
-                                        SourceChunkPathHash = chunk.PathHash,
-                                        SourceWadPath = wadPath,
-                                        Type = NodeType.VirtualFile
-                                    };
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogWarning($"Error processing WAD file {wadPath}: {ex.Message}");
-                    }
-                }
-
-                return null;
-            });
-        }
     }
 }
