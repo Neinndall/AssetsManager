@@ -30,14 +30,14 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        private SummonerIconMetadata _summonerIconMetadata;
-        public SummonerIconMetadata SummonerIconMetadata
+        private NarrativeMetadata _narrativeMetadata;
+        public NarrativeMetadata NarrativeMetadata
         {
-            get => _summonerIconMetadata;
-            set { _summonerIconMetadata = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsSummonerIconVisible)); }
+            get => _narrativeMetadata;
+            set { _narrativeMetadata = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsNarrativeMetadataVisible)); }
         }
 
-        public bool IsSummonerIconVisible => SummonerIconMetadata != null;
+        public bool IsNarrativeMetadataVisible => NarrativeMetadata != null;
 
         public bool IsRenamedInfoVisible => RenamedDiffDetails != null && RenamedDiffDetails.Type == ChunkDiffType.Renamed && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
 

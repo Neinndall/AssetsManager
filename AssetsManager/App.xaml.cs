@@ -124,7 +124,7 @@ namespace AssetsManager
       services.AddTransient<TreeUIManager>();
       services.AddSingleton<FavoritesManager>();
       services.AddSingleton<ImageMergerService>();
-      services.AddSingleton<SummonerIconMetadataService>();
+      services.AddSingleton<NarrativeMetadataService>();
     
       // Downloads Services
       services.AddSingleton<AssetDownloader>();

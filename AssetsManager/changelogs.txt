@@ -3,11 +3,12 @@ AssetsManager - League of Legends | v4.0.0.0
 MAJOR UPDATE
 
 New Features
-  - Explorer / Summoner Icon Metadata Discovery
-    * Integrated brand new narrative metadata for summoner icons: the system now automatically parses internal game data to display titles and descriptions for profile icons in the explorer previewer.
-    * Implemented Ultra-Fast Discovery Engine: developed a direct-hash lookup system (O(1)) that locates metadata files instantly without requiring the full hash database to be loaded, significantly improving startup and navigation performance.
-    * Refined Minimalist UI: added a clean, typography-focused information card that integrates seamlessly with the HUD, featuring a distinctive accent separator for a professional look.
-    * Enhanced Data Persistence: optimized the previewer logic to preserve icon information while navigating related data files, allowing for a better comparative workflow.
+  - Explorer / Narrative Metadata (Icons & Emotes)
+    * Integrated brand new narrative metadata for summoner icons and emotes: the system now automatically parses internal game data to display titles and descriptions in the explorer previewer.
+    * Implemented Ultra-Fast Discovery Engine: developed a direct-hash lookup system that locates metadata files instantly without requiring the full hash database to be loaded, significantly improving performance.
+    * Robust Path-Matching: enhanced the search algorithm to correctly identify emotes in complex subdirectories (charity, tft, esports, etc.) by using narrative path anchors.
+    * Refined Minimalist UI: added a clean, typography-focused information card with a distinctive accent separator for a professional integrated look.
+    * Enhanced Data Persistence: optimized the previewer logic to preserve narrative info while navigating related data files in Dual View.
   - Explorer / Persistent Grid Preference
     * Grid Mode now stays active while viewing file previews, allowing a seamless return to the grid when navigating back to folders.
   - Viewer / Mesh Visibility Synchronization

@@ -43,7 +43,7 @@ namespace AssetsManager.Services.Explorer
         private readonly AudioConversionService _audioConversionService;
         private readonly WadContentProvider _wadContentProvider;
         private readonly SvgParser _svgParser;
-        private readonly SummonerIconMetadataService _summonerIconMetadataService;
+        private readonly NarrativeMetadataService _narrativeMetadataService;
 
         public ExplorerPreviewService(
             LogService logService, 
@@ -53,7 +53,7 @@ namespace AssetsManager.Services.Explorer
             AudioConversionService audioConversionService, 
             WadContentProvider wadContentProvider,
             SvgParser svgParser,
-            SummonerIconMetadataService summonerIconMetadataService)
+            NarrativeMetadataService narrativeMetadataService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
@@ -62,7 +62,7 @@ namespace AssetsManager.Services.Explorer
             _audioConversionService = audioConversionService;
             _wadContentProvider = wadContentProvider;
             _svgParser = svgParser;
-            _summonerIconMetadataService = summonerIconMetadataService;
+            _narrativeMetadataService = narrativeMetadataService;
         }
 
         public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FilePreviewerModel viewModel)
@@ -107,13 +107,13 @@ namespace AssetsManager.Services.Explorer
             // Step 1: Tell the ViewModel to prepare the correct slot (Image or Content)
             _viewModel.PrepareSlotForFile(node);
 
-            // Step 2: Discovery of technical metadata (e.g., Summoner Icons)
+            // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)
             // We only update/clear metadata if the current node is an image. 
             // If it's a text file, we keep the metadata of the image shown in the other slot (Dual View).
-            var metadata = await _summonerIconMetadataService.GetMetadataAsync(node);
+            var metadata = await _narrativeMetadataService.GetMetadataAsync(node);
             if (isImage || metadata != null)
             {
-                _viewModel.SummonerIconMetadata = metadata;
+                _viewModel.NarrativeMetadata = metadata;
             }
 
             // Step 3: SELECTIVE clearing to maintain Dual View
@@ -159,7 +159,7 @@ namespace AssetsManager.Services.Explorer
                 _textEditorPreview.Document = new TextDocument();
             }
             _imagePreview.Source = null;
-            _viewModel.SummonerIconMetadata = null;
+            _viewModel.NarrativeMetadata = null;
 
             // Step 2: Restore the UI state
             await SetPreviewerAsync(Previewer.StatusPanel);

@@ -176,5 +176,22 @@ namespace AssetsManager.Utils
             string[] parts = fullName.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
             return parts.Length > 0 ? parts.Last() : fullName;
         }
+
+        /// <summary>
+        /// Normalizes a path by replacing backslashes with forward slashes and converting to lowercase.
+        /// </summary>
+        public static string NormalizePath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            return path.Replace('\\', '/').ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Converts a physical or mixed path into a clean virtual path for WAD lookups.
+        /// </summary>
+        public static string ToVirtualPath(string path)
+        {
+            return NormalizePath(path).TrimStart('/');
+        }
     }
 }

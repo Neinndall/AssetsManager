@@ -314,9 +314,9 @@
                             <!-- Summoner Icon Metadata (Minimalist) -->
                             <StackPanel Grid.Row="1" 
                                         Margin="32,0,32,40"
-                                        Visibility="{Binding IsSummonerIconVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        Visibility="{Binding IsNarrativeMetadataVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 
-                                <TextBlock Text="{Binding SummonerIconMetadata.Title}" 
+                                <TextBlock Text="{Binding NarrativeMetadata.Title}" 
                                            FontSize="16" 
                                            FontWeight="Black" 
                                            Foreground="White"
@@ -330,7 +330,7 @@
                                         HorizontalAlignment="Center" 
                                         Margin="0,0,0,16"/>
 
-                                <TextBlock Text="{Binding SummonerIconMetadata.Description}" 
+                                <TextBlock Text="{Binding NarrativeMetadata.Description}" 
                                            FontSize="13" 
                                            Foreground="{StaticResource TextSecondary}" 
                                            TextWrapping="Wrap" 
