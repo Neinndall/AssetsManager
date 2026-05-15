@@ -83,7 +83,7 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public bool IsGridVisible => IsGridMode && HasSelectedNode && IsSelectedNodeContainer;
+        public bool IsGridVisible => IsGridMode && IsSelectedNodeContainer;
         public bool IsPreviewVisible => !IsGridVisible;
 
         public bool HasSelectedNode
