@@ -3,6 +3,8 @@ AssetsManager - League of Legends | v4.0.0.0
 MAJOR UPDATE
 
 New Features
+  - Explorer / Persistent Grid Preference
+    * Grid Mode now stays active while viewing file previews, allowing a seamless return to the grid when navigating back to folders.
   - Viewer / Mesh Visibility Synchronization
     * Implemented a brand new synchronization system for multiple chromas: when enabled, toggling a mesh part on one model automatically updates its visibility across all other loaded chromas with matching part names. This significantly improves the workflow when analyzing character variations.
     * Integrated a safety-locking mechanism to prevent infinite event recursion during cross-model propagation.
@@ -48,6 +50,13 @@ New Features
     * Resolved HUD Race Conditions: fixed a logic error in the tree build and download modules where the "Ready" state would prematurely overwrite the orange cancellation feedback.
 
 Improvements
+  - Explorer / Smart Grid Navigation
+    * Improved the transition between Grid and Preview modes: clicking a file in the grid now shows its content while keeping the Grid View active for easier folder navigation.
+    * Refined Folder Context: activating Grid View while previewing a file now accurately displays the content of its containing folder.
+    * Optimized Search Refresh: the grid now updates instantly when using the search filter, even if the folder context hasn't changed.
+    * Flicker-free Navigation: alternating focus between already visible files (e.g., switching between a JSON and an Image in Dual View) is now instantaneous, eliminating redundant reloads and UI parpados.
+  - Architecture / Stabilized Virtualization
+    * Switched to high-stability virtualization for both the Explorer tree and Grid View, eliminating "phantom" selections and focus jumps during rapid scrolling.
   - User Interface / High-Fidelity Cancellation HUD
     * Standardized all cancellation states across the application (Comparator, Explorer, Versions, Backups) to use a unified "Cancelling Task..." message.
     * Implemented a dedicated 1.5-second "Courtesy Window" for all cancellations, ensuring the orange neon line and alert iconography are clearly visible before the system resets.
@@ -260,6 +269,7 @@ Bug Fixes
     * Resolved a syntax error in the configuration engine that prevented application builds after adding new export protocols.
   - Explorer / Mode Switch & Grid View Stability
     * Fixed a critical issue where the "Grid View" would fail to activate for the LIVE directory when entering directly from the Dashboard.
+    * Resolved a potential memory leak in the file previewer: the system now explicitly releases large text documents and image buffers when switching files, ensuring RAM stability during long browsing sessions.
     * Resolved a synchronization bug that caused the "Grid View" preference to be lost when switching between WAD and Local Dir modes.
     * Fixed a navigation error that prevented the WAD tree from reloading correctly when switching back from Local Dir mode, ensuring the preferred client is always prioritized.
     * Corrected a logic error in the tree reload process that caused the environment to incorrectly revert to PBE regardless of the active selection.

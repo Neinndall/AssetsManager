@@ -304,7 +304,6 @@ namespace AssetsManager.Services.Explorer
                         // Global Reset
                         _viewModel.ResetAllVisibility();
                         _imagePreview.Source = null;
-                        _textEditorPreview.Clear();
                     }
                     break;
             }
