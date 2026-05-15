@@ -88,6 +88,7 @@ Improvements
     * Implemented a brand new GitHub-inspired timeline: commits are now organized along a continuous vertical line with dynamic connection dots for a professional dev-tracking experience.
     * Added Intelligent Date Grouping: revisions are automatically categorized under "Commits on Date" headers, providing a clear chronological narrative.
     * Enhanced Author Metadata: introduced a "committed X ago" narrative using a new TimeAgoConverter, placing author info and relative timing in a clean metadata line below the title.
+    * Improved the visual hierarchy of the commit list by grouping the SHA and 'LATEST' status badges next to the timestamp.
     * Integrated Collapsible Descriptions: long commit messages are now intelligently segmented, hiding the detailed body under a GitHub-style "..." expand button with a reinforced 1.5px technical border.
     * Refined HUD Aesthetics: eliminated redundant action cards for a cleaner background flow, implementing surgical 3px indentation for descriptions and perfectly symmetric action badges.
   - Help / Documentation Redesign
@@ -142,6 +143,14 @@ Improvements
     * Refined the History View: unified the accent strip thickness to match the sleek design of the Asset Watcher, achieving absolute visual consistency across the monitor module.
     * Standardized Selection Behavior: improved the "Create Backup" workflow to prioritize selected items with a smart fallback system.
     * Technical Control Optimization: standardized icon-only selectors for better visual alignment across all dialogs.
+  - Monitor / Dashboard Redesign "Bento UI"
+    * Implemented a brand new "Bento" style layout for the Monitor Dashboard, featuring a modular grid that provides a much clearer and more professional organizational structure.
+    * Separated Core Information: introduced a dedicated "CORE BUILD" card that highlights the software identity, build channel (QA/Experimental vs Stable), and GitHub SHA for development tracking.
+    * Enhanced System Health: separated the integrity diagnostics into a "SYSTEM HEALTH" card focused exclusively on hash database synchronization and self-check status.
+    * High-Fidelity HUD Headers: upgraded the Operations Center header with four distinct technical indicators: PBE, SYSTEM, CORE, and ASSETS.
+
+    * Advanced Asset Watcher Metrics: significantly improved the Watcher card with real-time health badges and a "Last Change" tracker that displays the name of the most recently updated file.
+    * Intelligent Asset Tracker Insights: enhanced the Tracker card with "Last Discovered" metadata, providing immediate visibility into the latest assets found on the Riot CDN.
   - Explorer & Comparator / Extraction Logic Redefinition
     * Redefined "EXTRACT" as a dedicated RAW/Crude extraction tool across all modules: it now always yields original files (preserving .bnk/.wpk integrity) regardless of global settings.
     * Confirmed "SAVE" as the primary Smart conversion tool: it continues to force Mandatory Smart Conversion (PNG, JSON, OGG) for immediate asset utility.
@@ -238,7 +247,6 @@ Changes
 Bug Fixes
   - Help / Commit History Stability
     * Fixed a layout issue where commit descriptions were misaligned; they are now perfectly positioned under the title for a cleaner reading experience.
-    * Improved the visual hierarchy of the commit list by grouping the SHA and 'LATEST' status badges next to the timestamp.
     * Fixed a critical XamlParseException by correcting the invalid 'GitCommit' icon name to the standard 'SourceCommit' required by the Material library.
     * Resolved multiple compilation errors in the update dashboard caused by incorrect type references and missing LINQ/Generic namespaces.
   - Monitor / Manage Versions Stability

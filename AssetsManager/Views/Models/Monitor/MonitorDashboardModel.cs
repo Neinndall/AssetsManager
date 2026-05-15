@@ -33,11 +33,25 @@ namespace AssetsManager.Views.Models.Monitor
             set { _pbeStatusText = value; OnPropertyChanged(); }
         }
 
+        private string _pbeStatusSubtitle = "Checking connection...";
+        public string PbeStatusSubtitle
+        {
+            get => _pbeStatusSubtitle;
+            set { _pbeStatusSubtitle = value; OnPropertyChanged(); }
+        }
+
         private Brush _pbeStatusColor = Brushes.Gray;
         public Brush PbeStatusColor
         {
             get => _pbeStatusColor;
             set { _pbeStatusColor = value; OnPropertyChanged(); }
+        }
+
+        private MaterialIconKind _pbeStatusIconKind = MaterialIconKind.ServerNetwork;
+        public MaterialIconKind PbeStatusIconKind
+        {
+            get => _pbeStatusIconKind;
+            set { _pbeStatusIconKind = value; OnPropertyChanged(); }
         }
 
         private string _pbeLastCheck = "Not checked yet";
@@ -69,6 +83,13 @@ namespace AssetsManager.Views.Models.Monitor
             set { _watcherLastUpdate = value; OnPropertyChanged(); }
         }
 
+        private string _lastChangedFileName = "None";
+        public string LastChangedFileName
+        {
+            get => _lastChangedFileName;
+            set { _lastChangedFileName = value; OnPropertyChanged(); }
+        }
+
         // --- Asset Tracker ---
         private string _assetTrackerStatus = "Idle";
         public string AssetTrackerStatus
@@ -91,12 +112,31 @@ namespace AssetsManager.Views.Models.Monitor
             set { _assetTrackerCategoriesCount = value; OnPropertyChanged(); }
         }
 
+        private string _lastDiscoveredAssetName = "None";
+        public string LastDiscoveredAssetName
+        {
+            get => _lastDiscoveredAssetName;
+            set { _lastDiscoveredAssetName = value; OnPropertyChanged(); }
+        }
+
         // --- System / Hashes ---
         private string _hashesStatus = "Synced";
         public string HashesStatus
         {
             get => _hashesStatus;
-            set { _hashesStatus = value; OnPropertyChanged(); }
+            set 
+            { 
+                _hashesStatus = value; 
+                OnPropertyChanged();
+                UpdateHashesIndicatorColor();
+            }
+        }
+
+        private Brush _hashesIndicatorColor = Brushes.Gray;
+        public Brush HashesIndicatorColor
+        {
+            get => _hashesIndicatorColor;
+            set { _hashesIndicatorColor = value; OnPropertyChanged(); }
         }
 
         private string _appVersionText;
@@ -107,6 +147,8 @@ namespace AssetsManager.Views.Models.Monitor
         }
 
         public string BuildType => ApplicationInfos.BuildType;
+        public string BuildChannel => ApplicationInfos.IsQA ? "QA / EXPERIMENTAL" : "PRODUCTION / STABLE";
+        public string BuildSha => ApplicationInfos.IsQA ? ApplicationInfos.Version.Split('-').Last() : "N/A";
 
         private Brush _appVersionColor;
         public Brush AppVersionColor
@@ -193,7 +235,7 @@ namespace AssetsManager.Views.Models.Monitor
             // Check if an update was already found (Higher priority than Build Type)
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
             {
-                AppVersionText = $"{_updateCheckService.AvailableVersion} ready!";
+                AppVersionText = $"{_updateCheckService.AvailableVersion} available!";
                 AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")); // Blue for available updates
                 AppVersionIconKind = MaterialIconKind.CloudDownload;
             }
@@ -206,7 +248,7 @@ namespace AssetsManager.Views.Models.Monitor
                 {
                     Application.Current.Dispatcher.Invoke(() =>
                     {
-                        AppVersionText = $"v{latestVersion} ready!";
+                        AppVersionText = $"v{latestVersion} available!";
                         AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
                         AppVersionIconKind = MaterialIconKind.CloudDownload;
                         UpdateGlobalStatus();
@@ -215,23 +257,8 @@ namespace AssetsManager.Views.Models.Monitor
                 }
             };
 
-            // Initialize PBE status with last known message and check time
-            if (_appSettings.LastPbeStatusMessage == "ONLINE")
-            {
-                PbeStatusText = "Server Online";
-                PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
-            }
-            else if (!string.IsNullOrEmpty(_appSettings.LastPbeStatusMessage))
-            {
-                PbeStatusText = _appSettings.LastPbeStatusMessage;
-                PbeStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
-            }
-            else // Default if status is null or empty in settings
-            {
-                PbeStatusText = "Server Online";
-                PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
-            }
-            PbeLastCheck = FormatLastCheckTime(_appSettings.LastPbeCheckTime);
+            // Initial PBE Load
+            RefreshPbeData();
 
             // Initial Loads
             RefreshFileWatcherData();
@@ -306,12 +333,31 @@ namespace AssetsManager.Views.Models.Monitor
                     UpdateSystemHealthFooter();
                 });
             };
+
+            // Initial Indicator Color
+            UpdateHashesIndicatorColor();
+        }
+
+        private void UpdateHashesIndicatorColor()
+        {
+            if (HashesStatus == "Updating...")
+            {
+                HashesIndicatorColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")); // Blue
+            }
+            else if (HashesStatus == "Synced")
+            {
+                HashesIndicatorColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
+            }
+            else
+            {
+                HashesIndicatorColor = Brushes.Gray;
+            }
         }
 
         private void UpdateGlobalStatus()
         {
-            // Priority 1: Critical (PBE Down)
-            if (PbeStatusText != "Server Online")
+            // Priority 1: Critical (Maintenance started - RED)
+            if (PbeStatusText == "Under Maintenance")
             {
                 GlobalStatusText = "System Alert";
                 GlobalStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
@@ -319,8 +365,8 @@ namespace AssetsManager.Views.Models.Monitor
                 return;
             }
 
-            // Priority 2: Warning (Updates Pending - Files or App)
-            if (MonitoredFilesChangedCount > 0 || (AppVersionText != null && AppVersionText.Contains("available")))
+            // Priority 2: Warning (Service Alerts, File Changes, or App Updates - ORANGE)
+            if (PbeStatusText == "Service Alert" || MonitoredFilesChangedCount > 0 || (AppVersionText != null && AppVersionText.Contains("available!")))
             {
                 GlobalStatusText = "Action Required";
                 GlobalStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
@@ -328,7 +374,7 @@ namespace AssetsManager.Views.Models.Monitor
                 return;
             }
 
-            // Priority 3: Normal
+            // Priority 3: Normal (Nominal - GREEN)
             GlobalStatusText = "System Nominal";
             GlobalStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
             GlobalStatusIconKind = MaterialIconKind.ShieldCheckOutline;
@@ -359,7 +405,7 @@ namespace AssetsManager.Views.Models.Monitor
             }
 
             // Case 2: Update Available
-            if (AppVersionText != null && AppVersionText.Contains("available"))
+            if (AppVersionText != null && AppVersionText.Contains("available!"))
             {
                 SystemHealthFooterText = "Update Recommended";
                 SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
@@ -403,23 +449,42 @@ namespace AssetsManager.Views.Models.Monitor
 
         public void RefreshPbeData()
         {
-            // Since PbeStatusService stores the msg in AppSettings, we read it.
             string status = _appSettings.LastPbeStatusMessage;
-            if (status == "ONLINE") // Use the specific "code" from PbeStatusService
+            
+            if (status == "ONLINE")
             {
-                PbeStatusText = "Server Online";
+                PbeStatusText = "Operational";
+                PbeStatusSubtitle = "Server Status: Correct!";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
+                PbeStatusIconKind = MaterialIconKind.ServerNetwork;
             }
+
             else if (!string.IsNullOrEmpty(status))
             {
-                PbeStatusText = status; // Display the concise maintenance message directly
-                PbeStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
+                if (status.Contains("Maintenance started at"))
+                {
+                    PbeStatusText = "Under Maintenance";
+                    PbeStatusSubtitle = status;
+                    PbeStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
+                    PbeStatusIconKind = MaterialIconKind.Wrench;
+                }
+                else
+                {
+                    PbeStatusText = "Service Alert";
+                    PbeStatusSubtitle = status;
+                    PbeStatusColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
+                    PbeStatusIconKind = MaterialIconKind.ServerNetworkOff;
+                }
             }
-            else // Default if status is null or empty
+            else
             {
-                PbeStatusText = "Server Online";
+                PbeStatusText = "Operational";
+                PbeStatusSubtitle = "No maintenance detected";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
+                PbeStatusIconKind = MaterialIconKind.ServerNetwork;
             }
+
+            PbeLastCheck = FormatLastCheckTime(_appSettings.LastPbeCheckTime);
             UpdateGlobalStatus();
         }
 
@@ -429,6 +494,9 @@ namespace AssetsManager.Views.Models.Monitor
 
             MonitoredFilesCount = _monitorService.MonitoredAssets.Count;
             MonitoredFilesChangedCount = _monitorService.MonitoredAssets.Count(x => x.HasChanges);
+
+            var changedAssets = _monitorService.MonitoredAssets.Where(x => x.HasChanges).OrderByDescending(x => x.LastUpdated).ToList();
+            LastChangedFileName = changedAssets.FirstOrDefault()?.Alias ?? "None";
 
             var lastItem = _monitorService.MonitoredAssets.OrderByDescending(x => x.LastUpdated).FirstOrDefault();
             WatcherLastUpdate = lastItem != null && lastItem.LastUpdated != DateTime.MinValue
@@ -444,9 +512,22 @@ namespace AssetsManager.Views.Models.Monitor
             if (!_monitorService.AssetCategories.Any()) _monitorService.LoadAssetCategories();
 
             AssetTrackerCategoriesCount = _monitorService.AssetCategories.Count;
-            AssetTrackerTotalFound = _monitorService.AssetCategories.Sum(c => c.FoundUrls.Count);
+            AssetTrackerTotalFound = _monitorService.AssetCategories.Sum(c => c.FoundUrls?.Count ?? 0);
 
-            // If all idle
+            var lastActiveCategory = _monitorService.AssetCategories
+                .Where(c => c.FoundUrls != null && c.FoundUrls.Any())
+                .OrderByDescending(c => c.FoundUrls.Max())
+                .FirstOrDefault();
+
+            if (lastActiveCategory != null)
+            {
+                LastDiscoveredAssetName = $"{lastActiveCategory.Name} #{lastActiveCategory.FoundUrls.Max()}";
+            }
+            else
+            {
+                LastDiscoveredAssetName = "None";
+            }
+
             if (_monitorService.AssetCategories.All(c => c.Status == CategoryStatus.Idle || c.Status == CategoryStatus.CompletedSuccess))
             {
                 AssetTrackerStatus = "Idle";
