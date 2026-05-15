@@ -14,6 +14,7 @@ using System.Reflection;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
+using ICSharpCode.AvalonEdit.Document;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Utils;
@@ -27,7 +28,8 @@ namespace AssetsManager.Services.Explorer
     {
         private enum Previewer { None, Image, WebView, AvalonEdit, StatusPanel }
         private Previewer _activePreviewer = Previewer.None;
-        private FileSystemNodeModel _currentlyDisplayedNode;
+        private FileSystemNodeModel _currentContentNode;
+        private FileSystemNodeModel _currentImageNode;
         private Image _imagePreview;
         private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
@@ -83,31 +85,38 @@ namespace AssetsManager.Services.Explorer
                 return;
             }
 
-            // Avoid redundant reloads of the same file
-            if (_currentlyDisplayedNode == node) return;
+            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
+                           SupportedFileTypes.Textures.Contains(node.Extension) || 
+                           SupportedFileTypes.VectorImages.Contains(node.Extension);
+
+            // Per-Slot Early Exit:
+            // Check if the node is already loaded in its corresponding slot.
+            // This prevents reloads when alternating focus in Dual View.
+            if (isImage)
+            {
+                if (_currentImageNode == node && _viewModel.IsImageVisible) return;
+            }
+            else
+            {
+                if (_currentContentNode == node && (_viewModel.IsTextVisible || _viewModel.IsWebVisible || _viewModel.IsUnsupportedVisible)) return;
+            }
 
             // Step 1: Tell the ViewModel to prepare the correct slot (Image or Content)
             _viewModel.PrepareSlotForFile(node);
 
             // Step 2: SELECTIVE clearing to maintain Dual View
-            // Only clear the slot that is being updated to avoid flickering
-            // without affecting the other active panel.
-            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                           SupportedFileTypes.Textures.Contains(node.Extension) || 
-                           SupportedFileTypes.VectorImages.Contains(node.Extension);
-
             if (isImage)
             {
                 _imagePreview.Source = null;
+                _currentImageNode = node;
             }
             else
             {
                 _textEditorPreview.Clear();
                 // Note: WebView cleanup is handled inside SetPreviewerAsync 
                 // when the new media is ready to be injected.
+                _currentContentNode = node;
             }
-
-            _currentlyDisplayedNode = node;
 
             try
             {
@@ -128,7 +137,18 @@ namespace AssetsManager.Services.Explorer
 
         public async Task ResetPreviewAsync()
         {
-            _currentlyDisplayedNode = null;
+            _currentContentNode = null;
+            _currentImageNode = null;
+
+            // Step 1: Clean UI controls to release RAM
+            if (_textEditorPreview != null)
+            {
+                // Assigning a new document is the most efficient way to release old large buffers
+                _textEditorPreview.Document = new TextDocument();
+            }
+            _imagePreview.Source = null;
+
+            // Step 2: Restore the UI state
             await SetPreviewerAsync(Previewer.StatusPanel);
         }
 
