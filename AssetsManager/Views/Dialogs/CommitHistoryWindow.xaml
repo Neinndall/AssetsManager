@@ -163,13 +163,6 @@
                                                                     </ControlTemplate>
                                                                 </ToggleButton.Template>
                                                             </ToggleButton>
-
-                                                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="6,1" Margin="12,0,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding ShortSha}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" FontFamily="Consolas"/>
-                                                            </Border>
-                                                            <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center" Visibility="{Binding IsLatest, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                                <TextBlock Text="LATEST" FontSize="8" FontWeight="Black" Foreground="White" VerticalAlignment="Center" Margin="0,-0.5,0,0"/>
-                                                            </Border>
                                                         </StackPanel>
 
                                                         <!-- Line 2: Collapsible Description -->
@@ -177,7 +170,8 @@
                                                                    Visibility="{Binding IsChecked, ElementName=BtnExpand, Converter={StaticResource BoolToVisibilityConverter}}"
                                                                    FontSize="12" Foreground="{StaticResource TextMuted}" 
                                                                    Margin="0,8,0,0" TextWrapping="Wrap" MaxWidth="540" 
-                                                                   LineHeight="18" FontFamily="Consolas" Opacity="0.8"/>
+                                                                   LineHeight="18" FontFamily="Consolas" Opacity="0.8"
+                                                                   TextAlignment="Left"/>
 
                                                         <!-- Line 3: Author Metadata Line -->
                                                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
@@ -192,6 +186,14 @@
                                                             <TextBlock Text="{Binding Commit.Author.Name}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                                             <TextBlock Text=" committed " FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                             <TextBlock Text="{Binding Commit.Author.Date, Converter={StaticResource TimeAgoConverter}}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+
+                                                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding ShortSha}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" FontFamily="Consolas"/>
+                                                            </Border>
+
+                                                            <Border Background="{StaticResource AccentBrush}" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center" Visibility="{Binding IsLatest, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                                <TextBlock Text="LATEST" FontSize="8" FontWeight="Black" Foreground="White" VerticalAlignment="Center" Margin="0,-0.5,0,0"/>
+                                                            </Border>
                                                         </StackPanel>
                                                     </StackPanel>
 
