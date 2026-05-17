@@ -82,7 +82,7 @@
                         <!-- Discreet Quick Select (Arrow) -->
                         <ComboBox Grid.Column="1" x:Name="TargetQuickSelect" 
                                   Style="{StaticResource ModernComboBox}" Tag="Icon" 
-                                  Width="44" Height="44"
+							      Width="38" Height="38"
                                   ItemsSource="{Binding AvailableBackups}"
                                   SelectedItem="{Binding SelectedTargetBackup}"
                                   SelectionChanged="TargetQuickSelect_SelectionChanged"
@@ -274,7 +274,7 @@
                         <!-- Discreet Quick Select (Arrow) -->
                         <ComboBox Grid.Column="1" x:Name="BaseQuickSelect" 
                                   Style="{StaticResource ModernComboBox}" Tag="Icon" 
-                                  Width="44" Height="44"
+                                  Width="38" Height="38"
                                   ItemsSource="{Binding AvailableBackups}"
                                   SelectedItem="{Binding SelectedBaseBackup}"
                                   SelectionChanged="BaseQuickSelect_SelectionChanged"
