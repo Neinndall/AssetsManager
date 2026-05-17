@@ -15,7 +15,7 @@
         </Grid.RowDefinitions>
 
         <!-- HEADER: DASHBOARD HUD -->
-        <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,24" Padding="20,18">
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,24" Padding="20,18">
             <Border.Effect>
                 <DropShadowEffect BlurRadius="20" ShadowDepth="2" Opacity="0.1"/>
             </Border.Effect>
@@ -32,8 +32,8 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Module Icon Spanning both lines -->
-                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,20,0">
-                        <materialIcons:MaterialIcon Kind="MonitorDashboard" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="Radar" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <materialIcons:MaterialIcon.Effect>
                                 <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
                             </materialIcons:MaterialIcon.Effect>
