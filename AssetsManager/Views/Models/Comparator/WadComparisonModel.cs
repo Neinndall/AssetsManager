@@ -182,9 +182,15 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_newDirectoryPath != value) 
                 { 
                     _newDirectoryPath = value;
-                    if (value == null || (_selectedTargetDirectoryBackup != null && _selectedTargetDirectoryBackup.Path != value))
+                    if (string.IsNullOrEmpty(value))
+                    {
                         _selectedTargetDirectoryBackup = null;
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(false);
+                        ClearMetadata(false);
+                    }
+                    else if (_selectedTargetDirectoryBackup != null && _selectedTargetDirectoryBackup.Path != value)
+                    {
+                        _selectedTargetDirectoryBackup = null;
+                    }
                     OnPropertyChanged();
                     NotifySourceChanges();
                     OnPropertyChanged(nameof(SelectedTargetBackup));
@@ -200,9 +206,15 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_oldDirectoryPath != value) 
                 { 
                     _oldDirectoryPath = value; 
-                    if (value == null || (_selectedBaseDirectoryBackup != null && _selectedBaseDirectoryBackup.Path != value))
+                    if (string.IsNullOrEmpty(value))
+                    {
                         _selectedBaseDirectoryBackup = null;
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(true);
+                        ClearMetadata(true);
+                    }
+                    else if (_selectedBaseDirectoryBackup != null && _selectedBaseDirectoryBackup.Path != value)
+                    {
+                        _selectedBaseDirectoryBackup = null;
+                    }
                     OnPropertyChanged(); 
                     NotifySourceChanges();
                     OnPropertyChanged(nameof(SelectedBaseBackup));
@@ -218,13 +230,16 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_newWadFilePath != value) 
                 { 
                     _newWadFilePath = value; 
-                    // INTELLIGENT CLEAR: Only clear if the path doesn't start with the backup path
-                    if (value != null && _selectedTargetWadBackup != null && value.StartsWith(_selectedTargetWadBackup.Path, StringComparison.OrdinalIgnoreCase))
-                    { /* Keep selection */ }
-                    else if (value != null)
-                    { _selectedTargetWadBackup = null; }
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        _selectedTargetWadBackup = null;
+                        ClearMetadata(false);
+                    }
+                    else if (_selectedTargetWadBackup != null && !value.StartsWith(_selectedTargetWadBackup.Path, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _selectedTargetWadBackup = null;
+                    }
 
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(false);
                     OnPropertyChanged(); 
                     NotifySourceChanges();
                     OnPropertyChanged(nameof(SelectedTargetBackup));
@@ -240,13 +255,16 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_oldWadFilePath != value) 
                 { 
                     _oldWadFilePath = value; 
-                    // INTELLIGENT CLEAR: Only clear if the path doesn't start with the backup path
-                    if (value != null && _selectedBaseWadBackup != null && value.StartsWith(_selectedBaseWadBackup.Path, StringComparison.OrdinalIgnoreCase))
-                    { /* Keep selection */ }
-                    else if (value != null)
-                    { _selectedBaseWadBackup = null; }
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        _selectedBaseWadBackup = null;
+                        ClearMetadata(true);
+                    }
+                    else if (_selectedBaseWadBackup != null && !value.StartsWith(_selectedBaseWadBackup.Path, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _selectedBaseWadBackup = null;
+                    }
 
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(true);
                     OnPropertyChanged(); 
                     NotifySourceChanges();
                     OnPropertyChanged(nameof(SelectedBaseBackup));
