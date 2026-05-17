@@ -30,8 +30,9 @@
 
                 <!-- Title & Context -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="8" Width="38" Height="38" Margin="0,0,12,0">
-                        <materialIcons:MaterialIcon Kind="Wrench" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <!-- Standardized 44x44 Container -->
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="Wrench" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Configuration" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
@@ -53,7 +54,7 @@
         <Grid Grid.Row="1" Margin="0,0,0,24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="32"/> <!-- Divider Gap reduced for wider cards -->
+                <ColumnDefinition Width="32"/> 
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -68,8 +69,9 @@
                         </Grid.ColumnDefinitions>
                         
                         <StackPanel Orientation="Horizontal" Grid.Column="0">
-                            <Border Background="#1A00E676" CornerRadius="8" Width="38" Height="38" Margin="0,0,12,0">
-                                <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <!-- Standardized 44x44 Container -->
+                            <Border Background="#1A00E676" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                                <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentGreen}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="TARGET VERSION" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentGreen}"/>
@@ -80,7 +82,7 @@
                         <!-- Discreet Quick Select (Arrow) -->
                         <ComboBox Grid.Column="1" x:Name="TargetQuickSelect" 
                                   Style="{StaticResource ModernComboBox}" Tag="Icon" 
-                                  Width="38" Height="38"
+                                  Width="44" Height="44"
                                   ItemsSource="{Binding AvailableBackups}"
                                   SelectedItem="{Binding SelectedTargetBackup}"
                                   SelectionChanged="TargetQuickSelect_SelectionChanged"
@@ -245,7 +247,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- CENTER GAP (Icon removed as requested) -->
+            <!-- CENTER GAP -->
             <Grid Grid.Column="1" VerticalAlignment="Top" Margin="0,15,0,0"/>
 
             <!-- RIGHT CARD: BASE VERSION (OLD) -->
@@ -259,8 +261,9 @@
                         </Grid.ColumnDefinitions>
                         
                         <StackPanel Orientation="Horizontal" Grid.Column="0">
-                            <Border Background="#1AFF9100" CornerRadius="8" Width="38" Height="38" Margin="0,0,12,0">
-                                <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentOrange}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <!-- Standardized 44x44 Container -->
+                            <Border Background="#1AFF9100" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                                <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="BASE VERSION" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentOrange}"/>
@@ -271,7 +274,7 @@
                         <!-- Discreet Quick Select (Arrow) -->
                         <ComboBox Grid.Column="1" x:Name="BaseQuickSelect" 
                                   Style="{StaticResource ModernComboBox}" Tag="Icon" 
-                                  Width="38" Height="38"
+                                  Width="44" Height="44"
                                   ItemsSource="{Binding AvailableBackups}"
                                   SelectedItem="{Binding SelectedBaseBackup}"
                                   SelectionChanged="BaseQuickSelect_SelectionChanged"
@@ -451,14 +454,14 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Centered Icon Tip (i) -->
-                    <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="10" Width="38" Height="38" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <materialIcons:MaterialIcon Kind="InformationVariant" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <!-- Standardized 44x44 Container with centered 'i' icon -->
+                    <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="10" Width="44" Height="44" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="InformationVariant" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Ready to analyze?" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                        <TextBlock FontSize="10" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="14">
+                        <TextBlock Text="Ready to analyze?" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="14">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Text" Value="The comparison will identify new, modified, renamed and deleted assets."/>
