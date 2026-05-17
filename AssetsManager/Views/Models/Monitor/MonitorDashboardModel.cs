@@ -465,8 +465,8 @@ namespace AssetsManager.Views.Models.Monitor
             
             if (status == "ONLINE")
             {
-                PbeStatusText = "Operational";
-                PbeStatusSubtitle = "Server Status: Correct!";
+                PbeStatusText = "Online";
+                PbeStatusSubtitle = "Connection Verified";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
                 PbeStatusIconKind = MaterialIconKind.ServerNetwork;
             }
@@ -475,8 +475,8 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 if (status.Contains("Maintenance started at"))
                 {
-                    PbeStatusText = "Under Maintenance";
-                    PbeStatusSubtitle = status;
+                    PbeStatusText = "Maintenance";
+                    PbeStatusSubtitle = status.Replace("Maintenance ", ""); // "Started at HH:mm"
                     PbeStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
                     PbeStatusIconKind = MaterialIconKind.Wrench;
                 }
@@ -490,8 +490,8 @@ namespace AssetsManager.Views.Models.Monitor
             }
             else
             {
-                PbeStatusText = "Operational";
-                PbeStatusSubtitle = "No maintenance detected";
+                PbeStatusText = "Online";
+                PbeStatusSubtitle = "Connection: Verified";
                 PbeStatusColor = new SolidColorBrush(Color.FromRgb(46, 204, 113)); // Green
                 PbeStatusIconKind = MaterialIconKind.ServerNetwork;
             }
