@@ -7,6 +7,54 @@
              xmlns:monitorControls="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
+
+    <UserControl.Resources>
+        <!-- Premium Monitor Navigation Style -->
+        <Style x:Key="MonitorTabStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="12,12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Grid Background="Transparent">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="{TemplateBinding Padding}">
+                                <!-- Icon from Tag -->
+                                <materialIcons:MaterialIcon Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" 
+                                                            Width="18" Height="18" Margin="0,0,10,0" 
+                                                            VerticalAlignment="Center" x:Name="TabIcon"/>
+                                <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" x:Name="TabText"/>
+                            </StackPanel>
+
+                            <!-- Selection Indicator (Neon Underline) -->
+                            <Border x:Name="Indicator" Height="2.5" Background="{StaticResource AccentBrush}" 
+                                    VerticalAlignment="Bottom" CornerRadius="2,2,0,0" Opacity="0" Margin="10,0">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FF5C85FF" BlurRadius="10" ShadowDepth="0" Opacity="0.5"/>
+                                </Border.Effect>
+                            </Border>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="TabIcon" Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Indicator" Property="Opacity" Value="1"/>
+                                <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="TabIcon" Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
     
     <Grid>
         <Grid.RowDefinitions>
@@ -15,7 +63,7 @@
             <RowDefinition Height="*"/>    <!-- 2. Content Area -->
         </Grid.RowDefinitions>
 
-        <!-- 0. FLOATING COMMAND CENTER HEADER -->
+        <!-- 0. FLOATING DYNAMIC HEADER -->
         <Border Grid.Row="0" 
                 Margin="32,24,32,16" 
                 Background="{StaticResource CardBackground}" 
@@ -32,25 +80,75 @@
                         <ColumnDefinition Width="Auto"/> <!-- Icon -->
                         <ColumnDefinition Width="Auto"/> <!-- Separator -->
                         <ColumnDefinition Width="*"/>    <!-- Titles -->
-                        <ColumnDefinition Width="Auto"/> <!-- Status Badge -->
                     </Grid.ColumnDefinitions>
 
-                    <!-- Large Tech Icon with Glow -->
-                    <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="12" Width="56" Height="56" Margin="0,0,0,0">
-                        <materialIcons:MaterialIcon Kind="Radar" Width="30" Height="30" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- Dynamic Icon -->
+                    <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="12" Width="56" Height="56">
+                        <materialIcons:MaterialIcon Width="30" Height="30" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <materialIcons:MaterialIcon.Effect>
                                 <DropShadowEffect Color="#FF5C85FF" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/>
                             </materialIcons:MaterialIcon.Effect>
+                            <materialIcons:MaterialIcon.Style>
+                                <Style TargetType="materialIcons:MaterialIcon">
+                                    <Setter Property="Kind" Value="Radar"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True">
+                                            <Setter Property="Kind" Value="EyeOutline"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True">
+                                            <Setter Property="Kind" Value="History"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True">
+                                            <Setter Property="Kind" Value="Target"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True">
+                                            <Setter Property="Kind" Value="LayersOutline"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True">
+                                            <Setter Property="Kind" Value="ServerOutline"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True">
+                                            <Setter Property="Kind" Value="Api"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </materialIcons:MaterialIcon.Style>
                         </materialIcons:MaterialIcon>
                     </Border>
 
                     <!-- Technical Vertical Separator -->
                     <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="20,10" VerticalAlignment="Stretch" Opacity="0.6"/>
 
-                    <!-- Main Titles -->
+                    <!-- Dynamic Titles -->
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                        <TextBlock Text="MONITOR CENTER" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                        <TextBlock x:Name="DynamicSubtitle" FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
+                        <TextBlock FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="MONITOR DASHBOARD"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True">
+                                            <Setter Property="Text" Value="ASSET WATCHER"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True">
+                                            <Setter Property="Text" Value="COMPARISON HISTORY"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True">
+                                            <Setter Property="Text" Value="ASSET TRACKER"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True">
+                                            <Setter Property="Text" Value="VERSION MANAGER"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True">
+                                            <Setter Property="Text" Value="BACKUPS REPOSITORY"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True">
+                                            <Setter Property="Text" Value="RIOT API CENTER"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Text" Value="Operations dashboard and system integrity overview"/>
@@ -82,22 +180,20 @@
             </Border>
         </Border>
 
-        <!-- 1. NAVIGATION TAB BAR (Separate & Balanced) -->
+        <!-- 1. NAVIGATION TAB BAR (Unified & Professional) -->
         <Border Grid.Row="1" 
                 Margin="32,0,32,16" 
-                Background="{StaticResource CardBackground}" 
-                CornerRadius="8" 
+                Background="Transparent" 
                 BorderBrush="{StaticResource BorderColor}" 
-                BorderThickness="1"
-                Padding="4">
+                BorderThickness="0,0,0,1">
             <UniformGrid Columns="7">
-                <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                <RadioButton x:Name="TabHistory" Content="History" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                <RadioButton x:Name="TabAssetTracker" Content="Tracker" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                <RadioButton x:Name="TabVersions" Content="Versions" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                <RadioButton x:Name="TabBackups" Content="Backups" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                <RadioButton x:Name="TabApi" Content="API Center" GroupName="MonitorTabs" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="Radar"/>
+                <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="EyeOutline"/>
+                <RadioButton x:Name="TabHistory" Content="History" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="History"/>
+                <RadioButton x:Name="TabAssetTracker" Content="Tracker" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="Target"/>
+                <RadioButton x:Name="TabVersions" Content="Versions" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="LayersOutline"/>
+                <RadioButton x:Name="TabBackups" Content="Backups" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="ServerOutline"/>
+                <RadioButton x:Name="TabApi" Content="API Center" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="Api"/>
             </UniformGrid>
         </Border>
 
