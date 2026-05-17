@@ -68,14 +68,14 @@
             <Button Click="GetLeagueClient_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="DesktopClassic" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Get Client" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Install Client" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Download specific ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Click="GetLoLGameClient_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Get Game" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Install Game" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
                     <TextBlock Text="Download game ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Button>

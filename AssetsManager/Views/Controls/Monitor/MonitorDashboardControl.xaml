@@ -117,7 +117,7 @@
                             BorderBrush="{Binding PbeStatusColor}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <!-- Technical Time (Prominent / TextPrimary) -->
-                            <materialIcons:MaterialIcon Kind="ClockOutline" Width="11" Foreground="{StaticResource TextPrimary}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="ClockOutline" Width="11" Foreground="{StaticResource AccentGreen}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding PbeLastCheck}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                             
                             <!-- Vertical Separator -->
