@@ -32,14 +32,18 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Module Icon Spanning both lines -->
-                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
-                        <materialIcons:MaterialIcon Kind="MonitorDashboard" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,20,0">
+                        <materialIcons:MaterialIcon Kind="MonitorDashboard" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon.Effect>
+                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                            </materialIcons:MaterialIcon.Effect>
+                        </materialIcons:MaterialIcon>
                     </Border>
 
                     <!-- Titles Stacked to the right of the icon -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Operations Center" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                        <TextBlock Text="Manage status from severals places" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                        <TextBlock Text="Command Center" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                        <TextBlock Text="Real-time synchronization of environment status and core architectural metrics" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                     </StackPanel>
 					
                 </Grid>
@@ -52,11 +56,11 @@
                             <TextBlock Text="PBE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <Ellipse Fill="{Binding PbeStatusColor}" Style="{StaticResource PulsingLedTestStyle}" Margin="0,0,16,0"/>
                             
-                            <TextBlock Text="SYSTEM" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <Ellipse Fill="{Binding HashesIndicatorColor}" Style="{StaticResource PulsingLedTestStyle}" Margin="0,0,16,0"/>
-                            
                             <TextBlock Text="CORE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <Ellipse Fill="{Binding AppVersionColor}" Style="{StaticResource PulsingLedTestStyle}" Margin="0,0,16,0"/>
+                            
+                            <TextBlock Text="SYSTEM" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Ellipse Fill="{Binding HashesIndicatorColor}" Style="{StaticResource PulsingLedTestStyle}" Margin="0,0,16,0"/>
 
                             <TextBlock Text="ASSETS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <Ellipse Fill="{Binding DataStatusColor}" Style="{StaticResource PulsingLedTestStyle}"/>
@@ -89,7 +93,11 @@
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
                         <Border Width="42" Height="42" CornerRadius="10" Background="#1A3498DB">
-                            <materialIcons:MaterialIcon Kind="ServerNetwork" Width="22" Height="22" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="ServerNetwork" Width="22" Height="22" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon.Effect>
+                                    <DropShadowEffect Color="#FF3498DB" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                                </materialIcons:MaterialIcon.Effect>
+                            </materialIcons:MaterialIcon>
                         </Border>
                         <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
                             <TextBlock Text="Environment" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
@@ -104,8 +112,12 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="8" Background="{Binding PbeStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
-                                <materialIcons:MaterialIcon Kind="{Binding PbeStatusIconKind}" Width="22" Height="22" Foreground="{Binding PbeStatusColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="10" Background="{Binding PbeStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
+                                <materialIcons:MaterialIcon Kind="{Binding PbeStatusIconKind}" Width="22" Height="22" Foreground="{Binding PbeStatusColor}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon.Effect>
+                                        <DropShadowEffect Color="{Binding PbeStatusColor.Color}" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                                    </materialIcons:MaterialIcon.Effect>
+                                </materialIcons:MaterialIcon>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="Server Status" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
@@ -142,8 +154,12 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                        <Border Width="36" Height="36" CornerRadius="10" Background="{Binding AppVersionColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
-                            <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="18" Height="18" Foreground="{Binding AppVersionColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Width="42" Height="42" CornerRadius="10" Background="#1A00E676">
+                            <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="22" Height="22" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon.Effect>
+                                    <DropShadowEffect Color="#FF00E676" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                                </materialIcons:MaterialIcon.Effect>
+                            </materialIcons:MaterialIcon>
                         </Border>
                         <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
                             <TextBlock Text="Software Identity" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
@@ -152,14 +168,14 @@
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <!-- Version with Icon (Matching System Health Style) -->
+                        <!-- Version with Icon (Simplified, No Hero Glow) -->
                         <Grid HorizontalAlignment="Center">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{Binding AppVersionColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
-                                <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="18" Height="18" Foreground="{Binding AppVersionColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="10" Background="{Binding AppVersionColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
+                                <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="22" Height="22" Foreground="{Binding AppVersionColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="Core Version" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
@@ -193,7 +209,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <materialIcons:MaterialIcon Grid.Column="0" Kind="Update" Foreground="{Binding AppVersionColor}" Width="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="Channel: Up to date" FontSize="9" FontWeight="Bold" Foreground="{Binding AppVersionColor}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding AppVersionFooterText}" FontSize="9" FontWeight="Bold" Foreground="{Binding AppVersionColor}" VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
                 </Grid>
@@ -209,8 +225,12 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                        <Border Width="36" Height="36" CornerRadius="10" Background="#1A9B59B6">
-                            <materialIcons:MaterialIcon Kind="Pulse" Width="18" Height="18" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Width="42" Height="42" CornerRadius="10" Background="#1A9B59B6">
+                            <materialIcons:MaterialIcon Kind="Pulse" Width="22" Height="22" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon.Effect>
+                                    <DropShadowEffect Color="#FF9B59B6" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                                </materialIcons:MaterialIcon.Effect>
+                            </materialIcons:MaterialIcon>
                         </Border>
                         <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
                             <TextBlock Text="Diagnostics" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
@@ -226,8 +246,12 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <!-- Icon Box -->
-                            <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{Binding HashesIndicatorColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
-                                <materialIcons:MaterialIcon Kind="DatabaseCheckOutline" Width="18" Height="18" Foreground="{Binding HashesIndicatorColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="10" Background="{Binding HashesIndicatorColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
+                                <materialIcons:MaterialIcon Kind="DatabaseCheckOutline" Width="22" Height="22" Foreground="{Binding HashesIndicatorColor}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon.Effect>
+                                        <DropShadowEffect Color="{Binding HashesIndicatorColor.Color}" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                                    </materialIcons:MaterialIcon.Effect>
+                                </materialIcons:MaterialIcon>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="Hash Database" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
@@ -267,8 +291,12 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal">
-                            <Border Width="40" Height="40" CornerRadius="12" Background="#1A2ECC71">
-                                <materialIcons:MaterialIcon Kind="EyeSettingsOutline" Width="20" Height="20" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Width="42" Height="42" CornerRadius="10" Background="#1A2ECC71">
+                                <materialIcons:MaterialIcon Kind="EyeSettingsOutline" Width="22" Height="22" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon.Effect>
+                                        <DropShadowEffect Color="#FF2ECC71" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                                    </materialIcons:MaterialIcon.Effect>
+                                </materialIcons:MaterialIcon>
                             </Border>
                             <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
                                 <TextBlock Text="Live Surveillance" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
@@ -347,8 +375,12 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
-                        <Border Width="40" Height="40" CornerRadius="12" Background="#1AE67E22">
-                            <materialIcons:MaterialIcon Kind="ImageSearchOutline" Width="20" Height="20" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Width="42" Height="42" CornerRadius="10" Background="#1AE67E22">
+                            <materialIcons:MaterialIcon Kind="ImageSearchOutline" Width="22" Height="22" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon.Effect>
+                                    <DropShadowEffect Color="#FFE67E22" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                                </materialIcons:MaterialIcon.Effect>
+                            </materialIcons:MaterialIcon>
                         </Border>
                         <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
                             <TextBlock Text="CDN Discovery" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>

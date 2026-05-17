@@ -31,11 +31,11 @@
                 <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,0,0">
                     <materialIcons:MaterialIcon Width="26" Height="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <materialIcons:MaterialIcon.Effect>
-                            <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.3"/>
+                            <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
                         </materialIcons:MaterialIcon.Effect>
                         <materialIcons:MaterialIcon.Style>
                             <Style TargetType="materialIcons:MaterialIcon">
-                                <Setter Property="Kind" Value="Radar"/>
+                                <Setter Property="Kind" Value="MonitorDashboard"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True"><Setter Property="Kind" Value="EyeOutline"/></DataTrigger>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True"><Setter Property="Kind" Value="History"/></DataTrigger>
@@ -72,7 +72,7 @@
                     <TextBlock FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Text" Value="Operations dashboard and system integrity overview."/>
+                                <Setter Property="Text" Value="Real-time synchronization of environment status and core metrics."/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True"><Setter Property="Text" Value="Local game assets monitoring and real-time change detection after patches."/></DataTrigger>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True"><Setter Property="Text" Value="Audit log of historical changes and version differences."/></DataTrigger>

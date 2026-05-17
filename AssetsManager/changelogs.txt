@@ -58,6 +58,23 @@ New Features
     * Resolved HUD Race Conditions: fixed a logic error in the tree build and download modules where the "Ready" state would prematurely overwrite the orange cancellation feedback.
 
 Improvements
+  - User Interface / HUD Visual Hierarchy Unification
+    * Implemented a brand new mathematical hierarchy for CornerRadius across the entire application:
+      - Badges & Status Labels: Unified to **6px** for a consistent technical look.
+      - Icon Containers: Standardized to **10px** to differentiate them from cards.
+      - Standard Cards & Containers: Fixed at **12px** for robust information blocks.
+      - Hero & Module Cards: Set to **16px** for primary workspace identity.
+      - UI Components: Standardized Buttons, TextBoxes, and ComboBoxes to **8px**.
+    * This unification ensures absolute visual harmony and eliminates "phantom" inconsistencies in the HUD aesthetic.
+  - Monitor / Modular Bento UI Refinement
+    * Redesigned the Monitor modules (Dashboard, Watcher, Tracker, API) with a modular "Bento" layout.
+    * Integrated custom high-fidelity views for each sub-module, ensuring they follow the project's unique HUD design language while maintaining their own technical identity.
+    * Standardized Hero Iconography: unified all module header icons to the 42x42 / 22x22 standard with the "Hero Glow" effect, achieving perfect visual symmetry.
+    * Restored Primary Identity: upgraded the main module header to the 48x48 / 26x26 standard, ensuring it stands out as the core identity of the workspace.
+    * Enhanced Header Dynamism: refined the main Monitor header to dynamically update its icon and technical description based on the active tab, providing immediate functional context.
+  - Comparator / Refined Action Footer
+    * Redesigned the "Start comparison" footer with a new side-by-side layout: the "Ready to Analyze" status card is now more compact and placed alongside the action button for a more professional HUD look.
+    * Integrated "SelectionCardButton" style: upgraded the primary comparison button to use the high-fidelity card style, matching the Tracker module's metrics (height 86px, 13/10 typography) and refined iconography.
   - Explorer / Smart Grid Navigation
     * Improved the transition between Grid and Preview modes: clicking a file in the grid now shows its content while keeping the Grid View active for easier folder navigation.
     * Refined Folder Context: activating Grid View while previewing a file now accurately displays the content of its containing folder.
@@ -325,7 +342,11 @@ Bug Fixes
     * Fixed a visual issue in the ModernComboBox style where an extra empty space appeared at the bottom of the dropdown after the last item.
     * Resolved vertical alignment issues in the Comparator view, ensuring the central icon and footer are perfectly synchronized with the section headers.
   - Comparator / Mode State Isolation
-    * Fixed a regression in the comparison engine where renamed or moved files were incorrectly identified as new assets.
+    * Fixed a critical de-sync bug in Directory mode where clearing a path via the "X" button would fail to reset the Quick Select selection. Re-selecting the same item now correctly triggers the metadata update and path synchronization.
     * Improved the accuracy of the "Renamed" status to correctly track files even when duplicates exist or when files lack technical integrity signatures.
     * Fixed a bug where version information and client metadata leaked between Directory and WAD File modes when switching.
     * Resolved an issue where auto-filled paths in Directory mode were lost after using the WAD File mode; the state is now correctly preserved for each mode independently.
+  - Monitor / Dashboard Logic & Symmetry
+    * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it now dynamically reflects the actual version status and update availability.
+    * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
+    * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.

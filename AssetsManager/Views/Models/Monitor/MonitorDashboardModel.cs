@@ -216,6 +216,25 @@ namespace AssetsManager.Views.Models.Monitor
             set { _systemHealthFooterIconKind = value; OnPropertyChanged(); }
         }
 
+        private string _appVersionFooterText = "Channel: Up to date";
+        public string AppVersionFooterText
+        {
+            get => _appVersionFooterText;
+            set { _appVersionFooterText = value; OnPropertyChanged(); }
+        }
+
+        private void UpdateAppVersionFooter()
+        {
+            if (AppVersionText != null && AppVersionText.Contains("available!"))
+            {
+                AppVersionFooterText = "Channel: Update Available";
+            }
+            else
+            {
+                AppVersionFooterText = $"Channel: {ApplicationInfos.BuildType}";
+            }
+        }
+
         public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
         {
             _monitorService = monitorService;
@@ -235,8 +254,8 @@ namespace AssetsManager.Views.Models.Monitor
             // Check if an update was already found (Higher priority than Build Type)
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
             {
-                AppVersionText = $"{_updateCheckService.AvailableVersion} available!";
-                AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")); // Blue for available updates
+                AppVersionText = $"v{_updateCheckService.AvailableVersion} available!";
+                AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Unified Orange
                 AppVersionIconKind = MaterialIconKind.CloudDownload;
             }
 
@@ -251,6 +270,7 @@ namespace AssetsManager.Views.Models.Monitor
                         AppVersionText = $"v{latestVersion} available!";
                         AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
                         AppVersionIconKind = MaterialIconKind.CloudDownload;
+                        UpdateAppVersionFooter();
                         UpdateGlobalStatus();
                         UpdateSystemHealthFooter();
                     });
@@ -263,6 +283,7 @@ namespace AssetsManager.Views.Models.Monitor
             // Initial Loads
             RefreshFileWatcherData();
             RefreshAssetTrackerData();
+            UpdateAppVersionFooter();
             UpdateGlobalStatus(); // Initial global check
             UpdateSystemHealthFooter(); // Initial footer check
 
@@ -404,16 +425,7 @@ namespace AssetsManager.Views.Models.Monitor
                 return;
             }
 
-            // Case 2: Update Available
-            if (AppVersionText != null && AppVersionText.Contains("available!"))
-            {
-                SystemHealthFooterText = "Update Recommended";
-                SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
-                SystemHealthFooterIconKind = MaterialIconKind.CloudDownload;
-                return;
-            }
-
-            // Case 3: All Good
+            // Case 2: All Good (Hash integrity verified)
             SystemHealthFooterText = "Self-Check Passed";
             SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
             SystemHealthFooterIconKind = MaterialIconKind.CheckAll;
